@@ -117,7 +117,7 @@ function renderStory(){
   $("#epBadge").textContent=n+" ready";
   $("#watchBtn").disabled=!n||state.animating;
   $("#storyHint").innerHTML= n? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} unlocked — place your prediction before watching.`
-                              : "Upgrade a landmark to unlock the next episode.";
+                              : "Fully upgrade a builder to unlock the next episode.";
 }
 /* Reflect state.mult on the multiplier buttons (needed after a restore or user reset). */
 function syncMultButtons(){

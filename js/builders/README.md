@@ -1,7 +1,7 @@
 # Builder / series system
 
 The **coin sink** and the **episode-unlock engine**. Coins earned on the board are spent here;
-every level bought unlocks one story episode, and maxing every builder ends the series.
+**completing a builder** unlocks one story episode, and maxing every builder ends the series.
 
 All of it lives in [builders.js](builders.js) as a single `Builders` object (it's one system, not
 a family of types — unlike [tiles](../tiles/README.md) and [overlays](../overlays/README.md),
@@ -11,7 +11,9 @@ the UI announces.
 ## Model
 
 - `cfg.buildings` builders (default 12), each with `cfg.tiers` levels (default 5).
-- A full series is `buildings × tiers` = **60 episodes**.
+- An episode unlocks **only on the level that completes a builder** — intermediate levels pay
+  coins and spawn boxes but no episode. So a full series is `buildings` = **12 episodes**,
+  each costing `tiers` upgrades to earn.
 - Progress is `state.builder`: an array of `{tier}`, index 0 = "Builder 1".
 
 ## Cost curve
@@ -44,7 +46,8 @@ already finished, or mid-animation — otherwise:
 
 `spawned` is the tile indices of mystery boxes placed by the purchase (see
 [../overlays/README.md](../overlays/README.md)). `title` is the episode queued onto
-`state.epQueue`, which the prediction flow consumes.
+`state.epQueue` — **`null` unless this purchase completed the builder** — which the prediction
+flow consumes.
 
 `reshape()` rebuilds the array after `buildings` / `tiers` change in tuning, preserving each
 builder's progress where it still fits (levels clamp down to the new `tiers`).

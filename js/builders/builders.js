@@ -6,9 +6,10 @@
    announces (see uiUpgrade in js/ui/main.js). Rendering of the skyline and the
    builder list lives in js/ui/render.js and only reads through this API.
 
-   Model: cfg.buildings builders, each with cfg.tiers levels. Every level bought
-   unlocks one story episode, so a full series is buildings × tiers episodes and
-   maxing every builder ends the series. */
+   Model: cfg.buildings builders, each with cfg.tiers levels. Completing a builder
+   (taking it to its last level) unlocks one story episode — intermediate levels pay
+   no episode — so a full series is cfg.buildings episodes, and maxing every builder
+   both unlocks the last episode and ends the series. */
 const Builders={
   /* ---------- shape ---------- */
   count(){ return cfg.buildings; },
@@ -48,8 +49,9 @@ const Builders={
     return best;
   },
 
-  /* ---------- series / episodes ---------- */
-  totalEpisodes(){ return cfg.buildings*cfg.tiers; },
+  /* ---------- series / episodes ----------
+     One episode per completed builder, so the series length is the builder count. */
+  totalEpisodes(){ return cfg.buildings; },
   unlockedEpisodes(){ return Math.min(state.epUnlockedCount,this.totalEpisodes()); },
   /* Queue the next episode title (titles cycle through EP_TITLES).
      The prediction flow in js/ui/overlays.js consumes the queue. */
@@ -61,16 +63,19 @@ const Builders={
 
   /* ---------- transaction ---------- */
   /* Buy one level on builder bIdx. Returns null if not allowed (maxed, too poor,
-     series over, mid-animation), else what the UI should announce. */
+     series over, mid-animation), else what the UI should announce.
+     `title` is the unlocked episode — only set on the level that completes the
+     builder, and null on every intermediate level. */
   upgrade(bIdx){
     if(state.seriesDone||state.animating) return null;
     const b=state.builder[bIdx]; if(!b||b.tier>=cfg.tiers) return null;
     const cost=this.cost(bIdx,b.tier); if(state.coins<cost) return null;
     state.coins-=cost; b.tier++;
     const spawned=OVERLAY_TYPES.mysteryBox.spawn(cfg.boxesPerUpgrade);
-    const title=this.unlockEpisode();
+    const builderDone=this.isMaxed(bIdx);
+    const title=builderDone?this.unlockEpisode():null;
     const seriesDone=this.allMaxed();
     if(seriesDone) state.seriesDone=true;
-    return {cost, level:b.tier, title, builderDone:this.isMaxed(bIdx), seriesDone, spawned};
+    return {cost, level:b.tier, title, builderDone, seriesDone, spawned};
   },
 };

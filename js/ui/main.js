@@ -55,9 +55,13 @@ async function roll(){
 /* Upgrade button handler: apply in logic, announce in UI. */
 function uiUpgrade(bIdx){
   const r=Builders.upgrade(bIdx); if(!r) return;
-  toast(`🎬 Episode unlocked — <b>${r.title}</b>`);
-  log("🎬",`Builder ${bIdx+1} → level ${r.level}/${Builders.maxTier()} · −<b>${fmt(r.cost)}</b> · unlocked <b>${r.title}</b>`);
+  log("🏗️",`Builder ${bIdx+1} → level ${r.level}/${Builders.maxTier()} · −<b>${fmt(r.cost)}</b>`);
   if(r.builderDone) log("🏗️",`<b>Builder ${bIdx+1} fully upgraded</b> (${Builders.doneCount()}/${Builders.count()} done)`);
+  // episodes unlock only when a builder is completed
+  if(r.title){
+    toast(`🎬 Episode unlocked — <b>${r.title}</b>`);
+    log("🎬",`Episode unlocked · <b>${r.title}</b>`);
+  }
   if(r.seriesDone) seriesComplete();
   renderAll();
 }
