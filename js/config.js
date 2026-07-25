@@ -44,7 +44,7 @@ const TUNING=[
    ["revealMs","Center reveal hold (ms)",100],
    ["collectMinSec","Train collect auto-close min (s)",1],
    ["collectMaxSec","Train collect auto-close max (s)",1],
-   ["autoCollectMs","Train collect during auto (ms)",50],
+   ["autoCollectMs","Train collect during auto-play (ms)",50],
    ["deckCardMs","Deck: card on screen (ms)",100],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],

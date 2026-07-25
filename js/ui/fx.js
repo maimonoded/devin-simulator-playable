@@ -88,11 +88,12 @@ function showCard(c){
 }
 /* Blocking Collect popup (train tiles). Resolves on click, or automatically after a
    random cfg.collectMinSec–collectMaxSec so an idle session keeps moving.
-   While an auto mode is driving, it self-collects after cfg.autoCollectMs instead —
-   otherwise every train tile would stall the loop for the full player-facing window. */
+   Auto-roll deliberately gets the same player-facing treatment — it simulates a real
+   session. Only "auto-play session" (the internal balancing tool) self-collects fast,
+   after cfg.autoCollectMs, so a train tile doesn't stall a long batch run. */
 function showCollect(c){
   return new Promise(resolve=>{
-    const auto=typeof autoMode!=="undefined"&&autoMode!==null;
+    const auto=typeof autoMode!=="undefined"&&autoMode==="session";
     const secs=auto
       ? Math.max(0.05,cfg.autoCollectMs/1000)
       : rand(Math.min(cfg.collectMinSec,cfg.collectMaxSec),Math.max(cfg.collectMinSec,cfg.collectMaxSec));
