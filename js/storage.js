@@ -66,7 +66,12 @@ function loadState(){
       : Builders.fresh();
     if(state.builder.length!==Builders.count()) Builders.reshape();
     state.boxes=new Set(Array.isArray(d.boxes)?d.boxes:[]);
-    state.epQueue=Array.isArray(d.epQueue)?d.epQueue:[];
+    // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
+    const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
+    state.epQueue=rawQueue.filter(x=>Episodes.has(x));
+    // keep "unlocked" consistent with what survived, so the series bar doesn't
+    // count episodes that no longer exist
+    state.epUnlockedCount=Math.max(0,state.epUnlockedCount-(rawQueue.length-state.epQueue.length));
     state.energy=Math.min(state.energy,cfg.energyCap);
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero

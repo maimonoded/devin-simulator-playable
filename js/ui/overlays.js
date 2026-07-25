@@ -3,13 +3,14 @@
 let pending=null;
 function openPrediction(){
   if(!state.epQueue.length) return;
-  const title=state.epQueue[0];
-  const q=QUESTIONS[Math.floor(rand(0,QUESTIONS.length))];
-  pending={title,q,sel:null,wager:Math.min(cfg.avgWager,state.coins)};
+  const id=state.epQueue[0];
+  const ep=Episodes.get(id);
+  if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
+  pending={id,ep,sel:null,wager:Math.min(cfg.avgWager,state.coins)};
   const maxW=Math.max(0,Math.floor(state.coins));
-  const optHtml=q.opts.map((o,idx)=>`<button class="opt" data-idx="${idx}"><span>${o[0]}</span><span class="odds">×${o[1].toFixed(1)}</span></button>`).join("");
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${title}</h2></div>
-    <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${q.q}</div>
+  const optHtml=ep.answers.map((a,idx)=>`<button class="opt" data-idx="${idx}"><span>${a.text}</span><span class="odds">×${a.odds.toFixed(1)}</span></button>`).join("");
+  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
+    <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
     ${optHtml}
     <div class="wagerRow"><span style="font-size:12px;color:var(--muted)">Wager</span>
       <input type="range" id="wSlide" min="0" max="${maxW}" step="10" value="${pending.wager}">
@@ -26,22 +27,26 @@ function openPrediction(){
   $("#commitPred").onclick=()=>playEpisode();
 }
 async function playEpisode(){
-  const p=pending; const odds=p.q.opts[p.sel][1];
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Now playing</div><h2>${p.title}</h2></div>
+  const p=pending, ep=p.ep; const odds=ep.answers[p.sel].odds;
+  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Now playing</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div class="scene"><div class="play">🎬</div><div class="sceneBar" id="sBar"></div></div>
     <div class="hint" style="text-align:center;margin-top:10px">${p.wager>0?`You wagered <b style="color:var(--gold)">${fmt(p.wager)}</b> at ×${odds.toFixed(1)}`:"Watching with no wager"}</div></div></div>`;
-  const {won,payout}=resolvePrediction(p.wager,odds);
+  const {won,payout}=resolvePrediction({wager:p.wager,odds,sel:p.sel,correct:ep.correct,
+                                        auto:typeof autoMode!=="undefined"&&autoMode!==null});
   await sleep(60); const bar=$("#sBar"); bar.style.transition="width 1.6s linear"; bar.style.width="100%";
   await sleep(1700);
+  // name the true answer when the player got it wrong
+  const truth=ep.answers[ep.correct]?.text||"";
+  const truthHtml=won?"":`<div style="margin-top:8px;font-size:12px;color:var(--muted)">The answer was <b style="color:var(--teal)">${truth}</b></div>`;
   let resultHtml="";
   if(p.wager>0){
     if(won){ resultHtml=`<div class="result"><div class="big win">You called it! 🎉</div><div style="margin-top:6px">+<b style="color:var(--gold)">${fmt(payout)}</b> coins · streak ${state.streak}</div></div>`; confetti(); }
-    else { resultHtml=`<div class="result"><div class="big lose">Not this time</div><div style="margin-top:6px;color:var(--muted)">Lost your <b>${fmt(p.wager)}</b> wager · streak reset</div></div>`; }
+    else { resultHtml=`<div class="result"><div class="big lose">Not this time</div><div style="margin-top:6px;color:var(--muted)">Lost your <b>${fmt(p.wager)}</b> wager · streak reset</div>${truthHtml}</div>`; }
   }else{
-    resultHtml=`<div class="result"><div class="big" style="color:var(--teal)">${won?"You'd have been right ✓":"You'd have been wrong ✗"}</div><div style="margin-top:6px;color:var(--muted)">No wager placed</div></div>`;
+    resultHtml=`<div class="result"><div class="big" style="color:var(--teal)">${won?"You'd have been right ✓":"You'd have been wrong ✗"}</div><div style="margin-top:6px;color:var(--muted)">No wager placed</div>${truthHtml}</div>`;
   }
-  log(won?"✅":"❌",`${p.title} · ${p.wager>0?(won?`won +${fmt(payout)}`:`lost ${fmt(p.wager)}`):"watched (no wager)"}`);
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${p.title}</h2></div>
+  log(won?"✅":"❌",`${ep.title} · ${p.wager>0?(won?`won +${fmt(payout)}`:`lost ${fmt(p.wager)}`):"watched (no wager)"}`);
+  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${ep.title}</h2></div>
     <div class="mbody">${resultHtml}<button class="btn purple wide" id="closeEp" style="margin-top:16px">Back to the board</button></div></div>`;
   $("#closeEp").onclick=()=>{ $("#scrim").classList.remove("show"); pending=null; renderAll(); };
   renderAll();

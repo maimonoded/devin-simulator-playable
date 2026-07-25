@@ -29,13 +29,15 @@ function resolveLandingEvents(mult){
 }
 
 /* ---------- prediction ---------- */
-/* Deducts the wager, resolves the outcome (first 4 predictions of a run always win),
-   applies payout + streak/accuracy counters, consumes the queued episode. */
-function resolvePrediction(wager,odds){
+/* Deducts the wager, resolves the outcome, applies payout + streak/accuracy counters,
+   and consumes the queued episode.
+   Manual play is a real prediction: you win only if sel matches the episode's correct
+   answer. Auto runs can't meaningfully "pick", so they fall back to the modelled
+   cfg.accuracy — that keeps batch economy runs independent of what a script clicks. */
+function resolvePrediction({wager,odds,sel,correct,auto}){
   if(wager>0) state.coins-=wager;
-  const rigged=state.predsMade<4;
   state.predsMade++;
-  const won=rigged?true:chance(cfg.accuracy);
+  const won=auto?chance(cfg.accuracy):sel===correct;
   state.epsWatched++; state.epQueue.shift();
   let payout=0;
   if(wager>0){

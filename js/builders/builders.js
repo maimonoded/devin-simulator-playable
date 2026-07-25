@@ -53,12 +53,13 @@ const Builders={
      One episode per completed builder, so the series length is the builder count. */
   totalEpisodes(){ return cfg.buildings; },
   unlockedEpisodes(){ return Math.min(state.epUnlockedCount,this.totalEpisodes()); },
-  /* Queue the next episode title (titles cycle through EP_TITLES).
-     The prediction flow in js/ui/overlays.js consumes the queue. */
-  unlockEpisode(){
-    const title=EP_TITLES[state.epUnlockedCount%EP_TITLES.length];
-    state.epUnlockedCount++; state.epQueue.push(title);
-    return title;
+  /* Queue this builder's episode. Content lives in episodes/NNN.js — builder 1 → "001".
+     The queue holds ids; the prediction flow in js/ui/overlays.js looks them up. */
+  unlockEpisode(bIdx){
+    const id=Episodes.idForBuilder(bIdx);
+    if(!id) return null;
+    state.epUnlockedCount++; state.epQueue.push(id);
+    return id;
   },
 
   /* ---------- transaction ---------- */
@@ -73,9 +74,10 @@ const Builders={
     state.coins-=cost; b.tier++;
     const spawned=OVERLAY_TYPES.mysteryBox.spawn(cfg.boxesPerUpgrade);
     const builderDone=this.isMaxed(bIdx);
-    const title=builderDone?this.unlockEpisode():null;
+    const episodeId=builderDone?this.unlockEpisode(bIdx):null;
     const seriesDone=this.allMaxed();
     if(seriesDone) state.seriesDone=true;
-    return {cost, level:b.tier, title, builderDone, seriesDone, spawned};
+    return {cost, level:b.tier, episodeId, title:episodeId?Episodes.titleOf(episodeId):null,
+            builderDone, seriesDone, spawned};
   },
 };
