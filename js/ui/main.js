@@ -104,6 +104,16 @@ async function runAuto(mode){
 }
 const autoRoll=()=>runAuto("roll");
 const autoPlay=()=>runAuto("session");
+function stopAuto(){ if(autoMode!==null){ autoMode=null; renderAll(); } }
+
+/* Builder button click. Upgrades stay clickable during auto-roll, so buying one is
+   also how you take manual control: stop the loop, let the in-flight roll finish
+   (Builders.upgrade refuses mid-animation), then buy. */
+async function onUpgradeClick(bIdx){
+  stopAuto();
+  while(state.animating) await sleep(50);
+  uiUpgrade(bIdx);
+}
 
 /* ---------------- wiring ---------------- */
 $("#rollBtn").onclick=roll;

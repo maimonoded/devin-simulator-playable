@@ -59,6 +59,8 @@ function renderBuilderCenter(){
 function renderBuilderList(){
   const list=$("#builderList"); list.innerHTML="";
   const tiers=Builders.maxTier();
+  // clickable while auto-roll is running (buying stops it), but not during a manual roll
+  const live=!state.animating||autoMode==="roll";
   Builders.all().forEach((b,i)=>{
     const done=Builders.isMaxed(i);
     const cost=Builders.nextCost(i);
@@ -68,13 +70,13 @@ function renderBuilderList(){
     const row=document.createElement("div"); row.className="brow";
     const btn = done
       ? `<button class="upbtn max" disabled>MAX</button>`
-      : `<button class="upbtn${afford?'':' cant'}" data-b="${i}" ${afford&&!state.animating?'':'disabled'}>
+      : `<button class="upbtn${afford?'':' cant'}" data-b="${i}" ${afford&&live?'':'disabled'}>
            <span class="uplvl">Lvl ${b.tier+1}</span><span class="upcost">🪙 ${fmt(cost)}</span></button>`;
     row.innerHTML=`<span class="bname">Builder ${i+1}</span>
       <div class="lvpips">${pips}</div>${btn}`;
     list.appendChild(row);
   });
-  list.querySelectorAll(".upbtn[data-b]").forEach(bt=>bt.onclick=()=>uiUpgrade(+bt.dataset.b));
+  list.querySelectorAll(".upbtn[data-b]").forEach(bt=>bt.onclick=()=>onUpgradeClick(+bt.dataset.b));
   // series progress
   const totalEps=Builders.totalEpisodes(), doneEps=Builders.unlockedEpisodes();
   $("#seriesLbl").textContent=`Builders complete · ${Builders.doneCount()}/${Builders.count()}`;
