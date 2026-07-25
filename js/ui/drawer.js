@@ -52,7 +52,7 @@ function buildTuning(){
   // live bindings
   body.querySelectorAll("input[data-key]").forEach(inp=>inp.oninput=(e)=>{
     const key=e.target.dataset.key; let v=parseFloat(e.target.value); if(isNaN(v))return;
-    if(["buildings","tiers"].includes(key)){ v=Math.max(1,Math.round(v)); cfg[key]=v; rebuildBuilder(); }
+    if(["buildings","tiers"].includes(key)){ v=Math.max(1,Math.round(v)); cfg[key]=v; Builders.reshape(); }
     else cfg[key]=v;
     onCfgChange();
   });
@@ -76,7 +76,7 @@ function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clam
 function resetDefaults(){ cfg=Object.assign({},DEFAULTS);
   deck=JSON.parse(JSON.stringify(defDeck)); boxTable=JSON.parse(JSON.stringify(defBox));
   clearConfig();
-  rebuildBuilder(); buildTuning(); buildBoard(); onCfgChange(); toast("↺ Config reset to defaults"); }
+  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); toast("↺ Config reset to defaults"); }
 
 /* Reset user only — tuning values stay as they are. Two clicks to confirm. */
 let _armed=null;

@@ -62,9 +62,9 @@ function loadState(){
     if(typeof d!=="object"||d===null) return false;
     Object.keys(serializeState()).forEach(k=>{ if(k!=="v"&&d[k]!==undefined) state[k]=d[k]; });
     state.builder=Array.isArray(d.builder)&&d.builder.length
-      ? d.builder.map(b=>({tier:Math.min(Math.max(0,b.tier|0),cfg.tiers)}))
-      : freshBuilder();
-    if(state.builder.length!==cfg.buildings) rebuildBuilder();
+      ? d.builder.map(b=>({tier:Math.min(Math.max(0,b.tier|0),Builders.maxTier())}))
+      : Builders.fresh();
+    if(state.builder.length!==Builders.count()) Builders.reshape();
     state.boxes=new Set(Array.isArray(d.boxes)?d.boxes:[]);
     state.epQueue=Array.isArray(d.epQueue)?d.epQueue:[];
     state.energy=Math.min(state.energy,cfg.energyCap);

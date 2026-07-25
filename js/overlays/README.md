@@ -14,7 +14,7 @@ Today there's one: the **mystery box**.
 ## How it fits together
 
 ```
-applyUpgrade()  (js/game.js)
+Builders.upgrade()  (js/builders/builders.js)
   └─ OVERLAY_TYPES.mysteryBox.spawn(cfg.boxesPerUpgrade)   → picks free eligible tiles
 
 resolveLandingEvents()  (js/game.js)

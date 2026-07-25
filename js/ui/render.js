@@ -42,13 +42,14 @@ function renderOverlays(){
     if(el){ const b=document.createElement("div"); b.className="ovl "+o.cssClass; b.textContent=o.icon; el.appendChild(b); }
   }));
 }
+/* Skyline in the middle of the board — one tower per builder, height = its level. */
 function renderBuilderCenter(){
   const c=$("#builderCenter"); c.innerHTML="";
-  const n=state.builder.length;
-  const gap=n>6?"2%":"5%"; c.style.gap=gap;
-  state.builder.forEach((b,i)=>{
-    const done=b.tier>=cfg.tiers;
-    const h=16+(b.tier/cfg.tiers)*84;
+  const n=Builders.all().length;
+  c.style.gap=n>6?"2%":"5%";
+  Builders.all().forEach((b,i)=>{
+    const done=Builders.isMaxed(i);
+    const h=16+Builders.progress(i)*84;
     const d=document.createElement("div"); d.className="sky"+(done?" done":"");
     d.style.width=(n>6?(84/n):12)+"%";
     d.innerHTML=`<div class="skytower" style="height:${h}%">${done?'<span class="crownt">👑</span>':''}</div>`;
@@ -57,15 +58,13 @@ function renderBuilderCenter(){
 }
 function renderBuilderList(){
   const list=$("#builderList"); list.innerHTML="";
-  state.builder.forEach((b,i)=>{
-    const done=b.tier>=cfg.tiers;
-    const cost=builderCost(i);
-    const afford=cost!=null&&state.coins>=cost;
+  const tiers=Builders.maxTier();
+  Builders.all().forEach((b,i)=>{
+    const done=Builders.isMaxed(i);
+    const cost=Builders.nextCost(i);
+    const afford=Builders.canAfford(i);
     let pips="";
-    for(let t=1;t<=cfg.tiers;t++){
-      const on=b.tier>=t;
-      pips+=`<div class="lvpip${on?' on':''}${done?' done':''}"></div>`;
-    }
+    for(let t=1;t<=tiers;t++) pips+=`<div class="lvpip${b.tier>=t?' on':''}${done?' done':''}"></div>`;
     const row=document.createElement("div"); row.className="brow";
     const btn = done
       ? `<button class="upbtn max" disabled>MAX</button>`
@@ -77,20 +76,19 @@ function renderBuilderList(){
   });
   list.querySelectorAll(".upbtn[data-b]").forEach(bt=>bt.onclick=()=>uiUpgrade(+bt.dataset.b));
   // series progress
-  const totalEps=cfg.buildings*cfg.tiers;
-  const doneEps=Math.min(state.epUnlockedCount,totalEps);
-  const bd=buildersDone();
-  $("#seriesLbl").textContent=`Builders complete · ${bd}/${cfg.buildings}`;
+  const totalEps=Builders.totalEpisodes(), doneEps=Builders.unlockedEpisodes();
+  $("#seriesLbl").textContent=`Builders complete · ${Builders.doneCount()}/${Builders.count()}`;
   $("#seriesEps").textContent=`${doneEps} / ${totalEps} episodes`;
-  $("#seriesFill").style.width=(doneEps/totalEps*100)+"%";
+  $("#seriesFill").style.width=(totalEps?doneEps/totalEps*100:0)+"%";
   const dots=$("#seriesDots"); dots.innerHTML="";
-  state.builder.forEach((b)=>{
+  Builders.all().forEach((b,i)=>{
     const s=document.createElement("div");
-    const frac=b.tier/cfg.tiers, col=b.tier>=cfg.tiers?"var(--gold)":(b.tier>0?"var(--purple)":"#20265a");
+    const frac=Builders.progress(i);
+    const col=Builders.isMaxed(i)?"var(--gold)":(b.tier>0?"var(--purple)":"#20265a");
     s.style.cssText=`flex:1;height:6px;border-radius:3px;background:${col};opacity:${b.tier>0?0.5+0.5*frac:1}`;
     dots.appendChild(s);
   });
-  $("#builderName").textContent=`${cfg.buildings} builders · pick any to upgrade`;
+  $("#builderName").textContent=`${Builders.count()} builders · pick any to upgrade`;
 }
 function renderHUD(){
   $("#hDay").textContent="Day "+state.day;
@@ -109,7 +107,7 @@ function renderStats(){
   const tot=state.predWins+state.predLoss;
   $("#sAcc").textContent=tot? Math.round(state.predWins/tot*100)+"%":"—";
   $("#sStreak").textContent=state.streak;
-  $("#sBoards").textContent=buildersDone()+"/"+cfg.buildings;
+  $("#sBoards").textContent=Builders.doneCount()+"/"+Builders.count();
   $("#sRolls").textContent=state.rolls;
   $("#sSessions").textContent=state.sessionsToday;
 }

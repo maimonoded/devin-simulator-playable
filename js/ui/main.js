@@ -54,10 +54,10 @@ async function roll(){
 
 /* Upgrade button handler: apply in logic, announce in UI. */
 function uiUpgrade(bIdx){
-  const r=applyUpgrade(bIdx); if(!r) return;
+  const r=Builders.upgrade(bIdx); if(!r) return;
   toast(`🎬 Episode unlocked — <b>${r.title}</b>`);
-  log("🎬",`Builder ${bIdx+1} → level ${r.level}/${cfg.tiers} · −<b>${fmt(r.cost)}</b> · unlocked <b>${r.title}</b>`);
-  if(r.builderDone) log("🏗️",`<b>Builder ${bIdx+1} fully upgraded</b> (${buildersDone()}/${cfg.buildings} done)`);
+  log("🎬",`Builder ${bIdx+1} → level ${r.level}/${Builders.maxTier()} · −<b>${fmt(r.cost)}</b> · unlocked <b>${r.title}</b>`);
+  if(r.builderDone) log("🏗️",`<b>Builder ${bIdx+1} fully upgraded</b> (${Builders.doneCount()}/${Builders.count()} done)`);
   if(r.seriesDone) seriesComplete();
   renderAll();
 }
@@ -81,8 +81,8 @@ async function autoPlay(){
       await roll();
       if(state.animating) break;   // a roll bailed out unexpectedly — don't spin
       // opportunistically upgrade the cheapest available builder to keep the loop turning
-      let up=cheapestUpgrade();
-      while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=cheapestUpgrade(); }
+      let up=Builders.cheapest();
+      while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=Builders.cheapest(); }
       await sleep(60);
     }
   }finally{

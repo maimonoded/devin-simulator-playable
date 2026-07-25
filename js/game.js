@@ -5,27 +5,7 @@
    Event fields (any subset per event, played in this order):
      float:{text,color} · log:{icon,msg} · move:{path:[tileIdx,...],stepMs} · confetti:true · pause:ms */
 
-/* ---------- builders / upgrades ---------- */
-function upgradeCost(bIdx,tier){ return cfg.baseCost*Math.pow(cfg.tierGrowth,tier)*Math.pow(cfg.bldgGrowth,bIdx)*cfg.boardScale; }
-function builderCost(bIdx){ const b=state.builder[bIdx]; return b.tier>=cfg.tiers?null:upgradeCost(bIdx,b.tier); }
-function cheapestUpgrade(){ let best=null; state.builder.forEach((b,i)=>{ const c=builderCost(i); if(c!=null&&(best==null||c<best.cost)) best={b:i,tier:b.tier,cost:c}; }); return best; }
-function buildersDone(){ return state.builder.filter(b=>b.tier>=cfg.tiers).length; }
-
-/* Buy one level on builder bIdx. Returns null if not allowed, else a result the UI announces. */
-function applyUpgrade(bIdx){
-  if(state.seriesDone||state.animating) return null;
-  const b=state.builder[bIdx]; if(!b||b.tier>=cfg.tiers) return null;
-  const cost=upgradeCost(bIdx,b.tier); if(state.coins<cost) return null;
-  state.coins-=cost; b.tier++;
-  const spawned=OVERLAY_TYPES.mysteryBox.spawn(cfg.boxesPerUpgrade);
-  // every level upgrade unlocks a new episode
-  const title=EP_TITLES[state.epUnlockedCount%EP_TITLES.length];
-  state.epUnlockedCount++;
-  state.epQueue.push(title);
-  const seriesDone=state.builder.every(x=>x.tier>=cfg.tiers);
-  if(seriesDone) state.seriesDone=true;
-  return {cost, level:b.tier, title, builderDone:b.tier>=cfg.tiers, seriesDone, spawned};
-}
+/* Builders, upgrades and episode unlocks live in js/builders/builders.js. */
 
 /* ---------- rolling ---------- */
 function rollDice(){ const d1=Math.floor(rand(1,7)),d2=Math.floor(rand(1,7)); return {d1,d2,steps:d1+d2}; }
