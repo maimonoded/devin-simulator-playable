@@ -1,0 +1,175 @@
+# Tile system
+
+Every board tile has a **type**, every type has its own logic file in this folder, and all types
+inherit from the `Tile` base class in [tile.js](tile.js). Shared behavior (paying coins, granting
+energy, advancing to Start, …) lives once in the base class and is *called* by subclasses — never
+copy-pasted.
+
+## The board
+
+The board is a fixed 40-tile loop (indices 0–39, clockwise). Which index gets which type is
+declared in [`js/board-model.js`](../board-model.js):
+
+| Type | Tile indices | Count |
+|---|---|---|
+| `start` | 0 | 1 |
+| `spa` | 10 | 1 |
+| `vip` | 20 | 1 |
+| `premiere` | 30 | 1 |
+| `train` | 5, 15, 25, 35 | 4 |
+| `deck` | 3, 8, 13, 18, 23, 28 | 6 |
+| `standard` | everything else | 26 |
+
+`tileType(i)` (in board-model.js) maps an index to its type name; `TILE_TYPES[name]` (registry in
+[tile.js](tile.js)) maps the name to its singleton tile object.
+
+## Tile types and what they do
+
+All coin amounts scale with the roll **multiplier** (×1…×10) and the `boardScale` tuning value.
+The tuning-drawer values each type reads are noted per type.
+
+| Type | File | Icon | Behavior on landing | Tuning values used |
+|---|---|---|---|---|
+| **standard** | [standard-tile.js](standard-tile.js) | — | Pays the tile's printed coin value: `stdBase × stdWeights[i]`. Weights rise around the board (mean 1), so late tiles pay more. Also renders the printed value via `valueLabel(i)`. No interruption — just a floating number. | `stdBase` |
+| **train** | [train-tile.js](train-tile.js) | 🚗 | Pays a variable bonus: a weighted draw from `TRAIN_MULT` (0.5×–4×), normalised so the expected value is exactly `trainEV`. Presents the **Collect popup**. | `trainEV`, `collectMinSec`, `collectMaxSec` |
+| **deck** | [deck-tile.js](deck-tile.js) | 🃏 | Draws a weighted card from the merged `deck` table (editable in tuning) and **shows the card** for `deckCardMs`: coins (can be a negative fine), energy, clues, VIP-pool seed, or **Advance to Start** (walks the token to Start and pays the full Start landing bonus). | deck table, `deckCardMs`, `startPass`, `startLand`, `vipSeed` |
+| **spa** | [spa-tile.js](spa-tile.js) | 💆 | Grants `spaEnergy` energy, clamped to `energyCap`. Energy win → confetti **plus the dice shower**. | `spaEnergy`, `energyCap`, `revealMs` |
+| **vip** | [vip-tile.js](vip-tile.js) | 🌟 | Collects the entire VIP pool as coins — or shows the sad "Empty" reveal if the pool is dry. The pool is seeded by laps past Start, Start landings, and the Fine/Paparazzi card. | `vipRevealMs` |
+| **premiere** | [premiere-tile.js](premiere-tile.js) | 🎭 | Sweeps the token to Start at `premiereStepMs` per tile and pays the full Start landing bonus. | `premiereStepMs`, `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
+| **start** | [start-tile.js](start-tile.js) | ⭐ | Landing here pays `startPass + startLand`, seeds the VIP pool with `vipSeed`, and dwells `startRevealMs`. (Merely *passing* Start pays only `startPass` — that lap logic is in `applyPassStart()` in [`js/game.js`](../game.js), because it isn't a landing.) | `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
+
+The four single-index types (`start`, `spa`, `vip`, `premiere`) are **corner tiles**
+(`get corner(){ return true; }`) and get the highlighted corner styling.
+
+**Mystery boxes** are not a tile type — they're an **overlay** that sits on top of a tile. Overlays
+live in [`js/overlays/`](../overlays/README.md) and resolve before the tile's own `onLand()`.
+
+## How a landing flows
+
+```
+ui/main.js roll()                  animates the dice + token walk
+  └─ game.js resolveLandingEvents(mult)
+       ├─ OVERLAYS — resolves any overlay on the tile first (js/overlays/)
+       └─ TILE_TYPES[tileType(pos)].onLand({pos, mult, bs})
+            └─ mutates state synchronously, returns an event list
+  └─ ui/main.js playEvents(events)  plays the list back with animation
+```
+
+**Logic never touches the DOM.** `onLand()` mutates `state` immediately and returns *events*
+describing what the UI should show. An event is an object with any subset of these fields,
+played in this fixed order by `playEvents()`:
+
+| Field | Meaning |
+|---|---|
+| `float: {text, color}` | floating reward text over the token's tile |
+| `log: {icon, msg}` | one line in the Activity panel (msg is HTML) |
+| `move: {path, stepMs}` | walk the token along `path` (tile indices), one step per `stepMs` |
+| `confetti: true` | fire the confetti burst |
+| `dice: true` | fire the tumbling-dice shower (used for energy wins) |
+| `reveal: {big, sub, positive, energy, ms}` | **blocking** center-of-board reveal, held `ms` or `cfg.revealMs` (default 1500). `positive` → confetti + pop animation; otherwise the 😢 sad droop. `energy` → adds the dice shower |
+| `collect: {big, sub}` | **blocking** popup with a Collect button; waits for the click, or auto-closes after a random `cfg.collectMinSec`–`cfg.collectMaxSec` (default 10–20s). Clicking the backdrop also collects |
+| `card: {name, big, positive, energy}` | **blocking** drawn deck card, flipped onto the board centre and held `cfg.deckCardMs` (default 2000) |
+| `pause: ms` | wait before the next event |
+
+`reveal`, `collect` and `card` block the roll loop, so **auto-play waits for them too** — that's
+why every timing is tunable rather than hardcoded. Presentation convention: standard tiles show
+only a float (no interruption), train tiles use `collect`, deck tiles use `card`, and the
+remaining non-standard tiles use `reveal`.
+
+### Presentation timing (all in the drawer's "Presentation timing" group)
+
+| Config | Default | Applies to |
+|---|---|---|
+| `diceRevealMs` | 500 | Roll click → dice reveal (faces scramble during this window) |
+| `diceToMoveMs` | 30 | dice reveal → token starts moving |
+| `revealMs` | 1500 | generic center-reveal hold (spa, and any tile that doesn't override it) |
+| `deckCardMs` | 2000 | how long a drawn deck card stays on screen |
+| `vipRevealMs` | 1500 | VIP dwell before play continues (win *and* empty-pool) |
+| `startRevealMs` | 800 | dwell when landing on Start — also the arrival dwell after any advance-to-Start |
+| `premiereStepMs` | 90 | Premiere sweep speed, ms per tile |
+| `collectMinSec` / `collectMaxSec` | 10 / 20 | random auto-close window for the train Collect popup |
+| `tokenStepMs` | 135 | normal roll walk; also paces the deck Advance-to-Start dash (⅔ of it) |
+
+## The base class contract (tile.js)
+
+`Tile` extends **`BoardActor`** ([../board-actor.js](../board-actor.js)) — the shared base that
+also backs overlays. Reward helpers and presentation builders live there; tile-specific board
+movement (`startLandingBonus`, `advanceToStart`) lives on `Tile`.
+
+Subclasses may override:
+
+| Member | Default | Purpose |
+|---|---|---|
+| `get icon()` | `""` | emoji shown on the board tile |
+| `get corner()` | `false` | `true` → corner styling |
+| `valueLabel(i)` | `""` | small per-tile label (standard tiles print their coin value) |
+| `onLand(ctx)` | `[]` | the landing behavior; `ctx = {pos, mult, bs}` |
+
+Shared helpers subclasses should call instead of reimplementing:
+
+| Helper | Does |
+|---|---|
+| `gainCoins(amount, text?, color?)` | adds coins, returns the float event |
+| `gainEnergy(n, text?)` | adds energy clamped to `energyCap`, returns the float event |
+| `gainClues(n, text?)` | adds clues, returns the float event |
+| `reveal(big, sub, positive, energy)` | builds the blocking center-reveal event |
+| `collect(big, sub)` | builds the blocking Collect-popup event |
+| `startLandingBonus(mult)` | pays `startPass + startLand`, seeds VIP pool, returns the amount |
+| `advanceToStart(fromPos, mult, pace, sub)` | moves token to Start, pays the bonus, **and reveals it**; `pace` scales `tokenStepMs` (deck uses ⅔, premiere 0.52) |
+
+## Adding a new tile type
+
+Example: a "casino" tile that doubles-or-nothing a small stake.
+
+1. **Create the logic file** `js/tiles/casino-tile.js`:
+
+   ```js
+   "use strict";
+   class CasinoTile extends Tile {
+     get icon(){ return "🎰"; }
+     onLand({mult,bs}){
+       const stake=100*bs*mult;
+       if(chance(0.5)){
+         const ev=this.gainCoins(stake*2,"🎰 +"+fmt(stake*2));
+         ev.log={icon:"🎰",msg:`Casino · doubled to <b>${fmt(stake*2)}</b>`};
+         return [ev];
+       }
+       const ev=this.gainCoins(-stake,"🎰 −"+fmt(stake),"var(--bad)");
+       ev.log={icon:"🎰",msg:`Casino · lost <b>${fmt(stake)}</b>`};
+       return [ev];
+     }
+   }
+   registerTile("casino",CasinoTile);
+   ```
+
+2. **Assign it board positions** in [`js/board-model.js`](../board-model.js): add a position set
+   (e.g. `const CASINOS=new Set([7,27]);`) and a branch in `tileType(i)`. If the chosen indices
+   were previously `standard`, nothing else needs re-balancing (the `stdWeights` mean shifts
+   microscopically — recomputed automatically).
+
+3. **Load it** in [`index.html`](../../index.html): add
+   `<script src="js/tiles/casino-tile.js"></script>` anywhere **after** `js/tiles/tile.js` and
+   **before** `js/game.js`.
+
+4. Optionally add a CSS look in [`css/board.css`](../../css/board.css)
+   (`.tile.casino{border-color:...}`) — otherwise it renders like a standard tile with your icon.
+
+That's the whole surface: rendering (icon, corner style, label) and behavior both come from the
+one class file; no dispatch code anywhere else needs editing.
+
+## Note on persistence
+
+Tuning values and player progress are saved to `localStorage` by
+[`js/storage.js`](../storage.js) (slots `pmdrama.cfg.v1` / `pmdrama.state.v1`), so a tile type's
+tuning changes survive a reload. If you add a tile type that needs **new tuning values**, add them
+to `DEFAULTS` in [`js/config.js`](../config.js) — `loadConfig()` merges saved values onto
+`DEFAULTS`, so existing saves pick up the new key's default automatically instead of breaking.
+If a tile needs to persist **new player state**, add the field to `serializeState()` in
+storage.js; unlisted fields are treated as transient and reset each load.
+
+## Rules of the folder
+
+- **No DOM access** in tile files — return events, let `ui/` render them.
+- **No duplicated math** — if two types share behavior, promote it to a helper on `Tile`.
+- Files are classic scripts (no `import`/`export`) so the game keeps working from a plain
+  `file://` double-click; load order in index.html is the dependency order.

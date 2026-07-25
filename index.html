@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predictive Narrative — Daily Experience Simulator</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/board.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/drawer.css">
+<link rel="stylesheet" href="css/overlay.css">
+</head>
+<body>
+<div class="wrap">
+  <!-- HUD -->
+  <div class="hud">
+    <div class="brand"><span class="k">Predictive Narrative</span><span class="t display">Harbour Heights</span></div>
+    <div class="daychip"><span class="d" id="hDay">Day 1</span><span class="c" id="hClock">9:00 AM</span></div>
+    <div class="pills">
+      <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
+      <div class="pill clues"><span class="ic">🔍</span><div><div class="v" id="hClues">0</div><div class="lb">Clues</div></div></div>
+      <div class="pill"><span class="ic">🌟</span><div><div class="v" id="hVip">0</div><div class="lb">VIP Pool</div></div></div>
+      <div class="pill energywrap"><span class="ic">⚡</span><div style="flex:1">
+        <div class="v"><span id="hEnergy">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hEnergyCap">50</span></span></div>
+        <div class="ebar"><div class="efill" id="hEfill"></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- stage -->
+  <div class="stage">
+    <div class="boardScene">
+      <div class="board" id="board">
+        <div class="builderCenter" id="builderCenter"></div>
+        <div class="token" id="token"><div class="disc">💃</div></div>
+      </div>
+      <!-- win/loss reveal, sits flat above the 3D board -->
+      <div class="centerfx" id="centerFx"></div>
+    </div>
+    <div class="controls">
+      <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
+      <div class="multi">
+        <span class="mlbl">Multiplier</span>
+        <button class="mopt on" data-m="1">×1</button>
+        <button class="mopt" data-m="2">×2</button>
+        <button class="mopt" data-m="3">×3</button>
+        <button class="mopt" data-m="5">×5</button>
+        <button class="mopt" data-m="10">×10</button>
+      </div>
+      <button class="btn roll" id="rollBtn">🎲 Roll</button>
+      <button class="btn ghost" id="autoBtn">▶ Auto-play session</button>
+      <button class="btn ghost" id="flatBtn" title="Toggle 2.5D / flat view">⤢</button>
+    </div>
+  </div>
+
+  <!-- side -->
+  <div class="side">
+    <div class="card">
+      <h3>🏗️ Builder <span id="builderName" style="color:var(--muted);letter-spacing:0;text-transform:none;font-size:11px;margin-left:auto"></span></h3>
+      <div id="seriesWrap" style="margin-bottom:11px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+          <span id="seriesLbl">Builders complete · 0/12</span><span id="seriesEps">0 / 60 episodes</span></div>
+        <div style="height:8px;background:#10143a;border-radius:5px;overflow:hidden;border:1px solid var(--line);position:relative">
+          <div id="seriesFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--pink),var(--purple))"></div>
+        </div>
+        <div id="seriesDots" style="display:flex;gap:3px;margin-top:6px;justify-content:space-between"></div>
+      </div>
+      <div id="builderList" class="builderList"></div>
+    </div>
+
+    <div class="card">
+      <h3>🎬 Story <span id="epBadge" class="badge" style="margin-left:auto;display:none">0 ready</span></h3>
+      <div class="hint" id="storyHint">Upgrade a landmark to unlock the next episode.</div>
+      <button class="btn pink wide" id="watchBtn" style="margin-top:10px" disabled>Predict &amp; watch episode</button>
+    </div>
+
+    <div class="card">
+      <h3>📊 This run</h3>
+      <div class="statgrid">
+        <div class="stat"><div class="v teal" id="sEps">0</div><div class="l">Episodes watched</div></div>
+        <div class="stat"><div class="v gold" id="sAcc">—</div><div class="l">Prediction accuracy</div></div>
+        <div class="stat"><div class="v" id="sStreak">0</div><div class="l">Current streak</div></div>
+        <div class="stat"><div class="v" id="sBoards">0</div><div class="l">Builders done</div></div>
+        <div class="stat"><div class="v" id="sRolls">0</div><div class="l">Total rolls</div></div>
+        <div class="stat"><div class="v" id="sSessions">1</div><div class="l">Session today</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📜 Activity</h3>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <!-- action bar -->
+  <div class="actionbar">
+    <button class="btn teal" id="nextBtn">⏭ Wait for full energy → next session</button>
+    <span class="hint" id="nextHint"></span>
+    <span class="sep"></span>
+    <span class="hint">Editing any value in <b style="color:var(--purple)">Tuning</b> updates the sim live.</span>
+  </div>
+</div>
+
+<button class="drawerBtn" id="drawerBtn">⚙ Tuning</button>
+
+<!-- drawer -->
+<div class="drawer" id="drawer">
+  <div class="dh">
+    <div><h2>Economy tuning</h2><p>Live values. Board layout is fixed to the 40-tile reference.</p></div>
+    <button class="closeX" id="closeDrawer">✕</button>
+  </div>
+  <div class="body" id="tuningBody"></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="toasts" id="toasts"></div>
+
+<!-- Load order matters: each file only uses globals defined in files above it. -->
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/content.js"></script>
+<script src="js/board-model.js"></script>
+<script src="js/state.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/board-actor.js"></script>
+<script src="js/tiles/tile.js"></script>
+<script src="js/tiles/standard-tile.js"></script>
+<script src="js/tiles/start-tile.js"></script>
+<script src="js/tiles/spa-tile.js"></script>
+<script src="js/tiles/vip-tile.js"></script>
+<script src="js/tiles/premiere-tile.js"></script>
+<script src="js/tiles/train-tile.js"></script>
+<script src="js/tiles/deck-tile.js"></script>
+<script src="js/overlays/overlay.js"></script>
+<script src="js/overlays/mystery-box.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui/fx.js"></script>
+<script src="js/ui/render.js"></script>
+<script src="js/ui/overlays.js"></script>
+<script src="js/ui/drawer.js"></script>
+<script src="js/ui/main.js"></script>
+</body>
+</html>
