@@ -87,27 +87,34 @@ function showCard(c){
   return sleep(cfg.deckCardMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
 /* Blocking Collect popup (train tiles). Resolves on click, or automatically after a
-   random cfg.collectMinSec–collectMaxSec so an idle/auto-play session keeps moving. */
+   random cfg.collectMinSec–collectMaxSec so an idle session keeps moving.
+   While an auto mode is driving, it self-collects after cfg.autoCollectMs instead —
+   otherwise every train tile would stall the loop for the full player-facing window. */
 function showCollect(c){
   return new Promise(resolve=>{
-    const secs=rand(Math.min(cfg.collectMinSec,cfg.collectMaxSec),Math.max(cfg.collectMinSec,cfg.collectMaxSec));
+    const auto=typeof autoMode!=="undefined"&&autoMode!==null;
+    const secs=auto
+      ? Math.max(0.05,cfg.autoCollectMs/1000)
+      : rand(Math.min(cfg.collectMinSec,cfg.collectMaxSec),Math.max(cfg.collectMinSec,cfg.collectMaxSec));
     $("#scrim").innerHTML=`<div class="modal collectModal"><div class="top">
         <div class="eyebrow">Train bonus</div><h2>${c.sub||"You won"}</h2></div>
       <div class="mbody"><div class="collectAmt">🪙 ${c.big}</div>
         <button class="btn roll wide" id="collectBtn" style="margin-top:16px">Collect</button>
-        <div class="hint" style="text-align:center;margin-top:8px">auto-collects in <b id="collectCd">${Math.ceil(secs)}</b>s</div>
+        <div class="hint" style="text-align:center;margin-top:8px">${auto
+          ? "auto-collecting…"
+          : `auto-collects in <b id="collectCd">${Math.ceil(secs)}</b>s`}</div>
       </div></div>`;
     $("#scrim").classList.add("show");
     confetti();
     let done=false;
     const cd=$("#collectCd"); const t0=performance.now();
-    const iv=setInterval(()=>{
+    const iv=cd?setInterval(()=>{
       const left=Math.ceil(secs-(performance.now()-t0)/1000);
-      if(cd) cd.textContent=Math.max(0,left);
-    },250);
+      cd.textContent=Math.max(0,left);
+    },250):null;
     const finish=()=>{
       if(done) return; done=true;
-      clearTimeout(to); clearInterval(iv);
+      clearTimeout(to); if(iv) clearInterval(iv);
       $("#scrim").onclick=null;
       $("#scrim").classList.remove("show"); $("#scrim").innerHTML="";
       resolve();

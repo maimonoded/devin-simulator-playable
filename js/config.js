@@ -3,7 +3,7 @@
 const DEFAULTS={
   energyCap:30, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
-  deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800,
+  deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
@@ -44,6 +44,7 @@ const TUNING=[
    ["revealMs","Center reveal hold (ms)",100],
    ["collectMinSec","Train collect auto-close min (s)",1],
    ["collectMaxSec","Train collect auto-close max (s)",1],
+   ["autoCollectMs","Train collect during auto (ms)",50],
    ["deckCardMs","Deck: card on screen (ms)",100],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
