@@ -123,6 +123,7 @@ $("#watchBtn").onclick=openPrediction;
 $("#nextBtn").onclick=nextSession;
 $("#flatBtn").onclick=()=>$("#board").classList.toggle("flat");
 document.querySelectorAll(".mopt").forEach(b=>b.onclick=()=>{
+  if(state.animating||autoMode!==null) return;   // can't change the stake mid-spin
   document.querySelectorAll(".mopt").forEach(x=>x.classList.remove("on")); b.classList.add("on");
   state.mult=+b.dataset.m; renderAll(); });
 $("#drawerBtn").onclick=()=>$("#drawer").classList.add("open");

@@ -130,6 +130,9 @@ function renderAll(){ renderHUD();renderOverlays();renderBuilderCenter();renderB
   const autoBusy=autoMode!==null;
   const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;
   $("#rollBtn").disabled=autoBusy||cantRoll;
+  // the multiplier is the stake for the roll in flight — lock it mid-spin and during auto
+  const lockMult=state.animating||autoBusy;
+  document.querySelectorAll(".mopt").forEach(b=>b.disabled=lockMult);
   // the running mode's own button stays clickable so it can act as Stop; the other is locked out
   [["#autoRollBtn","roll","↻ Auto roll","⏸ Stop auto roll"],
    ["#autoBtn","session","▶ Auto-play session","⏸ Stop auto-play"]].forEach(([sel,mode,idle,active])=>{

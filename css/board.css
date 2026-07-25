@@ -81,3 +81,6 @@
 .multi .mlbl{font-size:10px;color:var(--muted);padding:0 4px;text-transform:uppercase;letter-spacing:.06em}
 .mopt{padding:6px 9px;border-radius:8px;font-weight:800;font-size:13px;background:transparent;color:var(--muted)}
 .mopt.on{background:var(--purple);color:#fff}
+/* locked mid-spin / during auto — keep the active choice legible */
+.mopt:disabled{cursor:not-allowed}
+.mopt.on:disabled{opacity:.75}
