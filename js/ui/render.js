@@ -125,10 +125,16 @@ function syncMultButtons(){
 }
 function renderAll(){ renderHUD();renderOverlays();renderBuilderCenter();renderBuilderList();renderStats();renderStory();
   scheduleSaveState();
-  $("#rollBtn").disabled=state.animating||state.energy<state.mult||state.seriesDone;
-  // autoBtn stays clickable while auto-play runs so it can act as a Stop button
-  $("#autoBtn").disabled=autoOn?false:(state.animating||state.energy<state.mult||state.seriesDone);
-  $("#autoBtn").innerHTML=autoOn?"⏸ Stop auto-play":"▶ Auto-play session";
+  const autoBusy=autoMode!==null;
+  const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;
+  $("#rollBtn").disabled=autoBusy||cantRoll;
+  // the running mode's own button stays clickable so it can act as Stop; the other is locked out
+  [["#autoRollBtn","roll","↻ Auto roll","⏸ Stop auto roll"],
+   ["#autoBtn","session","▶ Auto-play session","⏸ Stop auto-play"]].forEach(([sel,mode,idle,active])=>{
+    const b=$(sel), mine=autoMode===mode;
+    b.innerHTML=mine?active:idle;
+    b.disabled=mine?false:(autoBusy||cantRoll);
+  });
   $("#nextBtn").disabled=state.animating;
   const gap=Math.max((cfg.energyCap-state.energy)*cfg.regenMin, 1440/cfg.sessionsPerDay);
   $("#nextHint").textContent=`advances ${(gap/60).toFixed(1)} h · refills to ${cfg.energyCap}⚡`;

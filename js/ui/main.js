@@ -74,28 +74,40 @@ function nextSession(){
   renderAll();
 }
 
-/* Auto-play is a toggle: first click starts, second click stops after the current roll. */
-let autoOn=false;
-async function autoPlay(){
-  if(autoOn){ autoOn=false; renderAll(); return; }
-  if(state.animating) return;
-  autoOn=true; renderAll();
+/* Two auto modes, each a toggle (click to start, click again to stop after the current roll):
+     "roll"    — rolls only, nothing else. Stops when energy can't cover the multiplier.
+     "session" — rolls AND spends coins on the cheapest upgrades (internal balancing tool).
+   Only one can own the loop at a time. */
+let autoMode=null;   // null | "roll" | "session"
+async function runAuto(mode){
+  if(autoMode===mode){ autoMode=null; renderAll(); return; }   // same button again → stop
+  if(autoMode!==null||state.animating) return;                  // the other mode owns the loop
+  autoMode=mode; renderAll();
+  let outOfEnergy=false;
   try{
-    while(autoOn && state.energy>=state.mult){
+    while(autoMode===mode && !state.seriesDone){
+      if(state.energy<state.mult){ outOfEnergy=true; break; }   // re-checked each pass: mult can change mid-run
       await roll();
       if(state.animating) break;   // a roll bailed out unexpectedly — don't spin
-      // opportunistically upgrade the cheapest available builder to keep the loop turning
-      let up=Builders.cheapest();
-      while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=Builders.cheapest(); }
+      if(mode==="session"){
+        // opportunistically upgrade the cheapest available builder to keep the loop turning
+        let up=Builders.cheapest();
+        while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=Builders.cheapest(); }
+      }
       await sleep(60);
     }
   }finally{
-    autoOn=false; renderAll();
+    autoMode=null;
+    if(outOfEnergy) log("⏹",`${mode==="roll"?"Auto roll":"Auto-play"} stopped · needs <b>${state.mult}</b>⚡ for a ×${state.mult} roll, have <b>${Math.floor(state.energy)}</b>`);
+    renderAll();
   }
 }
+const autoRoll=()=>runAuto("roll");
+const autoPlay=()=>runAuto("session");
 
 /* ---------------- wiring ---------------- */
 $("#rollBtn").onclick=roll;
+$("#autoRollBtn").onclick=autoRoll;
 $("#autoBtn").onclick=autoPlay;
 $("#watchBtn").onclick=openPrediction;
 $("#nextBtn").onclick=nextSession;
