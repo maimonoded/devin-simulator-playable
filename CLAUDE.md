@@ -111,6 +111,19 @@ one can own it. Either stops on a second click or when energy can't cover the mu
 Neither mode opens the prediction modal on its own — episodes are only watched when the player
 clicks **Predict & watch**.
 
+## Tests
+
+```bash
+node tests/run.js
+```
+
+Zero-dependency runner that loads the real scripts into a `vm` context — no framework, no build,
+no mocked app modules. Covers the DOM-free layers: util, config invariants, board model,
+episodes, builders, game (prediction/session), tiles, overlays and storage. **Run it after
+changing any of those.** See [tests/README.md](tests/README.md), which also carries two lists we
+have not acted on yet: functionality that would need heavy mocking, and logic currently trapped
+inside DOM-building functions.
+
 ## Conventions
 
 - **Everything timed is tunable.** Presentation timings live in `cfg` and appear in the tuning
