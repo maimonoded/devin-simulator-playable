@@ -88,6 +88,26 @@ function playVideo(id){
     };
     if(!v){ fallback(); return; }
 
+    /* Auto-play session is a batch economy tool — don't sit through 90s of footage.
+       Read the length from metadata, log that the episode was watched, and move on.
+       (Auto-roll deliberately does NOT skip: it simulates a real viewing session.) */
+    if(typeof autoMode!=="undefined"&&autoMode==="session"){
+      const title=Episodes.titleOf(id);
+      let settled=false;
+      const skip=(secs)=>{
+        if(settled) return; settled=true;
+        const len=isFinite(secs)&&secs>0?` · ${mmss(secs)} of footage`:"";
+        log("⏩",`Auto-play watched <b>${title}</b>${len} (playback skipped)`);
+        try{ v.pause(); v.removeAttribute("src"); v.load(); }catch(e){}   // abort the download
+        finish();
+      };
+      if(isFinite(v.duration)&&v.duration>0) return skip(v.duration);
+      v.addEventListener("loadedmetadata",()=>skip(v.duration));
+      v.addEventListener("error",()=>skip(NaN));
+      setTimeout(()=>skip(v.duration),2000);        // don't hang if metadata never arrives
+      return;
+    }
+
     v.addEventListener("error",fallback);
     v.addEventListener("ended",finish);
     v.addEventListener("contextmenu",e=>e.preventDefault());   // hide download / speed menu
