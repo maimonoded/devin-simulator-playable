@@ -1,11 +1,11 @@
 Episodes.add({
   "id": "007",
-  "title": "The Reveal",
-  "question": "Who leaked the tape to the press?",
+  "title": "Technically Your Husband",
+  "question": "Victoria walks in on Simon in the shower. How does he play it?",
   "answers": [
-    { "text": "The publicist", "odds": 2.0 },
-    { "text": "Sofia", "odds": 2.5 },
-    { "text": "Marco's brother", "odds": 2.7 }
+    { "text": "He teases her — he's her husband now, after all", "odds": 1.82 },
+    { "text": "He scrambles to cover up, mortified", "odds": 2.22 }
   ],
-  "correct": 2
+  "correct": 0,
+  "difficulty": 5
 });

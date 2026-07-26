@@ -10,9 +10,17 @@ const Episodes={
   _ids:[],
   add(ep){
     if(!ep||!ep.id){ console.warn("Episodes.add: missing id",ep); return; }
+    ep.difficulty=this.normalizeDifficulty(ep.difficulty);
     if(!this._byId[ep.id]) this._ids.push(ep.id);
     this._byId[ep.id]=ep;
   },
+  /* difficulty is 1–10 (10 hardest). Missing or unusable → 1. Informational for now. */
+  normalizeDifficulty(v){
+    const n=typeof v==="string"?parseFloat(v):v;
+    if(typeof n!=="number"||!isFinite(n)) return 1;
+    return Math.min(10,Math.max(1,n));
+  },
+  difficultyOf(id){ const e=this.get(id); return e?e.difficulty:1; },
   get(id){ return this._byId[id]||null; },
   has(id){ return !!this._byId[id]; },
   ids(){ return this._ids.slice().sort(); },

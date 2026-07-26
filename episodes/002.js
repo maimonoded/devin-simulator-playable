@@ -1,11 +1,11 @@
 Episodes.add({
   "id": "002",
-  "title": "Rumors at Dawn",
-  "question": "Does Marco discover the affair?",
+  "title": "A Wedding by Christmas",
+  "question": "Carl walks into Victoria's burger joint on his day off. What's he actually there for?",
   "answers": [
-    { "text": "Yes, and reacts calmly", "odds": 2.7 },
-    { "text": "Yes, and it explodes", "odds": 1.7 },
-    { "text": "No — not yet", "odds": 2.2 }
+    { "text": "He's on a date — with Victoria's own cousin", "odds": 1.54 },
+    { "text": "He's come to call off the engagement to her face", "odds": 2.86 }
   ],
-  "correct": 2
+  "correct": 0,
+  "difficulty": 3
 });

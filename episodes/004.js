@@ -1,11 +1,11 @@
 Episodes.add({
   "id": "004",
-  "title": "A Knock at Midnight",
-  "question": "Who is the masked guest?",
+  "title": "Marry Me Instead",
+  "question": "Victoria can't cancel the wedding her family already paid for. What does Simon offer her?",
   "answers": [
-    { "text": "Elena's ex", "odds": 2.1 },
-    { "text": "A rival heiress", "odds": 2.4 },
-    { "text": "A private investigator", "odds": 2.9 }
+    { "text": "To marry her himself, just long enough for Grandma", "odds": 1.43 },
+    { "text": "To find her a stand-in groom before Christmas", "odds": 3.33 }
   ],
-  "correct": 2
+  "correct": 0,
+  "difficulty": 2
 });

@@ -17,13 +17,14 @@ The id is the whole identity: `003` is builder 3's episode and its video path is
 ```js
 Episodes.add({
   "id": "001",                       // must match the filename
-  "title": "The Inheritance",        // shown as the episode name
-  "question": "Does Sofia accept the inheritance?",
+  "title": "Six Months on the Street",   // shown as the episode name
+  "question": "Why is Simon really living on the street?",
   "answers": [                       // 2+ options, in display order
-    { "text": "Yes — and moves in", "odds": 1.6 },
-    { "text": "No, she walks away",  "odds": 2.6 }
+    { "text": "He's undercover, building a case against his own uncle", "odds": 1.82 },
+    { "text": "His family forced him out and seized everything he owned", "odds": 2.22 }
   ],
-  "correct": 0                       // 0-based index into answers
+  "correct": 0,                      // 0-based index into answers
+  "difficulty": 4                    // optional, 1–10 (default 1)
 });
 ```
 
@@ -35,6 +36,7 @@ Episodes.add({
 | `answers[].text` | Option label. |
 | `answers[].odds` | Payout multiplier if that option is picked **and** it's right — a wager of 500 at ×2.4 returns 1,200. Longer odds should go on less likely answers. |
 | `correct` | Index of the true answer. Decides win/loss in manual play. |
+| `difficulty` | **Optional.** How hard the call is, `1`–`10` (10 = hardest). **Defaults to `1`** when absent. Values outside the range are clamped. Informational for now — nothing in the game reads it yet; available as `Episodes.difficultyOf(id)`. |
 
 The payload is plain JSON wrapped in one `Episodes.add(...)` call. That wrapper is what lets the
 game run straight from `file://` by double-clicking `index.html` — browsers block `fetch()` of
