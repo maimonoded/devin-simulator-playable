@@ -37,8 +37,19 @@ js/
   tiles/            one file per tile type                                   → js/tiles/README.md
   overlays/         things that sit on top of tiles (mystery box)            → js/overlays/README.md
   game.js           rolling, landing dispatch, prediction, session time
-  ui/               fx · render · overlays · drawer · main (wiring + boot)
+  ui/               everything that touches the DOM                          → js/ui/README.md
+    fx.js           floats, log, toasts, confetti, dice, blocking overlays
+    render.js       state → DOM; renderAll() is the entry point
+    player.js       episode video player (markup + behaviour)
+    prediction.js   predict & watch: bet → playback → result
+    store.js        coin/energy top-up modal
+    finale.js       series-complete celebration
+    drawer.js       tuning drawer + the two reset buttons
+    main.js         roll(), playEvents(), auto modes, wiring, boot
 ```
+
+Note the naming: `js/overlays/` are **board overlays** (things sitting on a tile, like the
+mystery box). Modal dialogs live in `js/ui/` — there is no `ui/overlays.js`.
 
 ## The one architectural rule
 
