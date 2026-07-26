@@ -11,8 +11,10 @@ class BoardActor {
     state.coins+=amount;
     return {float:{text:text??"+"+fmt(amount),color:color||"var(--gold)"}};
   }
+  /* Tops up toward the cap, but never reduces a balance already above it
+     (store purchases are allowed to overflow the cap). */
   gainEnergy(n,text){
-    state.energy=Math.min(cfg.energyCap,state.energy+n);
+    state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+n));
     return {float:{text:text??"+"+n+"⚡",color:"var(--teal)"}};
   }
   gainClues(n,text){

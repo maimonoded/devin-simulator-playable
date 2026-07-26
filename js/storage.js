@@ -72,7 +72,7 @@ function loadState(){
     // keep "unlocked" consistent with what survived, so the series bar doesn't
     // count episodes that no longer exist
     state.epUnlockedCount=Math.max(0,state.epUnlockedCount-(rawQueue.length-state.epQueue.length));
-    state.energy=Math.min(state.energy,cfg.energyCap);
+    // no cap clamp on restore — purchased energy may legitimately exceed cfg.energyCap
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero
     state.lastCoins=state.coins; state.lastClues=state.clues; state.lastEnergy=state.energy;

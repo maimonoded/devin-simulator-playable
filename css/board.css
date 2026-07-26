@@ -3,6 +3,13 @@
        border-radius:20px;padding:26px 20px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .stage::before{content:"";position:absolute;inset:0;
   background:radial-gradient(600px 300px at 50% 0%, rgba(139,109,255,.14), transparent 70%);pointer-events:none}
+/* store button — floats over the top-right of the board window */
+.storeBtn{position:absolute;top:14px;right:16px;z-index:30;
+          background:linear-gradient(180deg,var(--gold),var(--gold-d));color:#2a2205;
+          border-radius:999px;padding:9px 16px;font-weight:800;font-size:13px;
+          box-shadow:0 4px 14px rgba(255,203,92,.28);transition:transform .08s}
+.storeBtn:active:not(:disabled){transform:translateY(2px)}
+
 .boardScene{perspective:1200px;display:flex;justify-content:center;align-items:center;min-height:520px;position:relative}
 .board{width:min(560px,92%);aspect-ratio:1;display:grid;
        grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);

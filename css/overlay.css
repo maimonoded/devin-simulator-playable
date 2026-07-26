@@ -95,6 +95,17 @@
 .scene .play{font-size:44px;animation:pulse 1.4s infinite}
 @keyframes pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
 .sceneBar{position:absolute;bottom:0;left:0;height:5px;background:var(--pink);width:0%}
+/* store */
+.pkGroup{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);
+         margin:14px 0 8px;font-weight:700}
+.packs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pack{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 6px;
+      display:flex;flex-direction:column;align-items:center;gap:5px;transition:.15s}
+.pack:hover{border-color:var(--gold);transform:translateY(-2px)}
+.pack:active{transform:translateY(0)}
+.pack .pkIco{font-size:20px;line-height:1}
+.pack .pkAmt{font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}
+
 /* collect popup (train bonus) */
 .collectModal{width:min(360px,100%);border-color:var(--gold)}
 .collectAmt{text-align:center;font-family:Georgia,serif;font-weight:800;font-size:40px;color:var(--gold);

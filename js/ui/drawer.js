@@ -67,7 +67,7 @@ function syncTuningInputs(){ document.querySelectorAll("#tuningBody input[data-k
 function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clamp + token speed
   document.querySelectorAll(".tile.standard .val").forEach(el=>{
     const i=+el.closest(".tile").dataset.i; el.textContent=TILE_TYPES.standard.valueLabel(i); });
-  state.energy=Math.min(state.energy,cfg.energyCap);
+  // note: energy is NOT clamped to a lowered cap — store purchases may exceed it
   applyFxTiming();
   scheduleSaveConfig();
   renderAll();

@@ -141,6 +141,7 @@ function renderAll(){ renderHUD();renderOverlays();renderBuilderCenter();renderB
     b.disabled=mine?false:(autoBusy||cantRoll);
   });
   $("#nextBtn").disabled=state.animating;
+  $("#storeBtn").disabled=state.animating||autoBusy;   // would fight the roll's own overlays
   const gap=Math.max((cfg.energyCap-state.energy)*cfg.regenMin, 1440/cfg.sessionsPerDay);
   $("#nextHint").textContent=`advances ${(gap/60).toFixed(1)} h · refills to ${cfg.energyCap}⚡`;
 }

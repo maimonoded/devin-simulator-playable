@@ -120,6 +120,7 @@ $("#rollBtn").onclick=roll;
 $("#autoRollBtn").onclick=autoRoll;
 $("#autoBtn").onclick=autoPlay;
 $("#watchBtn").onclick=openPrediction;
+$("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;
 $("#flatBtn").onclick=()=>$("#board").classList.toggle("flat");
 document.querySelectorAll(".mopt").forEach(b=>b.onclick=()=>{

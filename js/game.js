@@ -53,7 +53,8 @@ function advanceSession(){
   const refill=(cfg.energyCap-state.energy)*cfg.regenMin;
   const gap=Math.max(refill, 1440/cfg.sessionsPerDay);
   const regened=Math.floor(gap/cfg.regenMin);
-  state.energy=Math.min(cfg.energyCap,state.energy+regened);
+  // refills to the cap, but never drains a purchased overflow balance
+  state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+regened));
   state.clock+=gap;
   const newDay=Math.floor(state.clock/1440)+1;
   const rewards=[];
