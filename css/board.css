@@ -18,7 +18,7 @@
        transition:transform .6s ease}
 .board.flat{transform:rotateX(0) rotateZ(0)}
 .tile{background:var(--tile);border:1px solid #313a80;border-radius:7px;position:relative;
-      display:flex;align-items:center;justify-content:center;font-size:15px;
+      display:flex;align-items:center;justify-content:center;font-size:15px;z-index:1;
       box-shadow:inset 0 -3px 0 rgba(0,0,0,.28);transition:background .2s,box-shadow .2s}
 .tile .val{position:absolute;bottom:2px;right:4px;font-size:8px;color:var(--muted);
            transform:rotate(-45deg) rotateX(-52deg)} /* counter board tilt for legibility */
@@ -58,10 +58,12 @@
                100%{transform:rotateZ(-45deg) rotateX(-52deg) translateY(0)}}
 
 /* builder center — 12-tower skyline */
-.builderCenter{position:absolute;left:15%;top:15%;width:70%;height:70%;
+/* sits behind the tiles: translateZ pushes it under the board plane in the 3D
+   context, z-index covers the flat view — tall towers no longer cover tiles */
+.builderCenter{position:absolute;left:15%;top:15%;width:70%;height:70%;z-index:0;
      display:flex;align-items:flex-end;justify-content:center;gap:2%;
-     transform:rotateZ(-45deg) rotateX(-52deg);transform-origin:center}
-.board.flat .builderCenter{transform:none}
+     transform:translateZ(-2px) rotateZ(-45deg) rotateX(-52deg);transform-origin:center}
+.board.flat .builderCenter{transform:translateZ(-2px)}
 .sky{display:flex;align-items:flex-end;justify-content:center;height:100%}
 .sky .skytower{width:78%;border-radius:4px 4px 1px 1px;min-height:8px;
      background:linear-gradient(180deg,var(--purple),var(--purple-d));
