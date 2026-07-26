@@ -33,7 +33,7 @@ The tuning-drawer values each type reads are noted per type.
 | **standard** | [standard-tile.js](standard-tile.js) | — | Pays the tile's printed coin value: `stdBase × stdWeights[i]`. Weights rise around the board (mean 1), so late tiles pay more. Also renders the printed value via `valueLabel(i)`. No interruption — just a floating number. | `stdBase` |
 | **train** | [train-tile.js](train-tile.js) | 🚗 | Pays a variable bonus: a weighted draw from `TRAIN_MULT` (0.5×–4×), normalised so the expected value is exactly `trainEV`. Presents the **Collect popup**. | `trainEV`, `collectMinSec`, `collectMaxSec` |
 | **deck** | [deck-tile.js](deck-tile.js) | 🃏 | Draws a weighted card from the merged `deck` table (editable in tuning) and **shows the card** for `deckCardMs`: coins (can be a negative fine), energy, clues, VIP-pool seed, or **Advance to Start** (walks the token to Start and pays the full Start landing bonus). | deck table, `deckCardMs`, `startPass`, `startLand`, `vipSeed` |
-| **spa** | [spa-tile.js](spa-tile.js) | 💆 | Grants `spaEnergy` energy, clamped to `energyCap`. Energy win → confetti **plus the dice shower**. | `spaEnergy`, `energyCap`, `revealMs` |
+| **spa** | [spa-tile.js](spa-tile.js) | 💆 | Grants `spaEnergy` energy, topped up to `energyCap`. Energy win → confetti **plus the dice shower**. | `spaEnergy`, `energyCap`, `revealMs` |
 | **vip** | [vip-tile.js](vip-tile.js) | 🌟 | Collects the entire VIP pool as coins — or shows the sad "Empty" reveal if the pool is dry. The pool is seeded by laps past Start, Start landings, and the Fine/Paparazzi card. | `vipRevealMs` |
 | **premiere** | [premiere-tile.js](premiere-tile.js) | 🎭 | Sweeps the token to Start at `premiereStepMs` per tile and pays the full Start landing bonus. | `premiereStepMs`, `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
 | **start** | [start-tile.js](start-tile.js) | ⭐ | Landing here pays `startPass + startLand`, seeds the VIP pool with `vipSeed`, and dwells `startRevealMs`. (Merely *passing* Start pays only `startPass` — that lap logic is in `applyPassStart()` in [`js/game.js`](../game.js), because it isn't a landing.) | `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
@@ -88,6 +88,7 @@ remaining non-standard tiles use `reveal`.
 | `startRevealMs` | 800 | dwell when landing on Start — also the arrival dwell after any advance-to-Start |
 | `premiereStepMs` | 90 | Premiere sweep speed, ms per tile |
 | `collectMinSec` / `collectMaxSec` | 10 / 20 | random auto-close window for the train Collect popup |
+| `autoCollectMs` | 600 | how fast the Collect popup self-collects **during auto-play session only** — auto-roll gets the full player window above |
 | `tokenStepMs` | 135 | normal roll walk; also paces the deck Advance-to-Start dash (⅔ of it) |
 
 ## The base class contract (tile.js)
@@ -110,7 +111,7 @@ Shared helpers subclasses should call instead of reimplementing:
 | Helper | Does |
 |---|---|
 | `gainCoins(amount, text?, color?)` | adds coins, returns the float event |
-| `gainEnergy(n, text?)` | adds energy clamped to `energyCap`, returns the float event |
+| `gainEnergy(n, text?)` | tops up toward `energyCap`, returns the float event. Never *reduces* a balance already above the cap — store purchases are allowed to overflow it, so don't reintroduce a plain `Math.min` clamp |
 | `gainClues(n, text?)` | adds clues, returns the float event |
 | `reveal(big, sub, positive, energy)` | builds the blocking center-reveal event |
 | `collect(big, sub)` | builds the blocking Collect-popup event |

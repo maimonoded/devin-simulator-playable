@@ -6,7 +6,7 @@ builder 12 → `012`. Each episode is two files that share the id:
 ```
 episodes/
   001.js     the prediction (question, answers, correct answer)
-  001.mp4    the video           ← not wired up yet; drop files in when ready
+  001.mp4    the video, played after the bet is locked in
 ```
 
 The id is the whole identity: `003` is builder 3's episode and its video path is always
@@ -53,10 +53,45 @@ JSON-valid, so these can be converted to real `.json` files if the project ever 
 Episodes are matched to builders by number. If `cfg.buildings` is raised above the number of
 episode files, builders past the end cycle back through the existing ones rather than failing.
 
-## How the correct answer is used
+## Watching an episode
 
-- **Manual play** — you win only if your pick matches `correct`. Payout is `wager × odds`.
-- **Auto-play** — the outcome is modelled with `cfg.accuracy` (default 65%) instead, so batch
-  runs measure the economy without depending on which option a script happens to click.
+Clicking **Predict & watch** opens the prediction modal, and the flow is:
+
+1. **Pick an answer.** Options are reshuffled every showing (see `correct` above).
+2. **Place a bet — betting is mandatory.** The wager slider starts at `cfg.minWager`
+   (default 100) and runs to your full balance. **Lock in prediction** is the only way to
+   watch; **Watch later** closes the modal and leaves the episode queued.
+   - If you hold less than `cfg.minWager`, the wager row is replaced by **Skip & watch**
+     (watch with no wager) alongside Watch later.
+3. **The outcome is resolved at this point**, before playback — the video is the reveal.
+4. **The video plays**, then the win/loss screen appears.
+
+### How the correct answer is used
+
+- **Manual play and auto-roll** — you win only if your pick matches `correct`.
+  Payout is `wager × odds`.
+- **Auto-play session** — the outcome is modelled with `cfg.accuracy` (default 65%) instead,
+  so batch runs measure the economy without depending on which option a script clicks.
 
 The result screen names the true answer when you get it wrong.
+
+## The video player
+
+Implemented by `playVideo()` in [../js/ui/fx.js](../js/ui/fx.js); the markup lives in
+`playEpisode()` in [../js/ui/overlays.js](../js/ui/overlays.js).
+
+| Behavior | Detail |
+|---|---|
+| **Autoplay** | Starts on its own, with sound. If the browser blocks autoplay-with-audio it retries muted and shows a "tap for sound" badge. |
+| **No seeking** | The player has no `controls`, so there's no seek UI. Forward seeks are additionally snapped back to the furthest point actually watched; rewinding is allowed. The right-click menu is suppressed. |
+| **Pause / resume** | Click the video. The frame dims and a ▶ glyph appears while paused. |
+| **Progress** | A bar along the bottom plus an `m:ss / m:ss` readout. |
+| **2× speed** | Press and hold the video (after `cfg.longPressMs`, default 350) for a temporary 2×, or use the **2× speed** button below it, which latches until clicked again. A gold `2×` chip shows while boosted. |
+| **No exit** | Once playback starts there's no way out but to watch — the wager is already settled. |
+| **Auto-play session** | Skips playback entirely: it reads the length from metadata, logs `Auto-play watched <title> · m:ss of footage (playback skipped)`, and moves on. Auto-roll does *not* skip. |
+| **Missing video** | An episode with no `.mp4` (or a load error) falls back to the 🎬 placeholder for `cfg.fallbackSceneMs` (default 1700) and still reaches the result screen. |
+
+Videos are portrait 9:16, so the modal sizes the player by height (`min(68vh, 620px)`) rather
+than the usual fixed modal width.
+
+`*.mp4` is in [../.gitignore](../.gitignore) — the footage is large and stays out of git.
