@@ -22,8 +22,11 @@ function openPrediction(){
          <span class="wagerVal" id="wVal">${fmt(minW)}</span></div>
        <div class="hint" style="margin-top:4px">Minimum bet <b style="color:var(--gold)">${fmt(minW)}</b>🪙 · you hold <b>${fmt(state.coins)}</b>🪙</div>`
     : `<div class="hint" style="margin-top:10px">You need <b style="color:var(--gold)">${fmt(minW)}</b>🪙 to place a bet and hold only <b>${fmt(state.coins)}</b>🪙. Watch it without a wager, or come back once you've earned more.</div>`;
+  // "Watch later" is always available so the modal is never a dead end;
+  // "Skip & watch" only appears when the player can't afford the minimum bet.
   const footHtml=canBet
-    ? `<button class="btn pink wide" id="commitPred" disabled>Lock in prediction</button>`
+    ? `<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
+       <button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button>`
     : `<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
        <button class="btn pink" id="skipPred" style="flex:2">Skip &amp; watch</button>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
@@ -36,13 +39,13 @@ function openPrediction(){
     $("#scrim").querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
     b.classList.add("sel"); pending.sel=+b.dataset.idx;
     const commit=$("#commitPred"); if(commit) commit.disabled=false; });
+  $("#watchLater").onclick=()=>{   // leaves the episode queued for later
+    $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null; renderAll(); };
   if(canBet){
     $("#wSlide").oninput=(e)=>{ pending.wager=+e.target.value; $("#wVal").textContent=fmt(pending.wager); };
     $("#commitPred").onclick=()=>playEpisode();
   }else{
     $("#skipPred").onclick=()=>{ pending.wager=0; pending.sel=pending.sel??0; playEpisode(); };
-    $("#watchLater").onclick=()=>{   // leaves the episode queued for later
-      $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null; renderAll(); };
   }
 }
 async function playEpisode(){
