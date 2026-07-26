@@ -8,7 +8,7 @@ const DEFAULTS={
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
   buildings:12, tiers:5, baseCost:1200, tierGrowth:1.8, bldgGrowth:1.05, boxesPerUpgrade:1,
-  avgWager:500, accuracy:0.65, avgOdds:1.8,
+  minWager:100, accuracy:0.65, avgOdds:1.8,
 };
 let cfg=Object.assign({},DEFAULTS);
 let deck=[
@@ -59,5 +59,5 @@ const TUNING=[
    ["bldgGrowth","Builder cost growth ×",0.05],["boxesPerUpgrade","Boxes per upgrade",1],
    ["buildings","Builders (all available)",1],["tiers","Levels per builder",1]]},
  {group:"Prediction & wager",items:[
-   ["avgWager","Default wager",50],["accuracy","Player accuracy (0–1)",0.01],["avgOdds","Avg odds (reference)",0.1]]},
+   ["minWager","Minimum wager",10],["accuracy","Player accuracy (0–1)",0.01],["avgOdds","Avg odds (reference)",0.1]]},
 ];

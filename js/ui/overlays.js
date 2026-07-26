@@ -6,32 +6,53 @@ function openPrediction(){
   const id=state.epQueue[0];
   const ep=Episodes.get(id);
   if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
-  pending={id,ep,sel:null,wager:Math.min(cfg.avgWager,state.coins)};
-  const maxW=Math.max(0,Math.floor(state.coins));
-  const optHtml=ep.answers.map((a,idx)=>`<button class="opt" data-idx="${idx}"><span>${a.text}</span><span class="odds">×${a.odds.toFixed(1)}</span></button>`).join("");
+  // answers are shuffled every time, so the correct index in the file isn't a tell
+  const order=shuffle(ep.answers.map((_,i)=>i));
+  const minW=Math.max(0,cfg.minWager);
+  const canBet=state.coins>=minW&&minW>0;
+  pending={id,ep,order,sel:null,wager:canBet?minW:0};
+  const maxW=Math.max(minW,Math.floor(state.coins));
+  const optHtml=order.map((src,idx)=>{ const a=ep.answers[src];
+    return `<button class="opt" data-idx="${idx}"><span>${a.text}</span><span class="odds">×${a.odds.toFixed(1)}</span></button>`;
+  }).join("");
+  // betting is mandatory; only a player who can't afford the minimum gets a way out
+  const wagerHtml=canBet
+    ? `<div class="wagerRow"><span style="font-size:12px;color:var(--muted)">Wager</span>
+         <input type="range" id="wSlide" min="${minW}" max="${maxW}" step="10" value="${minW}">
+         <span class="wagerVal" id="wVal">${fmt(minW)}</span></div>
+       <div class="hint" style="margin-top:4px">Minimum bet <b style="color:var(--gold)">${fmt(minW)}</b>🪙 · you hold <b>${fmt(state.coins)}</b>🪙</div>`
+    : `<div class="hint" style="margin-top:10px">You need <b style="color:var(--gold)">${fmt(minW)}</b>🪙 to place a bet and hold only <b>${fmt(state.coins)}</b>🪙. Watch it without a wager, or come back once you've earned more.</div>`;
+  const footHtml=canBet
+    ? `<button class="btn pink wide" id="commitPred" disabled>Lock in prediction</button>`
+    : `<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
+       <button class="btn pink" id="skipPred" style="flex:2">Skip &amp; watch</button>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
     ${optHtml}
-    <div class="wagerRow"><span style="font-size:12px;color:var(--muted)">Wager</span>
-      <input type="range" id="wSlide" min="0" max="${maxW}" step="10" value="${pending.wager}">
-      <span class="wagerVal" id="wVal">${fmt(pending.wager)}</span></div>
-    <div class="hint" style="margin-top:4px">Skip = watch with no wager. Clues held: <b style="color:var(--teal)">${state.clues}🔍</b> (your edge)</div>
-    <div class="foot"><button class="btn ghost" id="skipPred" style="flex:1">Skip &amp; watch</button>
-    <button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button></div></div></div>`;
+    ${wagerHtml}
+    <div class="foot">${footHtml}</div></div></div>`;
   $("#scrim").classList.add("show");
   $("#scrim").querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
     $("#scrim").querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
-    b.classList.add("sel"); pending.sel=+b.dataset.idx; $("#commitPred").disabled=false; });
-  $("#wSlide").oninput=(e)=>{ pending.wager=+e.target.value; $("#wVal").textContent=fmt(pending.wager); };
-  $("#skipPred").onclick=()=>{ pending.wager=0; pending.sel=pending.sel??0; playEpisode(); };
-  $("#commitPred").onclick=()=>playEpisode();
+    b.classList.add("sel"); pending.sel=+b.dataset.idx;
+    const commit=$("#commitPred"); if(commit) commit.disabled=false; });
+  if(canBet){
+    $("#wSlide").oninput=(e)=>{ pending.wager=+e.target.value; $("#wVal").textContent=fmt(pending.wager); };
+    $("#commitPred").onclick=()=>playEpisode();
+  }else{
+    $("#skipPred").onclick=()=>{ pending.wager=0; pending.sel=pending.sel??0; playEpisode(); };
+    $("#watchLater").onclick=()=>{   // leaves the episode queued for later
+      $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null; renderAll(); };
+  }
 }
 async function playEpisode(){
-  const p=pending, ep=p.ep; const odds=ep.answers[p.sel].odds;
+  const p=pending, ep=p.ep;
+  const answerIdx=p.order[p.sel];        // displayed position → index in the episode file
+  const odds=ep.answers[answerIdx].odds;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Now playing</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div class="scene"><div class="play">🎬</div><div class="sceneBar" id="sBar"></div></div>
     <div class="hint" style="text-align:center;margin-top:10px">${p.wager>0?`You wagered <b style="color:var(--gold)">${fmt(p.wager)}</b> at ×${odds.toFixed(1)}`:"Watching with no wager"}</div></div></div>`;
-  const {won,payout}=resolvePrediction({wager:p.wager,odds,sel:p.sel,correct:ep.correct,
+  const {won,payout}=resolvePrediction({wager:p.wager,odds,sel:answerIdx,correct:ep.correct,
                                         auto:typeof autoMode!=="undefined"&&autoMode!==null});
   await sleep(60); const bar=$("#sBar"); bar.style.transition="width 1.6s linear"; bar.style.width="100%";
   await sleep(1700);

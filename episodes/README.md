@@ -35,7 +35,7 @@ Episodes.add({
 | `question` | The prediction prompt. |
 | `answers[].text` | Option label. |
 | `answers[].odds` | Payout multiplier if that option is picked **and** it's right — a wager of 500 at ×2.4 returns 1,200. Longer odds should go on less likely answers. |
-| `correct` | Index of the true answer. Decides win/loss in manual play. |
+| `correct` | Index of the true answer **as listed in this file**. Decides win/loss in manual play. The game reshuffles the answer order on every showing, so the correct answer doesn't sit in a predictable position — you don't need to vary it across files. |
 | `difficulty` | **Optional.** How hard the call is, `1`–`10` (10 = hardest). **Defaults to `1`** when absent. Values outside the range are clamped. Informational for now — nothing in the game reads it yet; available as `Episodes.difficultyOf(id)`. |
 
 The payload is plain JSON wrapped in one `Episodes.add(...)` call. That wrapper is what lets the

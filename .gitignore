@@ -1,1 +1,4 @@
 .DS_Store
+
+# episode videos — large binaries, kept out of git history
+*.mp4
