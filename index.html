@@ -30,8 +30,9 @@
   <div class="stage">
     <button class="storeBtn" id="storeBtn">🛒 Store</button>
     <div class="boardScene">
+      <!-- skyline is a sibling behind the board, not a child of its 3D context -->
+      <div class="skyLayer"><div class="builderCenter" id="builderCenter"></div></div>
       <div class="board" id="board">
-        <div class="builderCenter" id="builderCenter"></div>
         <div class="token" id="token"><div class="disc">💃</div></div>
       </div>
       <!-- win/loss reveal, sits flat above the 3D board -->

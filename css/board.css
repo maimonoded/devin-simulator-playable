@@ -13,7 +13,7 @@
 .boardScene{perspective:1200px;display:flex;justify-content:center;align-items:center;min-height:520px;position:relative}
 .board{width:min(560px,92%);aspect-ratio:1;display:grid;
        grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);
-       gap:4px;position:relative;
+       gap:4px;position:relative;z-index:1;
        transform:rotateX(52deg) rotateZ(45deg);transform-style:preserve-3d;
        transition:transform .6s ease}
 .board.flat{transform:rotateX(0) rotateZ(0)}
@@ -58,12 +58,15 @@
                100%{transform:rotateZ(-45deg) rotateX(-52deg) translateY(0)}}
 
 /* builder center — 12-tower skyline */
-/* sits behind the tiles: translateZ pushes it under the board plane in the 3D
-   context, z-index covers the flat view — tall towers no longer cover tiles */
-.builderCenter{position:absolute;left:15%;top:15%;width:70%;height:70%;z-index:0;
-     display:flex;align-items:flex-end;justify-content:center;gap:2%;
-     transform:translateZ(-2px) rotateZ(-45deg) rotateX(-52deg);transform-origin:center}
-.board.flat .builderCenter{transform:translateZ(-2px)}
+/* The skyline lives OUTSIDE the board's preserve-3d context, as a sibling layered
+   beneath it. Inside that context the towers are a billboard standing above the board
+   plane, so 3D sorting correctly draws them over the tiles — no z-index or translateZ
+   can override that. As a plain sibling it simply composites behind the whole board and
+   shows through the hollow middle. It also no longer needs a counter-rotation. */
+.skyLayer{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+     width:min(560px,92%);aspect-ratio:1;z-index:0;pointer-events:none}
+.builderCenter{position:absolute;left:15%;top:15%;width:70%;height:70%;
+     display:flex;align-items:flex-end;justify-content:center;gap:2%}
 .sky{display:flex;align-items:flex-end;justify-content:center;height:100%}
 .sky .skytower{width:78%;border-radius:4px 4px 1px 1px;min-height:8px;
      background:linear-gradient(180deg,var(--purple),var(--purple-d));
