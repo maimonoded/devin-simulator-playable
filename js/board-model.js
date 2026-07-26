@@ -21,6 +21,14 @@ function gridPos(i){
   if(i<=30) return {r:0,c:i-20};         // across the top edge
   return {r:i-30,c:10};                  // down the right edge
 }
+/* Optional tile artwork. Drop assets/tiles/1.png to skin the first tile (index 0),
+   2.png for the next, … 40.png for the last — i.e. the filename is 1-based, so it
+   matches how the board reads to a human rather than the 0-based index used in code.
+   Missing files are simply not used; see assets/tiles/README.md. */
+const TILE_ART_DIR="assets/tiles/";
+const TILE_ART_EXT=".png";
+function tileImagePath(i){ return `${TILE_ART_DIR}${i+1}${TILE_ART_EXT}`; }
+
 /* Clockwise path from a tile to Start (a full lap when already on Start). */
 function pathToStart(from){ const path=[]; const dist=(40-from)%40||40; let p=from;
   for(let s=0;s<dist;s++){ p=(p+1)%40; path.push(p); } return path; }

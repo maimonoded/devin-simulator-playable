@@ -136,6 +136,26 @@ test("stdWeights covers exactly the standard tiles and averages 1", () => {
   near(mean, 1, 1e-9);
 });
 
+test("tileImagePath is 1-based and points into assets/tiles", () => {
+  eq(tileImagePath(0), "assets/tiles/1.png", "the first tile (Start) uses 1.png");
+  eq(tileImagePath(5), "assets/tiles/6.png");
+  eq(tileImagePath(39), "assets/tiles/40.png", "the last tile uses 40.png");
+  eq(TILE_ART_DIR, "assets/tiles/");
+  eq(TILE_ART_EXT, ".png");
+});
+
+test("every tile maps to a distinct art filename", () => {
+  const paths = new Set();
+  for (let i = 0; i < 40; i++) paths.add(tileImagePath(i));
+  eq(paths.size, 40);
+});
+
+test("corner tiles land on the filenames the docs promise", () => {
+  eq(tileImagePath(10), "assets/tiles/11.png");   // Spa
+  eq(tileImagePath(20), "assets/tiles/21.png");   // VIP
+  eq(tileImagePath(30), "assets/tiles/31.png");   // Premiere
+});
+
 test("pathToStart ends on Start and has the right length", () => {
   eq(pathToStart(39).length, 1);
   deepEq(pathToStart(39), [0]);

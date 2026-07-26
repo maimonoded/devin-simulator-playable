@@ -22,6 +22,7 @@ no-store`. Video seeking needs a server that supports **HTTP Range**; Python's
 
 ```
 index.html          markup + ordered <link>/<script> tags
+assets/tiles/       optional per-tile artwork: N.png skins tile N-1  → assets/tiles/README.md
 css/                base · board · panels · drawer · overlay
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/
@@ -74,6 +75,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 |---|---|---|
 | Board layout | `js/board-model.js` | Fixed 40 tiles. Start sits at the **bottom** point of the diamond; indices run clockwise on screen (Start → Spa → VIP → Premiere). |
 | Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
+| Tile artwork | `assets/tiles/` | Drop `N.png` (1-based, so `1.png` is Start) to skin that tile; absent files change nothing. Author at 144×144. → [README](assets/tiles/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |

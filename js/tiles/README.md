@@ -158,6 +158,15 @@ Example: a "casino" tile that doubles-or-nothing a small stake.
 That's the whole surface: rendering (icon, corner style, label) and behavior both come from the
 one class file; no dispatch code anywhere else needs editing.
 
+## Artwork
+
+A tile's look can be replaced with an image by dropping `assets/tiles/<index+1>.png` — `1.png`
+skins Start, `40.png` the last tile. Absent files change nothing, so partial sets are fine.
+Sizes and what changes when art is present are documented in
+[../../assets/tiles/README.md](../../assets/tiles/README.md). The path comes from
+`tileImagePath(i)` in [../board-model.js](../board-model.js); the loading/caching lives in
+`applyTileArt()` in [../ui/render.js](../ui/render.js).
+
 ## Note on persistence
 
 Tuning values and player progress are saved to `localStorage` by

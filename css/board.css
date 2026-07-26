@@ -23,8 +23,14 @@
 .tile{background:var(--tile);border:1px solid #313a80;border-radius:7px;position:relative;
       display:flex;align-items:center;justify-content:center;font-size:15px;z-index:1;
       box-shadow:inset 0 -3px 0 rgba(0,0,0,.28);transition:background .2s,box-shadow .2s}
+/* a tile with artwork drops its gradient/inset so the image reads cleanly; the type's
+   border colour is kept, and the emoji is hidden since the art stands in for it */
+.tile.hasArt{background-color:transparent;background-size:cover;background-position:center;
+             background-repeat:no-repeat;box-shadow:none}
+.tile.hasArt .ico{display:none}
 .tile .val{position:absolute;bottom:2px;right:4px;font-size:8px;color:var(--muted);
            transform:rotate(-45deg) rotateX(-52deg)} /* counter board tilt for legibility */
+.tile.hasArt .val{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9)}
 .tile .ico{transform:rotate(-45deg) rotateX(-52deg)}
 .board.flat .tile .ico,.board.flat .tile .val{transform:none}
 .tile.corner{background:linear-gradient(180deg,var(--panel2),#1a2054);border-color:var(--purple)}

@@ -10,6 +10,33 @@ function applyFxTiming(){
   s.setProperty("--hopDur",Math.min(140,cfg.tokenStepMs)+"ms");
   s.setProperty("--shakeDur",Math.max(120,cfg.diceRevealMs)+"ms");
 }
+/* ---- optional tile artwork ----
+   A tile uses assets/tiles/<i+1>.png when that file exists. Existence is probed by
+   loading the image (fetch() is blocked on file://), and the result is cached per
+   index so rebuilding the board doesn't re-probe. Tiles with no art are untouched,
+   so a partly-filled assets/tiles/ mixes art and styled tiles happily.
+   404s in the network log for absent files are expected. */
+const tileArtStatus={};   // index → "ok" | "missing"
+
+function paintTileArt(el,src){
+  el.classList.add("hasArt");
+  el.style.backgroundImage=`url("${src}")`;
+}
+function applyTileArt(el,i){
+  if(tileArtStatus[i]==="missing") return;
+  const src=tileImagePath(i);
+  if(tileArtStatus[i]==="ok"){ paintTileArt(el,src); return; }
+  const probe=new Image();
+  probe.onload=()=>{
+    tileArtStatus[i]="ok";
+    // the board may have been rebuilt while the image loaded — re-find the tile
+    const live=document.querySelector(`.tile[data-i="${i}"]`);
+    if(live) paintTileArt(live,src);
+  };
+  probe.onerror=()=>{ tileArtStatus[i]="missing"; };
+  probe.src=src;
+}
+
 function buildBoard(){
   applyFxTiming();
   const board=$("#board");
@@ -23,6 +50,7 @@ function buildBoard(){
     const val=def.valueLabel(i);
     el.innerHTML=(def.icon?`<span class="ico">${def.icon}</span>`:"")+
       (val?`<span class="val">${val}</span>`:"");
+    applyTileArt(el,i);            // skins the tile if assets/tiles/<i+1>.png exists
     board.appendChild(el);
   }
   positionToken(true);
