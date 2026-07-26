@@ -67,6 +67,65 @@ function showReveal(r){
   if(r.energy) diceConfetti();   // energy wins get a dice shower on top
   return sleep(r.ms??cfg.revealMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
+/* ---------------- episode video ---------------- */
+function mmss(s){ if(!isFinite(s)||s<0) s=0; const m=Math.floor(s/60); return m+":"+String(Math.floor(s%60)).padStart(2,"0"); }
+/* Play an episode's video inside the already-open modal. Resolves when it ends.
+   No controls attribute, so the browser offers no seek UI; forward seeks are snapped
+   back to the furthest point actually watched. Click toggles pause/resume.
+   Episodes with no video file fall back to the 🎬 placeholder for cfg.fallbackSceneMs. */
+function playVideo(id){
+  return new Promise(resolve=>{
+    const wrap=$("#vWrap"), v=$("#epVideo");
+    let done=false, maxTime=0;
+    const finish=()=>{ if(done) return; done=true; try{ v&&v.pause(); }catch(e){} resolve(); };
+    /* no video (or it failed to load) → keep the old placeholder behaviour */
+    const fallback=()=>{
+      if(done) return;
+      if(wrap) wrap.innerHTML=`<div class="scene"><div class="play">🎬</div><div class="sceneBar" id="sBar"></div></div>`;
+      const bar=$("#sBar");
+      if(bar){ requestAnimationFrame(()=>{ bar.style.transition=`width ${cfg.fallbackSceneMs}ms linear`; bar.style.width="100%"; }); }
+      setTimeout(finish,cfg.fallbackSceneMs);
+    };
+    if(!v){ fallback(); return; }
+
+    v.addEventListener("error",fallback);
+    v.addEventListener("ended",finish);
+    v.addEventListener("contextmenu",e=>e.preventDefault());   // hide download / speed menu
+
+    const fill=$("#vFill"), time=$("#vTime");
+    v.addEventListener("timeupdate",()=>{
+      if(v.currentTime>maxTime) maxTime=v.currentTime;
+      const d=v.duration;
+      if(isFinite(d)&&d>0){
+        if(fill) fill.style.width=Math.min(100,(v.currentTime/d)*100)+"%";
+        if(time) time.textContent=`${mmss(v.currentTime)} / ${mmss(d)}`;
+      }
+    });
+    // block seeking ahead of what's actually been watched
+    v.addEventListener("seeking",()=>{
+      if(v.currentTime>maxTime+0.5) v.currentTime=maxTime;
+    });
+
+    // click anywhere on the video toggles pause/resume
+    wrap.onclick=()=>{
+      if(done) return;
+      if(v.paused){ v.play().catch(()=>{}); wrap.classList.remove("paused"); }
+      else { v.pause(); wrap.classList.add("paused"); }
+    };
+
+    // autoplay with sound; if the browser blocks it, retry muted and offer to unmute
+    v.play().catch(()=>{
+      v.muted=true;
+      v.play().catch(fallback);
+      const badge=$("#vSound");
+      if(badge){
+        badge.style.display="block";
+        badge.onclick=(e)=>{ e.stopPropagation(); v.muted=false; badge.style.display="none"; };
+      }
+    });
+  });
+}
+
 /* Tear down any blocking overlay/popup — used to recover from a mid-roll error. */
 function clearOverlayFx(){
   const el=$("#centerFx"); el.className="centerfx"; el.innerHTML="";

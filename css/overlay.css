@@ -63,6 +63,25 @@
 .wagerRow input[type=range]{flex:1;accent-color:var(--purple)}
 .wagerVal{font-weight:800;color:var(--gold);min-width:70px;text-align:right}
 .modal .foot{display:flex;gap:10px;margin-top:18px}
+/* ---------- episode video player ---------- */
+.modal.videoModal{width:auto}                      /* hug the portrait video instead of 480px */
+.vwrap{position:relative;margin-top:6px;cursor:pointer;line-height:0;border-radius:14px;overflow:hidden}
+.epVideo{height:min(68vh,620px);width:auto;max-width:86vw;display:block;background:#000}
+/* pause glyph — only while paused */
+.vpause{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+        font-size:58px;opacity:0;transition:opacity .15s;pointer-events:none;
+        text-shadow:0 4px 18px rgba(0,0,0,.7)}
+.vwrap.paused .vpause{opacity:.92}
+.vwrap.paused .epVideo{filter:brightness(.6)}
+/* progress along the bottom */
+.vbar{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(255,255,255,.18)}
+.vfill{height:100%;width:0%;background:var(--pink);transition:width .2s linear}
+.vtime{position:absolute;right:8px;bottom:11px;font-size:11px;font-variant-numeric:tabular-nums;
+       color:#fff;opacity:.85;text-shadow:0 1px 4px rgba(0,0,0,.9);pointer-events:none}
+.vsound{position:absolute;left:8px;top:8px;display:none;background:rgba(6,8,24,.72);
+        border:1px solid var(--purple);border-radius:999px;padding:5px 11px;font-size:11px;
+        font-weight:700;line-height:1;cursor:pointer}
+
 .scene{height:150px;border-radius:14px;margin-top:6px;position:relative;overflow:hidden;
        background:linear-gradient(120deg,#3a1f4a,#1c2a55);display:flex;align-items:center;justify-content:center}
 .scene .play{font-size:44px;animation:pulse 1.4s infinite}

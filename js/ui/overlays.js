@@ -52,13 +52,18 @@ async function playEpisode(){
   const p=pending, ep=p.ep;
   const answerIdx=p.order[p.sel];        // displayed position → index in the episode file
   const odds=ep.answers[answerIdx].odds;
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Now playing</div><h2>${ep.title}</h2></div>
-    <div class="mbody"><div class="scene"><div class="play">🎬</div><div class="sceneBar" id="sBar"></div></div>
+  $("#scrim").innerHTML=`<div class="modal videoModal"><div class="top"><div class="eyebrow">Now playing</div><h2>${ep.title}</h2></div>
+    <div class="mbody"><div class="vwrap" id="vWrap">
+      <video id="epVideo" class="epVideo" playsinline preload="auto" src="${Episodes.videoFor(p.id)}"></video>
+      <div class="vpause">▶</div>
+      <div class="vsound" id="vSound">🔇 tap for sound</div>
+      <div class="vbar"><div class="vfill" id="vFill"></div></div>
+      <div class="vtime" id="vTime">0:00</div>
+    </div>
     <div class="hint" style="text-align:center;margin-top:10px">${p.wager>0?`You wagered <b style="color:var(--gold)">${fmt(p.wager)}</b> at ×${odds.toFixed(1)}`:"Watching with no wager"}</div></div></div>`;
   const {won,payout}=resolvePrediction({wager:p.wager,odds,sel:answerIdx,correct:ep.correct,
                                         auto:typeof autoMode!=="undefined"&&autoMode!==null});
-  await sleep(60); const bar=$("#sBar"); bar.style.transition="width 1.6s linear"; bar.style.width="100%";
-  await sleep(1700);
+  await playVideo(p.id);   // resolves when the episode finishes (or the fallback elapses)
   // name the true answer when the player got it wrong
   const truth=ep.answers[ep.correct]?.text||"";
   const truthHtml=won?"":`<div style="margin-top:8px;font-size:12px;color:var(--muted)">The answer was <b style="color:var(--teal)">${truth}</b></div>`;
