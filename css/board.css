@@ -10,7 +10,10 @@
           box-shadow:0 4px 14px rgba(255,203,92,.28);transition:transform .08s}
 .storeBtn:active:not(:disabled){transform:translateY(2px)}
 
-.boardScene{perspective:1200px;display:flex;justify-content:center;align-items:center;min-height:520px;position:relative}
+/* padding-bottom: in 3D the perspective projection pushes the board's near (bottom)
+   vertex ~49px past the scene box, which was overlapping the controls by 33px */
+.boardScene{perspective:1200px;display:flex;justify-content:center;align-items:center;
+            min-height:520px;position:relative;padding-bottom:52px}
 .board{width:min(560px,92%);aspect-ratio:1;display:grid;
        grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);
        gap:4px;position:relative;z-index:1;
