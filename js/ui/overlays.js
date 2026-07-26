@@ -57,9 +57,11 @@ async function playEpisode(){
       <video id="epVideo" class="epVideo" playsinline preload="auto" src="${Episodes.videoFor(p.id)}"></video>
       <div class="vpause">▶</div>
       <div class="vsound" id="vSound">🔇 tap for sound</div>
+      <div class="vspeed" id="vSpeed">2×</div>
       <div class="vbar"><div class="vfill" id="vFill"></div></div>
       <div class="vtime" id="vTime">0:00</div>
     </div>
+    <div class="vctrl"><button class="btn ghost speedBtn" id="speedBtn">⏩ 2× speed</button></div>
     <div class="hint" style="text-align:center;margin-top:10px">${p.wager>0?`You wagered <b style="color:var(--gold)">${fmt(p.wager)}</b> at ×${odds.toFixed(1)}`:"Watching with no wager"}</div></div></div>`;
   const {won,payout}=resolvePrediction({wager:p.wager,odds,sel:answerIdx,correct:ep.correct,
                                         auto:typeof autoMode!=="undefined"&&autoMode!==null});

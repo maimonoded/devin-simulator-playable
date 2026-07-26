@@ -65,7 +65,8 @@
 .modal .foot{display:flex;gap:10px;margin-top:18px}
 /* ---------- episode video player ---------- */
 .modal.videoModal{width:auto}                      /* hug the portrait video instead of 480px */
-.vwrap{position:relative;margin-top:6px;cursor:pointer;line-height:0;border-radius:14px;overflow:hidden}
+.vwrap{position:relative;margin-top:6px;cursor:pointer;line-height:0;border-radius:14px;overflow:hidden;
+       user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .epVideo{height:min(68vh,620px);width:auto;max-width:86vw;display:block;background:#000}
 /* pause glyph — only while paused */
 .vpause{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -81,6 +82,13 @@
 .vsound{position:absolute;left:8px;top:8px;display:none;background:rgba(6,8,24,.72);
         border:1px solid var(--purple);border-radius:999px;padding:5px 11px;font-size:11px;
         font-weight:700;line-height:1;cursor:pointer}
+/* 2× indicator — shown while held or latched */
+.vspeed{position:absolute;right:8px;top:8px;display:none;background:rgba(6,8,24,.75);
+        border:1px solid var(--gold);color:var(--gold);border-radius:999px;padding:4px 10px;
+        font-size:11px;font-weight:800;line-height:1;pointer-events:none}
+.vctrl{display:flex;justify-content:center;margin-top:10px}
+.speedBtn{padding:8px 14px;font-size:12px;box-shadow:none}
+.speedBtn.on{background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;border-color:transparent}
 
 .scene{height:150px;border-radius:14px;margin-top:6px;position:relative;overflow:hidden;
        background:linear-gradient(120deg,#3a1f4a,#1c2a55);display:flex;align-items:center;justify-content:center}

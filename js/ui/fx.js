@@ -106,9 +106,35 @@ function playVideo(id){
       if(v.currentTime>maxTime+0.5) v.currentTime=maxTime;
     });
 
-    // click anywhere on the video toggles pause/resume
+    /* Speed: press-and-hold the video for a temporary 2×, plus a latching 2× button.
+       Effective rate is 2 whenever either is active. */
+    const speedBtn=$("#speedBtn"), chip=$("#vSpeed");
+    let latched=false, holding=false, pressTimer=null, suppressClick=false;
+    const applyRate=()=>{
+      const fast=latched||holding;
+      v.playbackRate=fast?2:1;
+      if(chip) chip.style.display=fast?"block":"none";
+      if(speedBtn) speedBtn.classList.toggle("on",latched);
+    };
+    if(speedBtn) speedBtn.onclick=()=>{ latched=!latched; applyRate(); };
+    wrap.addEventListener("pointerdown",()=>{
+      if(done) return;
+      pressTimer=setTimeout(()=>{
+        holding=true;
+        suppressClick=true;   // a hold must not also toggle pause
+        applyRate();
+      },cfg.longPressMs);
+    });
+    const endHold=()=>{
+      clearTimeout(pressTimer);
+      if(holding){ holding=false; applyRate(); }
+    };
+    ["pointerup","pointerleave","pointercancel"].forEach(e=>wrap.addEventListener(e,endHold));
+
+    // click anywhere on the video toggles pause/resume (unless it was a hold)
     wrap.onclick=()=>{
       if(done) return;
+      if(suppressClick){ suppressClick=false; return; }
       if(v.paused){ v.play().catch(()=>{}); wrap.classList.remove("paused"); }
       else { v.pause(); wrap.classList.add("paused"); }
     };
