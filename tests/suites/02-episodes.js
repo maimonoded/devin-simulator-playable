@@ -60,10 +60,21 @@ test("builders past the last episode cycle instead of failing", () => {
 
 suite("episodes: difficulty");
 
-test("declared difficulty is kept", () => {
-  eq(Episodes.difficultyOf("001"), 4);
-  eq(Episodes.difficultyOf("004"), 2);
-  eq(Episodes.difficultyOf("003"), 5);
+/* Deliberately content-agnostic: episode files are edited often, so assert the
+   mechanism and the invariant, never a specific episode's authored value. */
+test("a declared difficulty is kept as-is", () => {
+  Episodes.add({ id: "901", title: "T", question: "Q",
+                 answers: [{ text: "a", odds: 2 }, { text: "b", odds: 2 }], correct: 0, difficulty: 7 });
+  eq(Episodes.difficultyOf("901"), 7);
+  delete Episodes._byId["901"];
+  Episodes._ids.splice(Episodes._ids.indexOf("901"), 1);
+});
+
+test("every shipped episode reports a difficulty in range", () => {
+  Episodes.ids().forEach(id => {
+    const d = Episodes.difficultyOf(id);
+    ok(typeof d === "number" && d >= 1 && d <= 10, `${id}: difficulty ${d} out of range`);
+  });
 });
 
 test("missing difficulty defaults to 1", () => {
