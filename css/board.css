@@ -42,12 +42,17 @@
 .tile.hasArt{background-color:transparent;box-shadow:none}
 .tile.hasArt .ico{display:none}
 .tile.hasArt .val{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9)}
-/* The picture itself: counter-rotates the board tilt so it faces the viewer, and is scaled
-   up a little so an upright square reads across the diamond footprint. Overflow is allowed
-   on purpose — art with a base then reads as an object standing on the tile. */
+/* The picture itself. It counter-rotates the board tilt so it faces the viewer, then:
+     scale  — art is authored with its ground drawn as an isometric diamond, so it's scaled
+              until that ground spans the tile's on-screen diamond (~67px vs the 47px tile)
+     translateY — art sits low in its own frame, so it's lifted to plant that ground on the
+              tile face instead of hanging below it
+   Overflow is deliberate: anything with height then rises off the board like a prop. */
 .tile .art{position:absolute;inset:0;pointer-events:none;
-           background-size:contain;background-position:center;background-repeat:no-repeat;
-           transform:rotate(-45deg) rotateX(-52deg) scale(1.35);transform-origin:center}
+           background-size:contain;background-position:center bottom;background-repeat:no-repeat;
+           transform:rotate(-45deg) rotateX(-52deg)
+                     scale(var(--artScale,1.45)) translateY(calc(var(--artLift,8%) * -1));
+           transform-origin:center}
 .board.flat .tile .art{transform:none}
 /* overlay markers (mystery boxes) — .ovl is the shared hook, .box the per-overlay style */
 .ovl{position:absolute;top:1px;left:2px;font-size:12px;

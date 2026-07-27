@@ -5,6 +5,7 @@ const DEFAULTS={
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   fallbackSceneMs:1700, longPressMs:350,
+  tileArtScale:1.45, tileArtLift:8,
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
@@ -56,7 +57,9 @@ const TUNING=[
    ["stdBase","Standard base coins (avg)",1],["trainEV","Train bonus EV",10],
    ["startPass","Start pass bonus",10],["startLand","Start landing extra",10],
    ["spaEnergy","Spa Day energy grant",1],["vipSeed","VIP seed per lap",5],
-   ["boardScale","Board scale",0.1]]},
+   ["boardScale","Board scale",0.1],
+   ["tileArtScale","Tile art: size ×",0.05],
+   ["tileArtLift","Tile art: lift off tile (%)",1]]},
  {group:"Builders & series",items:[
    ["baseCost","Base cost (Builder 1, Lvl 1)",100],["tierGrowth","Level cost growth ×",0.05],
    ["bldgGrowth","Builder cost growth ×",0.05],["boxesPerUpgrade","Boxes per upgrade",1],

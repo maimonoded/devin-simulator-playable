@@ -41,6 +41,26 @@ but the artwork is counter-rotated by the same amount, so it **faces the viewer 
 as the source file looks. Don't skew your art into a diamond to "match" the board; that would be
 applied twice. A straight-on render or illustration is what you want.
 
+**A perfect edge-to-edge fit isn't possible, by design.** The board has a 1200px perspective, so a
+tile's on-screen diamond gets *taller* the nearer it is to the camera:
+
+| Tile | Where | Diamond width : height |
+|---|---|---|
+| 0 (Start) | nearest | 1.16 : 1 |
+| 5 | lower edge | 1.41 : 1 |
+| 10 / 30 | left & right corners | 1.67 : 1 |
+| 20 (VIP) | farthest | 2.18 : 1 |
+
+Standard isometric art is drawn at 2:1, which only matches the far end of the board. So art is
+treated as a **prop standing on the tile** rather than a texture filling it — the tile face stays
+visible around it, which is how Monopoly-GO-style boards look anyway. Two tuning-drawer values
+control the fit, under *Tile values*:
+
+- **`tileArtScale`** (default 1.45) — how large the art is relative to its tile
+- **`tileArtLift`** (default 8%) — how far it's raised so its base sits on the tile face
+
+Both are live, so open the drawer with your art in place and dial them until it sits right.
+
 The picture is scaled slightly larger than the tile and is allowed to overflow it, so art with a
 base or a tall element reads as an object standing on the board rather than a flat texture. It
 still occupies a small area — roughly 47px — so fine detail, thin lines and small text will not

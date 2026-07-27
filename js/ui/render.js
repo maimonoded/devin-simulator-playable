@@ -9,6 +9,10 @@ function applyFxTiming(){
   s.setProperty("--stepDur",Math.min(130,cfg.tokenStepMs*0.96)+"ms");
   s.setProperty("--hopDur",Math.min(140,cfg.tokenStepMs)+"ms");
   s.setProperty("--shakeDur",Math.max(120,cfg.diceRevealMs)+"ms");
+  // tile-art fit: tunable because the board's perspective makes the tile diamond's aspect
+  // vary by position, so no one value suits every piece of art
+  s.setProperty("--artScale",cfg.tileArtScale);
+  s.setProperty("--artLift",cfg.tileArtLift+"%");
 }
 /* ---- optional tile artwork ----
    A tile uses assets/tiles/<i+1>.png when that file exists. Existence is probed by
