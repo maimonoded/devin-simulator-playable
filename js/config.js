@@ -5,7 +5,7 @@ const DEFAULTS={
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   fallbackSceneMs:1700, longPressMs:350,
-  tileArtScale:1.45, tileArtLift:50,
+  tileArtScale:1.41, tileArtLift:20,
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,

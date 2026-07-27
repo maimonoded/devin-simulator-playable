@@ -10,10 +10,13 @@
           box-shadow:0 4px 14px rgba(255,203,92,.28);transition:transform .08s}
 .storeBtn:active:not(:disabled){transform:translateY(2px)}
 
-/* padding-bottom: in 3D the perspective projection pushes the board's near (bottom)
-   vertex ~49px past the scene box, which was overlapping the controls by 33px */
-.boardScene{perspective:1200px;display:flex;justify-content:center;align-items:center;
-            min-height:520px;position:relative;padding-bottom:52px}
+/* No perspective: with one, a tile's on-screen diamond ranges from 1.16:1 nearest the camera
+   to 2.18:1 farthest, so no single art size can line neighbours up. Flat (orthographic)
+   projection makes every tile the same 1.62:1 diamond, which is what lets art tile.
+   (It also means the board no longer overflows this box, so no padding is needed to keep
+   the near vertex off the controls — the projection alone leaves room.) */
+.boardScene{display:flex;justify-content:center;align-items:center;
+            min-height:520px;position:relative}
 .board{width:min(560px,92%);aspect-ratio:1;display:grid;
        grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);
        gap:4px;position:relative;z-index:1;
