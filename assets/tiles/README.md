@@ -36,13 +36,20 @@ A tile renders at **47.3 × 47.3 CSS px** on the default 560px board (11 columns
 Square, and `background-size: cover` fills the tile — so anything non-square gets cropped.
 Transparency is fine; it composites over the board background.
 
-**Design for the tilt.** The board is drawn at `rotateX(52deg) rotateZ(45deg)`, so tiles appear as
-compressed diamonds roughly 47px wide and 29px tall on screen. Fine detail, thin lines and small
-text will not survive. Bold shapes and strong contrast read best. (The ⤢ button toggles a flat
-view if you want to check art undistorted.)
+**Author it straight-on, not pre-skewed.** The board is drawn at `rotateX(52deg) rotateZ(45deg)`,
+but the artwork is counter-rotated by the same amount, so it **faces the viewer upright** — exactly
+as the source file looks. Don't skew your art into a diamond to "match" the board; that would be
+applied twice. A straight-on render or illustration is what you want.
+
+The picture is scaled slightly larger than the tile and is allowed to overflow it, so art with a
+base or a tall element reads as an object standing on the board rather than a flat texture. It
+still occupies a small area — roughly 47px — so fine detail, thin lines and small text will not
+survive. Bold shapes and strong contrast read best.
 
 ## What changes when art is present
 
+- the art is drawn on a child element (`.art`) that counter-rotates the board tilt — a CSS
+  background would be sheared by the board's 3D transform, which is why it isn't one
 - the tile's gradient background and inset shadow are dropped
 - its **type border colour is kept** (gold Start, teal Spa, purple VIP, pink Premiere) so the
   board still reads

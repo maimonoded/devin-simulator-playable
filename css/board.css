@@ -37,13 +37,18 @@
 .tile.lit{background:var(--gold);box-shadow:0 0 18px rgba(255,203,92,.8),inset 0 -3px 0 rgba(0,0,0,.2)}
 
 /* Artwork (assets/tiles/N.png). MUST come after the .tile.<type> rules above: those use the
-   `background` shorthand at the same specificity, so an earlier .tile.hasArt would lose its
-   size/position/repeat to them and the image would render at natural size, top-left aligned.
+   `background` shorthand at the same specificity, so an earlier rule here would lose to them.
    The type's border colour is kept so the board still reads; the emoji gives way to the art. */
-.tile.hasArt{background-color:transparent;background-size:cover;background-position:center;
-             background-repeat:no-repeat;box-shadow:none}
+.tile.hasArt{background-color:transparent;box-shadow:none}
 .tile.hasArt .ico{display:none}
 .tile.hasArt .val{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9)}
+/* The picture itself: counter-rotates the board tilt so it faces the viewer, and is scaled
+   up a little so an upright square reads across the diamond footprint. Overflow is allowed
+   on purpose — art with a base then reads as an object standing on the tile. */
+.tile .art{position:absolute;inset:0;pointer-events:none;
+           background-size:contain;background-position:center;background-repeat:no-repeat;
+           transform:rotate(-45deg) rotateX(-52deg) scale(1.35);transform-origin:center}
+.board.flat .tile .art{transform:none}
 /* overlay markers (mystery boxes) — .ovl is the shared hook, .box the per-overlay style */
 .ovl{position:absolute;top:1px;left:2px;font-size:12px;
      transform:rotate(-45deg) rotateX(-52deg)}

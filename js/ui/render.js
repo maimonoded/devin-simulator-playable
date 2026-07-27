@@ -18,9 +18,19 @@ function applyFxTiming(){
    404s in the network log for absent files are expected. */
 const tileArtStatus={};   // index → "ok" | "missing"
 
+/* The art goes on a child element, not the tile's own background: a background is painted
+   in the tile's local space and so gets rotated and sheared by the board's 3D transform.
+   The child carries the same counter-rotation the icons use, so the picture faces the
+   viewer upright. Inserted first so the coin label still paints above it. */
 function paintTileArt(el,src){
   el.classList.add("hasArt");
-  el.style.backgroundImage=`url("${src}")`;
+  let art=el.querySelector(".art");
+  if(!art){
+    art=document.createElement("div");
+    art.className="art";
+    el.insertBefore(art,el.firstChild);
+  }
+  art.style.backgroundImage=`url("${src}")`;
 }
 function applyTileArt(el,i){
   if(tileArtStatus[i]==="missing") return;
