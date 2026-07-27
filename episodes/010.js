@@ -1,11 +1,12 @@
 Episodes.add({
   "id": "010",
-  "title": "Last Dance",
-  "question": "Who does Elena leave the ball with?",
+  "title": "Escorted Out",
+  "question": "Carl has called security, claims he was attacked, and is demanding Simon be thrown out and banned. Who actually gets removed?",
   "answers": [
-    { "text": "Marco", "odds": 2.2 },
-    { "text": "Nobody — she leaves alone", "odds": 1.9 },
-    { "text": "The investigator", "odds": 3.0 }
+    { "text": "Carl and the cousin — bystanders back Simon's version", "odds": 1.82 },
+    { "text": "Simon and Victoria — Carl's VIP status carries the day", "odds": 6.67 },
+    { "text": "Nobody — staff recognise Simon as the owner and defuse it", "odds": 3.33 }
   ],
-  "correct": 1
+  "correct": 0,
+  "difficulty": 4
 });

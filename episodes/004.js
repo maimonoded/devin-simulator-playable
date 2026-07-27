@@ -1,10 +1,10 @@
 Episodes.add({
   "id": "004",
   "title": "Marry Me Instead",
-  "question": "Victoria can't cancel the wedding her family already paid for. What does Simon offer her?",
+  "question": "Victoria's Christmas wedding has collapsed, with her whole family already invited. What way out does she get?",
   "answers": [
-    { "text": "To marry her himself, just long enough for Grandma", "odds": 1.43 },
-    { "text": "To find her a stand-in groom before Christmas", "odds": 3.33 }
+    { "text": "Simon offers to stand in as her groom", "odds": 1.43 },
+    { "text": "Carl is pressured into faking it through the holiday", "odds": 3.33 }
   ],
   "correct": 0,
   "difficulty": 2

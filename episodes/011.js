@@ -1,11 +1,11 @@
 Episodes.add({
   "id": "011",
-  "title": "The Locked Drawer",
-  "question": "What's inside the locked drawer?",
+  "title": "Thirty Hours",
+  "question": "Carl and the cousin have just been marched out of the terminal and banned from Jones Airlines. How do they get to Texas?",
   "answers": [
-    { "text": "A hidden will", "odds": 2.0 },
-    { "text": "Old love letters", "odds": 2.3 },
-    { "text": "A second phone", "odds": 2.8 }
+    { "text": "They talk their way onto a rival airline", "odds": 3.33 },
+    { "text": "They can't fly at all and face a very long drive", "odds": 1.43 }
   ],
-  "correct": 0
+  "correct": 1,
+  "difficulty": 3
 });

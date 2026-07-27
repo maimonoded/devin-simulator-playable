@@ -1,11 +1,11 @@
 Episodes.add({
   "id": "003",
-  "title": "The VIP",
-  "question": "The cousin brags that Carl has moved up in the world. Which company just promoted him?",
+  "title": "Not Good Enough",
+  "question": "Victoria has just caught her fiancé with her own cousin. How does Carl handle being caught?",
   "answers": [
-    { "text": "The Jones Group — Simon's own company", "odds": 1.82 },
-    { "text": "A rival firm that outbid the Jones Group for him", "odds": 2.22 }
+    { "text": "He ends it coldly and tells her she's not good enough for him", "odds": 1.67 },
+    { "text": "He begs her to forgive him and blames the cousin", "odds": 2.50 }
   ],
   "correct": 0,
-  "difficulty": 5
+  "difficulty": 4
 });

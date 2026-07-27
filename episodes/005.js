@@ -1,11 +1,11 @@
 Episodes.add({
   "id": "005",
   "title": "The Name on the Certificate",
-  "question": "They make it all the way to the registry desk. What stops the moment cold?",
+  "question": "Simon has spent six months hiding who he is. What name does he give when it comes time to sign?",
   "answers": [
-    { "text": "The official recognizes the name Simon gives", "odds": 1.67 },
-    { "text": "Carl turns up to stop them signing", "odds": 2.50 }
+    { "text": "His real one — Simon Jones", "odds": 1.82 },
+    { "text": "A false name, to keep the secret intact", "odds": 2.22 }
   ],
   "correct": 0,
-  "difficulty": 4
+  "difficulty": 5
 });

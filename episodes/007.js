@@ -1,9 +1,9 @@
 Episodes.add({
   "id": "007",
   "title": "Technically Your Husband",
-  "question": "Victoria walks in on Simon in the shower. How does he play it?",
+  "question": "Victoria is about to walk in on Simon in the bathroom. How does he play it?",
   "answers": [
-    { "text": "He teases her — he's her husband now, after all", "odds": 1.82 },
+    { "text": "He teases her — he's technically her husband now", "odds": 1.82 },
     { "text": "He scrambles to cover up, mortified", "odds": 2.22 }
   ],
   "correct": 0,
