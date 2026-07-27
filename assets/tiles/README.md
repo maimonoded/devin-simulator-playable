@@ -3,6 +3,10 @@
 Drop a PNG in here and that board tile uses it. Nothing else to wire up — no config, no
 registration, no code change.
 
+> **Commissioning art?** Hand over [ART-BRIEF.md](ART-BRIEF.md) — it's the self-contained spec
+> (camera angle, diamond geometry, anchor, naming). The camera is the part that matters: this
+> board needs **38° elevation**, not the standard isometric 30°.
+
 ## Naming
 
 **The filename is 1-based**, counting clockwise from Start:
