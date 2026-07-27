@@ -43,9 +43,10 @@
 /* Artwork (assets/tiles/N.png). MUST come after the .tile.<type> rules above: those use the
    `background` shorthand at the same specificity, so an earlier rule here would lose to them.
    The type's border colour is kept so the board still reads; the emoji gives way to the art. */
-/* the art IS the tile: drop the drawn face entirely so nothing paints over the picture
-   (a visible face would also clip the art where the upright plane crosses the board) */
-.tile.hasArt{background-color:transparent;border-color:transparent;box-shadow:none}
+/* The art IS the tile: drop the drawn face entirely so nothing paints behind the picture.
+   `background:none` (not just background-color) is required — the .tile.<type> rules set
+   their fill as a linear-gradient, i.e. a background-IMAGE, which a colour reset leaves alone. */
+.tile.hasArt{background:none;border-color:transparent;box-shadow:none}
 .tile.hasArt .ico{display:none}
 .tile.hasArt .val{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9)}
 /* The picture itself. It counter-rotates the board tilt so it faces the viewer, then:
