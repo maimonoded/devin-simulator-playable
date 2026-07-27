@@ -20,8 +20,12 @@
        transform:rotateX(52deg) rotateZ(45deg);transform-style:preserve-3d;
        transition:transform .6s ease}
 .board.flat{transform:rotateX(0) rotateZ(0)}
+/* preserve-3d matters: without it the tile flattens its children onto its own plane, so the
+   counter-rotation on .art / .ico never cancels the board's rotation and they get squashed to
+   ~47% height. With it the transforms compose and the art renders exactly as authored. */
 .tile{background:var(--tile);border:1px solid #313a80;border-radius:7px;position:relative;
       display:flex;align-items:center;justify-content:center;font-size:15px;z-index:1;
+      transform-style:preserve-3d;
       box-shadow:inset 0 -3px 0 rgba(0,0,0,.28);transition:background .2s,box-shadow .2s}
 .tile .val{position:absolute;bottom:2px;right:4px;font-size:8px;color:var(--muted);
            transform:rotate(-45deg) rotateX(-52deg)} /* counter board tilt for legibility */
