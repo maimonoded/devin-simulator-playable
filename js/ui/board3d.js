@@ -367,6 +367,8 @@ const Board3D = {
         this._scene.add(holder);
         this._models.set(i, holder);
         slab.visible = false;                       // the model brings its own ground
+        /* Models arrive after the label layer is built, so the label has to be told. */
+        if (window.onTileModelled) window.onTileModelled(i);
       },
       undefined,
       () => {},                                     // no model for this tile — keep the slab
@@ -503,6 +505,10 @@ const Board3D = {
     Env3D.rebuild();
     this.resize();
   },
+
+  /* Did tile i end up with a 3D model? render.js asks, to decide whether the tile still
+     needs its emoji. */
+  hasModel(i) { return this._models.has(i); },
 
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */
   screenPosOf(i, lift = 0) {

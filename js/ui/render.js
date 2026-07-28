@@ -58,6 +58,20 @@ function use3d(){ return cfg.board3d && window.Board3D && Board3D.available; }
 /* ---- DOM label layer for the 3D board ----
    Tile values and emoji stay as DOM text over the canvas: crisp at ~47px, and the drawer's
    live stdBase edits keep working by rewriting textContent. Positioned by projection. */
+/* A tile with 3D art doesn't get an emoji too. The icon is a flat DOM sticker sitting over a
+   lit, shadowed model — it covers the art it is meant to caption and reads as a different
+   medium. The legacy CSS board has said the same thing since it gained artwork
+   (.tile.hasArt .ico is display:none); this is that rule for the WebGL board. The coin value
+   stays, because it is information the art cannot carry. */
+function showIcon(i,def){
+  if(!def.icon) return false;
+  return !(use3d() && window.Board3D && Board3D.hasModel && Board3D.hasModel(i));
+}
+/* Models load asynchronously, so a tile can gain its art after the label was built. */
+function onTileModelled(i){
+  const ico=document.querySelector(`#boardLabels .blabel[data-i="${i}"] .ico`);
+  if(ico) ico.remove();
+}
 function buildBoardLabels(){
   const layer=$("#boardLabels"); if(!layer) return;
   layer.innerHTML="";
@@ -65,7 +79,7 @@ function buildBoardLabels(){
     const def=TILE_TYPES[tileType(i)];
     const el=document.createElement("div");
     el.className="blabel"; el.dataset.i=i;
-    el.innerHTML=(def.icon?`<span class="ico">${def.icon}</span>`:"")+
+    el.innerHTML=(showIcon(i,def)?`<span class="ico">${def.icon}</span>`:"")+
                  (def.valueLabel(i)?`<span class="val">${def.valueLabel(i)}</span>`:"");
     layer.appendChild(el);
   }
