@@ -122,10 +122,15 @@ that decides whether the board sits square has to be true of the file itself.
 
 | | |
 |---|---|
-| Deck | contains a **1 × 1 axis-aligned square, centred on the origin** |
+| Deck | contains a **1 × 1 axis-aligned square, centred on the origin, with nothing standing on it** |
 | Deck surface | at **y = 0**. Rock and keel go negative, kerb and rim positive |
 | Rotation | deck edges square to X and Z |
-| Everything else | free — overhangs, piers and keels may be any size, they are never measured |
+| Everything else | free — overhangs, piers, buildings and keels may be any size, they are never measured |
+
+"Nothing standing on it" is the half that is easy to miss. A slab usually runs on *underneath*
+the buildings around it, so the flat area and the usable area are different numbers — on the
+Texas town the flat square was 0.83 wide and the clear square only 0.59. The conform tool
+measures the clear one, and the board is sized to that.
 
 The engine scales that 1 × 1 up to `11 + 2 × margin`, so the board lands centred with the
 requested border on every side, whatever the asset's own proportions were.

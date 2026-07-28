@@ -238,32 +238,137 @@ def min_area_rect(hull):
     return ang, centre, w, d
 
 
-def find_deck(tris):
-    """The flat, upward-facing surface with the most area — the thing the board stands on.
+def deck_candidates(tris, limit=8):
+    """Flat upward-facing surfaces, as (height, verts, area), biggest area first.
 
-    By area, not by height: the highest flat surface on the first island was the top of its
-    parapet, which is a ledge a few tiles wide, not the deck."""
-    buckets = {}
+    Plural, because "biggest flat surface" is the wrong test on its own. The Texas town's
+    largest flat surface by area is the base plate its whole diorama sits on — which is
+    almost entirely covered by the town square and the storefronts standing on it. Picking it
+    put the deck 1.19 units BELOW the surface the board should stand on, and buried the board.
+    conform() therefore scores these by how much CLEAR deck each one offers.
+
+    Faces are gathered into a band around each candidate height rather than a single thin
+    bucket: a reconstructed dirt lot is never perfectly level, and with thin buckets its area
+    scatters across dozens of them so a crisply flat porch roof wins instead."""
     ys = [v[1] for t in tris for v in t]
     span = max(ys) - min(ys) or 1.0
-    res = span / 400.0
+    band = span * 0.02
+    faces = []
     for a, b, c in tris:
         ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
         vx, vy, vz = c[0] - a[0], c[1] - a[1], c[2] - a[2]
         nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
         length = math.sqrt(nx * nx + ny * ny + nz * nz)
-        if length == 0:
+        if length == 0 or ny / length < 0.95:
             continue
-        if ny / length < 0.95:                      # not flat and facing up
-            continue
-        key = round(((a[1] + b[1] + c[1]) / 3) / res)
-        entry = buckets.setdefault(key, [0.0, []])
-        entry[0] += length / 2
-        entry[1].extend((a, b, c))
-    if not buckets:
+        faces.append(((a[1] + b[1] + c[1]) / 3, length / 2, (a, b, c)))
+    if not faces:
         sys.exit("no flat upward-facing surface — is this a deck piece?")
-    key, (area, verts) = max(buckets.items(), key=lambda kv: kv[1][0])
-    return key * res, verts, area
+
+    scored = []
+    for centre, _, _ in faces:
+        area = sum(f[1] for f in faces if abs(f[0] - centre) <= band)
+        scored.append((area, centre))
+    scored.sort(reverse=True)
+
+    out = []
+    for area, centre in scored:
+        if any(abs(centre - h) <= band * 2 for h, _, _ in out):
+            continue                                # same surface, already have it
+        picked = [f for f in faces if abs(f[0] - centre) <= band]
+        verts = [v for f in picked for v in f[2]]
+        height = sum(f[0] * f[1] for f in picked) / area
+        out.append((height, verts, area))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def clear_square(tris, height, ang, span):
+    """Largest axis-aligned square of deck that has NOTHING standing on it.
+
+    Flatness alone is not enough. The Texas town's slab runs on underneath its storefronts,
+    so the flat rectangle was 12.2 tiles wide while the part the board could actually occupy
+    was far smaller — the board landed with its far edge inside the shopfronts and the engine
+    reported four corners buried up to 2.88 above the deck.
+
+    So: rasterise the deck, rasterise everything that stands above it, subtract, and find the
+    biggest empty square left. Returns (side, centre_x, centre_z) in the rotated frame.
+    Marking the blockers by bounding box rather than exact coverage is deliberate — it errs
+    toward calling a cell blocked, and a slightly small deck is safe where a large one is not.
+    """
+    c, sn = math.cos(-ang), math.sin(-ang)
+    rot = lambda x, z: (x * c - z * sn, x * sn + z * c)
+    clearance = span * 0.03
+
+    pts = [rot(v[0], v[2]) for t in tris for v in t]
+    u0, u1 = min(p[0] for p in pts), max(p[0] for p in pts)
+    v0, v1 = min(p[1] for p in pts), max(p[1] for p in pts)
+    N = 160
+    du, dv = (u1 - u0) / N or 1, (v1 - v0) / N or 1
+    deck = [[False] * N for _ in range(N)]
+    blocked = [[False] * N for _ in range(N)]
+
+    def cells(ps):
+        us = [p[0] for p in ps]; vs = [p[1] for p in ps]
+        i0 = max(0, int((min(us) - u0) / du)); i1 = min(N - 1, int((max(us) - u0) / du))
+        j0 = max(0, int((min(vs) - v0) / dv)); j1 = min(N - 1, int((max(vs) - v0) / dv))
+        return i0, i1, j0, j1
+
+    def inside(ps, x, z):
+        (ax, az), (bx, bz), (cx_, cz_) = ps
+        d1 = (x - bx) * (az - bz) - (ax - bx) * (z - bz)
+        d2 = (x - cx_) * (bz - cz_) - (bx - cx_) * (z - cz_)
+        d3 = (x - ax) * (cz_ - az) - (cx_ - ax) * (z - az)
+        return not ((d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0))
+
+    for tri in tris:
+        ps = [rot(p[0], p[2]) for p in tri]
+        # Deck: fill the triangle properly. A flat slab can be two big triangles, so marking
+        # only the cells its vertices land in would leave the middle of the deck unmarked.
+        if all(abs(p[1] - height) <= clearance for p in tri):
+            i0, i1, j0, j1 = cells(ps)
+            for j in range(j0, j1 + 1):
+                for i in range(i0, i1 + 1):
+                    if inside(ps, u0 + (i + 0.5) * du, v0 + (j + 0.5) * dv):
+                        deck[j][i] = True
+        # Blocked: same proper fill, for anything sitting above the deck. Selected by
+        # centroid rather than by any-vertex, so a triangle bridging from the deck up to a
+        # roof does not claim the deck it springs from — and filled rather than
+        # bounding-boxed, because reconstruction is full of long thin triangles whose boxes
+        # are enormous. Marking only the vertices instead is the opposite failure: a slab
+        # covering the base plate is a handful of big triangles, so it marked its corners
+        # and left the middle "clear", and the base plate won the deck vote while sitting
+        # 1.19 units under the surface the board should stand on.
+        cy = sum(p[1] for p in tri) / 3
+        if cy > height + clearance:
+            i0, i1, j0, j1 = cells(ps)
+            for j in range(j0, j1 + 1):
+                for i in range(i0, i1 + 1):
+                    if inside(ps, u0 + (i + 0.5) * du, v0 + (j + 0.5) * dv):
+                        blocked[j][i] = True
+
+    # largest all-clear square, by the standard DP over the mask
+    best = (0, 0, 0)
+    dp = [[0] * N for _ in range(N)]
+    for j in range(N):
+        for i in range(N):
+            if not deck[j][i] or blocked[j][i]:
+                continue
+            dp[j][i] = 1 if i == 0 or j == 0 else 1 + min(dp[j-1][i], dp[j][i-1], dp[j-1][i-1])
+            if dp[j][i] > best[0]:
+                best = (dp[j][i], i, j)
+    n, i, j = best
+    if n == 0:
+        # Zero is an answer, not a failure: conform() scores every candidate surface and a
+        # buried one legitimately has no clear deck. Exiting here instead let the first dud
+        # candidate kill the whole run, which is how re-conforming the island — a piece that
+        # had worked for weeks — started reporting "no clear deck at all".
+        return 0.0, 0.0, 0.0
+    side = min(n * du, n * dv)
+    cu = u0 + (i - n / 2 + 0.5) * du
+    cv = v0 + (j - n / 2 + 0.5) * dv
+    return side, cu, cv
 
 
 # ---------------------------------------------------------------- the two modes
@@ -271,13 +376,40 @@ def find_deck(tris):
 
 def conform(tris, deck_mode):
     if deck_mode:
-        height, verts, area = find_deck(tris)
-        ang, (cx, cz), w, d = min_area_rect(hull_xz(verts))
-        # min(w, d): the guarantee is a SQUARE of deck, so the short side is what counts.
-        # A deck 11.2 x 11.5 has to promise 11.2, or the board hangs off the narrow way.
-        scale = 1.0 / min(w, d)
-        report = {"deck height": height, "deck size": (w, d), "deck area": area,
-                  "rotation": math.degrees(ang), "centre": (cx, cz)}
+        ys = [v[1] for t in tris for v in t]
+        span = max(ys) - min(ys) or 1.0
+        best = None
+        for height, verts, area in deck_candidates(tris):
+            ang, (cx, cz), w, d = min_area_rect(hull_xz(verts))
+            side, ccx, ccz = clear_square(tris, height, ang, span)
+            if best is None or side > best[0]:
+                best = (side, height, ang, cx, cz, ccx, ccz, w, d, area)
+        if best is None or best[0] <= 0:
+            sys.exit("no clear deck on any flat surface — every one has something standing "
+                     "on it. Regenerate with an empty middle (ART-BRIEF-ENV.md 6.3).")
+        side, height, ang, _, _, cx, cz_, w, d, area = best
+        # Sit the board on the TOP of the flat band, not its average. The band is a couple of
+        # percent of the model's height and the piece is then scaled up ~20x, so half a
+        # percent of slop becomes a tenth of a tile on screen — enough to sink tiles whose
+        # slabs are only 0.16 tall. Erring high leaves a hairline gap; erring low buries them.
+        c_, sn_ = math.cos(-ang), math.sin(-ang)
+        for h, verts, _a in deck_candidates(tris):
+            if abs(h - height) > 1e-9:
+                continue
+            inside_sq = [v[1] for v in verts
+                         if abs(v[0] * c_ - v[2] * sn_ - cx) <= side / 2
+                         and abs(v[0] * sn_ + v[2] * c_ - cz_) <= side / 2]
+            if inside_sq:
+                height = max(inside_sq)
+            break
+        fill = area / (w * d) if w * d else 0
+        scale = 1.0 / side
+        report = {"deck height": height, "flat size": (w, d), "flat fill": fill,
+                  "clear square": side, "rotation": math.degrees(ang),
+                  "centre": (cx, cz_)}
+        if side < w * 0.3:
+            print(f"  NOTE: only {side / min(w, d):.0%} of the flat surface is clear — "
+                  f"the rest has something standing on it")
         base = height
     else:
         verts = [v for t in tris for v in t]
@@ -293,7 +425,12 @@ def conform(tris, deck_mode):
     # so cancelling a rectangle sitting at `ang` means passing +ang, not -ang. Passing -ang
     # doubles the error instead of removing it: the island came out 10 degrees off rather
     # than 5, and every check still passed, because none of them looked at the angle.
-    m = mat_mul(mat_scale(scale), mat_mul(mat_rot_y(ang), mat_translate(-cx, -base, -cz)))
+    if deck_mode:
+        # centre comes from the rotated frame, so rotate, then translate, then scale
+        m = mat_mul(mat_scale(scale),
+                    mat_mul(mat_translate(-cx, -base, -cz_), mat_rot_y(ang)))
+    else:
+        m = mat_mul(mat_scale(scale), mat_mul(mat_rot_y(ang), mat_translate(-cx, -base, -cz)))
     return m, report, scale
 
 
@@ -308,16 +445,23 @@ def check(tris, deck_mode, tol=0.01, tol_deg=0.25):
     """Verify a conformed file, so the skill's checklist has something to run."""
     problems = []
     if deck_mode:
-        height, verts, _ = find_deck(tris)
+        ys0 = [v[1] for t in tris for v in t]
+        span0 = max(ys0) - min(ys0) or 1.0
+        cands = [(clear_square(tris, h, min_area_rect(hull_xz(vs))[0], span0)[0], h, vs)
+                 for h, vs, _ in deck_candidates(tris)]
+        _, height, verts = max(cands)
         ang, (cx, cz), w, d = min_area_rect(hull_xz(verts))
         if off_axis(ang) > tol_deg:
             problems.append(f"deck sits {off_axis(ang):.2f}° off axis, must be square to X/Z")
         if abs(height) > tol:
             problems.append(f"deck surface at y={height:.4f}, must be 0")
-        if min(w, d) < 1 - tol or min(w, d) > 1 + 0.5:
-            problems.append(f"deck short side {min(w, d):.4f}, must be 1")
-        if abs(cx) > tol or abs(cz) > tol:
-            problems.append(f"deck centre ({cx:.4f}, {cz:.4f}), must be (0, 0)")
+        ys = [v[1] for t in tris for v in t]
+        side, ccx, ccz = clear_square(tris, height, 0.0, max(ys) - min(ys))
+        if side < 1 - 0.02:
+            problems.append(f"clear deck is {side:.4f} across, must be at least 1 "
+                            f"— something stands where the board goes")
+        if abs(ccx) > 0.02 or abs(ccz) > 0.02:
+            problems.append(f"clear deck centred at ({ccx:.4f}, {ccz:.4f}), must be (0, 0)")
     else:
         verts = [v for t in tris for v in t]
         ang, (cx, cz), w, d = min_area_rect(hull_xz(verts))

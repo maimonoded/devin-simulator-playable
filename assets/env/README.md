@@ -43,11 +43,13 @@ and it is what you see with no models present.
 A manifest that ships a modelled island turns off the parts it replaces:
 
 ```js
-terrain: { sea: true, shelf: false, island: false, plinth: false },
+terrain: { ground: true, groundColor: 0x8a4a2c, shelf: false, island: false, plinth: false },
 ```
 
-The **sea stays procedural** on purpose. It has to reach the frame edge at every window shape and
-fade out before it gets there, which is not something to ask a generated mesh for. It is one
+The **ground stays procedural** on purpose. It has to reach the frame edge at every window shape
+and fade out before it gets there, which is not something to ask a generated mesh for. Only its
+colour changes per environment, and that is manifest data — harbour blue or Texas dirt is not a
+code change. It is one
 plane with a canvas-drawn radial gradient: solid around the island, transparent by the frame edge,
 so the stage's own background comes back at the rim instead of the water ending on a hard line.
 

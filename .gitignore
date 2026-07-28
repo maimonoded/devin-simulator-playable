@@ -5,3 +5,6 @@
 
 # scratch copies of superseded tile GLBs — kept on disk, out of history
 *.glb.bak
+
+# python bytecode from tools/
+__pycache__/

@@ -26,8 +26,8 @@ import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 const envScene = () => (typeof ENV_SCENE === "undefined" ? null : ENV_SCENE);
 
 const C = {
-  sea:      0x1d4f8f,
-  seaShelf: 0x17427c,
+  ground:   0x1d4f8f,          // harbour blue; assets/env/scene.js overrides per environment
+  shelf:    0x17427c,
   cliff:    0x1b2048,
   quay:     0x2b3268,
   quayLip:  0x3c4489,
@@ -75,15 +75,15 @@ export const Env3D = {
     return mesh;
   },
 
-  /* Radial water texture: solid around the island, gone by the frame edge. Drawn to a
-     canvas rather than shipped as a PNG — it is four stops of a gradient, and a file would
-     be one more thing to keep in step with the palette. */
-  _seaFade() {
+  /* Radial ground texture: solid around the deck, gone by the frame edge. Drawn to a canvas
+     rather than shipped as a PNG — it is four stops of a gradient, and a file would be one
+     more thing to keep in step with the palette. */
+  _groundFade(color) {
     const N = 256, cv = document.createElement("canvas");
     cv.width = cv.height = N;
     const g = cv.getContext("2d").createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
-    const hex = "#" + C.sea.toString(16).padStart(6, "0");
-    /* Stops are fractions of the plane's half-width (ENV_SIZE.sea = 24 tiles). The island's
+    const hex = "#" + color.toString(16).padStart(6, "0");
+    /* Stops are fractions of the plane's half-width (ENV_SIZE.ground = 24 tiles). The deck's
        corners reach 11.5, and the frame runs out at about 19 — so hold the water solid past
        the island and have it gone by the time the frame ends. */
     g.addColorStop(0.00, hex);
@@ -102,14 +102,17 @@ export const Env3D = {
      island turns off the parts it replaces — the sea stays, because a plane that reaches the
      frame edge at every aspect is not something a generated mesh can be asked for. */
   _buildTerrain() {
-    const { plinth, island, sea } = ENV_SIZE;
+    const { plinth, island, ground } = ENV_SIZE;
     const Y = ENV_Y;
-    const on = Object.assign({ sea: true, shelf: true, island: true, plinth: true },
+    const on = Object.assign({ ground: true, shelf: true, island: true, plinth: true },
                              envScene()?.terrain);
+    /* The colour is manifest data, not code: an environment that is not a harbour has to be
+       able to say so without anyone editing this file. */
+    const groundColor = on.groundColor ?? C.ground;
 
-    /* Sea. One plane, wider than the frame at any aspect, so the board is in a place rather
-       than on a tray. It only receives shadow — a shadow-casting water plane would shadow a
-       seabed nobody can see.
+    /* Ground. One plane, wider than the frame at any aspect, so the board is in a place
+       rather than on a tray. It only receives shadow — a shadow-casting ground plane would
+       shadow a seabed nobody can see.
 
        It fades out radially instead of ending on an edge. A flat plane that reaches the
        frame boundary paints the whole stage one colour and flattens the panel's own vignette;
@@ -117,10 +120,10 @@ export const Env3D = {
        as water near the island and as backdrop at the edges. Fog would do this too, but fog
        is depth-based and the camera looks along a diagonal — it would darken the far corner
        and leave the near one bright. */
-    if (on.sea) {
+    if (on.ground) {
       const water = new THREE.Mesh(
-        new THREE.PlaneGeometry(sea * 2, sea * 2),
-        new THREE.MeshLambertMaterial({ map: this._seaFade(), transparent: true }),
+        new THREE.PlaneGeometry(ground * 2, ground * 2),
+        new THREE.MeshLambertMaterial({ map: this._groundFade(groundColor), transparent: true }),
       );
       water.rotation.x = -Math.PI / 2;
       water.position.y = Y.water;
@@ -134,7 +137,7 @@ export const Env3D = {
     if (on.shelf) {
       const shelf = new THREE.Mesh(
         new THREE.PlaneGeometry((island + 2.6) * 2, (island + 2.6) * 2),
-        new THREE.MeshLambertMaterial({ color: C.seaShelf }),
+        new THREE.MeshLambertMaterial({ color: C.shelf }),
       );
       shelf.rotation.x = -Math.PI / 2;
       shelf.position.y = Y.water + 0.02;

@@ -28,10 +28,11 @@ const ENV_Y = { deck: 0, quay: -1.2, water: -1.85, keel: -3.6 };
 /* Horizontal half-extents, in tiles. The ring itself is 5.5.
      plinth — the platform the board stands on, a 0.5 lip around the ring
      island — the land: leaves a 2.0–2.8 tile quay outside the plinth for props
-     sea    — the water plane. 24 covers the visible diamond at every aspect with a little
-              to spare, and no more: the sea fades out radially, so an oversized plane would
+     ground — the plane beyond the deck: sea in a harbour, dirt in a desert, and its colour
+              comes from the manifest. 24 covers the visible diamond at every aspect with a
+              little to spare, and no more: it fades out radially, so an oversized plane would
               push the fade past the frame and leave a hard edge instead. */
-const ENV_SIZE = { plinth: 6.0, island: 7.5, sea: 24 };
+const ENV_SIZE = { plinth: 6.0, island: 7.5, ground: 24 };
 
 /* Framing margin when the environment is off — the value board3d.js used before there was
    anything to see outside the ring. cfg.envMargin replaces it when the environment is on. */
