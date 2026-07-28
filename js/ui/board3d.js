@@ -68,7 +68,11 @@ const Board3D = {
       this.available = false;
       return false;
     }
-    this._renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    /* Render at 2x and let the browser downsample, even on a 1x display. A tile spans only
+       ~27 CSS pixels at the default board size, so it is the sample count — not the texture
+       or the triangle budget — that limits how much of the art survives. The scene is a few
+       thousand triangles, so supersampling costs effectively nothing here. */
+    this._renderer.setPixelRatio(Math.max(2, Math.min(devicePixelRatio, 2)));
     this._renderer.domElement.className = "boardCanvas";
     host.appendChild(this._renderer.domElement);
 
@@ -346,6 +350,20 @@ const Board3D = {
         holder.position.y += TILE_H / 2 - box.min.y;
 
         holder.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+        /* Anisotropic filtering. The camera looks down at 38°, so tile surfaces are always
+           seen at a grazing angle — precisely the case where plain mipmapping over-blurs,
+           because it picks a mip level for the axis that is compressed hardest and applies
+           it to both. three.js defaults to 1 (off); the GPU offers 16. */
+        const aniso = this._renderer.capabilities.getMaxAnisotropy();
+        model.traverse((o) => {
+          if (!o.isMesh || !o.material) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+            if (!m.map) continue;
+            m.map.anisotropy = aniso;
+            m.map.needsUpdate = true;
+          }
+        });
+
         this._scene.add(holder);
         this._models.set(i, holder);
         slab.visible = false;                       // the model brings its own ground
