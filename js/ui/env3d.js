@@ -57,7 +57,7 @@ export const Env3D = {
     this._root = new THREE.Group();
     this._scene.add(this._root);
     this._buildTerrain();
-    this._buildProps();
+    this._buildPieces();
   },
 
   /* ---------------- terrain ----------------
@@ -157,12 +157,14 @@ export const Env3D = {
     }
   },
 
-  /* ---------------- props ----------------
-     Same contract as a tile model (assets/tiles/README.md), with one difference: a tile is
-     forced to 1×1 because every tile is one tile, whereas an env piece declares its own
-     width in the manifest. Everything else — any export scale, any origin, base dropped
-     onto its datum — works the same way. */
-  _buildProps() {
+  /* ---------------- pieces ----------------
+     Placement is scale, turn, drop — and nothing else.
+
+     Every environment GLB is conformed by tools/normalize-env.py before it ships, so its
+     deck (or its footprint, for a prop) is already 1 unit, already axis-aligned, already
+     centred on the origin, and already sitting at y = 0. See envPlace() in js/env-model.js
+     for why the measuring that used to live here is gone. */
+  _buildPieces() {
     const pieces = envExpand(envScene()?.pieces);
     if (!pieces.length) return;
     if (!this._gltf) this._gltf = new GLTFLoader();
@@ -175,94 +177,61 @@ export const Env3D = {
       }
       this._gltf.load(
         `assets/env/models/${piece.model}.glb`,
-        gltf => this._placeProp(gltf.scene, p, piece),
+        gltf => this._place(gltf.scene, p, piece),
         undefined,
         () => console.warn(`env: missing assets/env/models/${piece.model}.glb`),
       );
     });
   },
 
-  /* The model-space height that gets aligned to the piece's datum — see envPlace().
-     "surface" casts a ray straight down through the model's own centre and takes the first
-     thing it hits, which on a walled plaza is the plaza. Falls back to the top if the ray
-     misses, which it does on a piece with a hole through the middle. */
-  _anchorY(model, p, box) {
-    if (p.anchor === "top") return box.max.y;
-    if (p.anchor !== "surface") return box.min.y;
-    const ray = new THREE.Raycaster(
-      new THREE.Vector3(p.x, box.max.y + 1, p.z),
-      new THREE.Vector3(0, -1, 0),
-      0, (box.max.y - box.min.y) + 2,
-    );
-    const hit = ray.intersectObject(model, true)[0];
-    return hit ? hit.point.y : box.max.y;
-  },
-
-  /* Width of the flat surface on top of a piece, in its current scale.
-
-     Bounding-box width is the obvious way to size a piece and it is wrong for anything the
-     board stands on: the first island generated came back with a staircase jutting off one
-     side, which owned half the bounding box, so fitting the box to 15 tiles left a plaza of
-     7 — a board of 11 sat outside its own walls. What matters is the deck, so measure the
-     deck: find its height above the centre, then walk outward until the surface steps away
-     from it. Both axes, averaged, because a generated square is never quite square. */
-  _surfaceSpan(model, box) {
-    const c = box.getCenter(new THREE.Vector3());
-    const cast = (x, z) => {
-      const r = new THREE.Raycaster(new THREE.Vector3(x, box.max.y + 1, z),
-                                    new THREE.Vector3(0, -1, 0),
-                                    0, (box.max.y - box.min.y) + 2);
-      return r.intersectObject(model, true)[0]?.point.y ?? null;
-    };
-    const y0 = cast(c.x, c.z);
-    if (y0 === null) return box.getSize(new THREE.Vector3()).x;
-
-    const reach = box.getSize(new THREE.Vector3()).x;
-    const step = reach / 120, tol = reach * 0.02;
-    const walk = (dx, dz) => {
-      let d = 0;
-      for (let i = 1; i <= 120; i++) {
-        const y = cast(c.x + dx * step * i, c.z + dz * step * i);
-        if (y === null || Math.abs(y - y0) > tol) break;
-        d = step * i;
-      }
-      return d;
-    };
-    const x = walk(1, 0) + walk(-1, 0), z = walk(0, 1) + walk(0, -1);
-    return (x + z) / 2 || box.getSize(new THREE.Vector3()).x;
-  },
-
-  _placeProp(model, p, piece) {
+  _place(model, p, piece) {
     if (!this._root) return;                       // env was switched off while loading
 
-    /* Yaw first, then measure: `size` means the width the piece ends up with on the board,
-       which is the only thing a manifest author can reason about. Measuring in the model's
-       own frame instead would make `size` mean something different for every yaw. */
-    model.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), p.yaw);
+    model.scale.setScalar(p.scale);
+    model.rotation.y = p.yaw;
+    model.position.set(p.x, p.y, p.z);
     model.updateMatrixWorld(true);
 
-    let box = new THREE.Box3().setFromObject(model);
-    const span = p.fit === "surface" ? this._surfaceSpan(model, box)
-                                     : box.getSize(new THREE.Vector3()).x;
-    model.scale.multiplyScalar(p.size / (span || 1));
-    model.updateMatrixWorld(true);
-
-    box = new THREE.Box3().setFromObject(model);
-    const centre = box.getCenter(new THREE.Vector3());
-    model.position.x += p.x - centre.x;
-    model.position.z += p.z - centre.z;
-    /* XZ first, then update, then the height — the "surface" anchor casts a ray at the
-       piece's final x/z, so the matrices have to already reflect that move. */
-    model.updateMatrixWorld(true);
-    box = new THREE.Box3().setFromObject(model);
-    model.position.y += p.y - this._anchorY(model, p, box);
-    model.updateMatrixWorld(true);
-
-    model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    model.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
     this._root.add(model);
 
-    /* The height budget can only be checked once the mesh is here, and it is the rule
-       pieces actually break — so report it against what was really delivered. */
+    if (p.isDeck) this._checkDeck(model, p, piece);
+    else this._checkHeight(model, p, piece);
+  },
+
+  /* Does the board actually land on the deck?
+
+     This is the safety net that makes swapping environments unattended reasonable. A file
+     that does not meet the contract — wrong scale, a deck that is not square, a rotation
+     that puts the corners over the edge — is not something the engine should quietly paper
+     over, but it is something it can notice. Ray down at the ring's outer corners and edge
+     midpoints; each has to land on the deck at the datum. */
+  _checkDeck(model, p, piece) {
+    const half = ENV_BOARD / 2, ray = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+    const bad = [];
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      /* Corners at ±half, edge midpoints at half — the same square the tiles occupy. */
+      const k = 1 / Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+      const x = p.x + Math.cos(a) * half * k, z = p.z + Math.sin(a) * half * k;
+      ray.set(new THREE.Vector3(x, p.y + 20, z), down);
+      ray.far = 60;
+      const hit = ray.intersectObject(model, true)[0];
+      if (!hit || Math.abs(hit.point.y - p.y) > 0.05) {
+        bad.push(`(${x.toFixed(1)}, ${z.toFixed(1)})` +
+                 (hit ? ` is ${(hit.point.y - p.y).toFixed(2)} off` : " has no deck under it"));
+      }
+    }
+    if (bad.length) {
+      console.warn(`env: "${piece.model}" does not carry the board — ${bad.join(", ")}. ` +
+                   `Re-run tools/normalize-env.py --deck on the raw file.`);
+    }
+  },
+
+  /* The sight-line budget, checked against what was really delivered rather than what the
+     manifest asked for — it is the rule pieces actually break. */
+  _checkHeight(model, p, piece) {
     const top = new THREE.Box3().setFromObject(model).max.y;
     if (top > p.maxTop + 0.01) {
       console.warn(`env: "${piece.model}" reaches y=${top.toFixed(2)} at (${p.x}, ${p.z}); ` +

@@ -61,8 +61,8 @@ test("envPlace resolves a datum name, converts the yaw and defaults the rest", (
   eq(p.x, 3); eq(p.z, -2);
   eq(p.y, ENV_Y.water);
   eq(+p.yaw.toFixed(4), +(Math.PI / 2).toFixed(4));
-  eq(p.anchor, "base");
-  eq(p.fit, "bbox");
+  eq(p.isDeck, false);
+  eq(p.scale, 2, "a prop is scaled by its declared size");
   deepEq(p.problems, []);
 });
 
@@ -70,13 +70,35 @@ test("a numeric y is taken as a world height, not a datum name", () => {
   eq(envPlace({ model: "boat", at: [0, 0], y: -2.15, size: 1 }).y, -2.15);
 });
 
-test("anchor and fit only accept the modes env3d.js implements", () => {
-  eq(envPlace({ model: "a", at: [0, 0], size: 1, anchor: "surface" }).anchor, "surface");
-  eq(envPlace({ model: "a", at: [0, 0], size: 1, anchor: "top" }).anchor, "top");
-  eq(envPlace({ model: "a", at: [0, 0], size: 1, anchor: "middle" }).anchor, "base",
-     "an unknown anchor falls back rather than throwing");
-  eq(envPlace({ model: "a", at: [0, 0], size: 1, fit: "surface" }).fit, "surface");
-  eq(envPlace({ model: "a", at: [0, 0], size: 1, fit: "nonsense" }).fit, "bbox");
+/* The whole point of the asset contract: a deck piece carries no size, no rotation and no
+   anchor, because the file already states them. All the manifest chooses is the border. */
+test("a deck piece is scaled by the board plus its border, not by a measured size", () => {
+  const was = cfg.envDeckMargin;
+  cfg.envDeckMargin = 0.6;
+  const p = envPlace({ model: "island", at: [0, 0], y: "deck", deck: true });
+  eq(p.isDeck, true);
+  eq(p.margin, 0.6);
+  eq(p.scale, ENV_BOARD + 1.2, "11-tile board with 0.6 of deck each side");
+  eq(p.yaw, 0);
+  eq(p.y, ENV_Y.deck);
+  deepEq(p.problems, []);
+
+  cfg.envDeckMargin = 1.5;
+  eq(envPlace({ model: "island", at: [0, 0], deck: true }).scale, ENV_BOARD + 3,
+     "the border is live — a wider one scales the same asset up");
+  eq(envPlace({ model: "island", at: [0, 0], deck: true, margin: 0.2 }).scale, ENV_BOARD + 0.4,
+     "a piece may override the default border");
+  cfg.envDeckMargin = was;
+});
+
+test("a deck may only take quarter turns; a prop may sit at any angle", () => {
+  ok(envPlace({ model: "i", at: [0, 0], deck: true, yaw: 90 }).problems.length === 0);
+  ok(envPlace({ model: "i", at: [0, 0], deck: true, yaw: 270 }).problems.length === 0);
+  ok(envPlace({ model: "i", at: [0, 0], deck: true, yaw: 45 }).problems
+       .some(s => /quarter turn/.test(s)),
+     "a square board only stays on a square deck under quarter turns");
+  deepEq(envPlace({ model: "b", at: [0, 0], size: 1, yaw: 37 }).problems, [],
+     "nothing has to line up with a prop");
 });
 
 test("the problems list names what is wrong instead of dropping the piece", () => {
@@ -103,10 +125,11 @@ test("the shipped manifest places every piece somewhere legal", () => {
   });
 });
 
-test("the island is wide enough for the board to stand on it", () => {
-  const island = ENV_SCENE.pieces.find(p => p.model === "island");
-  ok(island, "the manifest should ship an island");
-  ok(island.size > 11, "the ring is 11 tiles across — a smaller plaza puts it over the edge");
-  eq(island.fit, "surface", "sized by its plaza, not by its silhouette");
-  eq(island.anchor, "surface", "its plaza, not its walls, is what meets the board");
+test("the shipped manifest carries a deck, and asks it for nothing it shouldn't", () => {
+  const island = ENV_SCENE.pieces.find(p => p.deck);
+  ok(island, "something has to carry the board");
+  ok(envPlace(island).scale > ENV_BOARD, "the deck must be wider than the ring");
+  ["size", "fit", "anchor"].forEach(k =>
+    eq(island[k], undefined,
+       `${k} is the asset's job now — a value here means someone hand-tuned around a bad file`));
 });

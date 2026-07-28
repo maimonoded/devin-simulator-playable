@@ -21,12 +21,15 @@ const ENV_SCENE = {
   terrain: { sea: true, shelf: false, island: false, plinth: false },
 
   pieces: [
-    /* The island the board stands on. anchor:"surface" puts its plaza — not its walls and
-       not its keel — at deck level, so the board sits on it. */
-    { model: "island", at: [0, 0], y: "deck", yaw: 45, anchor: "surface", fit: "surface", size: 11.9 },
+    /* The island the board stands on. `deck: true` is the whole specification: the asset
+       was conformed by tools/normalize-env.py, so the engine scales it to the board plus
+       cfg.envDeckMargin on each side and drops it. No rotation, no size, nothing measured. */
+    { model: "island", at: [0, 0], y: "deck", deck: true },
 
     /* Boats. They go in the four world-axis directions, because those are the screen's
-       corners — the only places water is visible once the island is in frame. Sunk a little
+       corners — the only places water is visible once the island is in frame. `size` is the
+       piece's width in tiles and `yaw` is a free angle: a prop has nothing to line up with,
+       unlike the deck, where only quarter turns keep the board's corners on it. `y` is set
        below the waterline so they float rather than perch on it. */
     { model: "boat", at: [ 11.5,  1.5], y: -2.15, yaw:  60, size: 2.6 },
     { model: "boat", at: [  1.0, 11.8], y: -2.15, yaw: 200, size: 2.3 },

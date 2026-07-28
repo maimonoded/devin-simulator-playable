@@ -11,7 +11,7 @@ const DEFAULTS={
      frames: 1.12 is the bare board, and everything above that trades board size for
      visible ground. 1.7 is what it takes to see water around the modelled island — the
      island has to be wider than the board it holds, so the frame has to be wider again. */
-  env3d:1, envMargin:1.7, envShadows:1,
+  env3d:1, envMargin:1.7, envShadows:1, envDeckMargin:0.6,
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
@@ -70,6 +70,7 @@ const TUNING=[
  {group:"Environment",items:[
    ["env3d","Environment (0/1)",1],
    ["envMargin","Camera margin (board size ↔ ground)",0.05],
+   ["envDeckMargin","Deck border beyond the board (tiles)",0.05],
    ["envShadows","Shadows (0/1) — reload to apply",1]]},
  {group:"Builders & series",items:[
    ["baseCost","Base cost (Builder 1, Lvl 1)",100],["tierGrowth","Level cost growth ×",0.05],

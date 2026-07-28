@@ -5,7 +5,7 @@ node tests/run.js            # all suites
 node tests/run.js tiles      # only suite files matching "tiles"
 ```
 
-Exit code is non-zero on failure. **129 assertions, no dependencies, no framework.**
+Exit code is non-zero on failure. **130 assertions, no dependencies, no framework.**
 
 ## How it works
 
@@ -37,7 +37,7 @@ Helpers available in suites: `suite`, `test`, `ok`, `eq`, `near`, `deepEq`, `thr
 | [04-game](suites/04-game.js) | Dice bounds, `spendRoll`, lap bonus, prediction resolution (correct/wrong, streaks, queue consumption, zero-wager, manual vs auto accuracy), session/time (refill, day rollover, login rewards, multi-day skips, over-cap energy) |
 | [05-tiles](suites/05-tiles.js) | `BoardActor` reward + presentation builders, the tile registry, and every tile's landing behaviour asserted on returned event lists — including train EV over 4,000 draws and all five deck-card branches |
 | [06-overlays-storage](suites/06-overlays-storage.js) | Mystery-box eligibility/spawn/consume and drop kinds, overlay-before-tile dispatch order, and storage: serialize/restore round-trip, over-cap energy, legacy-queue migration, corrupt data, config merge onto `DEFAULTS` |
-| [07-env](suites/07-env.js) | `env-model`: the screen-space axes, the region visible at every window aspect, the sight-line height budget (including the case a corner-based budget gets wrong), and the placement manifest — datum resolution, anchor/fit modes, the problem list, `repeat` expansion, and a check that the shipped `assets/env/scene.js` places every piece legally |
+| [07-env](suites/07-env.js) | `env-model`: the screen-space axes, the region visible at every window aspect, the sight-line height budget (including the case a corner-based budget gets wrong), and the placement manifest — datum resolution, deck scaling from the board plus its border, quarter-turn-only deck yaw, the problem list, `repeat` expansion, and a check that the shipped `assets/env/scene.js` places every piece legally |
 
 The suite is regression-checked: reintroducing the energy-cap clamp, unlocking episodes per level
 instead of per completion, or rotating the board back all produce failures.

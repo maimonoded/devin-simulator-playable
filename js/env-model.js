@@ -17,7 +17,8 @@
    +v, nearest the player. */
 
 const ENV_CAM = { az: 45, el: 38 };      // camera azimuth / elevation, degrees — board3d.js reads these
-const ENV_RING = 11 / Math.SQRT2;        // 7.778 — the ring's vertex, in screen-depth units
+const ENV_BOARD = 11;                    // the ring's outer span in tiles, so its edges are at ±5.5
+const ENV_RING = ENV_BOARD / Math.SQRT2; // 7.778 — the ring's vertex, in screen-depth units
 const ENV_BOARD_TOP = 0.16;              // top of a tile slab (TILE_H in board3d.js)
 
 /* Vertical datums. The board never moves: `deck` is the underside of the tiles and the
@@ -81,37 +82,59 @@ function envMaxTop(x, z) {
 }
 
 /* Resolve one manifest entry (see assets/env/ART-BRIEF-ENV.md §7) into placement numbers,
-   plus whatever is wrong with it. Pure, so tests can check a manifest without a canvas;
-   env3d.js logs the problems rather than refusing, because a piece that is too tall still
-   renders — it just sits badly, and saying so is more use than dropping it silently. */
+   plus whatever is wrong with it.
+
+   This is short because the *asset* carries the hard part. Every environment GLB is
+   conformed by tools/normalize-env.py before it ships, so by the time it is loaded:
+
+     a deck piece  — the surface the board stands on contains a 1×1 axis-aligned square,
+                     centred on the origin, with that surface at y = 0
+     a prop        — its footprint's longer axis runs along X and measures 1, centred in
+                     XZ, base at y = 0
+
+   So placing either is scale, turn, drop. There is deliberately no measuring here and none
+   in env3d.js: the engine used to infer a piece's rotation and deck size on every load, got
+   the island's rotation wrong by 5° (Tripo returns the mesh turned to the reference image's
+   camera — 50°, not the 45° the manifest guessed), and mis-scaled the deck by 6% because
+   its "find the flat top" tolerance ran off the paving onto the verge. Neither failure is
+   possible against a stated contract; a violation is caught by the check in env3d.js and
+   fixed by re-running the tool, not by tuning a number here.
+
+   Pure, so tests can check a manifest without a canvas. Problems are reported rather than
+   thrown: a piece that sits badly still renders, and saying so is more use than dropping it
+   silently. */
 function envPlace(piece) {
   const [x, z] = piece.at || [0, 0];
-  const datum = typeof piece.y === "number" ? piece.y : ENV_Y[piece.y ?? "quay"];
+  const datum = typeof piece.y === "number" ? piece.y : ENV_Y[piece.y ?? "deck"];
+  const isDeck = !!piece.deck;
+  /* A deck piece is scaled by what has to fit on it, not by a size someone measured: the
+     board plus the border asked for, on each side. Any conformed deck therefore lands with
+     exactly that border, whatever the asset's own proportions were. */
+  const margin = piece.margin ?? (typeof cfg === "object" ? cfg.envDeckMargin : 0.6);
+  const scale = isDeck ? ENV_BOARD + 2 * margin : (piece.size || 1);
+
   const problems = [];
   if (!piece.model) problems.push("no model");
   if (datum === undefined) problems.push(`unknown datum "${piece.y}"`);
-  if (!(piece.size > 0)) problems.push("size must be > 0");
+  /* A prop must say how big it is. Defaulting a missing size to one tile would place the
+     piece rather than complain, and a boat rendered at the size of a tile is not obviously
+     a mistake on screen — it just looks like a small boat. */
+  if (isDeck) { if (!(scale > 0)) problems.push("margin leaves no deck"); }
+  else if (!(piece.size > 0)) problems.push("size must be > 0");
   if (!envVisible(x, z)) problems.push(`off screen at (${x}, ${z})`);
-  const maxTop = envMaxTop(x, z);
+  /* The board is square and axis-aligned, so only quarter turns keep its corners on a
+     square deck. A prop may sit at any angle — nothing has to line up with it. */
+  const yaw = piece.yaw || 0;
+  if (isDeck && yaw % 90 !== 0) problems.push(`deck yaw ${yaw}° is not a quarter turn`);
+
   return {
     x, z,
-    y: datum ?? ENV_Y.quay,
-    /* Which part of the model lands on the datum.
-         base    — the model's lowest point. Right for anything standing on the ground.
-         top     — its highest point.
-         surface — the height of the mesh directly above its own centre, found by casting a
-                   ray down. This is the one the island needs: what has to line up with the
-                   board is the plaza the board stands on, and that is neither the model's
-                   top (the parapet wall) nor its base (a rocky keel of whatever depth the
-                   generator felt like). Nothing else can locate it without being told. */
-    anchor: ["top", "surface"].includes(piece.anchor) ? piece.anchor : "base",
-    /* What `size` measures. "bbox" (the default) is the piece's full width including
-       anything sticking out. "surface" measures only the flat top — the right choice when
-       what has to be a given size is the deck rather than the silhouette. */
-    fit: piece.fit === "surface" ? "surface" : "bbox",
-    yaw: (piece.yaw || 0) * Math.PI / 180,
-    size: piece.size || 1,
-    maxTop,
+    y: datum ?? ENV_Y.deck,
+    isDeck,
+    margin: isDeck ? margin : 0,
+    scale,
+    yaw: yaw * Math.PI / 180,
+    maxTop: envMaxTop(x, z),
     problems,
   };
 }

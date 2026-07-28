@@ -6,7 +6,9 @@ Everything around the board: the island it stands on, the sea, and the props in 
 assets/env/
   ART-BRIEF-ENV.md   the spec — hand this to whoever makes the art
   scene.js           the placement manifest (a classic script, so: a global)
-  models/*.glb       the pieces, exactly as the generator returned them
+  models/*.glb       the pieces, conformed to the asset contract
+  raw/*.glb          what the generator returned, kept so a piece can be re-conformed
+tools/normalize-env.py   conforms a raw GLB to the contract; --check verifies one
 js/env-model.js      geometry and the manifest contract — pure, no DOM, no three.js
 js/ui/env3d.js       the renderer. An ES module, imported by js/ui/board3d.js
 ```
@@ -25,6 +27,7 @@ dependency order.
 |---|---|---|
 | `env3d` | 1 | the whole environment. Live — toggling it in the tuning drawer rebuilds |
 | `envMargin` | 1.7 | how much wider than the ring the camera frames. Live |
+| `envDeckMargin` | 0.6 | how much deck shows beyond the board, in tiles. Live |
 | `envShadows` | 1 | shadow map. Needs a reload — lights are set up once in `init()` |
 
 `envMargin` is the one to understand. It replaces a hardcoded 1.12 in `board3d.js`, and with the
@@ -48,18 +51,43 @@ fade out before it gets there, which is not something to ask a generated mesh fo
 plane with a canvas-drawn radial gradient: solid around the island, transparent by the frame edge,
 so the stage's own background comes back at the rim instead of the water ending on a hard line.
 
-## Sizing and anchoring, and why they are not just "scale the bounding box"
+## The engine measures nothing
 
-Both of these exist because of a specific failure, documented in ART-BRIEF-ENV.md §6:
+This is the design decision the rest follows from. `env3d.js` scales a piece, turns it if the
+manifest says so, and drops it at its datum. There is no bounding-box fitting, no surface
+probing, no rotation inference.
 
-- **`fit: "surface"`** sizes a piece by the width of its flat top rather than its bounding box.
-  The first generated island had a staircase off one side that owned half the box; fitting the box
-  to 15 tiles left a plaza of 7, and the 11-tile board sat outside its own walls.
-- **`anchor: "surface"`** puts the height of the mesh above the piece's own centre onto the datum,
-  found by casting a ray down. For a walled plaza that is the plaza — not the kerb (its highest
-  point) and not the keel (its lowest).
+It used to do all three, and each one failed on the first real asset:
 
-Both are implemented with raycasts in `env3d.js`, on load, once per piece.
+- it inferred the island's rotation as 45°; the true figure was **50°**, so every board edge
+  ran at 5° to the deck and the board overhanged the paving by a third of a tile at one end
+- it sized the deck by walking outward until the height changed by 2% of the bounding box — a
+  tolerance that stepped straight over the deck's shallow verge, over-measuring the surface
+  and under-scaling the model by **6%**
+- an earlier version sized by the bounding box outright, which a staircase on one side owned
+  half of
+
+None of those are fixable by better heuristics, because the engine cannot know what it is
+looking at. They are fixable by *stating* what an asset must be, which is the contract in
+ART-BRIEF-ENV.md §5, and conforming files to it once with `tools/normalize-env.py`.
+
+The measuring still exists — it just runs offline, once per asset, where the result is a file
+you can open, diff and re-check, instead of a heuristic re-deciding in every browser.
+
+## Adding a new environment
+
+No code changes. Ever, if the contract holds:
+
+```bash
+python3 tools/normalize-env.py assets/env/raw/atoll.glb --deck -o assets/env/models/atoll.glb
+python3 tools/normalize-env.py assets/env/models/atoll.glb --deck --check
+```
+
+then one line in `scene.js`:
+
+```js
+{ model: "atoll", at: [0, 0], y: "deck", deck: true }
+```
 
 ## What the console tells you
 
@@ -68,6 +96,8 @@ Both are implemented with raycasts in `env3d.js`, on load, once per piece.
 - a missing `.glb`
 - a placement outside the visible region
 - a bad datum or a missing `size`
+- **a deck that does not carry the board** — checked by raying down at the ring's four corners
+  and four edge midpoints, reporting which ones missed and by how much
 - **a piece taller than the sight line allows at its position** — with the height delivered and
   the budget it broke
 
@@ -76,7 +106,7 @@ loaded, so it is reported against what was really delivered rather than what was
 
 ## Regenerating a piece
 
-The Scenario pipeline, the prompt changes that environment pieces need, and the four traps that
-cost a regeneration each are in [ART-BRIEF-ENV.md](ART-BRIEF-ENV.md) §6. `models/` holds the exact
-GLB that came back, unmodified — there is no offline normalization step to keep a "raw" copy
-apart from, because running one would drop the baked texture.
+The Scenario pipeline and the prompt changes environment pieces need are in
+[ART-BRIEF-ENV.md](ART-BRIEF-ENV.md) §6. Conform the result with `tools/normalize-env.py`, which
+writes the correction as a node transform and leaves geometry, materials and the BIN chunk
+untouched — so unlike the tile skill's `normalize_tile.py`, it cannot cost you the baked texture.

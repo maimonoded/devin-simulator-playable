@@ -106,78 +106,105 @@ board's left or right point is unconstrained. It isn't — out at `u = 5.3` the 
 is only 2.5 deep, so a tall piece there covers the tiles behind it. The engine checks the rule
 above on load and logs any piece that breaks it, naming the piece, its height and its budget.
 
-## 5. Technical spec
+## 5. The asset contract
 
-| | Island | Props |
-|---|---|---|
-| Format | `.glb`, single file, texture embedded | same |
-| Triangles | ≤ 4000 | ≤ 2000 |
-| Materials | **one baked texture**, not a PBR map set | same |
-| Texture | ≤ 1024 square | ≤ 1024 square |
-| Up axis | +Y (glTF standard) | +Y |
-| Scale / origin | anything — normalized on load | anything |
+**This is the part that makes new environments drop in.** The engine measures nothing. It
+scales the piece, turns it if the manifest says so, and drops it at the datum — so everything
+that decides whether the board sits square has to be true of the file itself.
 
-**Budget for the whole environment: ≤ 80,000 triangles and ≤ 30 draw calls.** The 40 tiles
-already cost about 77k. The current environment — island, three boats and the sea — adds about
-9k triangles and 4 draw calls.
+### A deck piece — anything the board stands on
 
-Style must match the tiles: **low-poly toy diorama**, chunky primitives, flat baked colour,
-strong value contrast, no fine detail and no text.
+| | |
+|---|---|
+| Deck | contains a **1 × 1 axis-aligned square, centred on the origin** |
+| Deck surface | at **y = 0**. Rock and keel go negative, kerb and rim positive |
+| Rotation | deck edges square to X and Z |
+| Everything else | free — overhangs, piers and keels may be any size, they are never measured |
+
+The engine scales that 1 × 1 up to `11 + 2 × margin`, so the board lands centred with the
+requested border on every side, whatever the asset's own proportions were.
+
+### A prop — boats, rocks, buoys
+
+| | |
+|---|---|
+| Footprint | longer horizontal axis along **X**, measuring **1** |
+| Origin | centred in XZ, **base at y = 0** |
+
+`size` in the manifest is then the piece's width in tiles, directly.
+
+### Conforming a file
+
+A generator satisfies none of this: it returns arbitrary scale and origin, and Tripo hands
+the mesh back turned to the reference image's three-quarter camera — measured at 50° on the
+island and 52.6° on the boat, so it is systematic rather than random. One tool fixes it:
+
+```bash
+python3 tools/normalize-env.py raw/island.glb --deck -o assets/env/models/island.glb
+python3 tools/normalize-env.py raw/boat.glb          -o assets/env/models/boat.glb
+python3 tools/normalize-env.py assets/env/models/island.glb --deck --check
+```
+
+It measures the raw mesh and writes the correction as a **transform on a new root node**.
+Geometry, materials and the whole BIN chunk are copied byte for byte — which is the point:
+round-tripping a mesh through a library is what drops the baked texture (see
+[../tiles/README.md](../tiles/README.md)); editing one node transform cannot. Keep the raw
+file in `raw/`, since conforming is not reversible from the output.
+
+`--check` re-runs the measurements against a finished file and passes or fails. Use it — it
+is what caught a rotation-sign bug that left the island 10° off while every other check was
+green.
+
+### What the engine does about a violation
+
+`env3d.js` rays down at the ring's four corners and four edge midpoints. Every one has to
+land on the deck at the datum. If not, it names the piece, the offending points and how far
+off they were, and tells you to re-run the tool. **A bad environment announces itself rather
+than looking subtly crooked** — which is what the whole contract is for.
 
 ## 6. Generating these with Scenario
 
-The tile pipeline (the `board-tile-art` skill) applies, with four differences that each cost a
-regeneration to learn. Keep the skill's style block **verbatim** except where noted.
+The tile pipeline (the `board-tile-art` skill) applies. Keep its style block **verbatim**
+except for the composition clause below.
+
+Orientation, scale and origin are no longer your problem — the conform tool fixes those. What
+it cannot fix is **proportion**: if the generated deck is only half the width of the piece,
+conforming it just makes the whole island enormous next to the board. So these are prompt
+requirements, not placement ones.
 
 ### 6.1 Replace the composition clause
 
-The locked style block ends with *"open ground across the front half, the tall mass set against
-the back edge."* That is right for a tile and wrong for anything the board stands on — it puts a
-rock tower in the middle of the plaza. Substitute:
+The locked style block ends with *"open ground across the front half, the tall mass set
+against the back edge."* That is right for a tile and wrong for anything the board stands
+on — it puts a rock tower in the middle of the deck. Substitute:
 
 > …the whole square base is visible, **the top surface completely flat, level and empty, every
 > detail confined to the outer rim.**
 
-### 6.2 Isolate the object — no water, no ground plane
+### 6.2 Isolate the object
 
-Ask explicitly for *"the island alone in empty space — no water, no sea, no ground plane, nothing
-underneath or around it."* Without it the reference comes back sitting on a slab of water,
-background removal keeps that slab, and reconstruction turns it into geometry that ends on a hard
-edge a few tiles out. It also inflates the bounding box, which is what used to set the scale.
+Ask for *"the island alone in empty space — no water, no sea, no ground plane, nothing
+underneath or around it."* Otherwise the reference comes back sitting on a slab of water,
+background removal keeps it, and reconstruction turns it into geometry that ends on a hard
+edge a few tiles out.
 
-### 6.3 Nothing may stick out past the square
+### 6.3 Proportions to ask for
 
-The first island came back with a staircase jutting off one side. It owned half the bounding box,
-so fitting that box to 15 tiles left a plaza of 7 — and a board of 11 sat outside its own walls.
-
-The engine now has `fit: "surface"`, which sizes a piece by its flat top rather than its
-silhouette, so this no longer breaks placement. Ask for it anyway: a protruding element scaled up
-along with the plaza becomes enormous.
-
-### 6.4 The reconstruction arrives rotated 45°
-
-`orientation: "align_image"` aligns the model to the reference's camera, and the reference is a
-three-quarter view — so the piece comes back at 45° to the world axes. The board's ring is axis
-aligned, so a square piece needs **`yaw: 45`** in the manifest. Check any square piece against the
-board and expect to correct it.
-
-### 6.5 Proportions to ask for
-
-- the flat top fills **at least four fifths** of the width
+- the flat deck fills **at least four fifths** of the width
 - the rim is a **low kerb**, not a parapet — one or two blocks
 - the underside is **shallow**
+- nothing sticks out past the square
 
-Set `faceLimit` at generation. Do **not** run the offline `normalize_tile.py` over the result: it
-round-trips through trimesh and drops the baked texture, and the engine normalizes on load
-anyway. Same reasoning as [../tiles/README.md](../tiles/README.md).
+Set `faceLimit` at generation. Do **not** run the offline `normalize_tile.py` over the
+result — that is the tile tool, and it destroys the texture. `normalize-env.py` is the one
+for environment pieces.
 
 ## 7. How pieces get placed
 
-Placement is data, not code, and never baked into the model. Each piece is an entry in
-[scene.js](scene.js):
+Placement is data. Each piece is an entry in [scene.js](scene.js):
 
 ```js
-{ model: "island", at: [0, 0], y: "deck", yaw: 45, anchor: "surface", fit: "surface", size: 11.9 }
+{ model: "island", at: [0, 0], y: "deck", deck: true }
 { model: "boat",   at: [11.5, 1.5], y: -2.15, yaw: 60, size: 2.6 }
 ```
 
@@ -186,27 +213,24 @@ Placement is data, not code, and never baked into the model. Each piece is an en
 | `model` | `assets/env/models/<name>.glb` |
 | `at` | world `[x, z]` |
 | `y` | a datum name from §2, or a plain number for a world height |
-| `yaw` | degrees; 0 leaves the model's authored **+Z** facing +Z |
-| `size` | the piece's width **on the board**, in tiles, measured after the yaw |
-| `fit` | what `size` measures: `bbox` (default) or `surface` — the flat top only |
-| `anchor` | what lands on `y`: `base` (default), `top`, or `surface` |
+| `deck` | `true` if the board stands on it — then `size` is not used |
+| `margin` | deck border in tiles; defaults to `cfg.envDeckMargin` |
+| `size` | a prop's width in tiles |
+| `yaw` | degrees. A deck may only take quarter turns; a prop may sit at any angle |
 | `repeat` | optional `{count, step:[dx,dz]}` for a row of the same piece |
 
-`anchor: "surface"` casts a ray down through the piece's centre and puts whatever it hits on the
-datum. That is what the island needs: the thing that has to line up with the board is the plaza,
-which is neither the model's highest point (its kerb) nor its lowest (a keel of whatever depth
-the generator felt like).
-
-Because `size` is declared per piece, **you do not have to export at any particular scale.**
+Note what is **not** there: no scale, no anchor, no fit, no per-asset rotation offset. Those
+were the hand-tuned numbers that had to be re-derived for every asset, and they are the file's
+job now. A `yaw` on a deck piece is a design choice about which side faces the player — not a
+correction. If you find yourself wanting a non-quarter-turn yaw on a deck, the file is wrong;
+conform it.
 
 ## 8. Check before delivering
 
-- [ ] Up axis +Y, and the piece stands on `y = 0` in its own file — no built-in ground plane
-- [ ] Nothing sticks out past the footprint
-- [ ] Height within §4 for where it stands
-- [ ] ≤ 4000 triangles (island) or ≤ 2000 (prop), one baked texture, ≤ 1024 square
+- [ ] `normalize-env.py --check` passes
+- [ ] Height within §4 for where the piece stands
+- [ ] ≤ 4000 triangles (deck) or ≤ 2000 (prop), one baked texture, ≤ 1024 square
 - [ ] Silhouette and palette sit with the tiles, not against them
 
-**Fastest sanity test:** add it to the manifest, load the board and watch the console — the engine
-reports anything off screen, over budget or missing. Then look at it with the token on the
-**Start** tile, which is the one a near-side piece will hide.
+**Fastest sanity test:** add it to the manifest, load the board and watch the console. The
+engine reports anything off screen, over budget, missing, or not carrying the board.
