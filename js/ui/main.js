@@ -34,7 +34,8 @@ async function roll(){
     for(let s=0;s<steps;s++){
       state.pos=(state.pos+1)%40;
       if(state.pos===0) passedStart=true;
-      positionToken(); const tok=$("#token"); tok.classList.remove("hop"); void tok.offsetWidth; tok.classList.add("hop");
+      positionToken();
+    if(!use3d()){ const tok=$("#token"); tok.classList.remove("hop"); void tok.offsetWidth; tok.classList.add("hop"); }
       await sleep(cfg.tokenStepMs);
     }
     // pass-start (lap) reward if we crossed 0 but did not land there
@@ -122,7 +123,11 @@ $("#autoBtn").onclick=autoPlay;
 $("#watchBtn").onclick=openPrediction;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;
-$("#flatBtn").onclick=()=>$("#board").classList.toggle("flat");
+$("#flatBtn").onclick=()=>{
+  const flat=!$("#board").classList.contains("flat");
+  $("#board").classList.toggle("flat",flat);
+  if(use3d()) Board3D.setFlat(flat);
+};
 document.querySelectorAll(".mopt").forEach(b=>b.onclick=()=>{
   if(state.animating||autoMode!==null) return;   // can't change the stake mid-spin
   document.querySelectorAll(".mopt").forEach(x=>x.classList.remove("on")); b.classList.add("on");
@@ -130,11 +135,19 @@ document.querySelectorAll(".mopt").forEach(b=>b.onclick=()=>{
 $("#drawerBtn").onclick=()=>$("#drawer").classList.add("open");
 $("#closeDrawer").onclick=()=>$("#drawer").classList.remove("open");
 
-/* ---------------- boot ---------------- */
-loadConfig();                 // tuning values first — initState() reads cfg.energyCap
-initState();
-const restored=loadState();   // overlay saved progress, if any
-buildBoard(); buildTuning(); setDice(3,4); syncMultButtons(); renderAll();
-if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
-else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");
-if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
+/* ---------------- boot ----------------
+   Not self-invoking: js/ui/board3d.js is an ES module, so it runs AFTER every classic script.
+   It calls boot() once the scene is up, so the board exists before buildBoard() needs it. */
+function boot(){
+  loadConfig();                 // tuning values first — initState() reads cfg.energyCap
+  initState();
+  const restored=loadState();   // overlay saved progress, if any
+  buildBoard(); buildTuning(); setDice(3,4); syncMultButtons(); renderAll();
+  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
+  else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");
+  if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
+}
+window.boot=boot;
+/* Safety net: if the module never runs (blocked, 404, or opened from file://), boot anyway
+   so the DOM board still comes up rather than leaving a blank page. */
+setTimeout(()=>{ if(!window.__booted){ window.__booted=true; boot(); } },1500);

@@ -6,23 +6,34 @@ watching an episode means betting on what happens next.
 
 ## Running it
 
-Open `index.html` — **double-clicking it from `file://` must keep working**. There is no build
-step, no bundler, and no dependencies. All scripts are classic `<script>` tags sharing globals;
-`import`/`export` and `fetch()` of local files are off-limits (browsers block `fetch` on
-`file://`, which is why episode content is `.js` wrapping a JSON payload rather than `.json`).
+```bash
+python3 serve.py          # → http://localhost:8125/index.html
+```
 
-Script order in `index.html` **is** the dependency order. A file may only use globals defined in
-files above it. Adding a file means adding a tag.
+**A server is required — `file://` no longer works.** The board renders with three.js, loaded as
+an ES module, and browsers block module scripts on file URLs. `serve.py` ships with the repo
+because two things matter: **HTTP Range** (episode videos are 30–60 MB and the player seeks;
+`python3 -m http.server` doesn't support Range and seeks restart the file) and **no-store**
+(the browser otherwise serves stale files after an edit).
 
-For local testing over http, note the browser caches aggressively — serve with `Cache-Control:
-no-store`. Video seeking needs a server that supports **HTTP Range**; Python's
-`SimpleHTTPRequestHandler` does not, and without it seeks restart the file from zero.
+There is still no build step and no npm. three.js is vendored at `vendor/three.module.js`.
+
+Everything except the board is classic `<script>` tags sharing globals — `import`/`export` and
+`fetch()` of local files stay off-limits there, which is why episode content is `.js` wrapping a
+JSON payload rather than `.json`. Script order in `index.html` **is** the dependency order; a file
+may only use globals defined above it, and adding a file means adding a tag.
+
+`js/ui/board3d.js` is the one ES module. Modules are deferred, so it runs *after* every classic
+script — which is why `boot()` in `js/ui/main.js` doesn't self-invoke: the board module calls it
+once the scene exists.
 
 ## Layout
 
 ```
 index.html          markup + ordered <link>/<script> tags
-assets/tiles/       optional per-tile artwork: N.png skins tile N-1  → assets/tiles/README.md
+serve.py            dev server (Range + no-store) — the way to run the project
+vendor/             three.module.js (r169), vendored; no npm, no build step
+assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
 css/                base · board · panels · drawer · overlay
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/
@@ -40,6 +51,7 @@ js/
   game.js           rolling, landing dispatch, prediction, session time
   ui/               everything that touches the DOM                          → js/ui/README.md
     fx.js           floats, log, toasts, confetti, dice, blocking overlays
+    board3d.js      the WebGL board (three.js) — the only ES module; calls boot()
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
     prediction.js   predict & watch: bet → playback → result
@@ -74,8 +86,9 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | System | Where | Notes |
 |---|---|---|
 | Board layout | `js/board-model.js` | Fixed 40 tiles. Start sits at the **bottom** point of the diamond; indices run clockwise on screen (Start → Spa → VIP → Premiere). |
+| Board rendering | `js/ui/board3d.js` | three.js scene: orthographic camera at 45° azimuth / 38° elevation, which reproduces the old CSS projection exactly (`sin 38° = cos 52°`). Tile labels stay DOM over the canvas so text is crisp. `cfg.board3d = 0` falls back to the legacy CSS-3D board, as does a missing WebGL context. |
 | Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
-| Tile artwork | `assets/tiles/` | Drop `N.png` (1-based, so `1.png` is Start) to skin that tile; absent files change nothing. Author at 144×144. → [README](assets/tiles/README.md) |
+| Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |

@@ -1,7 +1,71 @@
 # Tile artwork
 
-Drop a PNG in here and that board tile uses it. Nothing else to wire up — no config, no
-registration, no code change.
+Two ways to skin a tile, both drop-in — no config, no registration, no code change:
+
+- **`models/N.glb`** — a 3D model, used by the WebGL board. **This is the one to use.**
+- **`N.png`** — flat artwork, used by the legacy CSS board (`cfg.board3d = 0`). Documented from
+  [Naming](#naming) down.
+
+A model wins where both exist. Missing files are normal — the tile keeps its plain slab.
+
+## 3D models (`models/`)
+
+Same 1-based numbering as the PNGs: `models/1.glb` is Start. Mapped by `tileModelPath()` in
+[../../js/board-model.js](../../js/board-model.js).
+
+### The engine normalizes on load, so the file doesn't have to be normalized
+
+`_loadModel()` in [../../js/ui/board3d.js](../../js/ui/board3d.js) measures the model's bounding
+box and then fixes the up axis (a model deeper than it is tall is treated as Z-up and stood
+upright), scales the larger ground dimension to one tile, centres it in XZ, and rests its base on
+the slab top. So an export at any scale, origin or orientation drops in and lands correctly.
+
+This is deliberate, and it is why the generated GLB is used **as exported** rather than run
+through the `board-tile-art` skill's `normalize_tile.py`: that script round-trips the mesh
+through trimesh, which **drops the baked texture** — the raw export carries 1 image and 1
+texture, the normalized file carries 0, and the tile renders plain white. These assets already
+arrive inside the 2000-triangle budget (`faceLimit` is set at generation), so the offline pass
+had nothing left to contribute. If a future asset does come in over budget, decimate it — but
+verify the texture survives before trusting the output.
+
+### What the file should contain
+
+| | |
+|---|---|
+| Format | `.glb`, single file, texture embedded |
+| Budget | ≤ 2000 triangles |
+| Footprint | any — scaled to the tile on load |
+| Up axis | +Y or +Z — detected on load |
+| Origin | anywhere — re-centred on load |
+| Materials | one baked texture (not PBR map sets) |
+
+Height is free: a model taller than its tile stands up off the board like a prop, which is the
+intended look.
+
+### Facing: authored +Z, yawed outward per edge
+
+Models are authored facing **+Z**, and `_tileYaw()` turns each one to face **out of the ring** —
+0° / ±90° / 180°, one per board edge. Without that, the two side edges would present the model's
+flank while the other two present its face.
+
+Outward rather than inward because the two edges nearest the camera are the ones the player
+reads: an inward-facing model puts its back between the camera and its own tile, hiding the art
+and the token standing on it.
+
+**Not** rotated 45° to face the camera, which is the tempting version — that swings the square
+footprint into a diamond measuring 1.07 against a 0.92 tile, a 16% overhang into both neighbours.
+Corner tiles have two equally valid normals and simply take one, for the same reason.
+
+### Tall art hides the token — see the brief
+
+The token's top sits at 0.53 world units; the first asset's wall reached 0.726 and buried it on
+the far side of the ring. How tall a model may be depends on how far its mass sits from the tile
+centre, because the camera looks down at 38°. [ART-BRIEF.md](ART-BRIEF.md) §2.2 has the budget
+table and the reasoning — it is the main thing to get right when commissioning a tile.
+
+---
+
+## Flat PNG artwork (legacy CSS board)
 
 > **Commissioning art?** Hand over [ART-BRIEF.md](ART-BRIEF.md) — it's the self-contained spec
 > (camera angle, diamond geometry, anchor, naming). The camera is the part that matters: this

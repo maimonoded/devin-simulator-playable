@@ -2,3 +2,6 @@
 
 # episode videos — large binaries, kept out of git history
 *.mp4
+
+# scratch copies of superseded tile GLBs — kept on disk, out of history
+*.glb.bak

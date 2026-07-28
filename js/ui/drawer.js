@@ -67,6 +67,10 @@ function syncTuningInputs(){ document.querySelectorAll("#tuningBody input[data-k
 function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clamp + token speed
   document.querySelectorAll(".tile.standard .val").forEach(el=>{
     const i=+el.closest(".tile").dataset.i; el.textContent=TILE_TYPES.standard.valueLabel(i); });
+  // the 3D board keeps its labels in a DOM layer over the canvas
+  document.querySelectorAll("#boardLabels .blabel").forEach(el=>{
+    const i=+el.dataset.i; const v=el.querySelector(".val");
+    if(v) v.textContent=TILE_TYPES[tileType(i)].valueLabel(i); });
   // note: energy is NOT clamped to a lowered cap — store purchases may exceed it
   applyFxTiming();
   scheduleSaveConfig();

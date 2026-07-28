@@ -6,6 +6,7 @@ const DEFAULTS={
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   fallbackSceneMs:1700, longPressMs:350,
   tileArtScale:1.41, tileArtLift:20,
+  board3d:1,                 /* 1 = WebGL board (js/ui/board3d.js), 0 = the old CSS-3D board */
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
@@ -59,7 +60,8 @@ const TUNING=[
    ["spaEnergy","Spa Day energy grant",1],["vipSeed","VIP seed per lap",5],
    ["boardScale","Board scale",0.1],
    ["tileArtScale","Tile art: size ×",0.05],
-   ["tileArtLift","Tile art: lift off tile (%)",1]]},
+   ["tileArtLift","Tile art: lift off tile (%)",1],
+   ["board3d","3D board (0/1) — reload to apply",1]]},
  {group:"Builders & series",items:[
    ["baseCost","Base cost (Builder 1, Lvl 1)",100],["tierGrowth","Level cost growth ×",0.05],
    ["bldgGrowth","Builder cost growth ×",0.05],["boxesPerUpgrade","Boxes per upgrade",1],

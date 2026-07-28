@@ -17,6 +17,19 @@
    the near vertex off the controls — the projection alone leaves room.) */
 .boardScene{display:flex;justify-content:center;align-items:center;
             min-height:520px;position:relative}
+
+/* ---- WebGL board ---- */
+.boardHost{position:absolute;inset:0}
+/* no width/height here — Board3D.resize() sizes the canvas so the drawing buffer and the
+   CSS box always match; letting CSS stretch it would give non-square pixels */
+.boardHost canvas{display:block}
+/* tile labels ride above the canvas in the DOM so text stays crisp at ~47px */
+.boardLabels{position:absolute;inset:0;pointer-events:none;z-index:2}
+.blabel{position:absolute;transform:translate(-50%,-50%);text-align:center;line-height:1;
+        font-size:15px;white-space:nowrap}
+.blabel .val{display:block;font-size:8px;color:var(--muted);margin-top:1px}
+/* when the 3D board is live the legacy DOM board is hidden entirely */
+body.board3d .skyLayer,body.board3d .board{display:none}
 .board{width:min(560px,92%);aspect-ratio:1;display:grid;
        grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);
        gap:4px;position:relative;z-index:1;

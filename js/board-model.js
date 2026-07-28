@@ -28,6 +28,11 @@ function gridPos(i){
 const TILE_ART_DIR="assets/tiles/";
 const TILE_ART_EXT=".png";
 function tileImagePath(i){ return `${TILE_ART_DIR}${i+1}${TILE_ART_EXT}`; }
+/* 3D tile models use the same 1-based numbering: assets/tiles/models/1.glb is Start.
+   Dropped in as exported — board3d.js normalizes them on load (up axis, scale, centring),
+   so a model does not have to arrive at a 1x1 footprint. See assets/tiles/README.md. */
+const TILE_MODEL_DIR="assets/tiles/models/";
+function tileModelPath(i){ return `${TILE_MODEL_DIR}${i+1}.glb`; }
 
 /* Clockwise path from a tile to Start (a full lap when already on Start). */
 function pathToStart(from){ const path=[]; const dist=(40-from)%40||40; let p=from;

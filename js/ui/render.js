@@ -51,8 +51,39 @@ function applyTileArt(el,i){
   probe.src=src;
 }
 
+/* Is the WebGL board in charge? cfg.board3d turns it on; Board3D.available goes false if
+   WebGL couldn't start, in which case we fall back to the DOM board below. */
+function use3d(){ return cfg.board3d && window.Board3D && Board3D.available; }
+
+/* ---- DOM label layer for the 3D board ----
+   Tile values and emoji stay as DOM text over the canvas: crisp at ~47px, and the drawer's
+   live stdBase edits keep working by rewriting textContent. Positioned by projection. */
+function buildBoardLabels(){
+  const layer=$("#boardLabels"); if(!layer) return;
+  layer.innerHTML="";
+  for(let i=0;i<40;i++){
+    const def=TILE_TYPES[tileType(i)];
+    const el=document.createElement("div");
+    el.className="blabel"; el.dataset.i=i;
+    el.innerHTML=(def.icon?`<span class="ico">${def.icon}</span>`:"")+
+                 (def.valueLabel(i)?`<span class="val">${def.valueLabel(i)}</span>`:"");
+    layer.appendChild(el);
+  }
+  syncBoardLabels();
+}
+function syncBoardLabels(){
+  const layer=$("#boardLabels"); if(!layer||!use3d()) return;
+  layer.querySelectorAll(".blabel").forEach(el=>{
+    const p=Board3D.screenPosOf(+el.dataset.i);
+    if(!p) return;
+    el.style.left=p.x+"px"; el.style.top=p.y+"px";
+  });
+}
+
 function buildBoard(){
   applyFxTiming();
+  document.body.classList.toggle("board3d",!!use3d());   // hides the legacy DOM board
+  if(use3d()){ Board3D.build(); buildBoardLabels(); return; }
   const board=$("#board");
   board.querySelectorAll(".tile").forEach(t=>t.remove());
   for(let i=0;i<40;i++){
@@ -70,6 +101,7 @@ function buildBoard(){
   positionToken(true);
 }
 function positionToken(instant){
+  if(use3d()){ Board3D.setTokenTile(state.pos,instant); return; }
   const tok=$("#token"); const p=gridPos(state.pos);
   const left=((p.c+0.5)/11)*100, top=((p.r+0.5)/11)*100;
   if(instant) tok.style.transition="none"; else tok.style.transition="";
@@ -78,6 +110,7 @@ function positionToken(instant){
 }
 /* Draw every registered overlay's markers (mystery boxes today) on their tiles. */
 function renderOverlays(){
+  if(use3d()){ Board3D.setOverlays(OVERLAYS.flatMap(o=>o.all())); return; }
   document.querySelectorAll(".tile .ovl").forEach(b=>b.remove());
   OVERLAYS.forEach(o=>o.all().forEach(i=>{
     const el=document.querySelector(`.tile[data-i="${i}"]`);
@@ -86,6 +119,7 @@ function renderOverlays(){
 }
 /* Skyline in the middle of the board — one tower per builder, height = its level. */
 function renderBuilderCenter(){
+  if(use3d()){ Board3D.setBuilders(); return; }
   const c=$("#builderCenter"); c.innerHTML="";
   const n=Builders.all().length;
   c.style.gap=n>6?"2%":"5%";

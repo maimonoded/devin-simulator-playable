@@ -1,102 +1,146 @@
-# Tile art brief
+# Tile art brief — 3D models
 
-Hand this to whoever produces the tile artwork. It is self-contained.
+Hand this to whoever produces the tile assets. It is self-contained.
 
-The board is a 40-tile ring drawn in **orthographic isometric** projection. Each tile is a
-diamond. Art replaces the tile entirely, so a piece has to sit in that diamond exactly, or
-neighbouring tiles won't line up.
+The board is a 40-tile ring rendered in three.js under an **orthographic camera at 45° azimuth,
+38° elevation**. Each tile is one unit square of ground. Models are dropped in as GLB and the
+engine normalizes them on load, so most of the usual export worries don't apply — but the three
+rules in §2 are not negotiable, because they're what stops tiles from hiding each other and the
+player's token.
+
+> Authoring **flat PNG** art instead? That's the legacy CSS board, and a different brief —
+> see [ART-BRIEF-2D.md](ART-BRIEF-2D.md).
 
 ---
 
-## 1. The camera — the one thing that must be right
+## 1. What the engine does for you
 
-Render every asset with an **orthographic camera** (no perspective / no lens):
+Don't pre-transform anything. On load, the engine measures the model and:
 
-| Setting | Value |
+- **stands it upright** if it's Z-up
+- **scales** it so its larger ground dimension spans one tile
+- **centres** it on the tile and **rests its base** on the tile surface
+- **yaws** it so its front faces out of the ring — each of the four board edges gets a different
+  rotation, which is why §2.1 matters
+
+So: any scale, any origin, any up axis is fine. **Do not** rotate the model into an isometric
+pose — the camera does that. Author it straight-on, standing on the ground plane.
+
+## 2. The three rules that matter
+
+### 2.1 Front faces +Z
+
+Author with the model's **face — its entrance, signage, the side meant to be read — pointing
++Z**, and the tall mass behind it at −Z.
+
+The engine rotates each tile to face out of the ring. If a model's front points some other way,
+that tile ends up presenting its flank while its neighbours present their faces.
+
+### 2.1b The floor is flush and full-bleed — this is the one that decides the look
+
+The ground surface must run **edge to edge, flat and flush**, with no rim, no border strip, no
+base plate and no plinth. Neighbouring tiles then form one continuous floor and the paving reads
+across the seam.
+
+This — not the wall — is what makes the board hang together. Three regenerations that satisfied
+every other rule all failed here: each came back as a raised plinth with a grass rim and a base
+slab, so every tile became its own island and the ring read as scattered cards. A tall wall can
+*hide* a bad floor by bridging the gap between tiles, which is why the difference is easy to
+misattribute to the architecture.
+
+In the subject sentence, say the paving **runs to the very edges of the plot on all four sides**,
+and explicitly rule out grass borders, rims, base slabs and raised edges.
+
+### 2.2 Fill the full square, tall mass hard against the back edge
+
+The ground should fill the whole **1 × 1** tile, with tall mass pushed against the **back (−Z)
+edge** and the front half kept low.
+
+This is the rule the first asset broke, and it's worth understanding why. That model's ground was
+**1.00 × 0.64** — a shallow strip. The engine centres what it's given, so its wall landed only
+**0.17** from the tile centre instead of out at the edge, where it stood directly in front of the
+player's token on the far side of the board and buried it.
+
+Distance from the tile centre buys height, because the camera looks down at 38°:
+
+| Tall mass sits this far from tile centre | Maximum height |
 |---|---|
-| Projection | **Orthographic** — perspective breaks tiling |
-| Azimuth (yaw) | **45°** — looking at the ground square corner-on |
-| Elevation | **38° above the horizon** (= 52° down from vertical) |
-| Roll | 0° |
+| 0.10 | 0.64 |
+| 0.20 | 0.70 |
+| 0.30 | 0.76 |
+| 0.40 | 0.82 |
+| **0.46 (hard against the edge)** | **0.85** |
 
-⚠️ **This is not standard isometric.** The usual game-art preset is 30° elevation, which gives a
-2 : 1 diamond. This board needs **38°**, which gives a **1.62 : 1** diamond. Art rendered at 30°
-will not fit and cannot be corrected by scaling.
+All figures in tile units — 1.0 = one tile width. Anything taller hides the token when that tile
+is on the far side of the ring.
 
-Every asset must use the identical camera. Same for the key light direction, so tiles look like
-one place.
+The first asset was **0.70 tall at 0.17 from centre** — over the 0.64 budget, hence the burial.
+The same 0.70 wall pushed to the back edge would have passed comfortably.
 
-## 2. Geometry
+### 2.3 Nothing crosses the footprint
 
-One tile of ground renders as a diamond of exactly:
+Keep every part of the model inside the 1 × 1 square, including the roof overhangs and any
+ground/base plate.
 
-```
-         ●                    width  : 200 px
-      ╱     ╲                 height : 123 px
-   ●           ●              ratio  : 1.62 : 1
-      ╲     ╱                 (delivered at 3× for retina;
-         ●                     on screen it is 66.9 × 41.2)
-```
+The engine scales the *larger* ground dimension to the tile, so one prop sticking out sideways
+shrinks the entire tile to compensate — the model gets smaller, not clipped.
 
-Rules:
+Height above the budget in §2.2 is the only dimension that may exceed the cube.
 
-- **Ground footprint = exactly one tile.** The ground diamond is 200 × 123 px. It must not spill
-  into the neighbouring tiles — that is what made the first test piece collide.
-- **Build upward, not sideways.** Height is free: a tower, a gate arch, a tree can rise well above
-  the diamond and will correctly overlap the tile behind it. Width is not free.
-- **Horizontally centred** in the canvas.
-- **Bottom vertex of the ground diamond sits on the canvas bottom edge.** That is the anchor the
-  engine positions by, so it must be consistent in every file.
-- Any contact shadow stays **inside** the diamond, or it will darken the neighbouring tile.
+## 3. Which tile is which
 
-## 3. Canvas & format
-
-| | |
-|---|---|
-| Width | **200 px** (= the ground diamond width) |
-| Height | whatever the piece needs — 200 px for something flat, up to ~400 px for something tall |
-| Format | **PNG-24 with alpha**. Fully transparent background — no black, no matte |
-| Colour | sRGB |
-
-Deliver one file per tile, named by tile number: `1.png` … `40.png`.
-
-## 4. Which tile is which
-
-Numbering runs clockwise from Start (the bottom vertex of the diamond on screen).
+Numbering is 1-based, running clockwise from Start (the bottom vertex on screen).
 
 | File | Tile | What it is |
 |---|---|---|
-| `1.png` | Start | the entrance / go-again tile |
-| `11.png` | Spa | grants energy |
-| `21.png` | VIP Lounge | pays out the accumulated pot |
-| `31.png` | Premiere | sends the player back to Start |
-| `6, 16, 26, 36.png` | Train | bonus coins |
-| `4, 9, 14, 19, 24, 29.png` | Plot Twist | the card/chance tile |
+| `1.glb` | Start | the entrance / go-again tile |
+| `11.glb` | Spa | grants energy |
+| `21.glb` | VIP Lounge | pays out the accumulated pot |
+| `31.glb` | Premiere | sends the player back to Start |
+| `6, 16, 26, 36` | Train | bonus coins |
+| `4, 9, 14, 19, 24, 29` | Plot Twist | the card / chance tile |
 | everything else | Standard | ordinary property tiles |
 
-The four corners are the landmarks — they should read as bigger, distinct locations. The 26
-standard tiles should be visually quieter so the corners and specials stand out.
+The four corners are the landmarks and should read as bigger, distinct places. The 26 standard
+tiles should be visually quieter so the corners and specials stand out.
 
-## 5. Legibility
+**Corners are seen from two sides.** They sit at the diamond's extreme points where two edges
+meet, and the engine can only face them down one of the two. Give them something that reads from
+either direction rather than a detailed front and a blank back.
 
-A tile is **66.9 × 41.2 px on screen**. That is small. The 3× delivery is for sharpness, not for
-detail — anything under ~3 px in the delivered file disappears.
+## 4. Legibility
+
+A tile is roughly **47 px on screen**. That is small.
 
 - bold silhouettes, strong value contrast
-- no text, no thin outlines, no fine texture
-- read the piece at 25% zoom: if it's mush, simplify it
+- no text, no thin outlines, no fine surface detail
+- 3–8 chunky primitives is the target complexity, not a detailed model
+- judge it at 47 px, not in the viewer — if it's mush, simplify
+
+## 5. Technical
+
+| | |
+|---|---|
+| Format | `.glb`, single file, texture embedded |
+| Triangles | **≤ 2000** — set it at generation, not by decimating afterwards |
+| Materials | **one baked texture**, not a PBR map set |
+| Texture size | 512 or 1024 square (4096 is ~7 MB/tile once re-encoded — see the README) |
+| Up axis | +Y or +Z, either is fine |
+| Origin / scale | anything — normalized on load |
+
+Decimating a finished mesh **destroys its UVs and therefore its texture**, so the triangle budget
+has to be set when the mesh is generated. See [README.md](README.md).
 
 ## 6. Check before delivering
 
-- [ ] Orthographic, 45° azimuth, **38° elevation** — same camera in every file
-- [ ] Ground diamond exactly **200 × 123 px**, ratio 1.62 : 1
-- [ ] Ground diamond horizontally centred, bottom vertex on the canvas bottom edge
-- [ ] Nothing but height extends past the diamond's left/right vertices
-- [ ] Transparent background, no baked matte
-- [ ] Same light direction across the set
-- [ ] Named `N.png`, `N` = tile number from the table above
+- [ ] Front (entrance / readable side) faces **+Z**
+- [ ] Ground fills the full square — not a shallow strip
+- [ ] Tall mass hard against the **back (−Z) edge**, front half low
+- [ ] Height within the §2.2 budget for where the mass actually sits
+- [ ] Nothing crosses the 1 × 1 footprint sideways
+- [ ] ≤ 2000 triangles, one baked texture, texture ≤ 1024
+- [ ] Named `N.glb`, `N` = tile number from §3
 
-**Fastest sanity test:** put two finished tiles side by side, offset the second by **+100 px
-horizontally and +61.5 px vertically** (half the diamond width and height). Their grounds should
-interlock into a continuous surface with no gap and no overlap. If they do, they'll tile on the
-board.
+**Fastest sanity test:** drop the model in as `models/N.glb`, load the board, and put the token on
+that tile while it's on the **far** side of the ring. If you can still see the token, the piece is
+within budget. That is the check the first asset would have failed.

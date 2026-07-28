@@ -29,8 +29,11 @@
   <!-- stage -->
   <div class="stage">
     <button class="storeBtn" id="storeBtn">🛒 Store</button>
-    <div class="boardScene">
-      <!-- skyline is a sibling behind the board, not a child of its 3D context -->
+    <div class="boardScene" id="boardScene">
+      <!-- WebGL board (js/ui/board3d.js) plus a DOM layer for crisp tile labels -->
+      <div class="boardHost" id="boardHost"></div>
+      <div class="boardLabels" id="boardLabels"></div>
+      <!-- legacy CSS-3D board, used when cfg.board3d is 0 or WebGL is unavailable -->
       <div class="skyLayer"><div class="builderCenter" id="builderCenter"></div></div>
       <div class="board" id="board">
         <div class="token" id="token"><div class="disc">💃</div></div>
@@ -159,5 +162,11 @@
 <script src="js/ui/finale.js"></script>
 <script src="js/ui/drawer.js"></script>
 <script src="js/ui/main.js"></script>
+<!-- three.js addons import the bare specifier "three"; this maps it to the vendored build -->
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<!-- ES module: runs after every classic script above, then calls boot(). Needs http, not file:// -->
+<script type="module" src="js/ui/board3d.js"></script>
 </body>
 </html>

@@ -1,11 +1,21 @@
 "use strict";
 /* Visual effects & small DOM outputs: floats, activity log, toasts, confetti, dice faces, number tween. */
 function floatAt(pos,text,color){
-  const board=$("#board"),p=gridPos(pos);
   const el=document.createElement("div"); el.className="float"; el.textContent=text;
   el.style.color=color||"var(--gold)";
-  el.style.left=((p.c+0.5)/11)*100+"%"; el.style.top=((p.r+0.3)/11)*100+"%";
-  board.appendChild(el); setTimeout(()=>el.remove(),1000);
+  if(typeof use3d==="function"&&use3d()){
+    // project the tile into screen space and drop the float into the scene wrapper
+    const p=Board3D.screenPosOf(pos,0.5);
+    const host=$("#boardScene");
+    if(!p||!host) return;
+    el.style.left=p.x+"px"; el.style.top=p.y+"px";
+    host.appendChild(el);
+  }else{
+    const board=$("#board"),p=gridPos(pos);
+    el.style.left=((p.c+0.5)/11)*100+"%"; el.style.top=((p.r+0.3)/11)*100+"%";
+    board.appendChild(el);
+  }
+  setTimeout(()=>el.remove(),1000);
 }
 function floatToken(text,color){ floatAt(state.pos,text,color); }
 function log(icon,html){
