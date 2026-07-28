@@ -1,7 +1,9 @@
 /* 3D board renderer.
 
-   This is the only ES module in the project — everything else is classic scripts sharing
-   globals. It owns a three.js scene for the board and exposes an imperative API on
+   This is the project's only ES module *entry point* — everything else is classic scripts
+   sharing globals. It imports js/ui/env3d.js (the world around the board), which is therefore
+   also a module, but there is still one <script type="module"> tag so index.html's classic
+   load order remains the dependency order. It owns a three.js scene for the board and exposes an imperative API on
    window.Board3D that mirrors what js/ui/render.js used to do to the DOM, so callers barely
    change. Everything else on screen (HUD, panels, modals, the video player) is still DOM.
 
@@ -15,6 +17,7 @@
 
 import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
+import { Env3D } from "./env3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -74,7 +77,7 @@ const Board3D = {
     /* Orthographic so every tile is the same shape regardless of distance — the CSS board
        had to drop its perspective for exactly this reason. */
     this._camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    const az = THREE.MathUtils.degToRad(45), el = THREE.MathUtils.degToRad(38), r = 40;
+    const az = THREE.MathUtils.degToRad(ENV_CAM.az), el = THREE.MathUtils.degToRad(ENV_CAM.el), r = 40;
     this._camera.position.set(
       r * Math.cos(el) * Math.sin(az),
       r * Math.sin(el),
@@ -82,13 +85,36 @@ const Board3D = {
     );
     this._camera.lookAt(0, 0, 0);
 
-    this._scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-    const key = new THREE.DirectionalLight(0xffffff, 1.6);
-    key.position.set(6, 12, 8);
+    /* With nothing but the board on screen a near-flat ambient reads fine. Once there is
+       ground under it the board has to look like it is sitting on something, which means a
+       real key light and a shadow — so the ambient comes down to leave the shadow somewhere
+       to land. */
+    const env = !!cfg.env3d;
+    this._scene.add(new THREE.AmbientLight(0xffffff, env ? 0.95 : 1.5));
+    const key = new THREE.DirectionalLight(0xffffff, env ? 1.9 : 1.6);
+    key.position.set(...(env ? [12, 24, 16] : [6, 12, 8]));
     this._scene.add(key);
     const rim = new THREE.DirectionalLight(0x8b6dff, 0.7);
     rim.position.set(-8, 5, -6);
     this._scene.add(rim);
+    if (env) this._scene.add(new THREE.HemisphereLight(0x9fc4ff, 0x14204a, 0.45));
+
+    /* Shadows are what sell "the board sits on the island" — without one it reads as a decal.
+       The shadow camera is sized to the island, not the scene: anything bigger just spends
+       texels on water. */
+    if (env && cfg.envShadows) {
+      this._renderer.shadowMap.enabled = true;
+      this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      const s = ENV_SIZE.island + 1.5;
+      Object.assign(key.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 80 });
+      key.shadow.bias = -0.0006;
+      key.shadow.normalBias = 0.02;
+      key.shadow.camera.updateProjectionMatrix();
+    }
+
+    Env3D.init(this._scene);
 
     this.available = true;
     this.resize();
@@ -112,8 +138,8 @@ const Board3D = {
        sqrt(2) wider and sqrt(2)*sin(38°) taller, so pick the vertical half-extent that
        contains it on both axes and derive the horizontal from the true aspect. */
     const aspect = w / h;
-    const halfW = (EXTENT * 1.12 * Math.SQRT2) / 2;
-    const halfH = halfW * Math.sin(THREE.MathUtils.degToRad(38));
+    const halfW = (EXTENT * envMargin() * Math.SQRT2) / 2;
+    const halfH = halfW * Math.sin(THREE.MathUtils.degToRad(ENV_CAM.el));
     const fit = Math.max(halfH, halfW / aspect);
     this._camera.left = -fit * aspect;
     this._camera.right = fit * aspect;
@@ -219,6 +245,7 @@ const Board3D = {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.copy(this._tileWorld(i));
       mesh.userData.tile = i;
+      mesh.castShadow = mesh.receiveShadow = true;
       this._scene.add(mesh);
       this._tiles[i] = mesh;
 
@@ -318,6 +345,7 @@ const Board3D = {
         holder.position.z += w.z - f2.cz;
         holder.position.y += TILE_H / 2 - box.min.y;
 
+        holder.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
         this._scene.add(holder);
         this._models.set(i, holder);
         slab.visible = false;                       // the model brings its own ground
@@ -381,6 +409,7 @@ const Board3D = {
         new THREE.MeshLambertMaterial({ color: COLORS.tower }),
       );
       mesh.position.set(-span / 2 + (i + 0.5) * (span / n), 0, 0);
+      mesh.castShadow = true;
       group.add(mesh);
       this._towers.push(mesh);
     }
@@ -437,14 +466,23 @@ const Board3D = {
     this._flat = flat;
     if (!this.available) return;
     const r = 40;
-    const el = THREE.MathUtils.degToRad(flat ? 89.9 : 38);
-    const az = THREE.MathUtils.degToRad(flat ? 0 : 45);
+    const el = THREE.MathUtils.degToRad(flat ? 89.9 : ENV_CAM.el);
+    const az = THREE.MathUtils.degToRad(flat ? 0 : ENV_CAM.az);
     this._camera.position.set(
       r * Math.cos(el) * Math.sin(az),
       r * Math.sin(el),
       r * Math.cos(el) * Math.cos(az),
     );
     this._camera.lookAt(0, 0, 0);
+    Env3D.setFlat(flat);
+    this.resize();
+  },
+
+  /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
+     not, because the light and material setup is decided once in init(). */
+  applyEnv() {
+    if (!this.available) return;
+    Env3D.rebuild();
     this.resize();
   },
 
@@ -477,6 +515,7 @@ const Board3D = {
         p.y = TILE_H;
       }
     }
+    Env3D.tick(1 / 60);
     this._renderer.render(this._scene, this._camera);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },

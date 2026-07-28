@@ -18,6 +18,8 @@ const APP_FILES = [
   "js/config.js",
   "js/content.js",
   "js/board-model.js",
+  "js/env-model.js",
+  "assets/env/scene.js",
   "js/state.js",
   "js/storage.js",
   "js/episodes.js",

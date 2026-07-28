@@ -23,7 +23,9 @@ Everything except the board is classic `<script>` tags sharing globals — `impo
 JSON payload rather than `.json`. Script order in `index.html` **is** the dependency order; a file
 may only use globals defined above it, and adding a file means adding a tag.
 
-`js/ui/board3d.js` is the one ES module. Modules are deferred, so it runs *after* every classic
+`js/ui/board3d.js` is the one ES module *entry point* — it imports `js/ui/env3d.js`, which is
+therefore also a module, but there is still only one `<script type="module">` tag so the classic
+load order stays the dependency order. Modules are deferred, so it runs *after* every classic
 script — which is why `boot()` in `js/ui/main.js` doesn't self-invoke: the board module calls it
 once the scene exists.
 
@@ -34,6 +36,7 @@ index.html          markup + ordered <link>/<script> tags
 serve.py            dev server (Range + no-store) — the way to run the project
 vendor/             three.module.js (r169), vendored; no npm, no build step
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
+assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
 css/                base · board · panels · drawer · overlay
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/
@@ -41,6 +44,7 @@ js/
   config.js         cfg defaults + the tuning-drawer schema
   content.js        login reward ladder (story content lives in episodes/)
   board-model.js    tile index → type and → grid cell, pathToStart
+  env-model.js      environment geometry: datums, what's on screen, the height budget
   state.js          the run state object
   storage.js        localStorage persistence for config and progress
   episodes.js       episode registry
@@ -51,7 +55,8 @@ js/
   game.js           rolling, landing dispatch, prediction, session time
   ui/               everything that touches the DOM                          → js/ui/README.md
     fx.js           floats, log, toasts, confetti, dice, blocking overlays
-    board3d.js      the WebGL board (three.js) — the only ES module; calls boot()
+    board3d.js      the WebGL board (three.js) — the module entry point; calls boot()
+    env3d.js        the island, sea and props around the board (imported by board3d.js)
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
     prediction.js   predict & watch: bet → playback → result
@@ -88,6 +93,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Board layout | `js/board-model.js` | Fixed 40 tiles. Start sits at the **bottom** point of the diamond; indices run clockwise on screen (Start → Spa → VIP → Premiere). |
 | Board rendering | `js/ui/board3d.js` | three.js scene: orthographic camera at 45° azimuth / 38° elevation, which reproduces the old CSS projection exactly (`sin 38° = cos 52°`). Tile labels stay DOM over the canvas so text is crisp. `cfg.board3d = 0` falls back to the legacy CSS-3D board, as does a missing WebGL context. |
 | Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
+| Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Placement is data (`assets/env/scene.js`), the terrain has a procedural fallback, and `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |

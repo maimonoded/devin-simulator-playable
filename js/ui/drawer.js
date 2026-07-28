@@ -73,6 +73,8 @@ function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clam
     if(v) v.textContent=TILE_TYPES[tileType(i)].valueLabel(i); });
   // note: energy is NOT clamped to a lowered cap — store purchases may exceed it
   applyFxTiming();
+  // the environment reads cfg live: env3d toggles it, envMargin re-frames the camera
+  if(window.Board3D&&Board3D.available&&Board3D.applyEnv) Board3D.applyEnv();
   scheduleSaveConfig();
   renderAll();
 }

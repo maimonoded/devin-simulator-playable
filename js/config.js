@@ -7,6 +7,11 @@ const DEFAULTS={
   fallbackSceneMs:1700, longPressMs:350,
   tileArtScale:1.41, tileArtLift:20,
   board3d:1,                 /* 1 = WebGL board (js/ui/board3d.js), 0 = the old CSS-3D board */
+  /* Environment (js/ui/env3d.js). envMargin is how much wider than the ring the camera
+     frames: 1.12 is the bare board, and everything above that trades board size for
+     visible ground. 1.7 is what it takes to see water around the modelled island — the
+     island has to be wider than the board it holds, so the frame has to be wider again. */
+  env3d:1, envMargin:1.7, envShadows:1,
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
@@ -62,6 +67,10 @@ const TUNING=[
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],
    ["board3d","3D board (0/1) — reload to apply",1]]},
+ {group:"Environment",items:[
+   ["env3d","Environment (0/1)",1],
+   ["envMargin","Camera margin (board size ↔ ground)",0.05],
+   ["envShadows","Shadows (0/1) — reload to apply",1]]},
  {group:"Builders & series",items:[
    ["baseCost","Base cost (Builder 1, Lvl 1)",100],["tierGrowth","Level cost growth ×",0.05],
    ["bldgGrowth","Builder cost growth ×",0.05],["boxesPerUpgrade","Boxes per upgrade",1],
