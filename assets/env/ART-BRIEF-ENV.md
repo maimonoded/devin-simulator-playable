@@ -99,7 +99,13 @@ max top  =  0.16 + 0.781 · d              ... highest world y it may reach
 | ≥ 3.6 | 3.0 — the top of the frame takes over |
 
 `d ≤ 0` means the piece is behind the board in its column and cannot occlude it; the only limit
-is then the frame, **3.0**.
+is then the frame, **3.0** (which the formula reaches at `d = 3.64`).
+
+The engine checks this on load **for props**, at the piece's placement point — a fair proxy for
+something one to three tiles wide. A deck spans too much ground for one point to mean anything,
+so it gets the coverage check in §5 instead; the rule above still applies to its rim, and that
+one is on you. For reference the shipped island's kerb tops out at y = 1.47 against a budget of
+3.0 where it stands.
 
 **The trap this replaces:** measuring to the board's near *corner* says anything level with the
 board's left or right point is unconstrained. It isn't — out at `u = 5.3` the board's near edge
@@ -133,6 +139,28 @@ requested border on every side, whatever the asset's own proportions were.
 
 `size` in the manifest is then the piece's width in tiles, directly.
 
+### File format, either kind
+
+| | Deck piece | Prop |
+|---|---|---|
+| Format | `.glb`, single file, texture embedded | same |
+| Triangles | ≤ 4000 | ≤ 2000 |
+| Materials | **one baked texture**, not a PBR map set | same |
+| Texture | ≤ 1024 square | ≤ 1024 square |
+| Up axis | +Y (glTF standard) | +Y |
+| Scale / origin / rotation | set by the conform tool below | same |
+
+Shipped for comparison: the island is 3,668 triangles, each boat 1,783.
+
+**Budget: the environment may add ≤ 20,000 triangles and ≤ 10 draw calls** on top of the board.
+Measured on the shipped scene, the 40 tiles cost 74,952 triangles across 58 draw calls and the
+environment — island, three boats and the sea — adds **9,019 triangles and 5 draw calls**, for
+83,971 and 63 in total.
+
+Style must match the tiles: **low-poly toy diorama**, chunky primitives, flat baked colour,
+strong value contrast, no fine detail and no text. A piece fussier than the tiles reads as a
+different game.
+
 ### Conforming a file
 
 A generator satisfies none of this: it returns arbitrary scale and origin, and Tripo hands
@@ -140,8 +168,8 @@ the mesh back turned to the reference image's three-quarter camera — measured 
 island and 52.6° on the boat, so it is systematic rather than random. One tool fixes it:
 
 ```bash
-python3 tools/normalize-env.py raw/island.glb --deck -o assets/env/models/island.glb
-python3 tools/normalize-env.py raw/boat.glb          -o assets/env/models/boat.glb
+python3 tools/normalize-env.py assets/env/raw/island.glb --deck -o assets/env/models/island.glb
+python3 tools/normalize-env.py assets/env/raw/boat.glb          -o assets/env/models/boat.glb
 python3 tools/normalize-env.py assets/env/models/island.glb --deck --check
 ```
 
