@@ -453,6 +453,18 @@ const Board3D = {
      by how tall it stands next to a tile, and stood on the holder's origin so the existing
      hop tween — which drives holder.position.y — keeps working untouched. */
   _loadTokenModel(holder) {
+    /* Already parsed? Reattach it. build() runs on every board rebuild — a config reset, a
+       reshape — and each one used to discard the model and re-fetch 5 MB, leaving the
+       placeholder disc on screen until it came back. Warm, that gap is a few hundred
+       milliseconds; cold or on a slow link it is however long the download takes, and if the
+       fetch fails at all the disc simply stays. The piece is a singleton, so keeping it and
+       moving it between holders is both correct and free. */
+    if (this._tokenModel) {
+      holder.clear();
+      holder.add(this._tokenModel);
+      this.setTokenHeight();
+      return;
+    }
     if (!this._gltf) this._gltf = new GLTFLoader();
     this._gltf.load(TOKEN_MODEL, (gltf) => {
       const model = gltf.scene;
@@ -475,7 +487,11 @@ const Board3D = {
       holder.clear();                        // drop the placeholder disc
       holder.add(model);
       this.setTokenHeight();
-    }, undefined, () => {});                 // no model — the disc stays
+    }, undefined, (e) => {
+      /* Say so. A silent failure here is indistinguishable from "there is no model", and the
+         board just quietly shows the placeholder for ever. */
+      console.warn(`Board3D: player piece ${TOKEN_MODEL} failed to load, keeping the disc`, e);
+    });
   },
 
   /* Resize the piece to cfg.tokenHeight, in tile units. Rescales the model already in the
