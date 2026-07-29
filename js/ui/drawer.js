@@ -7,7 +7,16 @@ function buildTuning(){
     wrap.innerHTML=`<h4>${g.group}</h4>`;
     g.items.forEach(([key,label,step])=>{
       const row=document.createElement("div"); row.className="trow";
-      row.innerHTML=`<label>${label}</label><input type="number" step="${step}" data-key="${key}" value="${cfg[key]}">`;
+      /* A third element of {choices} makes the row a picker instead of a number box. The
+         options are fetched now rather than listed in the schema, because the schema lives
+         in config.js which loads before the manifest that defines them. */
+      if(step&&step.choices==="env"){
+        const opts=envSceneNames().map(n=>
+          `<option value="${n}"${n===cfg[key]?" selected":""}>${envSceneLabel(n)}</option>`).join("");
+        row.innerHTML=`<label>${label}</label><select data-key="${key}" data-choice="1">${opts}</select>`;
+      }else{
+        row.innerHTML=`<label>${label}</label><input type="number" step="${step}" data-key="${key}" value="${cfg[key]}">`;
+      }
       wrap.appendChild(row);
     });
     body.appendChild(wrap);
@@ -50,6 +59,12 @@ function buildTuning(){
   body.appendChild(zone);
 
   // live bindings
+  /* Pickers hold strings, so they bind separately — the numeric path parseFloats and would
+     reject every value a picker can produce. */
+  body.querySelectorAll("select[data-key]").forEach(sel=>sel.onchange=(e)=>{
+    cfg[e.target.dataset.key]=e.target.value;
+    onCfgChange();
+  });
   body.querySelectorAll("input[data-key]").forEach(inp=>inp.oninput=(e)=>{
     const key=e.target.dataset.key; let v=parseFloat(e.target.value); if(isNaN(v))return;
     if(["buildings","tiers"].includes(key)){ v=Math.max(1,Math.round(v)); cfg[key]=v; Builders.reshape(); }
@@ -63,7 +78,10 @@ function buildTuning(){
     const i=+e.target.dataset.b,f=e.target.dataset.f; let v=parseFloat(e.target.value); if(isNaN(v))return;
     boxTable[i][f]=v; onCfgChange(); });
 }
-function syncTuningInputs(){ document.querySelectorAll("#tuningBody input[data-key]").forEach(inp=>{ inp.value=cfg[inp.dataset.key]; }); }
+function syncTuningInputs(){
+  document.querySelectorAll("#tuningBody input[data-key]").forEach(inp=>{ inp.value=cfg[inp.dataset.key]; });
+  document.querySelectorAll("#tuningBody select[data-key]").forEach(sel=>{ sel.value=cfg[sel.dataset.key]; });
+}
 function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clamp + token speed
   document.querySelectorAll(".tile.standard .val").forEach(el=>{
     const i=+el.closest(".tile").dataset.i; el.textContent=TILE_TYPES.standard.valueLabel(i); });

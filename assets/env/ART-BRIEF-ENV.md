@@ -234,7 +234,8 @@ for environment pieces.
 
 ## 7. How pieces get placed
 
-Placement is data. Each piece is an entry in [scene.js](scene.js):
+Placement is data. [scene.js](scene.js) holds one entry per world — the drawer's **World**
+picker lists them — and each world holds its pieces:
 
 ```js
 { model: "island", at: [0, 0], y: "deck", deck: true }

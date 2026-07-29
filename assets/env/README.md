@@ -25,6 +25,7 @@ dependency order.
 
 | Config key | Default | Effect |
 |---|---|---|
+| `envScene` | `texas-town` | **which world to show.** A picker in the drawer, listing whatever `scene.js` defines. Live |
 | `env3d` | 1 | the whole environment. Live — toggling it in the tuning drawer rebuilds |
 | `envMargin` | 1.7 | how much wider than the ring the camera frames. Live |
 | `envDeckMargin` | 0.6 | how much deck shows beyond the board, in tiles. Live |
@@ -85,11 +86,22 @@ python3 tools/normalize-env.py assets/env/raw/atoll.glb --deck -o assets/env/mod
 python3 tools/normalize-env.py assets/env/models/atoll.glb --deck --check
 ```
 
-then one line in `scene.js`:
+then an entry in `scene.js`:
 
 ```js
-{ model: "atoll", at: [0, 0], y: "deck", deck: true }
+atoll: {
+  label: "Atoll",
+  terrain: { ground: true, groundColor: 0x1d7f8f, shelf: false, island: false, plinth: false },
+  pieces: [ { model: "atoll", at: [0, 0], y: "deck", deck: true } ],
+},
 ```
+
+It appears in the drawer's **World** picker straight away — the picker is built from
+`envSceneNames()`, so the manifest is the only list. Switching is live: `onCfgChange` calls
+`Board3D.applyEnv()`, which rebuilds the environment group from the newly selected scene.
+
+`label` is what the picker shows; without one it falls back to the key. A saved config naming
+a world that has since been renamed falls back to the first rather than rendering nothing.
 
 ## What the console tells you
 

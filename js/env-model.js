@@ -41,6 +41,26 @@ function envMargin() {
   return (typeof cfg === "object" && cfg.env3d) ? cfg.envMargin : ENV_MARGIN_BARE;
 }
 
+/* Which worlds exist, and which one is showing.
+
+   The names come from assets/env/scene.js, so the drawer offers whatever the manifest
+   contains and adding an environment stays a data change. An unknown or missing
+   cfg.envScene falls back to the first rather than rendering nothing — a saved config
+   naming a world that has since been renamed should show a board, not a void. */
+function envSceneNames() {
+  return (typeof ENV_SCENES === "undefined" || !ENV_SCENES) ? [] : Object.keys(ENV_SCENES);
+}
+function envSceneLabel(name) {
+  const s = (typeof ENV_SCENES === "undefined" || !ENV_SCENES) ? null : ENV_SCENES[name];
+  return (s && s.label) || name;
+}
+function envScene(name) {
+  const names = envSceneNames();
+  if (!names.length) return null;
+  const want = name ?? (typeof cfg === "object" ? cfg.envScene : null);
+  return ENV_SCENES[want] || ENV_SCENES[names[0]];
+}
+
 /* World (x,z) → screen axes. */
 function envScreen(x, z) {
   return { u: (x - z) / Math.SQRT2, v: (x + z) / Math.SQRT2 };

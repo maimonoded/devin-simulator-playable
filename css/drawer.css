@@ -18,6 +18,11 @@
 .trow input{width:92px;background:#10143a;border:1px solid var(--line);color:var(--text);
             border-radius:8px;padding:6px 8px;font-size:13px;text-align:right;font-weight:700}
 .trow input:focus{outline:none;border-color:var(--purple)}
+/* Pickers match the number boxes, but left-aligned and wider — a world name is words, not
+   a figure, and right-aligning it reads as a value rather than a choice. */
+.trow select{width:132px;background:#10143a;border:1px solid var(--line);color:var(--text);
+             border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700}
+.trow select:focus{outline:none;border-color:var(--purple)}
 .ttable{width:100%;border-collapse:collapse;margin-top:4px}
 .ttable th{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:3px 4px;text-align:right}
 .ttable th:first-child{text-align:left}

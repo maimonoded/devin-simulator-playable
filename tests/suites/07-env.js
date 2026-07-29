@@ -118,18 +118,48 @@ test("envExpand turns a repeat into individual placements and leaves singles alo
   ok(rows.every(r => !r.repeat), "expanded entries must not expand again");
 });
 
-test("the shipped manifest places every piece somewhere legal", () => {
-  ENV_SCENE.pieces.forEach(piece => {
-    const p = envPlace(piece);
-    deepEq(p.problems, [], `${piece.model} at ${piece.at}`);
+suite("env scenes");
+
+test("every shipped world places every piece somewhere legal", () => {
+  ok(envSceneNames().length >= 2, "there should be more than one world to choose from");
+  envSceneNames().forEach(name => {
+    envScene(name).pieces.forEach(piece => {
+      const p = envPlace(piece);
+      deepEq(p.problems, [], `${name}: ${piece.model} at ${piece.at}`);
+    });
   });
 });
 
-test("the shipped manifest carries a deck, and asks it for nothing it shouldn't", () => {
-  const island = ENV_SCENE.pieces.find(p => p.deck);
-  ok(island, "something has to carry the board");
-  ok(envPlace(island).scale > ENV_BOARD, "the deck must be wider than the ring");
-  ["size", "fit", "anchor"].forEach(k =>
-    eq(island[k], undefined,
-       `${k} is the asset's job now — a value here means someone hand-tuned around a bad file`));
+test("every world carries a deck, and asks it for nothing it shouldn't", () => {
+  envSceneNames().forEach(name => {
+    const deck = envScene(name).pieces.find(p => p.deck);
+    ok(deck, `${name}: something has to carry the board`);
+    ok(envPlace(deck).scale > ENV_BOARD, `${name}: the deck must be wider than the ring`);
+    ["size", "fit", "anchor"].forEach(k =>
+      eq(deck[k], undefined,
+         `${name}.${k} is the asset's job — a value here means someone hand-tuned a bad file`));
+  });
+});
+
+test("every world names a ground colour, since not every world is a harbour", () => {
+  envSceneNames().forEach(name => {
+    const t = envScene(name).terrain || {};
+    eq(typeof t.groundColor, "number", `${name} should say what colour its ground is`);
+  });
+});
+
+test("the picker's selection drives which world is returned", () => {
+  const was = cfg.envScene;
+  const [first, second] = envSceneNames();
+  cfg.envScene = second; eq(envScene(), envScene(second));
+  cfg.envScene = first;  eq(envScene(), envScene(first));
+  /* A saved config naming a world that has since been renamed must still show a board. */
+  cfg.envScene = "a-world-that-was-deleted";
+  eq(envScene(), envScene(first), "an unknown world falls back to the first, not to nothing");
+  cfg.envScene = was;
+});
+
+test("a world's label is what the drawer shows, falling back to its key", () => {
+  eq(envSceneLabel("harbour"), "Harbour");
+  eq(envSceneLabel("no-such-world"), "no-such-world");
 });

@@ -19,11 +19,10 @@
 import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 
-/* assets/env/scene.js declares `const ENV_SCENE`, and a top-level const in a classic script
-   is a global *lexical* binding — visible to this module by name, but never a property of
-   window. So `window.ENV_SCENE` is always undefined and this has to read the name directly,
-   guarded for the case where the manifest file is absent. */
-const envScene = () => (typeof ENV_SCENE === "undefined" ? null : ENV_SCENE);
+/* envScene() lives in js/env-model.js and picks the manifest entry cfg.envScene names.
+   Note it is reached by bare name, not through window: assets/env/scene.js declares a
+   top-level `const`, which is a global *lexical* binding — visible to this module, but
+   never a property of window. */
 
 const C = {
   ground:   0x1d4f8f,          // harbour blue; assets/env/scene.js overrides per environment
