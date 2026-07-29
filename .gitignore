@@ -8,3 +8,13 @@
 
 # python bytecode from tools/
 __pycache__/
+
+# Claude Code's project directory is mostly local state — personal settings, session
+# scratch — but .claude/skills holds the asset pipeline this repo's environment art
+# depends on, and that belongs to everyone working here.
+#
+# Excluding the CONTENTS rather than .claude itself is deliberate: git cannot re-include
+# anything under a directory it has already excluded, so `.claude/` followed by a negation
+# would silently ignore the skills too.
+.claude/*
+!.claude/skills/

@@ -38,6 +38,8 @@ vendor/             three.module.js (r169), vendored; no npm, no build step
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
 assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
+.claude/skills/     board-env-art — the environment art pipeline, versioned with the repo
+                    (the rest of .claude/ is local state and git-ignored)
 css/                base · board · panels · drawer · overlay
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/

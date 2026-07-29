@@ -120,6 +120,11 @@ loaded, so it is reported against what was really delivered rather than what was
 
 ## Regenerating a piece
 
+There is a skill for this: **`board-env-art`**, in `.claude/skills/`, so it loads
+automatically for anyone working in this repo. It walks the whole path — reference, cutout,
+image-to-3D, conform, place, verify — and carries the prompt rules that took three attempts to
+learn. Ask for a new world in plain words and it should pick it up.
+
 The Scenario pipeline and the prompt changes environment pieces need are in
 [ART-BRIEF-ENV.md](ART-BRIEF-ENV.md) §6. Conform the result with `tools/normalize-env.py`, which
 writes the correction as a node transform and leaves geometry, materials and the BIN chunk
