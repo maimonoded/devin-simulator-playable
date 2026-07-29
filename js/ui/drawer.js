@@ -5,15 +5,24 @@ function buildTuning(){
   TUNING.forEach(g=>{
     const wrap=document.createElement("div"); wrap.className="tgroup";
     wrap.innerHTML=`<h4>${g.group}</h4>`;
-    g.items.forEach(([key,label,step])=>{
+    g.items.forEach(([key,label,step,range])=>{
       const row=document.createElement("div"); row.className="trow";
-      /* A third element of {choices} makes the row a picker instead of a number box. The
-         options are fetched now rather than listed in the schema, because the schema lives
-         in config.js which loads before the manifest that defines them. */
+      /* Three row shapes, in order of specificity:
+           {choices} in the step slot -> a picker. The options are fetched now rather than
+             listed in the schema, because the schema lives in config.js which loads before
+             the manifest that defines them.
+           {min,max} as a 4th entry  -> a slider, for values you tune by eye rather than by
+             number: you want to sweep and watch, not guess and type.
+           otherwise                 -> a plain number box. */
       if(step&&step.choices==="env"){
         const opts=envSceneNames().map(n=>
           `<option value="${n}"${n===cfg[key]?" selected":""}>${envSceneLabel(n)}</option>`).join("");
         row.innerHTML=`<label>${label}</label><select data-key="${key}" data-choice="1">${opts}</select>`;
+      }else if(range){
+        row.innerHTML=`<label>${label}</label><span class="tslider">
+             <input type="range" min="${range.min}" max="${range.max}" step="${step}"
+                    data-key="${key}" value="${cfg[key]}">
+             <output data-out="${key}">${cfg[key]}</output></span>`;
       }else{
         row.innerHTML=`<label>${label}</label><input type="number" step="${step}" data-key="${key}" value="${cfg[key]}">`;
       }
@@ -69,6 +78,7 @@ function buildTuning(){
     const key=e.target.dataset.key; let v=parseFloat(e.target.value); if(isNaN(v))return;
     if(["buildings","tiers"].includes(key)){ v=Math.max(1,Math.round(v)); cfg[key]=v; Builders.reshape(); }
     else cfg[key]=v;
+    const out=body.querySelector(`output[data-out="${key}"]`); if(out) out.textContent=v;
     onCfgChange();
   });
   body.querySelectorAll("input[data-d]").forEach(inp=>inp.oninput=(e)=>{

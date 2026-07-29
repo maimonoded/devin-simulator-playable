@@ -24,9 +24,18 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8125
 
 
+# Binary art: big, and changed by dropping in a new file rather than by editing.
+# `no-cache` still forces a revalidation on every load, so a replaced asset shows up
+# immediately -- but an unchanged one comes back 304 with no body, instead of re-sending
+# megabytes. The player piece alone is 5 MB, and every tile is another 2 MB.
+CACHEABLE = re.compile(r"^/(assets|vendor|episodes)/")
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store, must-revalidate")
+        # no-store for code and markup: those are edited constantly and must never be reused.
+        cacheable = CACHEABLE.match(self.path.split("?")[0])
+        self.send_header("Cache-Control", "no-cache" if cacheable else "no-store, must-revalidate")
         self.send_header("Accept-Ranges", "bytes")
         super().end_headers()
 

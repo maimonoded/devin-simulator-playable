@@ -12,6 +12,25 @@ const DEFAULTS={
      visible ground. 1.7 is what it takes to see water around the modelled island — the
      island has to be wider than the board it holds, so the frame has to be wider again. */
   env3d:1, envMargin:1.7, envShadows:1, envDeckMargin:0.6, envScene:"texas-town",
+  /* Follow camera. camZoom is the fraction of the board left in view; 1 is all of it.
+     Desktop and phone need different numbers, not one shared value: a 9:16 frame is much
+     narrower, so the same zoom that fills a wide pane leaves the board tiny in a tall one.
+     camFollowMs is how long the camera takes to catch up with the token — it trails
+     deliberately, so a hop reads as movement rather than the world sliding underneath a
+     stationary piece. */
+  camFollow:1, camZoom:0.85, camZoomPhone:0.5, camFollowMs:450, camDrag:1, phoneView:0,
+  /* camBias pulls the camera's aim from the token toward the board centre: 0 aims straight
+     at the token and puts sea at the edges, 1 never leaves the middle and so never follows.
+     In between is the useful range — the token rides off-centre and the frame stays on the
+     board. camEdgePad only bounds how far a manual drag may wander. */
+  camBias:0.45, camEdgePad:0.5,
+  /* How much of the half-frame the token may occupy before the camera gives ground back.
+     1 lets it touch the edge; lower holds it further in. This is what stops camBias from
+     pushing it off-screen at the left and right corners, where the projection is widest. */
+  camTokenInset:0.7,
+  /* Player piece height in tile units — a tile is 1. The model is scaled to this rather
+     than to a footprint, since a piece reads by how tall it stands beside a tile. */
+  tokenHeight:1.15,
   diceRevealMs:500, diceToMoveMs:30,
   stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
   boardScale:1,
@@ -75,7 +94,17 @@ const TUNING=[
    ["env3d","Environment (0/1)",1],
    ["envMargin","Camera margin (board size ↔ ground)",0.05],
    ["envDeckMargin","Deck border beyond the board (tiles)",0.05],
-   ["envShadows","Shadows (0/1) — reload to apply",1]]},
+   ["envShadows","Shadows (0/1) — reload to apply",1],
+   ["camFollow","Follow the token (0/1)",1],
+   ["camZoom","Camera zoom — desktop (1 = whole board)",0.05,{min:0.3,max:1}],
+   ["camZoomPhone","Camera zoom — phone view",0.05,{min:0.3,max:1}],
+   ["camFollowMs","Camera catch-up (ms)",50],
+   ["camDrag","Drag the board to pan (0/1)",1],
+   ["camBias","Aim: token ↔ board centre",0.05,{min:0,max:1}],
+   ["camEdgePad","Drag range past board edge (tiles)",0.1,{min:0,max:3}],
+   ["camTokenInset","Token must stay within frame ×",0.05,{min:0.1,max:1}]]},
+ {group:"Player piece",items:[
+   ["tokenHeight","Size — height in tiles",0.05,{min:0.2,max:2}]]},
  {group:"Builders & series",items:[
    ["baseCost","Base cost (Builder 1, Lvl 1)",100],["tierGrowth","Level cost growth ×",0.05],
    ["bldgGrowth","Builder cost growth ×",0.05],["boxesPerUpgrade","Boxes per upgrade",1],

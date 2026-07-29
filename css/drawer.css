@@ -34,3 +34,9 @@
 .resetB{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;width:100%;margin-top:6px}
 .resetB.danger{border-color:var(--bad);color:var(--bad)}
 .resetB.danger:hover{background:rgba(255,95,126,.12)}
+
+/* Slider rows — schema entries carrying a {min,max}. The row's default `input` rule sizes a
+   number box, so the range and its readout share that width instead of each taking it. */
+.trow .tslider{display:flex;align-items:center;gap:8px;width:92px}
+.trow .tslider input[type=range]{width:60px;padding:0;accent-color:var(--purple);background:none;border:none}
+.trow .tslider output{font-size:11px;color:var(--text);min-width:26px;text-align:right;font-variant-numeric:tabular-nums}

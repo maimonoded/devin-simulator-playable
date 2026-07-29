@@ -128,6 +128,25 @@ $("#flatBtn").onclick=()=>{
   $("#board").classList.toggle("flat",flat);
   if(use3d()) Board3D.setFlat(flat);
 };
+/* 9:16 preview. The class goes on .stage and CSS reshapes .boardScene; Board3D's
+   ResizeObserver re-fits the camera to the new box by itself. cfg.phoneView persists it,
+   so the framing you were testing survives a reload. */
+$("#phoneBtn").onclick=()=>{
+  const on=!document.querySelector(".stage").classList.contains("phone");
+  /* cfg.phoneView first: applyPhoneView re-fits the camera, and resize() reads this flag to
+     pick the view's zoom. Setting it afterwards framed each view with the other's value. */
+  cfg.phoneView=on?1:0;
+  applyPhoneView(on);
+  scheduleSaveConfig();
+};
+function applyPhoneView(on){
+  document.querySelector(".stage").classList.toggle("phone",on);
+  $("#phoneBtn").classList.toggle("on",on);
+  $("#phoneBtn").textContent=on?"🖥 Desktop view":"📱 Phone view";
+  /* The two views use different zooms, so re-fit even when the box size happens not to
+     change — the ResizeObserver would not fire in that case and the frustum would be stale. */
+  if(use3d()&&window.Board3D&&Board3D.available) Board3D.resize();
+}
 document.querySelectorAll(".mopt").forEach(b=>b.onclick=()=>{
   if(state.animating||autoMode!==null) return;   // can't change the stake mid-spin
   document.querySelectorAll(".mopt").forEach(x=>x.classList.remove("on")); b.classList.add("on");
@@ -143,6 +162,7 @@ function boot(){
   initState();
   const restored=loadState();   // overlay saved progress, if any
   buildBoard(); buildTuning(); setDice(3,4); syncMultButtons(); renderAll();
+  applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
   if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
   else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");
   if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");

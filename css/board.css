@@ -141,3 +141,15 @@ body.board3d .skyLayer,body.board3d .board{display:none}
 /* locked mid-spin / during auto — keep the active choice legible */
 .mopt:disabled{cursor:not-allowed}
 .mopt.on:disabled{opacity:.75}
+
+/* Second control row — view-shape toggles, kept apart from the play controls. */
+.controls.viewrow{margin-top:8px}
+.controls.viewrow .btn.on{background:var(--purple);color:#fff}
+
+/* 9:16 phone framing. Only the board scene changes shape: the HUD, panels and controls
+   stay where they are, so this previews the play area rather than mocking up a whole phone.
+   aspect-ratio does the work and min-height is dropped, or it would fight the ratio and
+   leave the scene taller than 16 units for its width. Board3D's ResizeObserver picks the
+   new box up on its own and re-fits the frustum — no JS resize call needed here. */
+.stage.phone .boardScene{aspect-ratio:9/16;min-height:0;width:min(100%,360px);
+                         margin-inline:auto;overflow:hidden}

@@ -26,6 +26,8 @@ const TILE = 1;                  // one tile = one world unit
 const GAP = 0;
 const TILE_H = 0.16;             // tile slab thickness
 const EXTENT = N * TILE;         // board footprint
+/* The player piece. Absent file = the placeholder disc stays, so this is safe to remove. */
+const TOKEN_MODEL = "assets/token/token.glb";
 
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
@@ -57,6 +59,13 @@ const Board3D = {
   _tiles: [], _token: null, _towers: [], _boxes: new Map(), _models: new Map(), _gltf: null,
   _flat: false, _raf: 0,
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
+  /* _camTarget is where the camera is looking now, _camWant where it is heading. Keeping
+     them apart is what makes the follow trail rather than snap. */
+  _camTarget: new THREE.Vector3(), _camWant: new THREE.Vector3(),
+  _camAim: new THREE.Vector3(), _camOffset: new THREE.Vector3(),
+  /* Set while the player has dragged the view somewhere of their own. Follow stands down
+     until the token next moves, so a look-around isn't fought by the camera. */
+  _camManual: false, _drag: null,
 
   /* ---------------- setup ---------------- */
   init(host) {
@@ -81,13 +90,19 @@ const Board3D = {
     /* Orthographic so every tile is the same shape regardless of distance — the CSS board
        had to drop its perspective for exactly this reason. */
     this._camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    const az = THREE.MathUtils.degToRad(ENV_CAM.az), el = THREE.MathUtils.degToRad(ENV_CAM.el), r = 40;
-    this._camera.position.set(
-      r * Math.cos(el) * Math.sin(az),
-      r * Math.sin(el),
-      r * Math.cos(el) * Math.cos(az),
-    );
-    this._camera.lookAt(0, 0, 0);
+    const az = THREE.MathUtils.degToRad(ENV_CAM.az), el = THREE.MathUtils.degToRad(ENV_CAM.el);
+    /* The camera is defined as a direction and a distance from whatever it is looking at,
+       not as a fixed point. Framing the whole board and following the token are then the
+       same code with a different target — and the direction never changes, so the isometric
+       projection is identical however far the camera travels. */
+    this._camOffset = new THREE.Vector3(
+      Math.cos(el) * Math.sin(az),
+      Math.sin(el),
+      Math.cos(el) * Math.cos(az),
+    ).multiplyScalar(40);
+    this._camAim.copy(this._camTarget).add(this._camOffset);
+    this._camera.position.copy(this._camAim);
+    this._camera.lookAt(this._camTarget);
 
     /* With nothing but the board on screen a near-flat ambient reads fine. Once there is
        ground under it the board has to look like it is sitting on something, which means a
@@ -119,6 +134,7 @@ const Board3D = {
     }
 
     Env3D.init(this._scene);
+    this._initDrag(this._renderer.domElement);
 
     this.available = true;
     this.resize();
@@ -142,7 +158,20 @@ const Board3D = {
        sqrt(2) wider and sqrt(2)*sin(38°) taller, so pick the vertical half-extent that
        contains it on both axes and derive the horizontal from the true aspect. */
     const aspect = w / h;
-    const halfW = (EXTENT * envMargin() * Math.SQRT2) / 2;
+    /* Two different framings, deliberately not the same number scaled.
+
+       Static: fit the board plus envMargin, so the island and some water are in shot.
+       Following: fit a fraction of the BOARD itself and ignore the ground margin, because
+       camZoom is meant to read as "how much of the board is on screen" — 0.5 is half. Scaling
+       the margined frame instead would make 0.55 show 93% of the board, since most of that
+       frame is water. */
+    const follow = !!cfg.camFollow;
+    /* Phone framing keeps its own zoom. A 9:16 pane is far narrower than a desktop one, so
+       the value that fills a wide frame leaves the board small in a tall one — they are
+       genuinely different numbers rather than one scaled by aspect. */
+    const want = cfg.phoneView ? cfg.camZoomPhone : cfg.camZoom;
+    const zoom = follow ? Math.min(1, Math.max(0.05, want || 1)) : 1;
+    const halfW = (EXTENT * Math.SQRT2 / 2) * (follow ? zoom : envMargin());
     const halfH = halfW * Math.sin(THREE.MathUtils.degToRad(ENV_CAM.el));
     const fit = Math.max(halfH, halfW / aspect);
     this._camera.left = -fit * aspect;
@@ -411,6 +440,69 @@ const Board3D = {
     g.add(dot);
     this._token = g;
     this._scene.add(g);
+    this._loadTokenModel(g);
+  },
+
+  /* Swap the placeholder disc for the modelled piece (assets/token/token.glb).
+
+     The disc is built first and kept until the GLB actually arrives, so the board is never
+     without a token — a missing or failed file just leaves the disc in place.
+
+     Normalized on load like the tile art, for the same reason: the file is whatever the
+     generator produced. Scaled by HEIGHT rather than footprint, because a game piece reads
+     by how tall it stands next to a tile, and stood on the holder's origin so the existing
+     hop tween — which drives holder.position.y — keeps working untouched. */
+  _loadTokenModel(holder) {
+    if (!this._gltf) this._gltf = new GLTFLoader();
+    this._gltf.load(TOKEN_MODEL, (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model, true);
+      /* Keep the unscaled height: setTokenHeight() rescales from this, so dragging the size
+         slider never re-fetches the model. */
+      this._tokenNaturalH = box.getSize(new THREE.Vector3()).y || 1;
+      this._tokenModel = model;
+
+      /* Turn to face the camera. Unlike a tile, a piece has no board edge to align with —
+         it should read from wherever the player is looking, and the camera azimuth is fixed. */
+      model.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
+
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = !!cfg.envShadows;
+        if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
+      });
+
+      holder.clear();                        // drop the placeholder disc
+      holder.add(model);
+      this.setTokenHeight();
+    }, undefined, () => {});                 // no model — the disc stays
+  },
+
+  /* Resize the piece to cfg.tokenHeight, in tile units. Rescales the model already in the
+     scene rather than reloading it — the GLB is several MB, and this runs on every frame of
+     a slider drag. Re-grounds afterwards so the feet stay on the tile whatever the size. */
+  setTokenHeight() {
+    const m = this._tokenModel;
+    const holder = m && m.parent;
+    if (!holder) return;
+    m.scale.setScalar((cfg.tokenHeight || 0.6) / (this._tokenNaturalH || 1));
+    m.position.set(0, 0, 0);
+    /* From the HOLDER down: setTokenTile writes holder.position but nothing recomputes its
+       matrixWorld until the next render, and Box3 reads matrixWorld. Measuring against a
+       stale identity returns a local-space box, and the world-relative correction below then
+       double-counts the holder's position — the piece lands one tile-offset away. */
+    holder.updateMatrixWorld(true);
+
+    /* Box3 measures in WORLD space, but m.position is relative to the holder — and the holder
+       travels with the token. So correct toward the holder's position, not toward the origin.
+       Subtracting the world centre outright parks the piece at the middle of the board, which
+       is exactly what it did until this line was fixed; it only looked right on first load,
+       when the holder happened to still be at the origin. */
+    const box = new THREE.Box3().setFromObject(m, true);
+    const c = box.getCenter(new THREE.Vector3());
+    m.position.x += holder.position.x - c.x;        // centred on the tile
+    m.position.z += holder.position.z - c.z;
+    m.position.y += holder.position.y - box.min.y;  // feet on the tile top
   },
 
   _buildTowers() {
@@ -441,6 +533,8 @@ const Board3D = {
   /* ---------------- updates ---------------- */
   setTokenTile(i, instant) {
     if (!this.available || !this._token) return;
+    this._camManual = false;      // the token moved — the camera's job again
+
     const w = this._tileWorld(i);
     this._tokenTarget.set(w.x, TILE_H, w.z);
     if (instant) {
@@ -503,6 +597,7 @@ const Board3D = {
   applyEnv() {
     if (!this.available) return;
     Env3D.rebuild();
+    this.setTokenHeight();   // cfg.tokenHeight is live too, and must not reload the model
     this.resize();
   },
 
@@ -539,9 +634,151 @@ const Board3D = {
         p.y = TILE_H;
       }
     }
+    this._followCamera();
     Env3D.tick(1 / 60);
     this._renderer.render(this._scene, this._camera);
     if (window.syncBoardLabels) window.syncBoardLabels();
+  },
+
+  /* Move the camera toward the token, one frame's worth.
+
+     It aims at the token's own position rather than its tile centre, so the camera drifts
+     during the hop instead of stepping tile to tile. The catch-up is exponential and framed
+     as a time constant: cfg.camFollowMs is roughly how long it takes to close the distance,
+     independent of frame rate, so the feel doesn't change on a 120Hz display.
+
+     The camera trails on purpose. Locking it to the token would pin the piece dead centre
+     and slide the whole world underneath it, which reads as the board moving rather than
+     the player — the lag is what makes a hop look like travel. */
+  /* Drag the ground to pan the view.
+
+     Screen pixels map to world distance differently on the two axes: the camera looks down
+     at 38°, so a vertical drag covers 1/sin(38°) ≈ 1.6x more ground than the same drag
+     sideways. Panning with one scale for both makes the world feel like it slides out from
+     under the cursor. So horizontal uses the camera's own right vector, vertical uses the
+     ground direction that reads as "up screen", divided by sin(elevation).
+
+     The grabbed point stays under the pointer as a result, which is the whole trick — the
+     view feels dragged rather than nudged. */
+  _initDrag(canvas) {
+    const el = THREE.MathUtils.degToRad(ENV_CAM.el);
+    const right = new THREE.Vector3(), fwd = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+
+    canvas.style.cursor = "grab";
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!cfg.camDrag || e.button !== 0) return;
+      this._drag = { x: e.clientX, y: e.clientY };
+      this._camManual = true;
+      canvas.setPointerCapture(e.pointerId);
+      canvas.style.cursor = "grabbing";
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!this._drag) return;
+      const dx = e.clientX - this._drag.x, dy = e.clientY - this._drag.y;
+      this._drag.x = e.clientX; this._drag.y = e.clientY;
+
+      const c = this._camera, r = canvas.getBoundingClientRect();
+      const wppX = (c.right - c.left) / r.width;      // world units per screen pixel
+      const wppY = (c.top - c.bottom) / r.height;
+      right.setFromMatrixColumn(c.matrix, 0).setY(0).normalize();
+      fwd.copy(up).cross(right).normalize();          // ground axis that points up-screen
+
+      /* The world moves with the cursor, so the camera target moves against it. The two axes
+         take opposite signs because screen Y grows downward while the projection's Y grows
+         up — get this wrong and horizontal drags feel right while vertical ones invert. */
+      this._camWant
+        .addScaledVector(right, -dx * wppX)
+        .addScaledVector(fwd, dy * wppY / Math.sin(el));
+
+      this._clampPan(this._camWant);
+      this._camWant.y = 0;
+    });
+    const end = (e) => {
+      if (!this._drag) return;
+      this._drag = null;
+      canvas.style.cursor = "grab";
+      if (e.pointerId != null && canvas.hasPointerCapture?.(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+  },
+
+  /* Pull the aim inward, toward the middle of the board.
+
+     Centring on the token wastes the frame whenever the token is near an outer edge — half
+     the screen becomes sea. Aiming at a point part-way between the token and the board's
+     centre spends that frame on board instead, and the token simply sits off-centre. It does
+     not need to be centred.
+
+     This is a bias, not a clamp. Clamping the frame inside the board square was the first
+     attempt and it fails on this board: the ring is hollow, so "fit the frame inside the
+     board" resolves to "sit on the empty middle", and at any zoom where the whole board fits
+     the camera stops moving altogether. A bias always tracks the token, and camBias alone
+     decides how much board versus environment you get.
+
+       0    aim straight at the token (all follow, sea at the edges)
+       0.5  half way to the middle
+       1    always the board centre (no follow at all) */
+  _biasToCentre(v) {
+    const b = Math.min(1, Math.max(0, cfg.camBias ?? 0));
+    v.multiplyScalar(1 - b);            // board centre is the world origin
+  },
+
+  /* Pull the aim back until the token is actually on screen.
+
+     camBias alone is projection-blind, and the projection is not symmetric. The world
+     diagonals that form the diamond's LEFT and RIGHT vertices lie across the camera azimuth,
+     so they project to screen-horizontal at full scale; the TOP and BOTTOM ones lie along it
+     and are squashed by sin(38°). The same bias therefore pushes the token clean off the side
+     of the frame at the left and right corners while looking fine at the top and bottom.
+
+     So the offset is measured in the camera's own basis and any excess is given back.
+     camTokenInset is how much of the half-frame the token may use: 1 lets it reach the very
+     edge, lower values hold it further in. */
+  _keepTokenInFrame(v) {
+    if (!this._token) return;
+    const c = this._camera, el = THREE.MathUtils.degToRad(ENV_CAM.el);
+    const right = new THREE.Vector3().setFromMatrixColumn(c.matrix, 0).setY(0).normalize();
+    const fwd = new THREE.Vector3(0, 1, 0).cross(right).normalize();
+    const d = new THREE.Vector3(this._token.position.x - v.x, 0, this._token.position.z - v.z);
+
+    const inset = Math.min(1, Math.max(0.1, cfg.camTokenInset ?? 0.7));
+    const limX = (c.right - c.left) / 2 * inset;
+    const limY = (c.top - c.bottom) / 2 * inset;
+
+    const dr = d.dot(right);                 // already in camera-horizontal units
+    const df = d.dot(fwd) * Math.sin(el);    // ground distance -> camera-vertical units
+    if (Math.abs(dr) > limX) v.addScaledVector(right, dr - Math.sign(dr) * limX);
+    if (Math.abs(df) > limY) {
+      v.addScaledVector(fwd, (df - Math.sign(df) * limY) / Math.sin(el));
+    }
+  },
+
+  /* A loose bound so a drag can't lose the board off-screen entirely. */
+  _clampPan(v) {
+    const lim = EXTENT / 2 + (cfg.camEdgePad ?? 0.5);
+    v.x = Math.max(-lim, Math.min(lim, v.x));
+    v.z = Math.max(-lim, Math.min(lim, v.z));
+  },
+
+  _followCamera() {
+    if (this._camManual) {
+      /* left where the player put it — _camWant is already the dragged position */
+    } else if (!cfg.camFollow) {
+      this._camWant.set(0, 0, 0);
+    } else if (this._token) {
+      this._camWant.set(this._token.position.x, 0, this._token.position.z);
+      this._biasToCentre(this._camWant);
+      this._keepTokenInFrame(this._camWant);
+    }
+    const ms = Math.max(16, cfg.camFollowMs || 450);
+    const k = 1 - Math.exp(-(1000 / 60) / ms * 3);   // ~95% closed after camFollowMs
+    this._camTarget.lerp(this._camWant, k);
+    this._camAim.copy(this._camTarget).add(this._camOffset);
+    this._camera.position.copy(this._camAim);
+    this._camera.lookAt(this._camTarget);
   },
 
   _loop() {
