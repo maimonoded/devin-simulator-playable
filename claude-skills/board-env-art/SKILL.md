@@ -13,10 +13,10 @@ The one thing that makes this workflow different from tiles: **a tile only has t
 deck piece has to fit.** An 11×11 board sits on it, square and centred. That is a geometric
 promise, and it is kept by conforming the file, not by eyeballing the render.
 
-This skill is versioned **in this repo**, at `.claude/skills/board-env-art/`, so it arrives
-with a clone and loads for anyone working here. That is deliberate: it is built entirely
-around this board's contract and is meaningless elsewhere, and keeping it beside the brief and
-the tool it depends on is what stops the three drifting apart.
+This skill is versioned **in this repo**, at `claude-skills/board-env-art/`, and symlinked
+into `.claude/skills/` by `claude-skills/link-skills.sh` — run that once after cloning. It is
+built entirely around this board's contract and is meaningless elsewhere, so keeping it beside
+the brief and the tool it depends on is what stops the three drifting apart.
 
 ## Read this first
 

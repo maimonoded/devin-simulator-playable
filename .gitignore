@@ -9,12 +9,11 @@
 # python bytecode from tools/
 __pycache__/
 
-# Claude Code's project directory is mostly local state — personal settings, session
-# scratch — but .claude/skills holds the asset pipeline this repo's environment art
-# depends on, and that belongs to everyone working here.
-#
-# Excluding the CONTENTS rather than .claude itself is deliberate: git cannot re-include
-# anything under a directory it has already excluded, so `.claude/` followed by a negation
-# would silently ignore the skills too.
-.claude/*
-!.claude/skills/
+# Claude Code's own working directory: local settings and session state, plus the symlinks
+# that claude-skills/link-skills.sh puts there. All of it is per-machine — the skills
+# themselves are versioned in claude-skills/.
+.claude/
+
+# Skill virtualenvs: board-tile-art's is 67 MB of platform-specific binaries, rebuilt by
+# its own setup.sh.
+claude-skills/*/.venv/

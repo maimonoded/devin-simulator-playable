@@ -1,0 +1,43 @@
+{
+  "style_version": "v5-fixed-base",
+  "_style_version_note": [
+    "v5 stopped generating the slab. assets/base-tile.png is passed as referenceImages[0] on",
+    "every tile and the model only adds the object on top, so the base cannot drift in colour,",
+    "shape or camera. Subjects therefore describe the OBJECT ONLY \u2014 any mention of paving,",
+    "grass or a plot re-specifies the slab and invites the model to replace it.",
+    "Never mix versions on one board; re-run every tile after a bump."
+  ],
+  "spec": {
+    "format": "glb",
+    "footprint_units": 1.0,
+    "up_axis": "+Y",
+    "origin": "centre of base",
+    "max_tris": 2000,
+    "single_baked_texture": true,
+    "texture_px": 2048,
+    "min_ground_ratio": 0.8,
+    "tile_base_color": "#F4EDDD",
+    "_tile_base_color_note": "Measured from assets/base-tile.png, which supplies the slab. Not a target for the generator to hit \u2014 it is what the reference already contains.",
+    "max_height": 0.3,
+    "_max_height_note": "Low by design. The camera-derived ceiling is higher, but tall pieces hide the token and the tiles behind them, so the style targets a fifth of a tile width for the object; 0.3 is the check threshold, since the base slab counts toward measured height.",
+    "facing": "+Z",
+    "base_tile": "assets/base-tile.png"
+  },
+  "tiles": [
+    {
+      "number": 1,
+      "role": "Start",
+      "subject": "A small low white metal gate lying open, with two solid green wreath rings"
+    },
+    {
+      "number": 2,
+      "role": "Standard",
+      "subject": "A low folded striped deckchair and a small rolled towel"
+    },
+    {
+      "number": 11,
+      "role": "Spa",
+      "subject": "A shallow round turquoise plunge basin with two rolled white towels beside it"
+    }
+  ]
+}

@@ -120,8 +120,8 @@ loaded, so it is reported against what was really delivered rather than what was
 
 ## Regenerating a piece
 
-There is a skill for this: **`board-env-art`**, in `.claude/skills/`, so it loads
-automatically for anyone working in this repo. It walks the whole path — reference, cutout,
+There is a skill for this: **`board-env-art`**, in `claude-skills/` — run
+`./claude-skills/link-skills.sh` once after cloning and it loads for anyone working here. It walks the whole path — reference, cutout,
 image-to-3D, conform, place, verify — and carries the prompt rules that took three attempts to
 learn. Ask for a new world in plain words and it should pick it up.
 
