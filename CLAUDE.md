@@ -40,7 +40,8 @@ assets/env/         the world around the board: scene.js manifest + models/  →
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
 claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles) and
                     board-env-art (the world around them). Run link-skills.sh once after
-                    cloning — it symlinks them into .claude/skills, which is git-ignored
+                    cloning — it runs each skill's setup.sh, then symlinks them into
+                    .claude/skills, which is git-ignored. Both need the Scenario MCP server
 css/                base · board · panels · drawer · overlay
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/

@@ -19,6 +19,10 @@
 # Re-running is safe. Pass --no-setup to skip straight to linking when the environments are
 # already good and you just want the links back.
 #
+# It finishes by reminding you that both skills need the Scenario MCP server. That is a
+# printed note, deliberately not a check: verifying it would mean reading Claude Code's
+# config, which is none of this script's business.
+#
 # Everything here resolves from this script's own location, so the repo can live anywhere
 # and be cloned under any name.
 
@@ -78,7 +82,13 @@ done
 
 echo
 echo "$linked skill(s) linked. Restart Claude Code if they do not show up."
+echo
+echo "Both skills generate their art through Scenario (scenario.com), reached over its"
+echo "remote MCP server — without it connected they cannot produce anything. If the"
+echo "scenario:* tools are not in your session yet, connect it first:"
+echo "  claude-skills/board-tile-art/INSTALL.md"
 if [ ${#failed[@]} -gt 0 ]; then
+  echo
   echo "setup failed for: ${failed[*]}" >&2
   exit 1
 fi
