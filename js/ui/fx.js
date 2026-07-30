@@ -48,10 +48,14 @@ function diceConfetti(){
 
    Two presentations behind one call. On the 3D board the dice are thrown onto the middle of
    the board (js/ui/dice3d.js); otherwise the DOM pair shakes with its faces scrambling. The
-   fallback is not just for cfg.board3d = 0 — it also covers die.glb failing to load, which is
-   why this asks whether the model is actually there rather than only whether 3D is on. */
+   fallback is not just for cfg.board3d = 0 — it also covers die.glb failing to load.
+
+   It asks whether the model FAILED, not whether it has arrived: a throw made while the file is
+   still downloading is queued by Dice3D and appears when it lands, and the promise resolves on
+   cfg.diceRevealMs either way, so the turn is paced correctly. Falling back on "not arrived
+   yet" would instead shake a DOM pair that syncDiceMode is deliberately keeping hidden. */
 async function rollDiceAnim(d1,d2){
-  if(use3d() && cfg.dice3d && Board3D.diceReady && Board3D.diceReady()){
+  if(use3d() && cfg.dice3d && Board3D.diceFailed && !Board3D.diceFailed()){
     setDice(d1,d2);                  // keep the DOM pair truthful for anything still reading it
     await Board3D.throwDice([d1,d2]);
     return;

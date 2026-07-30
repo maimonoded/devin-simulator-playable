@@ -58,7 +58,7 @@ const Board3D = {
 
   _renderer: null, _scene: null, _camera: null, _host: null,
   _tiles: [], _token: null, _towers: [], _boxes: new Map(), _models: new Map(), _gltf: null,
-  _flat: false, _raf: 0,
+  _raf: 0,
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
   /* _camTarget is where the camera is looking now, _camWant where it is heading. Keeping
      them apart is what makes the follow trail rather than snap. */
@@ -596,22 +596,6 @@ const Board3D = {
     });
   },
 
-  setFlat(flat) {
-    this._flat = flat;
-    if (!this.available) return;
-    const r = 40;
-    const el = THREE.MathUtils.degToRad(flat ? 89.9 : ENV_CAM.el);
-    const az = THREE.MathUtils.degToRad(flat ? 0 : ENV_CAM.az);
-    this._camera.position.set(
-      r * Math.cos(el) * Math.sin(az),
-      r * Math.sin(el),
-      r * Math.cos(el) * Math.cos(az),
-    );
-    this._camera.lookAt(0, 0, 0);
-    Env3D.setFlat(flat);
-    this.resize();
-  },
-
   /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
      not, because the light and material setup is decided once in init(). */
   applyEnv() {
@@ -636,6 +620,8 @@ const Board3D = {
     return Dice3D.throwDice(values, { x: this._camTarget.x, z: this._camTarget.z });
   },
   diceReady() { return Dice3D.available(); },
+  /* Definitively failed, as opposed to merely not downloaded yet. */
+  diceFailed() { return Dice3D.failed(); },
   clearDice() { Dice3D.clear(); },
 
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */

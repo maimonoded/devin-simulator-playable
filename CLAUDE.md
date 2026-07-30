@@ -180,7 +180,14 @@ This applies to `BoardActor.gainEnergy` and the `advanceSession` regen. `onCfgCh
 `autoMode` in `js/ui/main.js` is `null | "roll" | "session"`; both drive one shared loop and only
 one can own it. Either stops on a second click or when energy can't cover the multiplier.
 
-|  | **Auto roll** | **Auto-play session** |
+**Auto roll has no button of its own — it is a state of Roll.** Tap Roll to roll once, hold it
+for `cfg.autoRollHoldMs` to hand the loop over, tap again to stop. That is why `renderAll()`
+keeps `#rollBtn` enabled while `autoMode === "roll"`: it is the only way out, so disabling it
+mid-loop would strand the player. The handler uses pointer events, not click, because the tap
+and the hold have to be told apart before a click would fire; sliding off the button cancels
+the hold without rolling.
+
+|  | **Auto roll** (hold Roll) | **Auto-play session** |
 |---|---|---|
 | Buys upgrades | no | yes (cheapest first) |
 | Intent | simulates a real player | internal balancing tool |

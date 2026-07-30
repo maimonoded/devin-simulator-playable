@@ -31,14 +31,14 @@ function seriesComplete(){
     $("#nextSeries").onclick=()=>{
       const s=Builders.advanceSeries();
       $("#scrim").classList.remove("show");
-      buildBoard(); syncMultButtons(); renderAll();
+      buildBoard(); syncMultButton(); renderAll();
       log("🎬",`<b>${s.name}</b> begins · builders ${s.from}–${s.to}.`);
       toast(`🎬 ${s.name} — ${s.builders} builders`);
     };
   }else{
     $("#newSeries").onclick=()=>{
       $("#scrim").classList.remove("show");
-      initState(); Economy.apply(); buildBoard(); syncMultButtons(); renderAll();
+      initState(); Economy.apply(); buildBoard(); syncMultButton(); renderAll();
       toast("🎬 New run — Day 1");
     };
   }

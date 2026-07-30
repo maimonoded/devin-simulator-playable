@@ -40,24 +40,19 @@
       </div>
       <!-- win/loss reveal, sits flat above the 3D board -->
       <div class="centerfx" id="centerFx"></div>
-    </div>
-    <div class="controls">
-      <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
-      <div class="multi">
-        <span class="mlbl">Multiplier</span>
-        <button class="mopt on" data-m="1">×1</button>
-        <button class="mopt" data-m="2">×2</button>
-        <button class="mopt" data-m="3">×3</button>
-        <button class="mopt" data-m="5">×5</button>
-        <button class="mopt" data-m="10">×10</button>
+      <!-- Play controls ride ON the board as a flat 2D layer pinned to its bottom edge, so the
+           scene reads as a game screen rather than a viewport with a toolbar under it. -->
+      <div class="playbar">
+        <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
+        <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
+        <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
+        <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
+        <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
       </div>
-      <button class="btn roll" id="rollBtn">🎲 Roll</button>
-      <button class="btn purple" id="autoRollBtn">↻ Auto roll</button>
-      <button class="btn ghost" id="autoBtn">▶ Auto-play session</button>
-      <button class="btn ghost" id="flatBtn" title="Toggle 2.5D / flat view">⤢</button>
     </div>
-    <!-- second row: view-shape toggles, separate from the play controls above -->
+    <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">
+      <button class="btn ghost" id="autoBtn">▶ Auto-play session</button>
       <button class="btn ghost" id="phoneBtn" title="Toggle 9:16 phone framing">📱 Phone view</button>
     </div>
   </div>

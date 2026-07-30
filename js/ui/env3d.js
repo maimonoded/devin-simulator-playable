@@ -241,12 +241,6 @@ export const Env3D = {
     }
   },
 
-  /* Top-down is a diagnostic view. The terrain is symmetrical so it survives it; anything
-     authored for the fixed camera (the backdrop, when it exists) hides here. */
-  setFlat(flat) {
-    this._flat = flat;
-  },
-
   tick(dt) {
     this._t += dt;
   },

@@ -5,6 +5,9 @@ const DEFAULTS={
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   fallbackSceneMs:1700, longPressMs:350,
+  /* How long Roll has to be held before it hands the loop to auto-roll. Long enough that a
+     slow tap never trips it, short enough not to feel stuck. */
+  autoRollHoldMs:1000,
   tileArtScale:1.41, tileArtLift:20,
   board3d:1,                 /* 1 = WebGL board (js/ui/board3d.js), 0 = the old CSS-3D board */
   /* Environment (js/ui/env3d.js). envMargin is how much wider than the ring the camera
@@ -54,6 +57,9 @@ const DEFAULTS={
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
 };
 let cfg=Object.assign({},DEFAULTS);
+/* Roll stakes in cycle order. One button steps through these and wraps, so the order here IS
+   the order the player sees. A stake costs that much energy per roll and multiplies the coins. */
+const MULTIPLIERS=[1,2,3,5,10];
 let deck=[
   {name:"Small coins",weight:40,coins:30,energy:0,clues:0,vip:0},
   {name:"Medium coins",weight:15,coins:80,energy:0,clues:0,vip:0},
@@ -93,6 +99,7 @@ const TUNING=[
    ["autoCollectMs","Train collect during auto-play (ms)",50],
    ["fallbackSceneMs","Episode w/o video: placeholder (ms)",100],
    ["longPressMs","Video: hold for 2× after (ms)",25],
+   ["autoRollHoldMs","Roll: hold this long for auto-roll (ms)",100],
    ["boxItemGapMs","Mystery box: gap between its two items (ms)",20],
    ["deckCardMs","Deck: card on screen (ms)",100],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],

@@ -30,6 +30,10 @@ export const Dice3D = {
   _t0: 0,
   _ms: 0,
   _pending: false,
+  /* Distinct from "not loaded yet". The DOM fallback pair keys off THIS, not off _proto:
+     treating a still-downloading model as a failure is what made the 2D dice flash on every
+     load, since die.glb takes a few hundred ms and the fallback showed for exactly that long. */
+  _failed: false,
 
   init(scene) {
     this._scene = scene;
@@ -55,13 +59,18 @@ export const Dice3D = {
       if (window.onDiceReady) window.onDiceReady();
     }, undefined, (e) => {
       this._loading = false;
-      /* Say so. Silence here is indistinguishable from "the dice never landed", and the DOM
-         dice in js/ui/fx.js stay hidden either way. */
-      console.warn(`Dice3D: ${DIE_MODEL} failed to load, no dice will be shown`, e);
+      this._failed = true;
+      /* Say so. Silence here is indistinguishable from "the dice never landed". */
+      console.warn(`Dice3D: ${DIE_MODEL} failed to load, falling back to the DOM dice`, e);
+      /* Same call as the success path, for the opposite reason: this is the moment the DOM
+         pair has to come BACK, because nothing else is going to draw a die now. */
+      if (window.onDiceReady) window.onDiceReady();
     });
   },
 
   available() { return !!this._proto; },
+  /* Did the model definitively fail? "Not yet" is not a failure — see _failed. */
+  failed() { return this._failed; },
 
   /* Throw `values` (one die per entry) into the middle of the CURRENT view.
 

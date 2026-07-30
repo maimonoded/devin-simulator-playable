@@ -132,6 +132,6 @@ function resetUser(){
   clearState(); initState();
   $("#scrim").classList.remove("show"); $("#scrim").innerHTML="";
   $("#log").innerHTML="";
-  buildTuning(); buildBoard(); syncMultButtons(); renderAll();
+  buildTuning(); buildBoard(); syncMultButton(); renderAll();
   log("🗑","<b>Progress reset</b> — new run, Day 1.");
   toast("🗑 User progress reset"); }

@@ -117,17 +117,46 @@ async function onUpgradeClick(bIdx){
 }
 
 /* ---------------- wiring ---------------- */
-$("#rollBtn").onclick=roll;
-$("#autoRollBtn").onclick=autoRoll;
+/* Roll is one button with two modes: tap it to roll once, hold it to hand the loop over to
+   auto-roll, tap it again to stop. Auto-roll used to be its own button; folding it into Roll
+   keeps the primary action in one place, which matters most in the 9:16 phone framing where
+   the control row is tight.
+
+   Pointer events rather than click, because the tap and the hold have to be told apart before
+   the click would fire. The hold is cancelled if the pointer leaves the button, so sliding off
+   is the way to back out without rolling. */
+(function wireRoll(){
+  const btn=$("#rollBtn");
+  let holdT=null, startedAuto=false;
+  const endHold=()=>{ clearTimeout(holdT); holdT=null; btn.classList.remove("holding"); };
+  btn.addEventListener("pointerdown",e=>{
+    if(e.button!==0||btn.disabled) return;
+    if(autoMode==="roll") return;            // already running: the tap stops it, on release
+    startedAuto=false;
+    btn.style.setProperty("--holdMs",cfg.autoRollHoldMs+"ms");   // CSS fills over the same time
+    btn.classList.add("holding");
+    holdT=setTimeout(()=>{ endHold(); startedAuto=true; autoRoll(); },cfg.autoRollHoldMs);
+  });
+  btn.addEventListener("pointerup",e=>{
+    if(e.button!==0) return;
+    /* endHold() nulls holdT, and the timer callback calls it too — so a hold that already
+       fired leaves holdT null and correctly does NOT also roll once on release. */
+    const wasTap=holdT!==null;
+    endHold();
+    /* Letting go of the hold that just STARTED auto-roll must not immediately stop it again:
+       by now autoMode is already "roll", so without this the mode would flick on and off in
+       one gesture. Only a fresh press counts as the stop. */
+    if(startedAuto){ startedAuto=false; return; }
+    if(autoMode==="roll") autoRoll();        // tap while auto-rolling = stop
+    else if(wasTap) roll();
+  });
+  btn.addEventListener("pointerleave",endHold);
+  btn.addEventListener("pointercancel",endHold);
+})();
 $("#autoBtn").onclick=autoPlay;
 $("#watchBtn").onclick=openPrediction;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;
-$("#flatBtn").onclick=()=>{
-  const flat=!$("#board").classList.contains("flat");
-  $("#board").classList.toggle("flat",flat);
-  if(use3d()) Board3D.setFlat(flat);
-};
 /* 9:16 preview. The class goes on .stage and CSS reshapes .boardScene; Board3D's
    ResizeObserver re-fits the camera to the new box by itself. cfg.phoneView persists it,
    so the framing you were testing survives a reload. */
@@ -147,10 +176,14 @@ function applyPhoneView(on){
      change — the ResizeObserver would not fire in that case and the frustum would be stale. */
   if(use3d()&&window.Board3D&&Board3D.available) Board3D.resize();
 }
-document.querySelectorAll(".mopt").forEach(b=>b.onclick=()=>{
+/* One stake button instead of a row: each tap steps to the next multiplier and wraps.
+   indexOf returning -1 for a stake that is no longer in the list (an old save, or a shortened
+   MULTIPLIERS) lands on index 0, so a restore can never strand the player on a dead value. */
+$("#multBtn").onclick=()=>{
   if(state.animating||autoMode!==null) return;   // can't change the stake mid-spin
-  document.querySelectorAll(".mopt").forEach(x=>x.classList.remove("on")); b.classList.add("on");
-  state.mult=+b.dataset.m; renderAll(); });
+  state.mult=MULTIPLIERS[(MULTIPLIERS.indexOf(state.mult)+1)%MULTIPLIERS.length];
+  renderAll();
+};
 $("#drawerBtn").onclick=()=>$("#drawer").classList.add("open");
 $("#closeDrawer").onclick=()=>$("#drawer").classList.remove("open");
 
@@ -168,7 +201,7 @@ function boot(){
   loadConfig();                 // initState() reads cfg.energyCap, so this must precede it
   initState();
   const restored=loadState();   // overlay saved progress, if any
-  buildBoard(); buildTuning(); setDice(3,4); syncMultButtons(); renderAll();
+  buildBoard(); buildTuning(); setDice(3,4); syncMultButton(); renderAll();
   applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
   if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
   else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");

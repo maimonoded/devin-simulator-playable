@@ -94,17 +94,25 @@ function syncBoardLabels(){
   });
 }
 
-/* Hide the DOM pair only once the 3D dice can actually replace them. If cfg.dice3d is off, or
+/* SHOW the DOM pair only when the 3D dice can't replace them. If cfg.dice3d is off, or
    die.glb never loaded, rollDiceAnim falls back to shaking them and they have to be on screen.
-   They stay in the DOM either way — setDice() keeps them truthful and this only hides them, so
-   nothing downstream has to guard against a missing #die1.
+   They stay in the DOM either way — setDice() keeps them truthful and this only toggles
+   visibility, so nothing downstream has to guard against a missing #die1.
 
-   Called again from onDiceReady() because the model arrives asynchronously: at boot the answer
-   is "not ready", and without the second call the DOM dice would sit there for the whole
-   session next to a perfectly good 3D pair. */
+   The test asks whether the 3D dice are EXPECTED to handle the throw, not whether they have
+   finished downloading. Those differ for the few hundred ms die.glb takes to arrive, and
+   keying off "downloaded" is what made the DOM pair flash on every single load: boot ran while
+   the model was still in flight, showed the fallback, then hid it again the moment the file
+   landed. Nothing is lost by waiting — Dice3D.throwDice queues a throw made before the model
+   arrives and still resolves on time, so a roll in that window is animated by the 3D dice a
+   fraction late rather than by the DOM pair.
+
+   Called again from onDiceReady(), which now fires on BOTH outcomes: on success to keep the
+   pair hidden, and on failure to bring it back, since at that point nothing else will draw
+   a die. */
 function syncDiceMode(){
-  document.body.classList.toggle("dice3d",
-    !!(use3d() && cfg.dice3d && window.Board3D && Board3D.diceReady && Board3D.diceReady()));
+  const dice3dWorks=use3d()&&cfg.dice3d&&window.Board3D&&Board3D.diceFailed&&!Board3D.diceFailed();
+  document.body.classList.toggle("dice2d",!dice3dWorks);
 }
 function onDiceReady(){ syncDiceMode(); }
 
@@ -228,21 +236,25 @@ function renderStory(){
   $("#storyHint").innerHTML= n? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} unlocked — place your prediction before watching.`
                               : "Fully upgrade a builder to unlock the next episode.";
 }
-/* Reflect state.mult on the multiplier buttons (needed after a restore or user reset). */
-function syncMultButtons(){
-  document.querySelectorAll(".mopt").forEach(b=>b.classList.toggle("on",+b.dataset.m===state.mult));
-}
+/* Reflect state.mult on the stake button (needed after a restore or user reset). */
+function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
 function renderAll(){ renderHUD();renderOverlays();renderBuilderCenter();renderBuilderList();renderStats();renderStory();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
   const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;
-  $("#rollBtn").disabled=autoBusy||cantRoll;
+  /* Roll IS the auto-roll control (hold to start, tap to stop), so while auto-roll owns the
+     loop it has to stay live to act as Stop — otherwise there'd be no way out. The session
+     loop still locks it, since that mode owns the loop instead. */
+  const rollIsAuto=autoMode==="roll";
+  const rollBtn=$("#rollBtn");
+  rollBtn.disabled=rollIsAuto?false:(autoBusy||cantRoll);
+  rollBtn.innerHTML=rollIsAuto?"⏸ Stop auto roll":"🎲 Roll";
+  rollBtn.classList.toggle("auto",rollIsAuto);
   // the multiplier is the stake for the roll in flight — lock it mid-spin and during auto
-  const lockMult=state.animating||autoBusy;
-  document.querySelectorAll(".mopt").forEach(b=>b.disabled=lockMult);
+  $("#multBtn").disabled=state.animating||autoBusy;
+  syncMultButton();
   // the running mode's own button stays clickable so it can act as Stop; the other is locked out
-  [["#autoRollBtn","roll","↻ Auto roll","⏸ Stop auto roll"],
-   ["#autoBtn","session","▶ Auto-play session","⏸ Stop auto-play"]].forEach(([sel,mode,idle,active])=>{
+  [["#autoBtn","session","▶ Auto-play session","⏸ Stop auto-play"]].forEach(([sel,mode,idle,active])=>{
     const b=$(sel), mine=autoMode===mode;
     b.innerHTML=mine?active:idle;
     b.disabled=mine?false:(autoBusy||cantRoll);
