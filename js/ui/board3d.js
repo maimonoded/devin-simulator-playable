@@ -18,6 +18,7 @@
 import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
+import { Dice3D } from "./dice3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -134,6 +135,9 @@ const Board3D = {
     }
 
     Env3D.init(this._scene);
+    /* Init once, not per build(): the dice hang off their own group, which build() leaves
+       alone, so they survive a board rebuild the way the token does. */
+    Dice3D.init(this._scene);
     this._initDrag(this._renderer.domElement);
 
     this.available = true;
@@ -621,6 +625,19 @@ const Board3D = {
      needs its emoji. */
   hasModel(i) { return this._models.has(i); },
 
+  /* Throw the dice onto the middle of the board. js/ui/fx.js calls this instead of shaking
+     the DOM dice when the 3D board is up and the model actually loaded; it falls back on its
+     own if either is false, so a missing die.glb costs the throw and nothing else. */
+  /* _camTarget is where the camera is looking right now — the board centre when nothing is
+     following, the token when it is, wherever the player dragged to otherwise. Handing it
+     over is what makes the dice land in view rather than at the middle of the board, which
+     with camFollow on is often off-screen entirely. */
+  throwDice(values) {
+    return Dice3D.throwDice(values, { x: this._camTarget.x, z: this._camTarget.z });
+  },
+  diceReady() { return Dice3D.available(); },
+  clearDice() { Dice3D.clear(); },
+
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */
   screenPosOf(i, lift = 0) {
     if (!this.available) return null;
@@ -652,6 +669,7 @@ const Board3D = {
     }
     this._followCamera();
     Env3D.tick(1 / 60);
+    Dice3D.tick();
     this._renderer.render(this._scene, this._camera);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },

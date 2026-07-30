@@ -123,6 +123,10 @@ body.board3d .skyLayer,body.board3d .board{display:none}
 /* dice + controls */
 .controls{margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
 .dice{display:flex;gap:8px}
+/* The 3D board throws real dice onto the middle of the board, so the DOM pair would be a
+   second, contradicting set. Hidden rather than removed: js/ui/fx.js still writes their faces,
+   and it falls back to shaking them whenever die.glb is missing or cfg.dice3d is off. */
+body.dice3d .dice{display:none}
 .die{width:42px;height:42px;border-radius:10px;background:#fff;color:#1b1b2b;
      display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
      padding:6px;box-shadow:0 5px 12px rgba(0,0,0,.4)}

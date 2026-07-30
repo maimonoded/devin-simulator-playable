@@ -43,9 +43,19 @@ function diceConfetti(){
     document.body.appendChild(d); setTimeout(()=>d.remove(),3200);
   }
 }
-/* Shake the dice for cfg.diceRevealMs (faces scrambling so the result isn't spoiled),
-   then land on the real roll. Awaited by roll(), so it paces the whole turn. */
+/* Show the roll for cfg.diceRevealMs, then land on the real numbers. Awaited by roll(), so
+   it paces the whole turn either way.
+
+   Two presentations behind one call. On the 3D board the dice are thrown onto the middle of
+   the board (js/ui/dice3d.js); otherwise the DOM pair shakes with its faces scrambling. The
+   fallback is not just for cfg.board3d = 0 — it also covers die.glb failing to load, which is
+   why this asks whether the model is actually there rather than only whether 3D is on. */
 async function rollDiceAnim(d1,d2){
+  if(use3d() && cfg.dice3d && Board3D.diceReady && Board3D.diceReady()){
+    setDice(d1,d2);                  // keep the DOM pair truthful for anything still reading it
+    await Board3D.throwDice([d1,d2]);
+    return;
+  }
   const a=$("#die1"),b=$("#die2");
   a.classList.add("roll"); b.classList.add("roll");
   const total=Math.max(0,cfg.diceRevealMs), t0=performance.now();

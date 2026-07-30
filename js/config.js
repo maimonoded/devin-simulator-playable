@@ -32,6 +32,11 @@ const DEFAULTS={
      than to a footprint, since a piece reads by how tall it stands beside a tile. */
   tokenHeight:1.15,
   diceRevealMs:500, diceToMoveMs:30,
+  /* 3D dice. diceRevealMs doubles as the length of the throw, so the pacing knob that already
+     existed keeps meaning the same thing: click to numbers-on-screen. The rest is the throw's
+     shape — diceSize is the die's edge in tile units, diceSpread how far apart the pair lands,
+     diceThrowFrom how far toward the camera it starts, diceArc how high it goes. */
+  dice3d:1, diceSize:0.9, diceSpread:1.5, diceThrowFrom:4.0, diceArc:2.2,
   /* These mirror ECONOMY_DEFAULT in js/economy.js, so a fresh install already runs the
      shipped model and Economy.apply() is a no-op until a workbook is imported.
      trainEV is the sheet's small/large pair collapsed to its expected value:
@@ -120,6 +125,14 @@ const TUNING=[
    ["camTokenInset","Token must stay within frame ×",0.05,{min:0.1,max:1}]]},
  {group:"Player piece",items:[
    ["tokenHeight","Size — height in tiles",0.05,{min:0.2,max:2}]]},
+ {group:"Dice",items:[
+   /* The throw's length is cfg.diceRevealMs, over in Presentation timing — it is the same
+      "click → numbers" window the DOM dice used, so it stays where it always was. */
+   ["dice3d","Throw them on the board (0/1)",1],
+   ["diceSize","Size — edge in tiles",0.05,{min:0.3,max:2}],
+   ["diceSpread","How far apart they land",0.1,{min:0,max:5}],
+   ["diceThrowFrom","Thrown from (tiles toward camera)",0.25,{min:0,max:10}],
+   ["diceArc","Throw height",0.1,{min:0,max:8}]]},
  {group:"Builders & series",items:[
    /* The cost curve is not here: it is segmented and belongs to the loaded economy model.
       The drawer shows it read-only in the Economy panel (js/ui/economy-panel.js). */

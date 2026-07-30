@@ -94,9 +94,24 @@ function syncBoardLabels(){
   });
 }
 
+/* Hide the DOM pair only once the 3D dice can actually replace them. If cfg.dice3d is off, or
+   die.glb never loaded, rollDiceAnim falls back to shaking them and they have to be on screen.
+   They stay in the DOM either way — setDice() keeps them truthful and this only hides them, so
+   nothing downstream has to guard against a missing #die1.
+
+   Called again from onDiceReady() because the model arrives asynchronously: at boot the answer
+   is "not ready", and without the second call the DOM dice would sit there for the whole
+   session next to a perfectly good 3D pair. */
+function syncDiceMode(){
+  document.body.classList.toggle("dice3d",
+    !!(use3d() && cfg.dice3d && window.Board3D && Board3D.diceReady && Board3D.diceReady()));
+}
+function onDiceReady(){ syncDiceMode(); }
+
 function buildBoard(){
   applyFxTiming();
   document.body.classList.toggle("board3d",!!use3d());   // hides the legacy DOM board
+  syncDiceMode();
   if(use3d()){ Board3D.build(); buildBoardLabels(); return; }
   const board=$("#board");
   board.querySelectorAll(".tile").forEach(t=>t.remove());

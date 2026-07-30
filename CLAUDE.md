@@ -55,6 +55,7 @@ js/
   economy-import.js workbook → model, and the structural check that gates it
   board-model.js    tile index → type and → grid cell, pathToStart
   env-model.js      environment geometry: datums, what's on screen, the height budget
+  dice-model.js     which turn puts a rolled number on top, and where a throw lands
   state.js          the run state object
   storage.js        localStorage persistence for config and progress
   episodes.js       episode registry
@@ -67,6 +68,7 @@ js/
     fx.js           floats, log, toasts, confetti, dice, blocking overlays
     board3d.js      the WebGL board (three.js) — the module entry point; calls boot()
     env3d.js        the island, sea and props around the board (imported by board3d.js)
+    dice3d.js       the dice, thrown onto the board (imported by board3d.js)
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
     prediction.js   predict & watch: bet → playback → result
@@ -106,6 +108,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
 | Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Several worlds live in `assets/env/scene.js` and `cfg.envScene` picks one live from the tuning drawer. Placement is data and the engine measures nothing: assets are conformed to a stated contract by `tools/normalize-env.py`, so a new environment needs no code change. `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
+| Dice | `js/dice-model.js` `js/ui/dice3d.js` | Thrown in from the bottom-left of the view and landing wherever the camera is aimed — the middle of the board is off-screen much of the time with `camFollow` on. `cfg.diceRevealMs` is the throw's length and the promise resolves at exactly that mark, `cfg.diceToMoveMs` still gates the token. Falls back to the DOM pair in `js/ui/fx.js` when `cfg.dice3d` is off or `die.glb` never loaded. |
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
