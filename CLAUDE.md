@@ -37,7 +37,9 @@ serve.py            dev server (Range + no-store) — the way to run the project
 vendor/             three.module.js (r169), vendored; no npm, no build step
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
 assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
+assets/dice/        the die: models/die.glb, built not reconstructed    → assets/dice/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
+                    make-dice.py    — builds assets/dice/models/die.glb from one blank face
 claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles) and
                     board-env-art (the world around them). Run link-skills.sh once after
                     cloning — it runs each skill's setup.sh, then symlinks them into
@@ -100,6 +102,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
 | Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Several worlds live in `assets/env/scene.js` and `cfg.envScene` picks one live from the tuning drawer. Placement is data and the engine measures nothing: assets are conformed to a stated contract by `tools/normalize-env.py`, so a new environment needs no code change. `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
+| Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
