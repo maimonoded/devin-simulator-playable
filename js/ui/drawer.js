@@ -46,8 +46,10 @@ function buildTuning(){
   dwrap.appendChild(dt); body.appendChild(dwrap);
   // box table
   const bwrap=document.createElement("div"); bwrap.className="tgroup";
-  bwrap.innerHTML=`<h4>Mystery Box drop table</h4>`;
   const bt=document.createElement("table"); bt.className="ttable";
+  bwrap.innerHTML=`<h4>Mystery Box · item 2 of 2</h4>
+    <p class="hint" style="margin:0 0 8px">Item 1 is always coins (set above). This table is the
+    second draw — and the game's only source of clues.</p>`;
   bt.innerHTML=`<tr><th>Drop</th><th>Weight</th><th>Amount</th></tr>`;
   boxTable.forEach((c,i)=>{ const tr=document.createElement("tr");
     tr.innerHTML=`<td>${c.name}</td>
@@ -55,6 +57,8 @@ function buildTuning(){
       <td><input data-b="${i}" data-f="amount" value="${c.amount}"></td>`;
     bt.appendChild(tr); });
   bwrap.appendChild(bt); body.appendChild(bwrap);
+  // the loaded economy model: provenance, its cost curve, its series, and the import button
+  buildEconomyPanel(body);
   // resets — config and player progress are separate storage slots, reset independently
   const zone=document.createElement("div"); zone.className="tgroup";
   zone.innerHTML=`<h4>Saved data</h4>
@@ -106,11 +110,16 @@ function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clam
   scheduleSaveConfig();
   renderAll();
 }
-/* Reset config only — player progress (coins, builders, day) is untouched. */
+/* Reset config only — player progress (coins, builders, day) is untouched.
+   "Defaults" means the LOADED ECONOMY, not the values hardcoded in config.js: the model is
+   what the game is meant to be balanced to, so an imported workbook survives this button and
+   only hand edits are discarded. Economy.apply() runs after DEFAULTS so it wins on the keys
+   it owns, while camera and presentation settings fall back to the code's defaults. */
 function resetDefaults(){ cfg=Object.assign({},DEFAULTS);
   deck=JSON.parse(JSON.stringify(defDeck)); boxTable=JSON.parse(JSON.stringify(defBox));
   clearConfig();
-  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); toast("↺ Config reset to defaults"); }
+  Economy.apply();
+  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); toast("↺ Config reset to the loaded economy"); }
 
 /* Reset user only — tuning values stay as they are. Two clicks to confirm. */
 let _armed=null;

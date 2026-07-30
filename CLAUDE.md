@@ -48,6 +48,9 @@ js/
   util.js           $, fmt, sleep, rand, chance, weighted, shuffle
   config.js         cfg defaults + the tuning-drawer schema
   content.js        login reward ladder (story content lives in episodes/)
+  xlsx.js           dependency-free .xlsx reader (ZIP + SpreadsheetML), browser-only
+  economy.js        the loaded economy model: segmented cost curve, series, the clue edge
+  economy-import.js workbook → model, and the structural check that gates it
   board-model.js    tile index → type and → grid cell, pathToStart
   env-model.js      environment geometry: datums, what's on screen, the height budget
   state.js          the run state object
@@ -67,6 +70,7 @@ js/
     prediction.js   predict & watch: bet → playback → result
     store.js        coin/energy top-up modal
     finale.js       series-complete celebration
+    economy-panel.js  the drawer's Economy section: provenance, curve, series, .xlsx import
     drawer.js       tuning drawer + the two reset buttons
     main.js         roll(), playEvents(), auto modes, wiring, boot
 ```
@@ -101,11 +105,56 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Several worlds live in `assets/env/scene.js` and `cfg.envScene` picks one live from the tuning drawer. Placement is data and the engine measures nothing: assets are conformed to a stated contract by `tools/normalize-env.py`, so a new environment needs no code change. `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
+| Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
 | Session & time | `js/game.js` `advanceSession()` | Rolls cost energy (`mult` per roll), never coins. "Next session" advances the clock by the greater of a full refill (`regenMin` minutes per energy point) and one session slot (`1440 / sessionsPerDay` minutes), refills energy and pays a login reward on each day rollover. |
 | Persistence | `js/storage.js` | Two independent localStorage slots — config and progress — with separate **Reset config** and **Reset user** buttons in the tuning drawer. Everything is guarded, so blocked storage degrades to "don't persist". |
 | Store | `js/ui/overlays.js` `openStore()` | Button top-right of the board. Instant grants: coins 10k/100k/1M, energy 100/1k/10k. |
+
+### The economy model vs `cfg`
+
+Two layers, deliberately separate:
+
+- **`economy`** (`js/economy.js`) is the *loaded model*. It comes from an .xlsx, carries a
+  version string, and holds things `cfg` cannot express: a segmented cost curve, an ordered
+  series list, a two-item mystery box.
+- **`cfg`** is the *live tuning surface* — flat scalars the drawer edits by hand.
+
+They meet in `Economy.apply()`, which projects the model's flat values onto `cfg` and rebuilds
+`deck`/`boxTable`. So tile code still just reads `cfg.stdBase` and nothing downstream had to
+learn about the model. `Economy.OWNED_CFG_KEYS` is the list `apply()` writes.
+
+**The cost curve is a list of segments and the last one must have no `to`.** A bounded final
+rule would leave builders past it unpriced and deadlock the game; `Economy.validateCurve()`
+refuses it. One formula never holds for a whole run — a new rule from builder 500 is an
+appended segment, not a code change.
+
+**Boot order is economy → config → state** (`boot()` in `js/ui/main.js`). The model is applied
+first and the saved tuning is overlaid on top, and the config slot is stamped with the economy
+version it was edited against. On a version change the economy-owned keys are dropped from the
+save while camera and presentation settings carry over — without that gate, importing a new
+workbook would silently do nothing for anyone who had played before.
+
+**Importing is all-or-nothing.** `EconomyImport.fromWorkbook()` validates the whole file and
+returns every problem at once; nothing is installed unless that list is empty. Layout is checked
+by asserting the *label* next to each value still reads what it read in v3 — an inserted row
+shifts values but not labels, so a bare "is this a number" test would happily import the wrong
+one. `Guide!B2` is the model's identity, and re-importing a version already imported is refused.
+
+There is no server yet, so the browser is the database: an imported model lives in
+`localStorage` under `pmdrama.econ.v1`, with its source filename kept for reference.
+
+### Clues are two different things
+
+`state.clues` is the **album** — a lifetime total, cosmetic, never spent. `state.cycleClues` is
+the **flow** — banked since the last prediction, it raises the modelled accuracy
+(`Economy.accuracyFor`: 0.55 + 0.04/clue, capped at 0.70) and is spent and reset by
+`resolvePrediction`. Mystery Box item 2 is the only source; the deck pays no clues, so one table
+sets the rate.
+
+Accuracy only decides the outcome in **auto** runs — a manual pick still wins on its merits.
+That gap is open design, tracked in [TODO.md](TODO.md).
 
 ### Energy may exceed the cap
 
@@ -167,5 +216,9 @@ inside DOM-building functions.
 
 ## Known dead config
 
-`secPerRoll` and `avgOdds` are in the tuning drawer but read by nothing — leftovers from the
-original spreadsheet model. `clues` are earned and displayed but never spent.
+`secPerRoll` and `avgOdds` are in the tuning drawer but read by nothing. Both are still used by
+the economy spreadsheet (seconds-per-roll derives its "active minutes per session"; average odds
+derives the prediction edge), so wiring them up is defensible — see [TODO.md](TODO.md).
+
+Four of the model's five relative knobs are imported and ignored; only `builderCost` is read.
+`clues` are now spent — see "Clues are two different things" above.

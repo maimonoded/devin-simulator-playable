@@ -197,9 +197,10 @@ test("a coin card pays and shows the drawn card", () => {
 test("a fine costs coins, seeds VIP and reads as a loss", () => {
   freshRun();
   state.coins = 1000; state.vip = 0;
+  const fine = deck.find(c => c.name === "Fine / Paparazzi");
   const ev = forceCard("Fine / Paparazzi", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.coins, 950);
-  eq(state.vip, 50);
+  eq(state.coins, 1000 + fine.coins, "the loss comes off the balance");
+  eq(state.vip, fine.vip, "and is recycled into the VIP pool");
   eq(ev.find(e => e.card).card.positive, false);
 });
 
@@ -211,11 +212,15 @@ test("an energy card flags the dice shower", () => {
   eq(ev.find(e => e.card).card.energy, true);
 });
 
-test("a clue card grants a clue", () => {
+/* The deck pays no clues: the economy model moved every clue to the Mystery Box so that one
+   table sets the rate a prediction runs on. A card that grants clues would double-count. */
+test("no deck card grants clues — the Mystery Box is the only source", () => {
   freshRun();
-  state.clues = 0;
-  forceCard("Clue fragment", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.clues, 1);
+  eq(deck.filter(c => c.clues > 0).length, 0);
+  state.clues = 0; state.cycleClues = 0;
+  deck.forEach(c => forceCard(c.name, () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 })));
+  eq(state.clues, 0, "the album total stays put");
+  eq(state.cycleClues, 0, "and so does the flow");
 });
 
 test("the advance card walks to Start and pays the landing bonus", () => {

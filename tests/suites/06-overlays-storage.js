@@ -47,14 +47,24 @@ test("has / all / clear reflect placement", () => {
   ok(!box.has(t));
 });
 
-test("consume removes the box and returns one playback event", () => {
+test("consume removes the box and returns an event for each of its two items", () => {
   freshRun();
   const box = OVERLAY_TYPES.mysteryBox;
   const [t] = box.spawn(1);
   const ev = box.consume(t);
   ok(!box.has(t), "must be removed from the board");
-  ok(ev && ev.log, "should return an event with a log line");
-  ok(ev.float, "and a float");
+  ok(Array.isArray(ev), "a two-item box has to return two events — one float per event");
+  eq(ev.length, 2);
+  ev.forEach((e, i) => { ok(e.log, `item ${i + 1} has a log line`); ok(e.float, `item ${i + 1} has a float`); });
+});
+
+test("item 1 is always coins, whatever item 2 turns out to be", () => {
+  freshRun();
+  ["coins", "energy", "clues"].forEach(kind => {
+    state.coins = 0;
+    forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand());
+    ok(state.coins >= cfg.boxCoins * cfg.boardScale, `guaranteed coins still paid on a ${kind} draw`);
+  });
 });
 
 suite("overlays: mystery box drops");
@@ -68,25 +78,26 @@ function forceDrop(kind, fn) {
 test("a coin drop pays coins and does not fire the dice shower", () => {
   freshRun();
   state.coins = 0;
-  const ev = forceDrop("coins", () => OVERLAY_TYPES.mysteryBox.onLand());
+  const [, second] = forceDrop("coins", () => OVERLAY_TYPES.mysteryBox.onLand());
   ok(state.coins > 0);
-  eq(ev.dice, false);
-  eq(ev.pause, 120);
+  eq(second.dice, false);
+  eq(second.pause, 120);
 });
 
 test("an energy drop grants energy and fires the dice shower", () => {
   freshRun();
   state.energy = 0;
-  const ev = forceDrop("energy", () => OVERLAY_TYPES.mysteryBox.onLand());
+  const [, second] = forceDrop("energy", () => OVERLAY_TYPES.mysteryBox.onLand());
   ok(state.energy > 0);
-  eq(ev.dice, true);
+  eq(second.dice, true);
 });
 
-test("a clue drop grants clues", () => {
+test("a clue drop feeds both the album total and the per-prediction flow", () => {
   freshRun();
-  state.clues = 0;
+  state.clues = 0; state.cycleClues = 0;
   forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand());
-  ok(state.clues > 0);
+  ok(state.clues > 0, "the album counts it");
+  eq(state.cycleClues, state.clues, "and so does the flow that buys accuracy");
 });
 
 test("an energy drop cannot reduce an over-cap balance", () => {

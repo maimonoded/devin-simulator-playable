@@ -25,8 +25,11 @@ renderOverlays()  (js/ui/render.js)
   └─ draws each overlay's icon/cssClass on its tiles
 ```
 
-`consume(i)` removes the marker from the board and calls `onLand(i)`, which returns a single
-playback event (same event vocabulary as tiles — see [../tiles/README.md](../tiles/README.md)).
+`consume(i)` removes the marker from the board and calls `onLand(i)`, which returns a playback
+event, **an array of them**, or null (same event vocabulary as tiles — see
+[../tiles/README.md](../tiles/README.md)). An event carries at most one `float` and one `log`,
+so an overlay that pays out twice — the two-item mystery box — has to return two events rather
+than cram both rewards into one. `resolveLandingEvents` spreads whatever comes back.
 
 `Overlay` extends **`BoardActor`** ([../board-actor.js](../board-actor.js)), the shared base that
 also backs `Tile`. That's where `gainCoins` / `gainEnergy` / `gainClues` and the

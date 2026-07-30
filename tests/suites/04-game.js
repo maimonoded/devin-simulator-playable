@@ -110,9 +110,9 @@ test("a zero wager changes no coins but still resolves and counts", () => {
   eq(state.epsWatched, 1);
 });
 
-test("auto mode ignores the pick and uses cfg.accuracy", () => {
+test("auto mode ignores the pick and uses the clue-driven accuracy", () => {
   setupPrediction(1e9);
-  cfg.accuracy = 1;
+  cfg.accuracy = 1; cfg.accuracyMax = 1;   // the cap binds first, so it has to move too
   for (let i = 0; i < 5; i++) {
     state.epQueue.push("001");
     eq(resolvePrediction({ wager: 10, odds: 2, sel: 1, correct: 0, auto: true }).won, true,

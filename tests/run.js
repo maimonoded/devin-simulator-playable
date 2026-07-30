@@ -25,6 +25,12 @@ const APP_FILES = [
   "js/episodes.js",
   ...fs.readdirSync(path.join(ROOT, "episodes"))
       .filter(f => /^\d+\.js$/.test(f)).sort().map(f => "episodes/" + f),
+  /* xlsx.js is browser-only at runtime, but it must still LOAD in a bare context —
+     it is listed here so a stray top-level DOMParser/DecompressionStream reference fails
+     the suite rather than only breaking in an old browser. */
+  "js/xlsx.js",
+  "js/economy.js",
+  "js/economy-import.js",
   "js/board-actor.js",
   "js/builders/builders.js",
   "js/tiles/tile.js",

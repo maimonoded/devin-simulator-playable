@@ -13,8 +13,11 @@
      get icon()      → emoji drawn on the tile
      get cssClass()  → extra class on the marker element (styling lives in css/board.css)
      eligible(i)     → may an overlay be placed on tile i? (default: any tile)
-     onLand(i)       → returns one playback event, or null. Called after the overlay
-                       has already been removed from the board by consume().
+     onLand(i)       → returns one playback event, an ARRAY of events, or null. Called after
+                       the overlay has already been removed from the board by consume().
+                       An event carries at most one float and one log, so an overlay that
+                       pays out twice (the two-item mystery box) has to return two events
+                       rather than trying to cram both rewards into one.
    Rewards/presentation helpers are inherited from BoardActor (js/board-actor.js). */
 class Overlay extends BoardActor {
   constructor(name){ super(); this.name=name; }
@@ -40,7 +43,7 @@ class Overlay extends BoardActor {
     }
     return out;
   }
-  /* Remove from the board and resolve. Returns the playback event (or null). */
+  /* Remove from the board and resolve. Returns the playback event, an array of them, or null. */
   consume(i){ this.positions().delete(i); return this.onLand(i); }
 }
 const OVERLAY_TYPES={};

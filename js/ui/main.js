@@ -158,7 +158,14 @@ $("#closeDrawer").onclick=()=>$("#drawer").classList.remove("open");
    Not self-invoking: js/ui/board3d.js is an ES module, so it runs AFTER every classic script.
    It calls boot() once the scene is up, so the board exists before buildBoard() needs it. */
 function boot(){
-  loadConfig();                 // tuning values first — initState() reads cfg.energyCap
+  /* Economy before config, config before state.
+     The model is projected onto cfg first, then the saved tuning is overlaid on top of it —
+     that ordering is what lets a newly imported workbook actually reach a returning player
+     instead of being shadowed by their old save. js/storage.js loadConfig() explains the
+     version gate that decides how much of the save survives. */
+  loadEconomy();
+  Economy.apply();
+  loadConfig();                 // initState() reads cfg.energyCap, so this must precede it
   initState();
   const restored=loadState();   // overlay saved progress, if any
   buildBoard(); buildTuning(); setDice(3,4); syncMultButtons(); renderAll();

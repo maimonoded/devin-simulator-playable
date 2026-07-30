@@ -32,10 +32,21 @@ const DEFAULTS={
      than to a footprint, since a piece reads by how tall it stands beside a tile. */
   tokenHeight:1.15,
   diceRevealMs:500, diceToMoveMs:30,
-  stdBase:40, trainEV:150, startPass:100, startLand:100, spaEnergy:5, vipSeed:25,
+  /* These mirror ECONOMY_DEFAULT in js/economy.js, so a fresh install already runs the
+     shipped model and Economy.apply() is a no-op until a workbook is imported.
+     trainEV is the sheet's small/large pair collapsed to its expected value:
+     60 x 0.65 + 315 x 0.35. */
+  stdBase:40, trainEV:149.25, startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
   boardScale:1,
-  buildings:12, tiers:5, baseCost:1200, tierGrowth:1.8, bldgGrowth:1.05, boxesPerUpgrade:1,
-  minWager:100, accuracy:0.65, avgOdds:1.8,
+  /* Builder shape. The COST CURVE is not here — it is segmented and lives in js/economy.js,
+     because no single formula holds for a whole run. `buildings` is the current series'
+     length, seeded by Economy.apply(). */
+  buildings:12, tiers:5, boxesPerUpgrade:1,
+  /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
+  boxCoins:60, boxItemGapMs:260,
+  /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
+     accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
+  minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
 };
 let cfg=Object.assign({},DEFAULTS);
 let deck=[
@@ -43,14 +54,17 @@ let deck=[
   {name:"Medium coins",weight:15,coins:80,energy:0,clues:0,vip:0},
   {name:"Windfall",weight:5,coins:300,energy:0,clues:0,vip:0},
   {name:"Small energy",weight:15,coins:0,energy:2,clues:0,vip:0},
-  {name:"Clue fragment",weight:10,coins:0,energy:0,clues:1,vip:0},
-  {name:"Fine / Paparazzi",weight:10,coins:-50,energy:0,clues:0,vip:50},
+  /* No clue card: all clues come from the Mystery Box, so the box's weights alone
+     set the rate a prediction runs on. */
+  {name:"Insider tip",weight:10,coins:50,energy:0,clues:0,vip:0},
+  {name:"Fine / Paparazzi",weight:10,coins:-80,energy:0,clues:0,vip:80},
   {name:"Advance to Start",weight:5,coins:0,energy:0,clues:0,vip:0,advance:true},
 ];
+/* The mystery box's SECOND item. Item 1 is always cfg.boxCoins. */
 let boxTable=[
-  {name:"Coins",weight:60,amount:200,kind:"coins"},
-  {name:"Energy",weight:25,amount:3,kind:"energy"},
-  {name:"Clues",weight:15,amount:1,kind:"clues"},
+  {name:"Coins",weight:33,amount:60,kind:"coins"},
+  {name:"Energy",weight:33,amount:3,kind:"energy"},
+  {name:"Clues",weight:33,amount:2,kind:"clues"},
 ];
 const defDeck=JSON.parse(JSON.stringify(deck));
 const defBox=JSON.parse(JSON.stringify(boxTable));
@@ -74,6 +88,7 @@ const TUNING=[
    ["autoCollectMs","Train collect during auto-play (ms)",50],
    ["fallbackSceneMs","Episode w/o video: placeholder (ms)",100],
    ["longPressMs","Video: hold for 2× after (ms)",25],
+   ["boxItemGapMs","Mystery box: gap between its two items (ms)",20],
    ["deckCardMs","Deck: card on screen (ms)",100],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
@@ -106,9 +121,14 @@ const TUNING=[
  {group:"Player piece",items:[
    ["tokenHeight","Size — height in tiles",0.05,{min:0.2,max:2}]]},
  {group:"Builders & series",items:[
-   ["baseCost","Base cost (Builder 1, Lvl 1)",100],["tierGrowth","Level cost growth ×",0.05],
-   ["bldgGrowth","Builder cost growth ×",0.05],["boxesPerUpgrade","Boxes per upgrade",1],
-   ["buildings","Builders (all available)",1],["tiers","Levels per builder",1]]},
+   /* The cost curve is not here: it is segmented and belongs to the loaded economy model.
+      The drawer shows it read-only in the Economy panel (js/ui/economy-panel.js). */
+   ["boxesPerUpgrade","Boxes per upgrade",1],["boxCoins","Box item 1: coins",10],
+   ["buildings","Builders in this series",1],["tiers","Levels per builder",1]]},
  {group:"Prediction & wager",items:[
-   ["minWager","Minimum wager",10],["accuracy","Player accuracy (0–1)",0.01],["avgOdds","Avg odds (reference)",0.1]]},
+   ["minWager","Minimum wager",10],
+   ["accuracy","Accuracy with no clues",0.01,{min:0,max:1}],
+   ["accuracyPerClue","Accuracy gained per clue",0.01,{min:0,max:0.2}],
+   ["accuracyMax","Accuracy cap",0.01,{min:0,max:1}],
+   ["avgOdds","Avg odds (reference)",0.1]]},
 ];

@@ -18,14 +18,42 @@ the UI announces.
 
 ## Cost curve
 
+**The curve lives in [`js/economy.js`](../economy.js), not here.** `Builders.cost()` only
+translates a series-local builder index into a global builder number and asks `Economy.costFor`.
+
 ```
-cost(builderIndex, tier) = baseCost × tierGrowth^tier × bldgGrowth^builderIndex × boardScale
+cost(b, L) = base × levelGrowth^(L-1) × b^exponent × boardScale × costKnob
 ```
 
-Two independent growth factors: `tierGrowth` (1.8) makes each *level* of a builder pricier, and
-`bldgGrowth` (1.05) makes *later builders* pricier at every level. So Builder 1 Lvl 1 costs
-1,200 while Builder 12 Lvl 5 costs ~21,545. All five values are live-tunable in the drawer's
-"Builders & series" group.
+That is a **power law** in the builder index `b`, not an exponential — `b^0.0498` grows 1.31×
+across 240 builders where a `1.05^b` exponential would grow 115,942×. Pacing comes from the
+level ramp and the number of builders, not from later builders escalating. The exponent is
+*derived* from four pacing anchors (60 episodes in 14 days, 240 in 60), which ride along in the
+segment so it can be re-solved rather than guessed.
+
+The curve is a **list of segments**, because no single formula holds for a whole run. Each owns
+a builder range; `bIndex` says whether `b` keeps counting or restarts inside the segment, and
+`baseMode` says whether the segment steps at the boundary or is solved to continue smoothly.
+A segment may also be an explicit per-level table instead of a formula.
+
+**The last segment must have no `to`.** `Economy.validateCurve()` enforces it — a bounded final
+rule would leave builders past it unpriced and deadlock the game. See the header of
+`js/economy.js` for the full contract.
+
+## Series
+
+A run is a sequence of series, ordered, defined by the economy model. `cfg.buildings` is the
+*current* series' length and `state.series` says which one is being played. Builder indices in
+this file are always local to that series; `Economy.globalOf()` converts to the global number
+that the cost curve and the episode registry are keyed by — so series 2's first builder is
+local 0, global 61, and unlocks episode `061`.
+
+A series can never be longer than the episodes left for it, since completing a builder is what
+unlocks one. `Economy.seriesShape()` hands each series what it can from the remaining pool;
+series past the content wall come back with zero builders and stay locked.
+
+`advanceSeries()` moves to the next one **without wiping the run** — coins, day, energy and the
+unwatched episode queue all carry over, and only the builders are fresh.
 
 ## API
 

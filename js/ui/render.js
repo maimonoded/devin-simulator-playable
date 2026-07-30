@@ -180,7 +180,9 @@ function renderBuilderList(){
     s.style.cssText=`flex:1;height:6px;border-radius:3px;background:${col};opacity:${b.tier>0?0.5+0.5*frac:1}`;
     dots.appendChild(s);
   });
-  $("#builderName").textContent=`${Builders.count()} builders · pick any to upgrade`;
+  // name the series once there is more than one with content, so the run has a sense of place
+  const s=Builders.series(), many=Economy.playableSeries().length>1;
+  $("#builderName").textContent=`${many&&s?`${s.name} · `:""}${Builders.count()} builders · pick any to upgrade`;
 }
 function renderHUD(){
   $("#hDay").textContent="Day "+state.day;

@@ -33,8 +33,18 @@ function openPrediction(){
        <button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button>`
     : `<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
        <button class="btn pink" id="skipPred" style="flex:2">Skip &amp; watch</button>`;
+  /* Clues banked since the last prediction are spent on this one. They set the accuracy the
+     economy model uses, so say what they bought — otherwise the only clue feedback a player
+     ever gets is a number going up in the HUD. */
+  const clueHtml=state.cycleClues>0
+    ? `<div class="hint" style="margin:6px 0 2px">
+         <b style="color:var(--teal)">${state.cycleClues}🔍</b> banked since your last prediction —
+         they lift the modelled accuracy to <b>${Math.round(Economy.accuracyFor(state.cycleClues)*100)}%</b>, and are spent here.</div>`
+    : `<div class="hint" style="margin:6px 0 2px">No clues banked — modelled accuracy sits at its floor of
+         <b>${Math.round(Economy.accuracyFor(0)*100)}%</b>. Mystery Boxes are where clues come from.</div>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
+    ${clueHtml}
     ${optHtml}
     ${wagerHtml}
     <div class="foot">${footHtml}</div></div></div>`;

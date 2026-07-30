@@ -39,11 +39,75 @@ test("reshape keeps progress that still fits and drops the rest", () => {
 
 suite("builders: cost curve");
 
-test("cost matches baseCost x tierGrowth^tier x bldgGrowth^index x boardScale", () => {
+test("cost follows the model's power law: base x levelGrowth^(L-1) x b^exponent x boardScale", () => {
   resetCfg();
-  const expected = (b, t) => cfg.baseCost * Math.pow(cfg.tierGrowth, t) * Math.pow(cfg.bldgGrowth, b) * cfg.boardScale;
+  const seg = Economy.model().costCurve[0];
+  // tier is the level already owned, so the level being paid for is tier+1;
+  // b is the 1-based GLOBAL builder number, which in series 1 is index+1
+  const expected = (b, t) => seg.base * Math.pow(seg.levelGrowth, t) * Math.pow(b + 1, seg.exponent) * cfg.boardScale;
   [[0, 0], [0, 4], [5, 2], [11, 4]].forEach(([b, t]) => near(Builders.cost(b, t), expected(b, t), 1e-6, `cost(${b},${t})`));
-  eq(Builders.cost(0, 0), cfg.baseCost);
+  near(Builders.cost(0, 0), seg.base, 1e-9, "builder 1, level 1 is the base cost");
+});
+
+test("the curve is a power law, not an exponential — it barely rises across a series", () => {
+  resetCfg();
+  const span = Builders.cost(239, 0) / Builders.cost(0, 0);   // builder 240 vs builder 1
+  ok(span > 1 && span < 2, `240 builders should span well under 2x, got ${span.toFixed(3)}x`);
+});
+
+test("the last curve segment is open-ended, so no builder is ever unpriced", () => {
+  resetCfg();
+  const curve = Economy.model().costCurve;
+  eq(curve[curve.length - 1].to, undefined, "the final segment must not be bounded");
+  ok(isFinite(Economy.costFor(100000, 1)), "a builder far past the model still has a price");
+  deepEq(Economy.validateCurve(curve), [], "the shipped curve validates");
+});
+
+test("validateCurve rejects a bounded final segment and a gap between segments", () => {
+  const bounded = [{ from: 1, to: 10, kind: "power", base: 100, levelGrowth: 1.5, exponent: 0.05 }];
+  ok(Economy.validateCurve(bounded).some(e => /last cost-curve segment/i.test(e)),
+     "a curve that stops must be refused");
+  const gapped = [
+    { from: 1, to: 10, kind: "power", base: 100, levelGrowth: 1.5, exponent: 0.05 },
+    { from: 20, kind: "power", base: 100, levelGrowth: 1.5, exponent: 0.05 },
+  ];
+  ok(Economy.validateCurve(gapped).some(e => /leave no gap/i.test(e)), "builders 11-19 would be unpriced");
+});
+
+test("a continuous segment picks up exactly where the previous one left off", () => {
+  const saved = Economy.model().costCurve;
+  const curve = [
+    { from: 1, to: 20, kind: "power", base: 164, levelGrowth: 1.5, exponent: 0.0497678368,
+      bIndex: "global", baseMode: "absolute" },
+    { from: 21, kind: "power", base: 999, levelGrowth: 1.5, exponent: 0.4,
+      bIndex: "global", baseMode: "continuous" },
+  ];
+  Economy.model().costCurve = curve;
+  const before = 164 * Math.pow(21, 0.0497678368);   // what rule 1 would have charged at 21
+  near(Economy.costFor(21, 1), before, 1e-9, "no step at the boundary");
+  ok(Economy.costFor(40, 1) > Economy.costFor(21, 1), "and the steeper exponent takes over after it");
+  Economy.model().costCurve = saved;
+});
+
+test("an absolute segment steps at the boundary, deliberately", () => {
+  const saved = Economy.model().costCurve;
+  Economy.model().costCurve = [
+    { from: 1, to: 20, kind: "power", base: 164, levelGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
+    { from: 21, kind: "power", base: 500, levelGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
+  ];
+  ok(Economy.costFor(21, 1) > Economy.costFor(20, 1) * 2, "the new base applies in full");
+  Economy.model().costCurve = saved;
+});
+
+test("an explicit segment reads its prices straight from the table", () => {
+  const saved = Economy.model().costCurve;
+  Economy.model().costCurve = [
+    { from: 1, to: 2, kind: "explicit", levels: [[10, 20, 30, 40, 50], [11, 21, 31, 41, 51]] },
+    { from: 3, kind: "power", base: 164, levelGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
+  ];
+  eq(Economy.costFor(1, 1), 10);
+  eq(Economy.costFor(2, 3), 31);
+  Economy.model().costCurve = saved;
 });
 
 test("cost rises with both level and builder index", () => {

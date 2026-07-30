@@ -9,7 +9,13 @@
    Model: cfg.buildings builders, each with cfg.tiers levels. Completing a builder
    (taking it to its last level) unlocks one story episode — intermediate levels pay
    no episode — so a full series is cfg.buildings episodes, and maxing every builder
-   both unlocks the last episode and ends the series. */
+   both unlocks the last episode and ends the series.
+
+   A run is a sequence of SERIES (js/economy.js owns the list and its order). cfg.buildings is
+   the current series' length; state.series says which one is being played. Builder indices
+   here are always local to that series, and are translated to a GLOBAL builder number for the
+   two things that span the whole run: the cost curve and the episode registry. So series 2's
+   first builder is local 0, global 61, and unlocks episode 061. */
 const Builders={
   /* ---------- shape ---------- */
   count(){ return cfg.buildings; },
@@ -31,11 +37,10 @@ const Builders={
   allMaxed(){ return state.builder.every(b=>b.tier>=cfg.tiers); },
 
   /* ---------- cost curve ----------
-     Cost rises with the level being bought (tierGrowth) and with the builder's
-     index (bldgGrowth), so later builders are pricier at every level. */
-  cost(bIdx,tier){
-    return cfg.baseCost*Math.pow(cfg.tierGrowth,tier)*Math.pow(cfg.bldgGrowth,bIdx)*cfg.boardScale;
-  },
+     Owned by js/economy.js, which holds a segmented curve rather than one formula — see the
+     header there. `tier` is the 0-based level already bought, so the level being PAID for is
+     tier+1, and the builder index is translated to its global number first. */
+  cost(bIdx,tier){ return Economy.costFor(Economy.globalOf(bIdx),tier+1); },
   /* Price of this builder's next level, or null when it's maxed. */
   nextCost(bIdx){ return this.isMaxed(bIdx)?null:this.cost(bIdx,this.tier(bIdx)); },
   canAfford(bIdx){ const c=this.nextCost(bIdx); return c!=null&&state.coins>=c; },
@@ -53,13 +58,31 @@ const Builders={
      One episode per completed builder, so the series length is the builder count. */
   totalEpisodes(){ return cfg.buildings; },
   unlockedEpisodes(){ return Math.min(state.epUnlockedCount,this.totalEpisodes()); },
-  /* Queue this builder's episode. Content lives in episodes/NNN.js — builder 1 → "001".
-     The queue holds ids; the prediction flow in js/ui/overlays.js looks them up. */
+  /* Queue this builder's episode. Content lives in episodes/NNN.js, keyed by the GLOBAL
+     builder number — series 2's first builder is global 61, so it unlocks "061".
+     The queue holds ids; the prediction flow in js/ui/prediction.js looks them up. */
   unlockEpisode(bIdx){
-    const id=Episodes.idForBuilder(bIdx);
+    const id=Episodes.idForBuilder(Economy.globalOf(bIdx)-1);
     if(!id) return null;
     state.epUnlockedCount++; state.epQueue.push(id);
     return id;
+  },
+  /* Which series the run is in, and whether another one has content waiting. */
+  series(){ return Economy.currentSeries(); },
+  hasNextSeries(){ return !!Economy.nextSeries(); },
+  /* Move to the next series: a fresh set of builders, but the run continues — coins, day,
+     energy and the episode queue all carry over. Returns the series entered, or null when
+     there is no more content. Finishing the last one leaves seriesDone set, which is what
+     the finale reads. */
+  advanceSeries(){
+    const next=Economy.nextSeries();
+    if(!next) return null;
+    state.series=next.index;
+    Economy.apply();                 // cfg.buildings becomes the new series' length
+    state.builder=this.fresh();
+    state.epUnlockedCount=0;
+    state.seriesDone=false;
+    return next;
   },
 
   /* ---------- transaction ---------- */

@@ -17,8 +17,9 @@ class BoardActor {
     state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+n));
     return {float:{text:text??"+"+n+"⚡",color:"var(--teal)"}};
   }
+  /* Feeds both counters: the album total and the per-prediction flow that buys accuracy. */
   gainClues(n,text){
-    state.clues+=n;
+    state.clues+=n; state.cycleClues+=n;
     return {float:{text:text??"+"+n+"🔍",color:"var(--teal)"}};
   }
 

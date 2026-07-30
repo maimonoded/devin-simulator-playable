@@ -23,7 +23,8 @@ function applyPassStart(mult){
    behavior lives in js/tiles/. Nothing tile-specific belongs in this function. */
 function resolveLandingEvents(mult){
   const ev=[]; const i=state.pos;
-  OVERLAYS.forEach(o=>{ if(o.has(i)){ const e=o.consume(i); if(e) ev.push(e); } });
+  // an overlay may pay out more than once, so it may hand back an array (see js/overlays/overlay.js)
+  OVERLAYS.forEach(o=>{ if(o.has(i)){ const e=o.consume(i); if(e) ev.push(...[].concat(e)); } });
   ev.push(...TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale}));
   return ev;
 }
@@ -37,14 +38,20 @@ function resolveLandingEvents(mult){
 function resolvePrediction({wager,odds,sel,correct,auto}){
   if(wager>0) state.coins-=wager;
   state.predsMade++;
-  const won=auto?chance(cfg.accuracy):sel===correct;
+  /* Clues banked since the last prediction buy accuracy, then are spent — the economy model
+     treats them as a per-cycle flow, not a balance. They only decide the outcome in auto runs;
+     a human's pick still decides a manual one. See TODO.md. */
+  const accuracy=Economy.accuracyFor(state.cycleClues);
+  const cluesSpent=state.cycleClues;
+  state.cycleClues=0;
+  const won=auto?chance(accuracy):sel===correct;
   state.epsWatched++; state.epQueue.shift();
   let payout=0;
   if(wager>0){
     if(won){ payout=wager*odds; state.coins+=payout; state.predWins++; state.streak++; state.bestStreak=Math.max(state.bestStreak,state.streak); }
     else { state.predLoss++; state.streak=0; }
   }
-  return {won,payout};
+  return {won,payout,accuracy,cluesSpent};
 }
 
 /* ---------- time ---------- */
