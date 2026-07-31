@@ -50,11 +50,18 @@ const DEFAULTS={
      because no single formula holds for a whole run. `buildings` is the current series'
      length, seeded by Economy.apply(). */
   buildings:12, tiers:5, boxesPerUpgrade:1,
+  /* How many buildings the builders view shows at once. The page only advances once every
+     building on it is maxed, so this is also the size of a "chunk" of the series. */
+  builderPageSize:5,
   /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
   boxCoins:60, boxItemGapMs:260,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
+  /* Wagers are a share of the player's balance, not a flat amount — three tiers, Confident
+     being the one the economy model's projections assume (Economy.wagerTiers). minWager is
+     the floor underneath all three. clueAlbumSize is the cosmetic album target. */
+  wagerSafe:0.05, wagerConfident:0.10, wagerMax:0.20, clueAlbumSize:300,
 };
 let cfg=Object.assign({},DEFAULTS);
 /* Roll stakes in cycle order. One button steps through these and wraps, so the order here IS
@@ -146,9 +153,13 @@ const TUNING=[
    ["boxesPerUpgrade","Boxes per upgrade",1],["boxCoins","Box item 1: coins",10],
    ["buildings","Builders in this series",1],["tiers","Levels per builder",1]]},
  {group:"Prediction & wager",items:[
-   ["minWager","Minimum wager",10],
+   ["minWager","Minimum wager (floor under every tier)",10],
+   ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],
+   ["wagerConfident","Wager tier 2 · Confident (the default)",0.01,{min:0,max:1}],
+   ["wagerMax","Wager tier 3 · Max (share of balance)",0.01,{min:0,max:1}],
    ["accuracy","Accuracy with no clues",0.01,{min:0,max:1}],
    ["accuracyPerClue","Accuracy gained per clue",0.01,{min:0,max:0.2}],
    ["accuracyMax","Accuracy cap",0.01,{min:0,max:1}],
+   ["clueAlbumSize","Clue album size (cosmetic target)",10,{min:1}],
    ["avgOdds","Avg odds (reference)",0.1]]},
 ];

@@ -1,0 +1,114 @@
+/* ---------- index.html?view=mobile ----------
+   The player's-eye view: the game window and nothing else.
+
+   Everything that exists for DEVELOPMENT is hidden — the side panels (builder list, story,
+   stats, activity log), the action bar, the tuning drawer and its button, and the second
+   controls row (auto-play, phone toggle). What survives is what a player actually sees: the
+   board, the play controls already riding on it, the store, and the HUD.
+
+   The HUD moves INSIDE the frame rather than being hidden with the rest. "How it looks when
+   you play" still has to show coins and energy — a board with no balances is not the game,
+   it is a screensaver. Overlaying it is also how a real mobile game is laid out.
+
+   Loaded last so these overrides win on load order rather than by inflating selectors. The
+   html.viewMobile class is set by an inline <head> script in index.html, before first paint. */
+
+html.viewMobile, html.viewMobile body { height: 100%; overflow: hidden; }
+
+/* The page behind the canvas IS the edge of the world here.
+
+   The renderer is alpha:true and the ground plane fades to transparent at its rim (by design —
+   see _buildTerrain in js/ui/env3d.js), so whatever sits behind the canvas shows through around
+   the island. With the app's blue gradients back there, that reads as a border framing the
+   game. --envBg is set from the environment's own ground colour by Board3D.syncPageBackground(),
+   which makes the rim seamless: at the fade's midpoint the half-transparent water blends over
+   the same colour it is fading into, so there is no visible transition at all.
+
+   The desktop stage gradients and its vignette have to go for the same reason — they are panel
+   decoration, and there is no panel here. */
+html.viewMobile body,
+html.viewMobile .stage { background: var(--envBg, #0b1024); }
+html.viewMobile .stage::before { display: none; }
+
+/* Development chrome, gone. */
+html.viewMobile .side,
+html.viewMobile .actionbar,
+html.viewMobile .controls.viewrow,
+html.viewMobile .drawerBtn,
+html.viewMobile .drawer { display: none; }
+
+/* The wrap fills the viewport exactly — the whole screen is the game.
+   It deliberately does NOT lock to 9:16. Capping the width by height letterboxes the moment
+   the window is not that ratio, and those bars are the "blue surroundings" this mode exists to
+   get rid of. The shape of the preview is the shape of the window; the camera fits the board to
+   whatever aspect it is given. */
+html.viewMobile .wrap {
+  position: relative; display: block; max-width: none; gap: 0;
+  margin: 0; padding: 0; width: 100vw;
+  /* 100vh on iOS is the LARGE viewport — it excludes the browser's collapsible toolbar, so a
+     control pinned to the bottom sits behind it and is unreachable. That is exactly what hid
+     the play controls on iOS Chrome. 100dvh tracks the toolbar as it shows and hides; the vh
+     line stays first as the fallback for anything that does not know dvh. */
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* The stage fills the frame edge to edge — no card border or radius, since there is nothing
+   left for it to sit against. */
+html.viewMobile .stage {
+  height: 100%; border: 0; border-radius: 0; padding: 0; overflow: hidden;
+}
+/* Beats .stage.phone's aspect-ratio rule: here the frame sets the shape and the scene just
+   fills it, so the board gets the whole screen rather than a 9:16 box inside one. */
+html.viewMobile .boardScene {
+  height: 100%; min-height: 0; width: 100%; aspect-ratio: auto; margin: 0;
+}
+
+/* HUD as an overlay strip across the top of the board.
+   js/ui/main.js reparents it (and the store button) INTO #boardScene in this mode, so these
+   offsets are relative to the 3D view itself, not to the page frame — the two boxes are the
+   same size here, so the numbers did not change when it moved. */
+html.viewMobile .hud {
+  position: absolute; top: calc(10px + var(--safeT)); left: 10px; right: 10px; z-index: 40;
+  padding: 8px 10px; gap: 8px; border-radius: 14px;
+  background: rgba(14, 19, 46, .74); backdrop-filter: blur(6px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+}
+/* The title block is branding, not gameplay, and it costs two lines the frame cannot spare. */
+html.viewMobile .hud .brand { display: none; }
+/* One row, no wrapping. Pills drop their captions — at this width the icon already says which
+   number it is — and the energy pill gives up its 190px floor, which was on its own what
+   forced the row to wrap onto a second line. */
+html.viewMobile .hud { flex-wrap: nowrap; }
+html.viewMobile .hud .pills { gap: 6px; flex-wrap: nowrap; min-width: 0; }
+html.viewMobile .hud .pill { padding: 4px 8px; gap: 5px; min-width: 0; }
+html.viewMobile .hud .pill .lb { display: none; }
+html.viewMobile .hud .pill .v { font-size: 13px; }
+html.viewMobile .hud .pill .ic { font-size: 13px; }
+html.viewMobile .hud .energywrap { min-width: 0; flex: 1 1 auto; }
+html.viewMobile .hud .ebar { height: 5px; margin-top: 3px; }
+/* Day and clock are simulator instrumentation — a player has no session counter on screen.
+   Dropping it also gives the four balance pills the whole width. */
+html.viewMobile .daychip { display: none; }
+
+/* Below the HUD strip rather than under it. The HUD sits at top:10 and runs ~55px tall once
+   the pills are compacted, so this clears it with a small gap. Both are absolute inside the
+   same frame, so if the HUD ever grows a row this is the number to move.
+   Back and the builders-view header clear it the same way, which puts the three of them on one
+   line: back left, title centred, store right. */
+html.viewMobile .storeBtn { top: calc(74px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
+html.viewMobile .navBtn.back { top: calc(74px + var(--safeT)); left: 12px; width: 44px; height: 44px; }
+html.viewMobile .buildersHead { top: calc(80px + var(--safeT)); }
+
+/* ---- notch and home indicator ----
+   The frame runs edge to edge (viewport-fit=cover in index.html), which is what we want for the
+   world — but not for anything you have to touch. These insets keep every control out from
+   under the notch, the status bar and the home indicator. env() reports 0 on a desktop browser,
+   so the same rules are a no-op there and no separate desktop values are needed. */
+html.viewMobile {
+  --safeT: env(safe-area-inset-top, 0px);
+  --safeB: env(safe-area-inset-bottom, 0px);
+}
+html.viewMobile .playbar,
+html.viewMobile .buildersBar,
+html.viewMobile .navBtn:not(.back) { bottom: calc(14px + var(--safeB)); }

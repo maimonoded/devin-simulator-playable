@@ -17,11 +17,46 @@ test("solveExponent reproduces the workbook's derived value", () => {
   eq(Economy.solveExponent(null), null);
 });
 
-test("the shipped curve reproduces the workbook's builder-1 prices", () => {
+test("the shipped curve tracks the workbook's builder-1 prices to within 1%", () => {
   resetCfg();
-  // Builder!C6:G6 in economy model v3
-  [164, 246, 369, 553.5, 830.25].forEach((want, i) => near(Economy.costFor(1, i + 1), want, 1e-6, `level ${i + 1}`));
-  near([1, 2, 3, 4, 5].reduce((a, L) => a + Economy.costFor(1, L), 0), 2162.75, 1e-6, "Builder!H6 total");
+  /* Builder!C6:G6 in economy model v3.12. The fit is deliberately not exact — the six segments
+     are chosen to preserve the cumulative cost that sets pacing, so any single builder may sit
+     up to 1% either side of the sheet. */
+  [160.2752, 240.4128, 360.6193, 540.9289, 811.3933].forEach((want, i) => {
+    const got = Economy.costFor(1, i + 1);
+    ok(Math.abs(got - want) / want < 0.01, `level ${i + 1}: ${got.toFixed(4)} vs ${want}`);
+  });
+});
+
+test("no builder anywhere in the run is mispriced by more than 1%", () => {
+  resetCfg();
+  /* The whole point of six segments rather than three. Spot-checked against the sheet at the
+     segment boundaries, where a fitted curve is at its worst. */
+  [[1, 160.2752], [14, 167.8050], [15, 168.4630], [28, 178.3957], [29, 179.0620],
+   [63, 198.3581], [64, 199.0873], [73, 206.2506], [74, 206.7320], [227, 224.4166],
+   [228, 224.5554], [240, 226.2492]].forEach(([b, want]) => {
+    const got = Economy.costFor(b, 1);
+    ok(Math.abs(got - want) / want < 0.01, `builder ${b}: ${got.toFixed(4)} vs ${want}`);
+  });
+});
+
+test("the six segments reproduce the model's pacing", () => {
+  resetCfg();
+  /* This is the contract the fit was built to keep. Days come from cumulative cost: a builder
+     takes however long it takes to earn its price, net of the box income the model credits
+     against it. Series 1 lands within a quarter of an hour and the full run within a minute. */
+  const COINS_PER_DAY = 7344.126506, BOX_INCOME = 889.608434;
+  let cum = 0;
+  const days = [];
+  for (let b = 1; b <= 240; b++) {
+    let gross = 0;
+    for (let L = 1; L <= 5; L++) gross += Economy.costFor(b, L);
+    cum += (gross - BOX_INCOME) / COINS_PER_DAY;
+    days.push(cum);
+  }
+  near(days[59], 11.9555, 0.02, "series 1 — Progression!E6");
+  near(days[239], 59.5836, 0.01, "the full run — Progression!C11");
+  eq(days.filter(d => d <= 14).length, 68, "builders finished by day 14, the pace that was asked for");
 });
 
 test("segmentFor picks the rule that owns a builder, and the open-ended one owns the tail", () => {
@@ -99,6 +134,67 @@ test("playableSeries drops the ones with no content", () => {
   eq(playable.length, 2);
 });
 
+suite("economy: wager tiers");
+
+test("a tier is a share of the balance, and Confident is the modelled default", () => {
+  resetCfg();
+  const t = Economy.wagerTiers(10000);
+  deepEq(t.map(x => x.key), ["safe", "confident", "max"]);
+  deepEq(t.map(x => x.amount), [500, 1000, 2000], "5% / 10% / 20% of 10,000");
+  eq(Economy.DEFAULT_TIER, "confident", "the tier Inputs!C50 calls the modelled default");
+  eq(Economy.wagerTier("max", 10000).amount, 2000);
+  eq(Economy.wagerTier("nope", 10000), null);
+});
+
+test("tiers scale with the balance — the flat minimum no longer sets the bet", () => {
+  resetCfg();
+  const small = Economy.wagerTier("confident", 5000).amount;
+  const big = Economy.wagerTier("confident", 500000).amount;
+  eq(small, 500);
+  eq(big, 50000, "a hundredfold balance stakes a hundredfold bet");
+  ok(big / small === 100, "the tier is proportional, which is what the model assumes");
+});
+
+test("minWager is a floor under every tier, never a ceiling", () => {
+  resetCfg();                                  // minWager 100
+  const t = Economy.wagerTiers(400);           // 5% = 20, below the floor
+  deepEq(t.map(x => x.amount), [100, 100, 100], "all three clamp up to the minimum");
+  const u = Economy.wagerTiers(3000);          // 5% = 150, clear of it
+  deepEq(u.map(x => x.amount), [150, 300, 600]);
+});
+
+test("a tier can never stake more than the player holds", () => {
+  resetCfg();
+  cfg.minWager = 5000;
+  deepEq(Economy.wagerTiers(1200).map(x => x.amount), [1200, 1200, 1200],
+         "the floor is capped by the balance, so no tier overdraws");
+  resetCfg();
+});
+
+test("canWager is the same affordability rule the modal shows", () => {
+  resetCfg();
+  ok(!Economy.canWager(99));
+  ok(Economy.canWager(100), "exactly the minimum can bet");
+  cfg.minWager = 0;
+  ok(!Economy.canWager(1e9), "a zero minimum turns betting off entirely");
+  resetCfg();
+});
+
+test("apply projects the model's three tiers and the album target onto cfg", () => {
+  resetCfg();
+  const p = Economy.model().prediction;
+  Economy.apply();
+  eq(cfg.wagerSafe, p.wagerSafe);
+  eq(cfg.wagerConfident, p.wagerConfident);
+  eq(cfg.wagerMax, p.wagerMax);
+  eq(cfg.clueAlbumSize, p.clueAlbumSize);
+  ["wagerSafe", "wagerConfident", "wagerMax", "clueAlbumSize"].forEach(k =>
+    ok(Economy.OWNED_CFG_KEYS.includes(k), `${k} must be economy-owned so an import replaces it`));
+  ok(!Economy.OWNED_CFG_KEYS.includes("participation"),
+     "participation is an observed rate, not a game input — see Economy.apply()");
+  resetCfg();
+});
+
 suite("economy: the clue edge");
 
 test("accuracy rises per clue and stops at the cap", () => {
@@ -172,13 +268,17 @@ function stubWorkbook(over) {
   const put = (sheet, ref, v) => { cells[sheet + "!" + ref.toUpperCase()] = v; };
   const dig = (o, p) => p.split(".").reduce((a, k) => (a == null ? a : a[k]), o);
   const e = ECONOMY_DEFAULT;
-  const anchors = e.costCurve[0].anchors;
+  /* The importer still reads the v3 layout: one cost base, one level growth, one derived
+     exponent and the four pacing anchors it was solved from. Those constants are written out
+     here rather than lifted from ECONOMY_DEFAULT, whose curve is now the six fitted v3.12
+     segments — no single base, and no anchors to solve. Until the workbook grows a segment
+     table (TODO.md), these two shapes are legitimately different. */
   const extra = {
-    "_anchors.daysSeries1": anchors.daysSeries1,
-    "_anchors.totalDays": anchors.totalDays,
-    "_exponent": e.costCurve[0].exponent,
-    "_costBase": e.costCurve[0].base,
-    "_levelGrowth": e.costCurve[0].levelGrowth,
+    "_anchors.daysSeries1": 14,
+    "_anchors.totalDays": 60,
+    "_exponent": 0.0497678368,
+    "_costBase": 164,
+    "_levelGrowth": 1.5,
   };
 
   put("Guide", "B2", "Economy Model v9 - test fixture");

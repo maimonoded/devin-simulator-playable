@@ -19,6 +19,7 @@ import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
 import { Dice3D } from "./dice3d.js";
+import { Builders3D } from "./builders3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -57,8 +58,10 @@ const Board3D = {
   ready: false,
 
   _renderer: null, _scene: null, _camera: null, _host: null,
-  _tiles: [], _token: null, _towers: [], _boxes: new Map(), _models: new Map(), _gltf: null,
+  _tiles: [], _token: null, _boxes: new Map(), _models: new Map(), _gltf: null,
   _raf: 0,
+  /* "board" | "builders" — which scene the one renderer is drawing. See setView(). */
+  _view: "board",
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
   /* _camTarget is where the camera is looking now, _camWant where it is heading. Keeping
      them apart is what makes the follow trail rather than snap. */
@@ -135,6 +138,9 @@ const Board3D = {
     }
 
     Env3D.init(this._scene);
+    /* Its own scene, drawn by this renderer — see setView(). */
+    Builders3D.init();
+    this.syncPageBackground();
     /* Init once, not per build(): the dice hang off their own group, which build() leaves
        alone, so they survive a board rebuild the way the token does. */
     Dice3D.init(this._scene);
@@ -172,8 +178,12 @@ const Board3D = {
     const follow = !!cfg.camFollow;
     /* Phone framing keeps its own zoom. A 9:16 pane is far narrower than a desktop one, so
        the value that fills a wide frame leaves the board small in a tall one — they are
-       genuinely different numbers rather than one scaled by aspect. */
-    const want = cfg.phoneView ? cfg.camZoomPhone : cfg.camZoom;
+       genuinely different numbers rather than one scaled by aspect.
+       ?view=mobile IS phone framing, but it must not write cfg.phoneView to say so: that key
+       is persisted, so a single visit to the mobile URL would leave the desktop view stuck in
+       9:16 forever. Read the flag here instead of setting the config. */
+    const phone = cfg.phoneView || (typeof VIEW_MOBILE !== "undefined" && VIEW_MOBILE);
+    const want = phone ? cfg.camZoomPhone : cfg.camZoom;
     const zoom = follow ? Math.min(1, Math.max(0.05, want || 1)) : 1;
     const halfW = (EXTENT * Math.SQRT2 / 2) * (follow ? zoom : envMargin());
     const halfH = halfW * Math.sin(THREE.MathUtils.degToRad(ENV_CAM.el));
@@ -183,6 +193,9 @@ const Board3D = {
     this._camera.top = fit;
     this._camera.bottom = -fit;
     this._camera.updateProjectionMatrix();
+    /* The builders scene shares this canvas, so it re-fits on the same events — otherwise it
+       would still be framed for whatever size the window was when it was last shown. */
+    Builders3D.resize(w, h);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },
 
@@ -300,7 +313,6 @@ const Board3D = {
     }
 
     this._buildToken();
-    this._buildTowers();
     this.setTokenTile(state.pos, true);
   },
 
@@ -525,30 +537,6 @@ const Board3D = {
     m.position.y += holder.position.y - box.min.y;  // feet on the tile top
   },
 
-  _buildTowers() {
-    if (this._towerGroup) this._scene.remove(this._towerGroup);
-    this._towers = [];
-    /* The row is laid along world X, then the whole group is turned 45° about Y so it reads
-       as a straight line across the board from the camera's 45° viewpoint — otherwise the
-       skyline runs diagonally across the ring. */
-    const group = new THREE.Group();
-    group.rotation.y = Math.PI / 4;
-    const n = Builders.count();
-    const span = 6.4, w = Math.min(0.6, (span / n) * 0.72);
-    for (let i = 0; i < n; i++) {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(w, 1, w),
-        new THREE.MeshLambertMaterial({ color: COLORS.tower }),
-      );
-      mesh.position.set(-span / 2 + (i + 0.5) * (span / n), 0, 0);
-      mesh.castShadow = true;
-      group.add(mesh);
-      this._towers.push(mesh);
-    }
-    this._towerGroup = group;
-    this._scene.add(group);
-    this.setBuilders();
-  },
 
   /* ---------------- updates ---------------- */
   setTokenTile(i, instant) {
@@ -584,16 +572,25 @@ const Board3D = {
     });
   },
 
+  /* The buildings live in their own scene now (js/ui/builders3d.js) — the board's middle is
+     where dice land and reveals play, which is no place for a progress readout. */
   setBuilders() {
     if (!this.available) return;
-    const tiers = Builders.maxTier();
-    this._towers.forEach((mesh, i) => {
-      const done = Builders.isMaxed(i);
-      const h = 0.25 + Builders.progress(i) * 3.2;
-      mesh.scale.y = h;
-      mesh.position.y = (h * 1) / 2;        // geometry is 1 tall, so scale then re-centre
-      mesh.material.color.setHex(done ? COLORS.towerDone : COLORS.tower);
-    });
+    Builders3D.build();
+    if (this._view === "builders") this.resize();   // slot count may have changed the fit
+  },
+
+  /* ---------------- views ----------------
+     One renderer, one canvas, two scenes. A second WebGLRenderer would take a second GL
+     context and browsers cap those — losing one silently kills the board. */
+  view() { return this._view; },
+  setView(name) {
+    const next = name === "builders" ? "builders" : "board";
+    if (next === this._view) return this._view;
+    this._view = next;
+    if (next === "builders") Builders3D.build();
+    this.resize();                     // each scene fits the canvas its own way
+    return this._view;
   },
 
   /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
@@ -601,8 +598,22 @@ const Board3D = {
   applyEnv() {
     if (!this.available) return;
     Env3D.rebuild();
+    this.syncPageBackground();
     this.setTokenHeight();   // cfg.tokenHeight is live too, and must not reload the model
     this.resize();
+  },
+
+  /* ?view=mobile only: paint the page behind the canvas with the environment's own ground
+     colour. The renderer is alpha:true and the ground fades to transparent at the rim, so
+     whatever is behind the canvas IS the edge of the world — with the app's blue gradient
+     back there it reads as a border around the game. Matching the colour makes the rim
+     disappear. Set as a CSS variable rather than a style so css/mobile.css keeps ownership
+     of which elements use it. With the environment off there is no world colour to match,
+     so it falls back to the near-black the sea would have faded into anyway. */
+  syncPageBackground() {
+    if (typeof VIEW_MOBILE === "undefined" || !VIEW_MOBILE) return;
+    const css = cfg.env3d ? Env3D.groundColorCss() : "#0b1024";
+    document.documentElement.style.setProperty("--envBg", css);
   },
 
   /* Did tile i end up with a 3D model? render.js asks, to decide whether the tile still
@@ -652,6 +663,13 @@ const Board3D = {
         p.lerp(this._tokenTarget, 0.35);
         p.y = TILE_H;
       }
+    }
+    /* Only the active scene ticks and draws. The board's camera-follow and the dice are
+       pointless work while the builders screen is up, and the tile labels are hidden there. */
+    if (this._view === "builders") {
+      Builders3D.tick(1 / 60);
+      this._renderer.render(Builders3D.scene(), Builders3D.camera());
+      return;
     }
     this._followCamera();
     Env3D.tick(1 / 60);

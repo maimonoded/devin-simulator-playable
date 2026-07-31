@@ -117,6 +117,19 @@ async function onUpgradeClick(bIdx){
 }
 
 /* ---------------- wiring ---------------- */
+/* ?view=mobile: reparent the HUD and the store button INTO the board scene, so the whole game
+   screen is one element — a 2D layer sitting on the WebGL canvas — instead of chrome arranged
+   in a frame around it. The play controls are already in there (index.html), so this is what
+   makes the set complete.
+
+   Done here rather than in boot(): boot() is called by the deferred board module, i.e. after
+   first paint, and the HUD would visibly jump from the page flow into the scene. This file is
+   a classic script at the end of <body>, so it runs while the parser is still blocking paint.
+   Reparenting is safe — nothing reads these through their parent, only by id. */
+if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE){
+  const scene=$("#boardScene");
+  if(scene) [$(".hud"),$(".storeBtn")].forEach(el=>{ if(el) scene.appendChild(el); });
+}
 /* Roll is one button with two modes: tap it to roll once, hold it to hand the loop over to
    auto-roll, tap it again to stop. Auto-roll used to be its own button; folding it into Roll
    keeps the primary action in one place, which matters most in the 9:16 phone framing where
@@ -154,6 +167,16 @@ async function onUpgradeClick(bIdx){
   btn.addEventListener("pointercancel",endHold);
 })();
 $("#autoBtn").onclick=autoPlay;
+/* Builders view. The buildings are a separate 3D scene, so switching means moving the DOM
+   overlay AND the scene the renderer draws — doing both here is what keeps them from ever
+   disagreeing about which view is up. */
+function setBuildersView(on){
+  $("#boardScene").classList.toggle("showBuilders",!!on);
+  if(use3d()&&window.Board3D&&Board3D.available) Board3D.setView(on?"builders":"board");
+  renderAll();
+}
+$("#buildersBtn").onclick=()=>setBuildersView(true);
+$("#boardBtn").onclick=()=>setBuildersView(false);
 $("#watchBtn").onclick=openPrediction;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;
@@ -169,6 +192,14 @@ $("#phoneBtn").onclick=()=>{
   scheduleSaveConfig();
 };
 function applyPhoneView(on){
+  /* ?view=mobile is already a full-screen phone frame, so it must never also wear the .phone
+     preview class. The two are different framing systems and they fight: .stage.phone caps
+     .boardScene at 360px and re-imposes a 9:16 box, which in mobile view showed up as a strip
+     of page either side of the canvas — exactly the border this mode exists to remove. And it
+     wins on specificity (three classes), so css/mobile.css cannot simply override it.
+     cfg.phoneView is left alone: it is persisted, and board3d.js reads it alongside
+     VIEW_MOBILE when picking the camera zoom. */
+  if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE) on=false;
   document.querySelector(".stage").classList.toggle("phone",on);
   $("#phoneBtn").classList.toggle("on",on);
   $("#phoneBtn").textContent=on?"🖥 Desktop view":"📱 Phone view";

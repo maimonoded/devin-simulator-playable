@@ -241,6 +241,18 @@ export const Env3D = {
     }
   },
 
+  /* The colour the ground fades OUT to at the rim, as a CSS hex string.
+
+     The fade is deliberate (see _buildTerrain): the plane dissolves to transparent so the page
+     shows through and the water reads as backdrop at the edges. On the desktop panel that is
+     exactly right. In ?view=mobile the game fills the screen, and "the page" is then a blue
+     border around the world — so that mode paints the page this colour instead, and the rim
+     becomes seamless rather than a frame. */
+  groundColorCss() {
+    const c = envScene()?.terrain?.groundColor ?? C.ground;
+    return "#" + c.toString(16).padStart(6, "0");
+  },
+
   tick(dt) {
     this._t += dt;
   },

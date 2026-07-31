@@ -25,16 +25,25 @@ translates a series-local builder index into a global builder number and asks `E
 cost(b, L) = base × levelGrowth^(L-1) × b^exponent × boardScale × costKnob
 ```
 
-That is a **power law** in the builder index `b`, not an exponential — `b^0.0498` grows 1.31×
-across 240 builders where a `1.05^b` exponential would grow 115,942×. Pacing comes from the
-level ramp and the number of builders, not from later builders escalating. The exponent is
-*derived* from four pacing anchors (60 episodes in 14 days, 240 in 60), which ride along in the
-segment so it can be re-solved rather than guessed.
+That is a **power law** in the builder index `b`, not an exponential — the shipped exponents
+grow the price 1.43× across 240 builders where a `1.05^b` exponential would grow 115,942×.
+Pacing comes from the level ramp and the number of builders, not from later builders escalating.
 
 The curve is a **list of segments**, because no single formula holds for a whole run. Each owns
 a builder range; `bIndex` says whether `b` keeps counting or restarts inside the segment, and
 `baseMode` says whether the segment steps at the boundary or is solved to continue smoothly.
 A segment may also be an explicit per-level table instead of a formula.
+
+**The shipped curve is six segments**, fitted to economy model v3.12. That model does not ask
+for one steady rate: it opens at 6 episodes/day, steps to 5 at day 5, then to 4 at day 15 easing
+to 3.5 by day 60. The boundaries at builders 29 and 74 are where those steps land; the rest are
+where one power law stops tracking the schedule within 1%.
+
+The fit preserves the **sum** of prices over each segment, not the worst individual price —
+days-to-finish is a cumulative total, so tracking the running sum is what keeps pacing honest.
+The result reproduces the model's full run exactly, series 1 to within 12 minutes, and the
+builder count at every day checkpoint. No single builder is more than 1% off the spreadsheet.
+`tests/suites/08-economy.js` asserts all three.
 
 **The last segment must have no `to`.** `Economy.validateCurve()` enforces it — a bounded final
 rule would leave builders past it unpriced and deadlock the game. See the header of
@@ -83,8 +92,9 @@ builder's progress where it still fits (levels clamp down to the new `tiers`).
 ## Who calls it
 
 ```
-js/ui/render.js   renderBuilderCenter()  skyline: one tower per builder, height = progress(i)
-                  renderBuilderList()    rows, level pips, cost buttons, series bar
+js/ui/render.js   renderBuilders()       the builders view's 2D layer: page header + one
+                                         upgrade button per building on the page
+js/ui/builders3d.js  build()/update()    the buildings themselves, in their own 3D scene
 js/ui/main.js     uiUpgrade(i)           calls upgrade(i), then toasts/logs the result
                   autoPlay()             spends via cheapest()
 js/ui/overlays.js seriesComplete()       finale modal, reads count()/totalEpisodes()

@@ -58,6 +58,14 @@ engaged) can never be observed in the tool built to validate it.
 Deliberately left as-is for now. **Done when:** auto-play runs predictions under a stated policy
 for wager tier, participation and clue spend.
 
+Two of those three now exist to be pointed at: `Economy.wagerTiers(balance)` gives the policy a
+tier to name (Confident is `Economy.DEFAULT_TIER`, the one the workbook assumes), and the clue
+spend is already `Economy.accuracyFor(state.cycleClues)`. What is still undecided is
+participation — `prediction.participation` is 0.95 in the model and is deliberately not
+projected onto `cfg`, because for a human it is an outcome rather than an input. An auto policy
+is the one place where it *would* be an input, so wiring it belongs to this item, not to the
+wager work.
+
 ---
 
 ## Session & time
@@ -150,21 +158,51 @@ together, so it is a pure currency redenomination with no pacing effect.
 **Done when:** each knob has a decided call site, and it is stated whether `boardScale` survives
 alongside them.
 
-### Box income is delayed and capped here, guaranteed in the model
-The model's Builder-net column assumes all boxes pay out. In the code a box is a marker placed
-on a **free standard tile** — 26 slots, no stacking (`state.boxes` is a Set), and `spawn`
-silently drops any it cannot place. At 240 builders saturation is guaranteed, so realized box
-income falls below the 889.6/builder the cost curve was netted against.
+### Box income is delayed here, guaranteed in the model — but it is NOT capped
+The model's Builder-net column credits 889.6 coins/builder (5 boxes × 80 coins + 1 energy, the
+energy valued at `coinsPerRoll / (1 - energyPerRoll)` = 97.9). In the code a box is a marker on
+a **free standard tile** — 26 slots, no stacking (`state.boxes` is a Set), and `spawn` silently
+drops any it cannot place.
 
-### Multi-segment cost curves have no UI
-`Economy.costCurve` supports segments — a rule for builders 1–499, another from 500, `bIndex`
-global-or-restart, `baseMode` absolute-or-continuous, and explicit per-level tables. It is
-validated (the last segment must be open-ended) and tested, and the drawer displays it
-read-only. But there is **no way to author a second segment except by editing code**, and the
-v3 workbook has no segment table to import one from.
+**An earlier note here claimed saturation was guaranteed at 240 builders. Simulation against
+the real board model says otherwise, with about 3× of margin.** Boxes are consumed as fast as
+they appear: landing is uniform over 40 tiles, so collections per builder are `rolls × B/40`
+and spawns are 5, giving an equilibrium of `B = 40 × 5 / 22.43 ≈ 8.9` boxes on the board. Three
+240-builder runs agree — mean 8.5 on the board, peak 14 of 26, **0 dropped**, 1191 of 1200
+collected.
 
-**Done when:** the workbook grows a segment table (`from`, `to`, `bIndex`, `baseMode`, params or
-explicit levels) and the importer reads it.
+Saturation needs more than `22.43 × 26/40 = 14.6` spawns per builder. At the shipped
+`boxesPerUpgrade = 1` we spawn 5. Raising it to 3 is where drops begin (306 lost of 3600); at 4
+it is severe (1309 of 4800).
+
+What is real is **delay, not loss**: ~9 boxes are in flight at any moment, so a box is collected
+some rolls after the upgrade that granted it, and a run ends with ~9 never collected — a 0.8%
+shortfall against the model's credit, which is a timing artifact rather than a leak.
+
+**Done when:** someone decides whether that 0.8% tail matters. If `boxesPerUpgrade` is ever
+raised above 2, this stops being academic and `spawn` needs a queue instead of a silent drop.
+
+### The importer cannot produce the curve the game now ships
+This got sharper. `ECONOMY_DEFAULT` is now **six segments**, fitted to economy model v3.12's
+phased pacing. But `EconomyImport` still only knows the v3 layout — one `_costBase`, one
+`_levelGrowth`, one `_exponent` solved from four anchors — so it can only ever build a
+**single** segment. Importing any workbook today therefore *downgrades* the curve to one power
+law and throws the phased pacing away.
+
+v3.12 itself does not import at all: five Inputs labels moved (B14–B17 became a rate schedule,
+B41 became a net total rather than a level-1 base), so the structural gate refuses it. Two
+smaller problems ride along: `Guide!B2` was never bumped off the v3 string, and "Episodes in
+series 1" — the 60 that `structure.episodesPerSeries` needs — lost its numeric cell and now
+survives only as prose.
+
+**Done when:** the workbook grows a segment table (`from`, `to`, `base`, `exponent`, and
+optionally `bIndex`/`baseMode` or explicit levels) and the importer reads it as a discovered
+table, the way it already reads the deck. Then the six shipped segments come from the
+spreadsheet rather than from a fit checked into `js/economy.js`.
+
+Until then the built-in model and the importable model are deliberately different shapes, and
+`tests/suites/08-economy.js` writes the v3 constants into its stub workbook rather than lifting
+them from `ECONOMY_DEFAULT`.
 
 ### No server — the browser is the database
 An imported model lives only in `localStorage` (`pmdrama.econ.v1`), so it is per-browser and

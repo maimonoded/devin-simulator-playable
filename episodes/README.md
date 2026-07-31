@@ -58,11 +58,18 @@ episode files, builders past the end cycle back through the existing ones rather
 Clicking **Predict & watch** opens the prediction modal, and the flow is:
 
 1. **Pick an answer.** Options are reshuffled every showing (see `correct` above).
-2. **Place a bet — betting is mandatory.** The wager slider starts at `cfg.minWager`
-   (default 100) and runs to your full balance. **Lock in prediction** is the only way to
-   watch; **Watch later** closes the modal and leaves the episode queued.
-   - If you hold less than `cfg.minWager`, the wager row is replaced by **Skip & watch**
-     (watch with no wager) alongside Watch later.
+2. **Pick a wager tier.** Three buttons — **Safe**, **Confident**, **Max** — each a share of
+   what you currently hold (`cfg.wagerSafe/wagerConfident/wagerMax`, 5% / 10% / 20%).
+   Confident is preselected because it is the tier the economy model's projections assume.
+   `cfg.minWager` (default 100) is a **floor under all three**, never a ceiling, so early on
+   every tier reads the same until your balance clears it — the modal says so when it happens.
+   - There is no free slider. The model sizes a bet as a share of the balance, and a bet the
+     player can set to anything makes its "average wager" meaningless.
+   - **Watch later** closes the modal and leaves the episode queued. **Skip & watch** watches
+     with no wager and is *always* available — the model expects a stake on 95% of predictions
+     (`participation`), which only means something if declining is a real choice.
+   - If you hold less than `cfg.minWager` the tiers are replaced by an explanation, and
+     Skip & watch is the way through.
 3. **The outcome is resolved at this point**, before playback — the video is the reveal.
 4. **The video plays**, then the win/loss screen appears.
 

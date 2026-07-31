@@ -41,12 +41,17 @@ suite("builders: cost curve");
 
 test("cost follows the model's power law: base x levelGrowth^(L-1) x b^exponent x boardScale", () => {
   resetCfg();
-  const seg = Economy.model().costCurve[0];
   // tier is the level already owned, so the level being paid for is tier+1;
   // b is the 1-based GLOBAL builder number, which in series 1 is index+1
-  const expected = (b, t) => seg.base * Math.pow(seg.levelGrowth, t) * Math.pow(b + 1, seg.exponent) * cfg.boardScale;
-  [[0, 0], [0, 4], [5, 2], [11, 4]].forEach(([b, t]) => near(Builders.cost(b, t), expected(b, t), 1e-6, `cost(${b},${t})`));
-  near(Builders.cost(0, 0), seg.base, 1e-9, "builder 1, level 1 is the base cost");
+  const expected = (idx, t) => {
+    const seg = Economy.segmentFor(idx + 1);          // the shipped curve has six of them
+    return seg.base * Math.pow(seg.levelGrowth, t) * Math.pow(idx + 1, seg.exponent) * cfg.boardScale;
+  };
+  // sampled either side of the 15 / 29 / 64 / 74 boundaries, so the segment lookup is exercised
+  [[0, 0], [0, 4], [5, 2], [11, 4], [13, 0], [14, 0], [27, 3], [28, 1], [40, 2], [62, 4], [63, 0], [73, 2]]
+    .forEach(([b, t]) => near(Builders.cost(b, t), expected(b, t), 1e-6, `cost(${b},${t})`));
+  near(Builders.cost(0, 0), Economy.segmentFor(1).base, 1e-9,
+       "builder 1 level 1 is the first segment's base, since b^exponent is 1 there");
 });
 
 test("the curve is a power law, not an exponential — it barely rises across a series", () => {
@@ -150,6 +155,60 @@ test("cheapest finds the lowest available upgrade and ignores maxed ones", () =>
   near(c.cost, Builders.cost(0, 0), 1e-6);
   state.builder.forEach(b => { b.tier = cfg.tiers; });
   eq(Builders.cheapest(), null, "nothing left to buy");
+});
+
+suite("builders: paging");
+
+test("a page holds pageSize builders, and the last one carries the remainder", () => {
+  freshRun();
+  cfg.buildings = 12; cfg.builderPageSize = 5; Builders.reshape();
+  eq(Builders.pageCount(), 3, "12 builders at 5 a page");
+  eq(Builders.page(), 0);
+  deepEq(Builders.pageBuilders(), [0, 1, 2, 3, 4]);
+  // max the whole first page
+  for (let i = 0; i < 5; i++) state.builder[i].tier = cfg.tiers;
+  eq(Builders.page(), 1, "page turns only once every builder on it is done");
+  deepEq(Builders.pageBuilders(), [5, 6, 7, 8, 9]);
+  for (let i = 5; i < 10; i++) state.builder[i].tier = cfg.tiers;
+  eq(Builders.page(), 2);
+  deepEq(Builders.pageBuilders(), [10, 11], "short final page, not a padded one");
+  resetCfg();
+});
+
+test("the page does not turn while any builder on it is unfinished", () => {
+  freshRun();
+  cfg.buildings = 12; cfg.builderPageSize = 5; Builders.reshape();
+  // finish four of five, out of order, and leave one at a middling tier
+  [0, 1, 3, 4].forEach(i => { state.builder[i].tier = cfg.tiers; });
+  state.builder[2].tier = cfg.tiers - 1;
+  eq(Builders.page(), 0, "one unfinished builder holds the page");
+  deepEq(Builders.pageBuilders(), [0, 1, 2, 3, 4]);
+  state.builder[2].tier = cfg.tiers;
+  eq(Builders.page(), 1);
+  resetCfg();
+});
+
+test("completing everything holds on the last page rather than running off the end", () => {
+  freshRun();
+  cfg.buildings = 12; cfg.builderPageSize = 5; Builders.reshape();
+  state.builder.forEach(b => { b.tier = cfg.tiers; });
+  eq(Builders.page(), 2, "clamped to the last page");
+  deepEq(Builders.pageBuilders(), [10, 11]);
+  resetCfg();
+});
+
+test("paging survives a page size that does not divide, or exceeds the series", () => {
+  freshRun();
+  cfg.buildings = 12; cfg.builderPageSize = 7; Builders.reshape();
+  eq(Builders.pageCount(), 2);
+  deepEq(Builders.pageBuilders(), [0, 1, 2, 3, 4, 5, 6]);
+  cfg.builderPageSize = 50;
+  eq(Builders.pageCount(), 1, "a page bigger than the series is one page");
+  eq(Builders.pageBuilders().length, 12);
+  cfg.builderPageSize = 0;
+  eq(Builders.pageSize(), 1, "a zero page size cannot divide by zero");
+  ok(Builders.pageCount() >= 1);
+  resetCfg();
 });
 
 suite("builders: episodes & series");

@@ -154,58 +154,44 @@ function renderOverlays(){
     if(el){ const b=document.createElement("div"); b.className="ovl "+o.cssClass; b.textContent=o.icon; el.appendChild(b); }
   }));
 }
-/* Skyline in the middle of the board — one tower per builder, height = its level. */
-function renderBuilderCenter(){
-  if(use3d()){ Board3D.setBuilders(); return; }
-  const c=$("#builderCenter"); c.innerHTML="";
-  const n=Builders.all().length;
-  c.style.gap=n>6?"2%":"5%";
-  Builders.all().forEach((b,i)=>{
-    const done=Builders.isMaxed(i);
-    const h=16+Builders.progress(i)*84;
-    const d=document.createElement("div"); d.className="sky"+(done?" done":"");
-    d.style.width=(n>6?(84/n):12)+"%";
-    d.innerHTML=`<div class="skytower" style="height:${h}%">${done?'<span class="crownt">👑</span>':''}</div>`;
-    c.appendChild(d);
-  });
-}
-function renderBuilderList(){
-  const list=$("#builderList"); list.innerHTML="";
-  const tiers=Builders.maxTier();
+/* The builders view's 2D layer: the page header, and one upgrade button per building on the
+   page. The buildings themselves are 3D and live in js/ui/builders3d.js — this is only the
+   part you press.
+
+   Every button on the row is the same width and shows a COMPACT price (fmtShort), because the
+   row has to fit cfg.builderPageSize of them across a phone whatever the economy charges:
+   "2.5k" costs four characters where "2,500" costs five and "1,240,000" costs nine. */
+function renderBuilders(){
+  const page=Builders.pageBuilders();
   // clickable while auto-roll is running (buying stops it), but not during a manual roll
   const live=!state.animating||autoMode==="roll";
-  Builders.all().forEach((b,i)=>{
+  const bar=$("#buildersBar"); bar.innerHTML="";
+  page.forEach(i=>{
     const done=Builders.isMaxed(i);
-    const cost=Builders.nextCost(i);
     const afford=Builders.canAfford(i);
-    let pips="";
-    for(let t=1;t<=tiers;t++) pips+=`<div class="lvpip${b.tier>=t?' on':''}${done?' done':''}"></div>`;
-    const row=document.createElement("div"); row.className="brow";
-    const btn = done
-      ? `<button class="upbtn max" disabled>MAX</button>`
-      : `<button class="upbtn${afford?'':' cant'}" data-b="${i}" ${afford&&live?'':'disabled'}>
-           <span class="uplvl">Lvl ${b.tier+1}</span><span class="upcost">🪙 ${fmt(cost)}</span></button>`;
-    row.innerHTML=`<span class="bname">Builder ${i+1}</span>
-      <div class="lvpips">${pips}</div>${btn}`;
-    list.appendChild(row);
+    const b=document.createElement("button");
+    b.className="upb"+(done?" max":afford?"":" cant");
+    b.disabled=done||!afford||!live;
+    b.dataset.b=i;
+    b.innerHTML=done
+      ? `<span class="upbName">#${i+1}</span><span class="upbCost">MAX</span>`
+      : `<span class="upbName">#${i+1} · Lv${Builders.tier(i)+1}</span>
+         <span class="upbCost">🪙 ${fmtShort(Builders.nextCost(i))}</span>`;
+    bar.appendChild(b);
   });
-  list.querySelectorAll(".upbtn[data-b]").forEach(bt=>bt.onclick=()=>onUpgradeClick(+bt.dataset.b));
-  // series progress
-  const totalEps=Builders.totalEpisodes(), doneEps=Builders.unlockedEpisodes();
-  $("#seriesLbl").textContent=`Builders complete · ${Builders.doneCount()}/${Builders.count()}`;
-  $("#seriesEps").textContent=`${doneEps} / ${totalEps} episodes`;
-  $("#seriesFill").style.width=(totalEps?doneEps/totalEps*100:0)+"%";
-  const dots=$("#seriesDots"); dots.innerHTML="";
-  Builders.all().forEach((b,i)=>{
-    const s=document.createElement("div");
-    const frac=Builders.progress(i);
-    const col=Builders.isMaxed(i)?"var(--gold)":(b.tier>0?"var(--purple)":"#20265a");
-    s.style.cssText=`flex:1;height:6px;border-radius:3px;background:${col};opacity:${b.tier>0?0.5+0.5*frac:1}`;
-    dots.appendChild(s);
-  });
-  // name the series once there is more than one with content, so the run has a sense of place
+  bar.querySelectorAll("button[data-b]").forEach(bt=>bt.onclick=()=>onUpgradeClick(+bt.dataset.b));
+
   const s=Builders.series(), many=Economy.playableSeries().length>1;
-  $("#builderName").textContent=`${many&&s?`${s.name} · `:""}${Builders.count()} builders · pick any to upgrade`;
+  const range=page.length?`${page[0]+1}–${page[page.length-1]+1}`:"—";
+  $("#buildersHead").innerHTML=
+    `<b>${many&&s?`${s.name} · `:""}Buildings ${range}</b>
+     <span>${Builders.doneCount()}/${Builders.count()} complete · set ${Builders.page()+1} of ${Builders.pageCount()}</span>`;
+
+  /* The board shows nothing about builders any more, so the only hint that there is something
+     to spend on is a dot on the button that takes you there. */
+  const any=Builders.all().some((_,i)=>Builders.canAfford(i));
+  $("#buildersDot").classList.toggle("on",any);
+  if(use3d()&&window.Board3D&&Board3D.available&&Board3D.setBuilders) Board3D.setBuilders();
 }
 function renderHUD(){
   $("#hDay").textContent="Day "+state.day;
@@ -213,7 +199,12 @@ function renderHUD(){
   const ap=h<12?"AM":"PM"; let h12=h%12; if(h12===0)h12=12;
   $("#hClock").textContent=`${h12}:${String(m).padStart(2,"0")} ${ap}`;
   tweenNumber($("#hCoins"),state.lastCoins,state.coins,v=>fmt(v)); state.lastCoins=state.coins;
-  tweenNumber($("#hClues"),state.lastClues,state.clues,v=>fmt(v)); state.lastClues=state.clues;
+  /* The album is a lifetime total with a target the model names (clueAlbumSize), so show it as
+     progress toward that rather than as a bare number climbing forever. Past the target it
+     stops reading as a fraction — the collection is simply complete. */
+  tweenNumber($("#hClues"),state.lastClues,state.clues,
+              v=>state.clues>=cfg.clueAlbumSize?fmt(v):`${fmt(v)}/${fmt(cfg.clueAlbumSize)}`);
+  state.lastClues=state.clues;
   $("#hVip").textContent=fmt(state.vip);
   $("#hEnergy").textContent=Math.floor(state.energy);
   $("#hEnergyCap").textContent=cfg.energyCap;
@@ -238,7 +229,7 @@ function renderStory(){
 }
 /* Reflect state.mult on the stake button (needed after a restore or user reset). */
 function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
-function renderAll(){ renderHUD();renderOverlays();renderBuilderCenter();renderBuilderList();renderStats();renderStory();
+function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderStats();renderStory();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
   const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;

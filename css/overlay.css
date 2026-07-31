@@ -59,9 +59,15 @@
 .opt:hover{border-color:var(--purple);transform:translateX(3px)}
 .opt.sel{border-color:var(--gold);background:#2b2b52}
 .opt .odds{font-weight:800;color:var(--gold);font-size:13px}
-.wagerRow{display:flex;align-items:center;gap:10px;margin-top:16px}
-.wagerRow input[type=range]{flex:1;accent-color:var(--purple)}
-.wagerVal{font-weight:800;color:var(--gold);min-width:70px;text-align:right}
+/* Wager tiers — three shares of the balance, not a free slider (js/economy.js wagerTiers). */
+.tierRow{display:flex;gap:8px;margin-top:16px}
+.tier{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+      padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s}
+.tier:hover{border-color:var(--purple)}
+.tier.sel{border-color:var(--gold);background:#2b2b52}
+.tier .tierName{font-size:12px;font-weight:700;color:var(--text)}
+.tier .tierPct{font-size:11px;color:var(--muted)}
+.tier .tierAmt{font-size:13px;font-weight:800;color:var(--gold)}
 .modal .foot{display:flex;gap:10px;margin-top:18px}
 /* ---------- episode video player ---------- */
 .modal.videoModal{width:auto}                      /* hug the portrait video instead of 480px */

@@ -3,6 +3,26 @@
 
 suite("util");
 
+test("fmtShort compacts prices and never exceeds four characters", () => {
+  eq(fmtShort(0), "0");
+  eq(fmtShort(999), "999");
+  eq(fmtShort(1000), "1k", "a bare 1.0 loses the pointless decimal");
+  eq(fmtShort(2500), "2.5k");
+  eq(fmtShort(2900), "2.9k");
+  eq(fmtShort(9949), "9.9k");
+  eq(fmtShort(9950), "10k", "no '10.0k' — the decimal is dropped once it would not fit");
+  eq(fmtShort(12500), "13k");
+  eq(fmtShort(999499), "999k");
+  eq(fmtShort(999500), "1m", "rounding up rolls over a unit instead of printing '1000k'");
+  eq(fmtShort(1240000), "1.2m");
+  eq(fmtShort(3.4e9), "3.4b");
+  eq(fmtShort(1.1e12), "1.1t");
+  eq(fmtShort(-2500), "-2.5k");
+  // the promise the upgrade row depends on: five of these fit one phone line
+  for (const n of [0, 999, 1000, 2500, 9950, 12500, 999500, 1.24e6, 3.4e9, 1.1e12, 9.9e14])
+    ok(fmtShort(n).length <= 4, `fmtShort(${n}) = "${fmtShort(n)}" is wider than 4 chars`);
+});
+
 test("fmt rounds and adds thousands separators", () => {
   eq(fmt(0), "0");
   eq(fmt(1234.6), "1,235");

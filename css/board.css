@@ -29,7 +29,7 @@
         font-size:15px;white-space:nowrap}
 .blabel .val{display:block;font-size:8px;color:var(--muted);margin-top:1px}
 /* when the 3D board is live the legacy DOM board is hidden entirely */
-body.board3d .skyLayer,body.board3d .board{display:none}
+body.board3d .board{display:none}
 .board{width:min(560px,92%);aspect-ratio:1;display:grid;
        grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);
        gap:4px;position:relative;z-index:1;
@@ -97,24 +97,6 @@ body.board3d .skyLayer,body.board3d .board{display:none}
                50%{transform:rotateZ(-45deg) rotateX(-52deg) translateY(-10px) scale(1.06)}
                100%{transform:rotateZ(-45deg) rotateX(-52deg) translateY(0)}}
 
-/* builder center — 12-tower skyline */
-/* The skyline lives OUTSIDE the board's preserve-3d context, as a sibling layered
-   beneath it. Inside that context the towers are a billboard standing above the board
-   plane, so 3D sorting correctly draws them over the tiles — no z-index or translateZ
-   can override that. As a plain sibling it simply composites behind the whole board and
-   shows through the hollow middle. It also no longer needs a counter-rotation. */
-.skyLayer{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-     width:min(560px,92%);aspect-ratio:1;z-index:0;pointer-events:none}
-.builderCenter{position:absolute;left:15%;top:15%;width:70%;height:70%;
-     display:flex;align-items:flex-end;justify-content:center;gap:2%}
-.sky{display:flex;align-items:flex-end;justify-content:center;height:100%}
-.sky .skytower{width:78%;border-radius:4px 4px 1px 1px;min-height:8px;
-     background:linear-gradient(180deg,var(--purple),var(--purple-d));
-     box-shadow:0 3px 8px rgba(0,0,0,.45);transition:height .5s cubic-bezier(.2,.9,.2,1);
-     display:flex;align-items:flex-start;justify-content:center;position:relative}
-.sky.done .skytower{background:linear-gradient(180deg,var(--gold),var(--gold-d))}
-.sky .crownt{position:absolute;top:-15px;font-size:12px}
-
 /* Play controls, as a 2D layer ON the board rather than a row beneath it.
 
    Pinned to the bottom edge of .boardScene (which is position:relative), so it rides the board
@@ -132,6 +114,55 @@ body.board3d .skyLayer,body.board3d .board{display:none}
    over whatever tile happens to be down there. */
 .playbar::before{content:"";position:absolute;left:0;right:0;bottom:-14px;height:110px;z-index:-1;
                  background:linear-gradient(180deg,transparent,rgba(9,13,38,.6));pointer-events:none}
+
+/* ---------- builders view ----------
+   Two overlays share the one 3D surface: .boardScene.showBuilders swaps which is on screen,
+   while Board3D.setView() swaps which scene the renderer draws. Keeping the switch in one
+   class means the DOM and the scene can never disagree about which view is up. */
+.navBtn{position:absolute;left:14px;bottom:14px;z-index:35;width:52px;height:52px;border-radius:16px;
+        background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;font-size:22px;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 5px 0 rgba(0,0,0,.28);transition:transform .08s}
+.navBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
+/* Back sits TOP-left, not bottom-left where the 🏗 button was: the upgrade row owns the whole
+   bottom edge, and five buttons plus a back button do not fit one phone line. */
+.navBtn.back{background:var(--panel2);border:1px solid var(--line);font-size:24px;
+             top:14px;left:14px;bottom:auto}
+/* The board shows nothing about builders now, so this dot is the only nudge that there is
+   something affordable waiting. */
+.navDot{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;
+        background:var(--gold);border:2px solid #10142f;display:none}
+.navDot.on{display:block}
+
+.buildersUi{position:absolute;inset:0;z-index:35;display:none;pointer-events:none}
+.buildersUi>*{pointer-events:auto}
+.boardScene.showBuilders .buildersUi{display:block}
+/* While the builders view is up the board's own layer is not just hidden but inert — a stray
+   tap must not roll the dice behind a screen the player thinks they are on. */
+.boardScene.showBuilders .playbar,
+.boardScene.showBuilders .boardLabels,
+.boardScene.showBuilders #buildersBtn{display:none}
+
+.buildersHead{position:absolute;left:0;right:0;top:14px;text-align:center;line-height:1.35;
+              text-shadow:0 2px 6px rgba(0,0,0,.75);pointer-events:none}
+.buildersHead b{display:block;font-size:15px}
+.buildersHead span{font-size:11px;color:var(--muted)}
+
+/* One row, one line, always. Each button takes an equal share of the width and is allowed to
+   shrink (min-width:0), so the row holds whether the page has five buildings or two — and the
+   prices inside are compacted by fmtShort so the text never decides the layout. */
+.buildersBar{position:absolute;left:10px;right:10px;bottom:14px;
+             display:flex;gap:6px;align-items:stretch}
+.upb{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;
+     background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;border-radius:11px;
+     padding:8px 4px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.28);transition:transform .08s}
+.upb:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
+.upb .upbName{font-size:9px;opacity:.85;text-transform:uppercase;letter-spacing:.03em;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.upb .upbCost{font-size:13px;white-space:nowrap}
+/* Can't afford it: still readable, obviously inert. */
+.upb.cant{background:var(--panel2);color:var(--muted);box-shadow:none;border:1px solid var(--line)}
+.upb.max{background:transparent;border:1px solid var(--line);color:var(--gold);box-shadow:none}
 
 /* dice
    The 3D board throws real dice onto the middle of the board, so the DOM pair would be a

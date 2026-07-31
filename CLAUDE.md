@@ -33,6 +33,7 @@ once the scene exists.
 
 ```
 index.html          markup + ordered <link>/<script> tags
+                    ?view=mobile → the player's-eye view (see css/mobile.css)
 serve.py            dev server (Range + no-store) — the way to run the project
 vendor/             three.module.js (r169), vendored; no npm, no build step
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
@@ -44,7 +45,7 @@ claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 4
                     board-env-art (the world around them). Run link-skills.sh once after
                     cloning — it runs each skill's setup.sh, then symlinks them into
                     .claude/skills, which is git-ignored. Both need the Scenario MCP server
-css/                base · board · panels · drawer · overlay
+css/                base · board · panels · drawer · overlay · mobile (loaded last)
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/
   util.js           $, fmt, sleep, rand, chance, weighted, shuffle
@@ -69,6 +70,7 @@ js/
     board3d.js      the WebGL board (three.js) — the module entry point; calls boot()
     env3d.js        the island, sea and props around the board (imported by board3d.js)
     dice3d.js       the dice, thrown onto the board (imported by board3d.js)
+    builders3d.js   the buildings, in their own scene (imported by board3d.js)
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
     prediction.js   predict & watch: bet → playback → result
@@ -136,6 +138,15 @@ rule would leave builders past it unpriced and deadlock the game; `Economy.valid
 refuses it. One formula never holds for a whole run — a new rule from builder 500 is an
 appended segment, not a code change.
 
+**The shipped curve is six segments**, fitted to economy model v3.12, whose pacing is phased
+rather than steady: 6 episodes/day, stepping to 5 at day 5 and 4 at day 15, easing to 3.5 by
+day 60. Builders 29 and 74 are where those steps land. The fit preserves the cumulative cost
+over each segment rather than any single price, because days-to-finish is a running total —
+it reproduces the model's full run exactly and series 1 to within 12 minutes, with no builder
+more than 1% off the spreadsheet. **`EconomyImport` cannot yet produce this shape** — it still
+builds one segment from the v3 layout, so importing any workbook today flattens the pacing.
+See [TODO.md](TODO.md).
+
 **Boot order is economy → config → state** (`boot()` in `js/ui/main.js`). The model is applied
 first and the saved tuning is overlaid on top, and the config slot is stamped with the economy
 version it was edited against. On a version change the economy-owned keys are dropped from the
@@ -174,6 +185,26 @@ state.energy = Math.max(state.energy, Math.min(cfg.energyCap, state.energy + n))
 
 This applies to `BoardActor.gainEnergy` and the `advanceSession` regen. `onCfgChange` and
 `loadState` deliberately do **not** clamp. Adding a new clamp will silently delete purchases.
+
+### `index.html?view=mobile` — the player's-eye view
+
+Everything that exists for development is hidden — side panels, action bar, tuning drawer and
+its button, and the second controls row — and `.wrap` becomes a 9:16 frame filling the
+viewport. What is left is what a player sees: the board, the play controls already riding on
+it, the store, and the HUD, which moves *inside* the frame as an overlay rather than being
+hidden with the rest (a board with no coin or energy balance is not the game).
+
+Two things worth knowing before changing it:
+
+- The `viewMobile` class is set by an **inline `<head>` script**, deliberately. Every other
+  script is at the end of `<body>` and the board is a deferred module, which is at least one
+  paint too late for a layout switch — the desktop view would flash first.
+- It must **not** write `cfg.phoneView`. That key is persisted, so one visit to the mobile URL
+  would leave the desktop view stuck in 9:16 forever. `js/ui/board3d.js` reads the global
+  `VIEW_MOBILE` alongside `cfg.phoneView` when picking the camera zoom instead.
+
+All overrides live in `css/mobile.css`, loaded last so it wins on order rather than by
+inflating selectors.
 
 ### The two auto modes
 
@@ -222,9 +253,16 @@ inside DOM-building functions.
   are treated as transient. `loadState` also drops queue entries that aren't known episode ids.
 - **`roll()` and `autoPlay()` use try/finally.** `state.animating` must always clear — if it
   doesn't, the board soft-locks with Roll permanently disabled.
-- **The skyline renders behind the board.** It's a sibling of `.board`, not a child: inside the
-  board's `preserve-3d` context the towers legitimately stand above the board plane and occlude
-  tiles, and `z-index` is ignored there.
+- **The buildings are not on the board.** They have their own 3D scene (`js/ui/builders3d.js`),
+  reached by the 🏗 button. One renderer draws both scenes — a second `WebGLRenderer` would take
+  a second GL context, and browsers cap those. `Board3D.setView()` swaps the scene and
+  `.boardScene.showBuilders` swaps the DOM overlay; both happen in `setBuildersView()` so they
+  cannot disagree.
+- **The builders view shows `cfg.builderPageSize` buildings and the page is derived, not
+  stored.** `Builders.page()` is the first page still holding an unmaxed builder, so finishing
+  them out of order can never skip one and nothing needs persisting.
+- **Prices in that row use `fmtShort`** (`2.5k`, `1.2m`, `14b`), capped at four characters, so
+  five buttons fit one phone line whatever the economy charges.
 - The activity log keeps the last 60 entries; older lines are trimmed.
 
 ## Known dead config
@@ -232,6 +270,15 @@ inside DOM-building functions.
 `secPerRoll` and `avgOdds` are in the tuning drawer but read by nothing. Both are still used by
 the economy spreadsheet (seconds-per-roll derives its "active minutes per session"; average odds
 derives the prediction edge), so wiring them up is defensible — see [TODO.md](TODO.md).
+`avgOdds` is a *reference* number: real odds are per-answer in the episode files, so the model's
+single average has no honest call site until something needs to check the library against it.
 
 Four of the model's five relative knobs are imported and ignored; only `builderCost` is read.
 `clues` are now spent — see "Clues are two different things" above.
+
+The **wager tiers are wired**: `wagerSafe/wagerConfident/wagerMax` project onto `cfg` and
+`Economy.wagerTiers(balance)` prices them, with `minWager` as a floor under all three.
+`clueAlbumSize` drives the HUD's `137/300` album readout. `participation` stays unprojected on
+purpose — it is the share of predictions the model expects a stake on, which in a game a human
+plays is an *outcome*, not an input; what the game owes it is the choice, so **Skip & watch is
+always offered**.

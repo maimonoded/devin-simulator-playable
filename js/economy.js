@@ -20,17 +20,23 @@
 
    cost(b, L) = base x levelGrowth^(L-1) x b^exponent
    ... which is a POWER LAW in the builder index b, not an exponential. That distinction is
-   the whole design: b^0.0498 grows 1.31x across 240 builders, where a 1.05^b exponential
-   grows 115,942x. Pacing is meant to come from the level ramp and the sheer number of
-   builders, not from later builders escalating.
+   the whole design: the shipped exponents grow the price 1.43x across 240 builders, where a
+   1.05^b exponential would grow 115,942x. Pacing is meant to come from the level ramp and the
+   sheer number of builders, not from later builders escalating.
 
-   The exponent is DERIVED from four pacing anchors, not typed:
-       exponent = LN(daysSeries1 / totalDays) / LN(episodesSeries1 / totalEpisodes) - 1
-   The anchors ride along in each segment so a future segment can be re-solved rather than
-   guessed at.
+   ONE power law is not enough, because pacing is not one rate. The v3.12 model asks for a fast
+   opening that steps down twice — 6 episodes/day, then 5 from day 5, then 4 from day 15 easing
+   to 3.5 by day 60. The workbook expresses that as a rate schedule and prints the 240 resulting
+   builder prices; a single b^exponent cannot follow it (the local exponent it implies swings
+   between 0.008 and 0.21).
 
-   The curve is a LIST of segments because no single formula holds forever. Each segment owns
-   a builder range and its own rule, so the economy can bend at builder 500, then again at 550,
+   So the curve is a LIST of segments, each its own power law over a builder range. Six of them
+   reproduce the workbook's pacing to within 12 minutes on series 1 and exactly on the full run,
+   with no single builder mispriced by more than 1%. They are fitted to preserve the SUM of
+   prices over each range, not to minimise the worst one: days-to-finish is a cumulative total,
+   so a fit that tracks the running sum beats a fit that tracks any individual price.
+
+   The segment list is also what lets the economy bend at builder 500, then again at 550,
    without touching code. Two knobs decide what happens at a boundary:
 
      bIndex   "global"  — b keeps counting from builder 1, so a new exponent bends the
@@ -46,9 +52,9 @@
    enforces this, and it is the one invariant here worth being loud about. */
 
 const ECONOMY_DEFAULT = {
-  /* Identity — Guide!B2 of the workbook this came from. The built-in default carries the same
-     string the shipped v3 workbook does, so a fresh install and a v3 import agree. */
-  version: "Economy Model v3 - 240 builders / 240 episodes",
+  /* Identity — Guide!B2 of the workbook this came from, or the model this was transcribed
+     from when nothing has been imported. */
+  version: "Economy Model v3.13 - segmented cost curve, 240 builders / 240 episodes",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
@@ -56,10 +62,28 @@ const ECONOMY_DEFAULT = {
 
   structure: { totalBuilders: 240, levelsPerBuilder: 5, episodesPerSeries: 60 },
 
+  /* Six segments, fitted to the phased pacing curve v3.12 printed as 240 builder rows. The
+     boundaries at 29 and 74 are the model's own: they are where its day-5 and day-15 steps land
+     in builder space. The other three splits are where one power law stops tracking the schedule
+     within 1%.
+
+     v3.13 of the workbook carries these same six segments natively, in a block on its Builder
+     tab, instead of the 240 rows — so this list and the spreadsheet now describe the curve the
+     same way. They still have to be kept in step by hand until EconomyImport can read that
+     block; see TODO.md. */
   costCurve: [
-    { from: 1, kind: "power", base: 164, levelGrowth: 1.5, exponent: 0.0497678368,
-      bIndex: "global", baseMode: "absolute",
-      anchors: { episodesSeries1: 60, daysSeries1: 14, totalEpisodes: 240, totalDays: 60 } },
+    { from: 1,   to: 14,  kind: "power", base: 158.722823, levelGrowth: 1.5, exponent: 0.017804825,
+      bIndex: "global", baseMode: "absolute" },
+    { from: 15,  to: 28,  kind: "power", base: 130.940527, levelGrowth: 1.5, exponent: 0.091685906,
+      bIndex: "global", baseMode: "absolute" },
+    { from: 29,  to: 63,  kind: "power", base: 113.831949, levelGrowth: 1.5, exponent: 0.131745838,
+      bIndex: "global", baseMode: "absolute" },
+    { from: 64,  to: 73,  kind: "power", base:  65.134193, levelGrowth: 1.5, exponent: 0.268494329,
+      bIndex: "global", baseMode: "absolute" },
+    { from: 74,  to: 227, kind: "power", base: 148.768898, levelGrowth: 1.5, exponent: 0.074138555,
+      bIndex: "global", baseMode: "absolute" },
+    { from: 228,          kind: "power", base: 101.359660, levelGrowth: 1.5, exponent: 0.146500821,
+      bIndex: "global", baseMode: "absolute" },
   ],
 
   tiles: {
@@ -105,7 +129,7 @@ const ECONOMY_DEFAULT = {
      checked against the model that produced it. */
   reference: {
     coinsPerRoll: 81.275, energyPerRoll: 0.17,
-    coinsPerDayEngaged: 7344.126506, totalDays: 59.42593271, episodesPerDay: 4.03864086,
+    coinsPerDayEngaged: 7344.126506, totalDays: 59.58355042, episodesPerDay: 4.027957352,
   },
 };
 
@@ -286,6 +310,39 @@ const Economy = {
     return Math.min(cfg.accuracyMax, cfg.accuracy + Math.max(0, clues || 0) * cfg.accuracyPerClue);
   },
 
+  /* ---------------- wagers ---------------- */
+
+  /* The model sizes a bet as a SHARE OF WHAT THE PLAYER HOLDS, not as a flat number, and offers
+     exactly three of them. That is why there is no free slider: a bet the player can set to
+     anything makes the workbook's "average wager" meaningless, and it was the flat 100-coin
+     floor drifting further from the model with every builder that made this worth wiring.
+
+     Confident is the tier the workbook's own projections assume (Inputs!C50, "the modeled
+     default"); Max exists to cap a losing streak rather than to be used every time. */
+  WAGER_TIERS: [
+    { key: "safe",      label: "Safe",      cfgKey: "wagerSafe" },
+    { key: "confident", label: "Confident", cfgKey: "wagerConfident" },
+    { key: "max",       label: "Max",       cfgKey: "wagerMax" },
+  ],
+  DEFAULT_TIER: "confident",
+
+  /* Each tier priced against a balance. Amounts are whole coins, never above the balance, and
+     floored at cfg.minWager so an early player whose 5% is a rounding error can still bet —
+     which does mean every tier reads the same until the balance clears minWager / wagerSafe. */
+  wagerTiers(balance) {
+    const bal = Math.max(0, Math.floor(balance || 0));
+    const floor = Math.max(0, Math.round(cfg.minWager));
+    return this.WAGER_TIERS.map(t => {
+      const pct = Math.max(0, cfg[t.cfgKey] || 0);
+      return { ...t, pct, amount: Math.min(bal, Math.max(floor, Math.round(bal * pct))) };
+    });
+  },
+  wagerTier(key, balance) {
+    return this.wagerTiers(balance).find(t => t.key === key) || null;
+  },
+  /* Can a bet be placed at all? Unchanged rule: the minimum has to be affordable. */
+  canWager(balance) { return cfg.minWager > 0 && balance >= cfg.minWager; },
+
   /* ---------------- projection onto cfg ---------------- */
 
   /* The cfg keys apply() owns. Everything else in cfg (camera, presentation, environment) is
@@ -296,7 +353,8 @@ const Economy = {
   OWNED_CFG_KEYS: ["energyCap", "regenMin", "sessionsPerDay", "secPerRoll", "tiers",
                    "stdBase", "trainEV", "startPass", "startLand", "spaEnergy", "vipSeed",
                    "boardScale", "boxesPerUpgrade", "boxCoins", "buildings",
-                   "accuracy", "accuracyPerClue", "accuracyMax", "avgOdds"],
+                   "accuracy", "accuracyPerClue", "accuracyMax", "avgOdds",
+                   "wagerSafe", "wagerConfident", "wagerMax", "clueAlbumSize"],
 
   /* Push the model's flat values onto the live tuning surface and rebuild the editable tables.
      Everything downstream keeps reading cfg/deck/boxTable exactly as before. */
@@ -328,6 +386,17 @@ const Economy = {
     cfg.accuracyPerClue = e.prediction.accuracyPerClue;
     cfg.accuracyMax = e.prediction.maxAccuracy;
     cfg.avgOdds = e.prediction.avgOdds;
+
+    /* The three wager tiers, as shares of the player's balance — see wagerTiers(). */
+    cfg.wagerSafe = e.prediction.wagerSafe;
+    cfg.wagerConfident = e.prediction.wagerConfident;
+    cfg.wagerMax = e.prediction.wagerMax;
+    cfg.clueAlbumSize = e.prediction.clueAlbumSize;
+    /* prediction.participation is deliberately NOT projected. It is the share of predictions
+       the model expects a stake on (0.95), which in a game a human plays is an OUTCOME, not an
+       input — forcing a 5% random skip would be modelling the player rather than the economy.
+       What the game owes the model is the choice it presupposes, so Skip & watch is always
+       offered rather than only appearing when the minimum is unaffordable. */
 
     deck = JSON.parse(JSON.stringify(e.deck));
     boxTable = JSON.parse(JSON.stringify(e.box.item2));

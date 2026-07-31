@@ -2,13 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover is what makes env(safe-area-inset-*) report real values on a notched
+     iPhone; without it they are all 0 and css/mobile.css cannot keep the controls clear of the
+     home indicator. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Predictive Narrative — Daily Experience Simulator</title>
+<script>
+  /* index.html?view=mobile — the player's-eye view: the game window and nothing else.
+     Inline, and in <head>, on purpose. Every other script in this project is at the end of
+     <body> (and the board is a deferred module), which is at least one paint too late for a
+     layout switch: the desktop view would flash first. Reading it here means the very first
+     paint is already the right one.
+     VIEW_MOBILE is a global the rest of the app can read — see css/mobile.css and the camera
+     zoom in js/ui/board3d.js. */
+  const VIEW_MOBILE = new URLSearchParams(location.search).get("view") === "mobile";
+  if (VIEW_MOBILE) document.documentElement.classList.add("viewMobile");
+</script>
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/board.css">
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/drawer.css">
 <link rel="stylesheet" href="css/overlay.css">
+<!-- last, so its overrides win the cascade without needing specificity tricks -->
+<link rel="stylesheet" href="css/mobile.css">
 </head>
 <body>
 <div class="wrap">
@@ -34,7 +50,6 @@
       <div class="boardHost" id="boardHost"></div>
       <div class="boardLabels" id="boardLabels"></div>
       <!-- legacy CSS-3D board, used when cfg.board3d is 0 or WebGL is unavailable -->
-      <div class="skyLayer"><div class="builderCenter" id="builderCenter"></div></div>
       <div class="board" id="board">
         <div class="token" id="token"><div class="disc">💃</div></div>
       </div>
@@ -49,6 +64,16 @@
         <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
         <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
       </div>
+      <!-- Bottom-left: into the builders view. Carries a dot when something is affordable,
+           since the board no longer shows builder progress at all. -->
+      <button class="navBtn" id="buildersBtn" title="Builders">🏗<i class="navDot" id="buildersDot"></i></button>
+      <!-- The builders view's own 2D layer. Board3D swaps the scene; .boardScene.showBuilders
+           swaps which of these two overlays is on screen. -->
+      <div class="buildersUi">
+        <button class="navBtn back" id="boardBtn" title="Back to the board">←</button>
+        <div class="buildersHead" id="buildersHead"></div>
+        <div class="buildersBar" id="buildersBar"></div>
+      </div>
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">
@@ -59,19 +84,8 @@
 
   <!-- side -->
   <div class="side">
-    <div class="card">
-      <h3>🏗️ Builder <span id="builderName" style="color:var(--muted);letter-spacing:0;text-transform:none;font-size:11px;margin-left:auto"></span></h3>
-      <div id="seriesWrap" style="margin-bottom:11px">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
-          <span id="seriesLbl">Builders complete · 0/12</span><span id="seriesEps">0 / 12 episodes</span></div>
-        <div style="height:8px;background:#10143a;border-radius:5px;overflow:hidden;border:1px solid var(--line);position:relative">
-          <div id="seriesFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--pink),var(--purple))"></div>
-        </div>
-        <div id="seriesDots" style="display:flex;gap:3px;margin-top:6px;justify-content:space-between"></div>
-      </div>
-      <div id="builderList" class="builderList"></div>
-    </div>
-
+    <!-- The builder list used to live here. Upgrading now happens in the builders view
+         (the 🏗 button on the board), which is the only surface for it in either layout. -->
     <div class="card">
       <h3>🎬 Story <span id="epBadge" class="badge" style="margin-left:auto;display:none">0 ready</span></h3>
       <div class="hint" id="storyHint">Upgrade a landmark to unlock the next episode.</div>

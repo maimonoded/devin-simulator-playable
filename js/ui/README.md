@@ -6,7 +6,7 @@ it mutates `state` and returns *event lists* that `playEvents()` here plays back
 | File | Owns |
 |---|---|
 | [fx.js](fx.js) | Generic effects and small DOM outputs: floating rewards, the activity log, toasts, confetti + the dice shower, dice-face drawing and the roll shake, the number tween. Also the three blocking board overlays — `showReveal`, `showCard`, `showCollect` — and `clearOverlayFx()` for error recovery. |
-| [render.js](render.js) | Pure state → DOM rendering: the board, token position, overlay markers, builder skyline and list, HUD, stats, story card, button enable/disable. `renderAll()` is the single entry point. Nothing here mutates game state. |
+| [render.js](render.js) | Pure state → DOM rendering: the board, token position, overlay markers, the builders view's upgrade row, HUD, stats, story card, button enable/disable. `renderAll()` is the single entry point. Nothing here mutates game state. |
 | [player.js](player.js) | The episode video player — both `playerMarkup(id)` and the `playVideo(id)` behaviour that drives it (autoplay, no-seek, pause, 2×, progress, session skip, missing-video fallback). |
 | [prediction.js](prediction.js) | Predict & watch: the betting modal, playback, and the result screen. |
 | [store.js](store.js) | The coin/energy top-up modal. |

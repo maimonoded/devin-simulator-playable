@@ -54,6 +54,30 @@ const Builders={
     return best;
   },
 
+  /* ---------- paging ----------
+     The builders view shows cfg.builderPageSize buildings at a time and only moves on once
+     every building on the page is maxed. The page is therefore DERIVED — it is the first page
+     that still has work in it, not a cursor the player moves. That means completing builders
+     out of order can never skip a page, and nothing has to be persisted: the tiers already say
+     where you are. The last page carries the remainder when the count does not divide evenly. */
+  pageSize(){ return Math.max(1,Math.round(cfg.builderPageSize||1)); },
+  pageCount(){ return Math.max(1,Math.ceil(this.count()/this.pageSize())); },
+  page(){
+    const size=this.pageSize(), pages=this.pageCount();
+    for(let p=0;p<pages;p++){
+      const from=p*size, to=Math.min(from+size,this.count());
+      for(let i=from;i<to;i++) if(!this.isMaxed(i)) return p;
+    }
+    return pages-1;                    // everything maxed: hold on the last page
+  },
+  /* Builder indices on the current page — a short final page returns fewer than pageSize. */
+  pageBuilders(){
+    const size=this.pageSize(), from=this.page()*size;
+    const out=[];
+    for(let i=from;i<Math.min(from+size,this.count());i++) out.push(i);
+    return out;
+  },
+
   /* ---------- series / episodes ----------
      One episode per completed builder, so the series length is the builder count. */
   totalEpisodes(){ return cfg.buildings; },

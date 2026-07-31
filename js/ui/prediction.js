@@ -13,26 +13,34 @@ function openPrediction(){
   // answers are shuffled every time, so the correct index in the file isn't a tell
   const order=shuffle(ep.answers.map((_,i)=>i));
   const minW=Math.max(0,cfg.minWager);
-  const canBet=state.coins>=minW&&minW>0;
-  pending={id,ep,order,sel:null,wager:canBet?minW:0};
-  const maxW=Math.max(minW,Math.floor(state.coins));
+  const canBet=Economy.canWager(state.coins);
+  /* Three tiers priced off the balance, not a free slider — the model sizes a bet as a share
+     of what the player holds, and Confident is the one its projections assume. */
+  const tiers=Economy.wagerTiers(state.coins);
+  const startTier=canBet?Economy.DEFAULT_TIER:null;
+  pending={id,ep,order,sel:null,tier:startTier,
+           wager:canBet?Economy.wagerTier(startTier,state.coins).amount:0};
   const optHtml=order.map((src,idx)=>{ const a=ep.answers[src];
     return `<button class="opt" data-idx="${idx}"><span>${a.text}</span><span class="odds">×${a.odds.toFixed(1)}</span></button>`;
   }).join("");
-  // betting is mandatory; only a player who can't afford the minimum gets a way out
+  /* Every tier reads the same while the balance is small enough that minWager is doing the
+     clamping. Say so rather than showing three identical buttons with no explanation. */
+  const allFloored=tiers.every(t=>t.amount===tiers[0].amount);
   const wagerHtml=canBet
-    ? `<div class="wagerRow"><span style="font-size:12px;color:var(--muted)">Wager</span>
-         <input type="range" id="wSlide" min="${minW}" max="${maxW}" step="10" value="${minW}">
-         <span class="wagerVal" id="wVal">${fmt(minW)}</span></div>
-       <div class="hint" style="margin-top:4px">Minimum bet <b style="color:var(--gold)">${fmt(minW)}</b>🪙 · you hold <b>${fmt(state.coins)}</b>🪙</div>`
+    ? `<div class="tierRow">${tiers.map(t=>
+         `<button class="tier${t.key===startTier?" sel":""}" data-tier="${t.key}">
+            <span class="tierName">${t.label}</span>
+            <span class="tierPct">${Math.round(t.pct*100)}%</span>
+            <span class="tierAmt">${fmt(t.amount)}🪙</span></button>`).join("")}</div>
+       <div class="hint" style="margin-top:6px">You hold <b>${fmt(state.coins)}</b>🪙 · a tier is a share of that${
+         allFloored?`, but all three are at the <b>${fmt(minW)}</b>🪙 minimum until you hold more`:""}</div>`
     : `<div class="hint" style="margin-top:10px">You need <b style="color:var(--gold)">${fmt(minW)}</b>🪙 to place a bet and hold only <b>${fmt(state.coins)}</b>🪙. Watch it without a wager, or come back once you've earned more.</div>`;
-  // "Watch later" is always available so the modal is never a dead end;
-  // "Skip & watch" only appears when the player can't afford the minimum bet.
-  const footHtml=canBet
-    ? `<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
-       <button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button>`
-    : `<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
-       <button class="btn pink" id="skipPred" style="flex:2">Skip &amp; watch</button>`;
+  /* "Watch later" keeps the modal from being a dead end. "Skip & watch" is now ALWAYS offered:
+     the model expects a stake on 95% of predictions, which only means anything if declining is
+     a choice the player actually has. See Economy.apply(). */
+  const footHtml=`<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
+       <button class="btn ghost" id="skipPred" style="flex:1">Skip &amp; watch</button>${
+         canBet?`<button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button>`:""}`;
   /* Clues banked since the last prediction are spent on this one. They set the accuracy the
      economy model uses, so say what they bought — otherwise the only clue feedback a player
      ever gets is a number going up in the HUD. */
@@ -55,11 +63,16 @@ function openPrediction(){
     const commit=$("#commitPred"); if(commit) commit.disabled=false; });
   $("#watchLater").onclick=()=>{   // leaves the episode queued for later
     $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null; renderAll(); };
+  /* Skipping settles nothing: wager 0 means resolvePrediction leaves coins, streak and the
+     win counter alone, so the arbitrary sel can't score. */
+  $("#skipPred").onclick=()=>{ pending.wager=0; pending.tier=null; pending.sel=pending.sel??0; playEpisode(); };
   if(canBet){
-    $("#wSlide").oninput=(e)=>{ pending.wager=+e.target.value; $("#wVal").textContent=fmt(pending.wager); };
+    $("#scrim").querySelectorAll(".tier").forEach(b=>b.onclick=()=>{
+      $("#scrim").querySelectorAll(".tier").forEach(x=>x.classList.remove("sel"));
+      b.classList.add("sel");
+      pending.tier=b.dataset.tier;
+      pending.wager=Economy.wagerTier(pending.tier,state.coins).amount; });
     $("#commitPred").onclick=()=>playEpisode();
-  }else{
-    $("#skipPred").onclick=()=>{ pending.wager=0; pending.sel=pending.sel??0; playEpisode(); };
   }
 }
 
