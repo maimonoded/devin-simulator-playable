@@ -86,6 +86,8 @@ function serializeState(){
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
     energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
     pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
+    /* [tile, contents] pairs — the contents were decided when the box was placed, so they have
+       to survive a reload or a gold box would reopen as something else. */
     builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes], pendingBoxes:state.pendingBoxes,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
@@ -118,7 +120,12 @@ function loadState(){
       ? d.builder.map(b=>({tier:Math.min(Math.max(0,b.tier|0),Builders.maxTier())}))
       : Builders.fresh();
     if(state.builder.length!==Builders.count()) Builders.reshape();
-    state.boxes=new Set(Array.isArray(d.boxes)?d.boxes:[]);
+    /* Saves from before contents were decided at spawn stored bare tile indices. Accept both:
+       a number becomes a box with nothing known about it, and onLand draws for it then — which
+       is exactly what the old code did. */
+    state.boxes=new Map((Array.isArray(d.boxes)?d.boxes:[])
+      .map(e=>Array.isArray(e)?[e[0],e[1]]:[e,null])
+      .filter(([i])=>Number.isInteger(i)&&i>=0&&i<40));
     /* Boxes bought but never thrown survive a reload — they are paid for, so losing them would
        be losing a reward. They land the next time the player leaves the builders view. */
     state.pendingBoxes=Math.max(0,Math.floor(+d.pendingBoxes||0));

@@ -4,8 +4,15 @@ Small 3D objects that sit **on** a tile rather than being one. Today there is on
 box ([js/overlays/mystery-box.js](../../js/overlays/mystery-box.js)).
 
 ```
-assets/props/models/mystery-box.glb
+assets/props/models/mystery-box.glb        plum — coins or energy inside
+assets/props/models/mystery-box-gold.glb   gold — clues inside
 ```
+
+Two boxes, because a box's contents are decided when it is **placed** rather than when it is
+landed on, so the board can say which one is worth crossing to. See
+[js/overlays/README.md](../../js/overlays/README.md). Gold falls back to the plum model before it
+falls back to the cube: a wrong-coloured box still reads as a box, where a cube reads as missing
+art.
 
 | | |
 |---|---|

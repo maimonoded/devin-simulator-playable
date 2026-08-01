@@ -27,11 +27,20 @@ class Overlay extends BoardActor {
   eligible(i){ return true; }
   onLand(i){ return null; }
 
-  /* ---- shared placement/query logic ---- */
+  /* ---- shared placement/query logic ----
+     The occupied tiles are a MAP, not a Set: an overlay may need to remember something about
+     each tile it sits on, and the mystery box does — it decides what is inside when it is
+     PLACED, so the board can show a gold box on a tile holding clues before the player gets
+     there. Overlays that carry nothing just store null and behave exactly as before. */
   positions(){ return state[this.stateKey]; }
   has(i){ return this.positions().has(i); }
-  all(){ return [...this.positions()]; }
+  all(){ return [...this.positions().keys()]; }
+  dataAt(i){ return this.positions().get(i); }
   clear(){ this.positions().clear(); }
+  /* What to remember about a tile when placing on it. Called once, at spawn. */
+  roll(i){ return null; }
+  /* Extra CSS class for this tile's marker (legacy board), so one overlay can have variants. */
+  classAt(i){ return this.cssClass; }
   /* Place up to n overlays on random free eligible tiles. Returns the indices used. */
   spawn(n){
     const pos=this.positions(), free=[];
@@ -39,12 +48,13 @@ class Overlay extends BoardActor {
     const out=[];
     for(let k=0;k<n&&free.length;k++){
       const t=free.splice(Math.floor(rand(0,free.length)),1)[0];
-      pos.add(t); out.push(t);
+      pos.set(t,this.roll(t)); out.push(t);
     }
     return out;
   }
-  /* Remove from the board and resolve. Returns the playback event, an array of them, or null. */
-  consume(i){ this.positions().delete(i); return this.onLand(i); }
+  /* Remove from the board and resolve. Returns the playback event, an array of them, or null.
+     Whatever roll() stored is handed to onLand — read it BEFORE the delete. */
+  consume(i){ const d=this.positions().get(i); this.positions().delete(i); return this.onLand(i,d); }
 }
 const OVERLAY_TYPES={};
 const OVERLAYS=[];

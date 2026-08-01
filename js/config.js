@@ -81,9 +81,13 @@ const DEFAULTS={
      Landing on one lifts it off its tile, floats it to the middle of the view swelling as it
      goes, then pops it. boxRiseMs is the trip to the centre, boxSwellMs the last inflate before
      it goes, boxOpenScale how many times its board size it reaches.
-     boxCluePopupMs is measured from the START of the whole thing, not from the pop, so the clue
-     sheet can be set to appear while the confetti is still falling rather than after it. */
-  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxCluePopupMs:1000,
+     The pop is followed by the SPOILS: what was just won, held in the middle of the screen.
+     Floats over the token are too small and too far from where the player is looking after a
+     burst in the centre — the numbers have to appear where the box was.
+     boxSpoilsMs is that hold, and boxCluePopupMs is counted from the moment the spoils appear,
+     so the clue sheet follows the numbers rather than racing them. On a clue box the spoils stay
+     up until the sheet arrives, so the two never leave a blank gap between them. */
+  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxSpoilsMs:1200, boxCluePopupMs:2000,
   /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
      gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
      this long if the player doesn't tap Collect. */
@@ -174,7 +178,8 @@ const TUNING=[
    ["boxRiseMs","1 · Float to the centre (ms)",20],
    ["boxSwellMs","2 · Swell before the pop (ms)",20],
    ["boxOpenScale","Size it reaches (x board size)",0.25],
-   ["boxCluePopupMs","Clue sheet, from the start (ms)",50]]},
+   ["boxSpoilsMs","3 · Winnings held on screen (ms)",50],
+   ["boxCluePopupMs","4 · Clue sheet, after the winnings (ms)",50]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —

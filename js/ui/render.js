@@ -147,11 +147,16 @@ function positionToken(instant){
 }
 /* Draw every registered overlay's markers (mystery boxes today) on their tiles. */
 function renderOverlays(){
-  if(use3d()){ Board3D.setOverlays(OVERLAYS.flatMap(o=>o.all())); return; }
+  /* classAt/isGold rather than the flat cssClass: one overlay can look different tile to tile,
+     which is how a box holding clues shows up gold before you land on it. */
+  if(use3d()){
+    Board3D.setOverlays(OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))));
+    return;
+  }
   document.querySelectorAll(".tile .ovl").forEach(b=>b.remove());
   OVERLAYS.forEach(o=>o.all().forEach(i=>{
     const el=document.querySelector(`.tile[data-i="${i}"]`);
-    if(el){ const b=document.createElement("div"); b.className="ovl "+o.cssClass; b.textContent=o.icon; el.appendChild(b); }
+    if(el){ const b=document.createElement("div"); b.className="ovl "+o.classAt(i); b.textContent=o.icon; el.appendChild(b); }
   }));
 }
 /* Mystery boxes bought but not yet thrown onto the board.

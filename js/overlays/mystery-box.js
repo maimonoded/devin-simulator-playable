@@ -7,21 +7,38 @@
      item 2  one weighted draw from the editable boxTable — coins, energy or clues
    Item 2 is the only source of clues in the game, so its weight is what sets the clue rate
    a prediction runs on. Two rewards means two playback events (an event carries one float
-   and one log), separated by cfg.boxItemGapMs so they don't stack on top of each other. */
+   and one log), separated by cfg.boxItemGapMs so they don't stack on top of each other.
+
+   ITEM 2 IS DRAWN WHEN THE BOX IS PLACED, not when it is landed on. That is what lets the board
+   show a GOLD box on a tile holding clues — a box you can see is worth crossing to is a target,
+   where an identical box on every tile is only an invisible bonus. Moving the draw earlier
+   changes no expectation whatever: it is the same weighted() call on the same table, so the
+   payout distribution and the clue rate are exactly what they were.
+
+   One consequence worth knowing: a box carries the table as it was when it spawned. Editing the
+   weights in the drawer changes the boxes placed after that, not the ones already on the board —
+   which is correct, since the player has already been shown what those contain. */
 class MysteryBoxOverlay extends Overlay {
   get stateKey(){ return "boxes"; }
   get icon(){ return "🎁"; }
   get cssClass(){ return "box"; }
   /* boxes only appear on plain tiles — never on corners, trains or decks */
   eligible(i){ return tileType(i)==="standard"; }
-  onLand(i){
+  /* What is inside, decided at placement. Stored on the board with the position. */
+  roll(){ const d=weighted(boxTable); return {kind:d.kind,amount:d.amount,name:d.name}; }
+  /* Clues are what make a box gold — see the header. */
+  isGold(i){ const d=this.dataAt(i); return !!d&&d.kind==="clues"; }
+  classAt(i){ return this.cssClass+(this.isGold(i)?" gold":""); }
+  onLand(i,drop){
     const bs=cfg.boardScale;
     const c1=cfg.boxCoins*bs;
     const first=this.gainCoins(c1,"🎁 +"+fmt(c1));
     first.log={icon:"🎁",msg:`Mystery Box · <b>${fmt(c1)}</b> coins`};
     first.pause=cfg.boxItemGapMs;
 
-    const drop=weighted(boxTable);
+    /* A box restored from a save made before contents were decided at spawn has nothing stored;
+       draw for it now, which is exactly what the old code did anyway. */
+    if(!drop) drop=this.roll();
     let ev,clue=null;
     if(drop.kind==="coins"){ const c=drop.amount*bs; ev=this.gainCoins(c,"+"+fmt(c)); }
     else if(drop.kind==="energy"){ ev=this.gainEnergy(drop.amount,"+"+drop.amount+"⚡"); }

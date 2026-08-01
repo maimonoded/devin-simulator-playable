@@ -36,6 +36,21 @@
                      100%{transform:translateY(6px) rotate(-3deg);opacity:.9}}
 @keyframes revealDroop{0%{transform:translateY(-8px);opacity:0}100%{transform:translateY(0);opacity:1}}
 
+/* What a mystery box held, centred where it popped. Wider than the plain reveal because it can
+   carry three rows, and it pops in per row so the numbers arrive with the confetti rather than
+   all at once after it. */
+.centerfx.spoils{width:auto}
+.spoilTop{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);
+          opacity:.9;margin-bottom:4px;text-shadow:0 2px 8px rgba(0,0,0,.8)}
+.spoilRow{display:flex;align-items:center;justify-content:center;gap:9px;line-height:1.15;
+          animation:revealPop .42s cubic-bezier(.2,1.5,.4,1) both}
+.spoilRow:nth-child(3){animation-delay:.10s}
+.spoilRow:nth-child(4){animation-delay:.20s}
+.spoilIco{font-size:30px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))}
+.spoilAmt{font-family:Georgia,serif;font-weight:800;font-size:36px;color:var(--gold);
+          text-shadow:0 3px 12px rgba(0,0,0,.75)}
+.spoilAmt.teal{color:var(--teal)}
+
 /* drawn deck card */
 .centerfx.card{width:auto}
 .playcard{width:158px;margin:0 auto;padding:12px 12px 14px;border-radius:14px;

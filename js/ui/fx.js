@@ -85,27 +85,47 @@ function energyShower(){ rainFx("energyfx", "⚡", 16, true); }
    That is why this owns the sheet rather than leaving it to the payout event's ev.clue.
 
    Resolves — never rejects — on every path, including no WebGL and auto-play. */
-function showBoxOpen(b){
+async function showBoxOpen(b){
   const auto=typeof autoMode!=="undefined"&&autoMode==="session";
   /* The batch balancing tool takes the reward without the ceremony, like everything else. */
-  if(auto) return b.clue?showClue(b.clue):Promise.resolve();
+  if(auto) return b.clue?showClue(b.clue):undefined;
 
-  let clueDone=Promise.resolve();
-  if(b.clue){
-    clueDone=new Promise(res=>{
-      setTimeout(()=>showClue(b.clue).then(res),Math.max(0,cfg.boxCluePopupMs||0));
-    });
-  }
-  const popped=(use3d()&&window.Board3D&&Board3D.available)
+  /* 1-2 · fly to the middle and pop */
+  await ((use3d()&&window.Board3D&&Board3D.available)
     ? Board3D.openBox(b.tile)
-    : sleep(Math.max(0,cfg.boxRiseMs||0)+Math.max(0,cfg.boxSwellMs||0));
+    : sleep(Math.max(0,cfg.boxRiseMs||0)+Math.max(0,cfg.boxSwellMs||0)));
 
-  return popped.then(()=>{
-    confetti();
-    if(b.coins) coinShower(b.coins>=(cfg.boxCoins||0)*2);   // a bigger haul rains harder
-    if(b.energy) energyShower();
-    return clueDone;                                        // already running; just wait it out
-  });
+  confetti();
+  if(b.coins) coinShower(b.coins>=(cfg.boxCoins||0)*2);     // a bigger haul rains harder
+  if(b.energy) energyShower();
+
+  /* 3 · the winnings, where the box just was. A float over the token is too small and too far
+     from where the player is looking after a burst in the middle of the board. */
+  const clueMs=Math.max(0,cfg.boxCluePopupMs||0);
+  const hold=b.clue?Math.max(cfg.boxSpoilsMs||0,clueMs):Math.max(0,cfg.boxSpoilsMs||0);
+  showBoxSpoils(b,hold);
+
+  /* 4 · then, and only then, the clue sheet — counted from the moment the numbers appeared. */
+  if(b.clue){ await sleep(clueMs); await showClue(b.clue); }
+  else await sleep(hold);
+}
+
+/* What the box held, centred where it popped. Not a blocking modal — it fades on its own while
+   the caller waits, so the clue sheet can arrive over it rather than after an empty pause. */
+function showBoxSpoils(b,ms){
+  const el=$("#centerFx");
+  const rows=[];
+  if(b.coins) rows.push(`<div class="spoilRow"><span class="spoilIco">🪙</span><span class="spoilAmt">+${fmt(b.coins)}</span></div>`);
+  if(b.energy) rows.push(`<div class="spoilRow"><span class="spoilIco">⚡</span><span class="spoilAmt teal">+${b.energy}</span></div>`);
+  if(b.clue&&b.clue.count) rows.push(`<div class="spoilRow"><span class="spoilIco">🔍</span><span class="spoilAmt teal">+${b.clue.count}</span></div>`);
+  if(!rows.length) return;
+  el.className="centerfx show spoils";
+  el.innerHTML=`<div class="spoilTop">Mystery Box</div>${rows.join("")}`;
+  setTimeout(()=>{
+    /* Only clear if nothing else has taken the panel over in the meantime — a reveal from the
+       tile underneath can land while this is still up. */
+    if(el.classList.contains("spoils")){ el.className="centerfx"; el.innerHTML=""; }
+  },Math.max(200,ms));
 }
 
 /* Show the roll for cfg.diceRevealMs, then land on the real numbers. Awaited by roll(), so

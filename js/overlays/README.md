@@ -11,6 +11,30 @@ Today there's one: the **mystery box**.
 |---|---|---|---|---|
 | `mysteryBox` | [mystery-box.js](mystery-box.js) | 🎁 (pulsing) | standard tiles only | Earned by builder upgrades (`cfg.boxesPerUpgrade` per level) but **banked, not placed** — see below. Landing on one draws from the editable `boxTable` — coins, energy, or clues — then the tile pays out normally. Energy drops also fire the dice shower. On the 3D board it is a real model ([assets/props/](../../assets/props/README.md)); the emoji is the legacy CSS board's version. |
 
+## The gold box holds clues
+
+A box's **item 2 is drawn when the box is placed**, not when it is landed on — and a box holding
+clues is rendered in gold. That one change turns a box from an invisible bonus into somewhere
+worth crossing the board for: you can see the good one from four tiles away.
+
+**It costs the economy nothing.** It is the same `weighted(boxTable)` call on the same table, made
+earlier. The payout distribution is identical and the clue rate — which sets prediction accuracy —
+does not move at all. That was the deciding argument for doing it this way rather than adding
+rarity tiers, which *would* have moved it.
+
+Two consequences worth knowing:
+
+- **`state.boxes` is a `Map`**, tile → contents, not a `Set`. `Overlay` supports this generally:
+  `roll(i)` decides what to remember when placing, `dataAt(i)` reads it back, and `consume(i)`
+  hands it to `onLand(i, data)`. An overlay that carries nothing stores `null` and behaves
+  exactly as before.
+- **A box carries the table as it was when it spawned.** Editing the weights in the drawer
+  changes boxes placed after that, not the ones already on the board — which is right, since the
+  player has already been shown what those contain.
+
+Saves from before this stored bare tile indices. Those restore as boxes with nothing known, and
+`onLand` draws for them then — exactly what the old code did.
+
 ## Opening one
 
 Landing on a box no longer just floats two numbers past. The box lifts off its tile, floats to
@@ -22,11 +46,16 @@ burst rather than over a box still sitting on its tile.
 |---|---|
 | always | confetti + a **coin** shower — item 1 is always coins, so every box rains money |
 | item 2 = energy | an **energy** shower on top |
-| item 2 = clues | the clue sheet, on its own timer |
+| item 2 = clues | the clue sheet, after the winnings |
 
-The clue sheet is timed from the **start** of the opening (`cfg.boxCluePopupMs`, default 1000ms),
-not from the pop, so it can be tuned to slide in while the confetti is still falling. That is why
-`showBoxOpen` owns it rather than leaving it to the payout event.
+Then the **spoils**: what was just won, held in the middle of the screen where the box popped. A
+float over the token is too small and too far from where the player is looking after a burst in
+the centre of the board.
+
+The clue sheet is counted from the moment the spoils appear (`cfg.boxCluePopupMs`, 2000ms), so it
+follows the numbers rather than racing them — and on a clue box the spoils stay up until the sheet
+arrives, so the two never leave a blank gap between them. That is why `showBoxOpen` owns the sheet
+rather than leaving it to the payout event.
 
 `boxOpen` carries what to *show*, never what to pay — the coins, energy and clues were already
 banked by the `gain*` helpers before it was built. Same split the bonus mini-games use.

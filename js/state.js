@@ -10,7 +10,9 @@ function initState(){
                       (it buys accuracy, see Economy.accuracyFor) and reset to zero. */
     energy:cfg.energyCap, coins:0, clues:0, cycleClues:0, vip:0,
     pos:0, mult:1, boardNum:1, series:0,
-    builder:Builders.fresh(), boxes:new Set(),
+    /* tile index → what that box holds, decided when it was placed (js/overlays/mystery-box.js).
+       A Map rather than a Set because the board shows a GOLD box on a tile holding clues. */
+    builder:Builders.fresh(), boxes:new Map(),
     /* Boxes EARNED but not yet on the board. Upgrades bank them here rather than dropping them
        straight onto tiles, because the player is looking at the builders screen when they buy —
        a box appearing on a board they cannot see is a reward nobody witnesses. They are thrown

@@ -213,7 +213,8 @@ function deliverBoxes(){
   /* Auto-play session is the batch tool — thousands of upgrades, nobody watching. It gets the
      boxes without the show, exactly as it skips episode video and the bonus games. */
   if(autoMode==="session"||!use3d()||!window.Board3D||!Board3D.available) return;
-  Board3D.throwOverlays(OVERLAYS.flatMap(o=>o.all()),spawned);
+  Board3D.throwOverlays(
+    OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))),spawned);
 }
 $("#buildersBtn").onclick=()=>setBuildersView(true);
 $("#boardBtn").onclick=()=>setBuildersView(false);

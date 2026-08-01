@@ -34,6 +34,10 @@ const TOKEN_MODEL = "assets/token/token.glb";
    board never depends on the asset having been generated. Normalized to a 1x1 footprint with its
    origin at the base, like the tiles, so BOX_SIZE is just how big it is in tile units. */
 const BOX_MODEL = "assets/props/models/mystery-box.glb";
+/* The gold one holds clues. Because contents are decided when a box is PLACED, the board can
+   say so before the player gets there — which is what turns a box into somewhere worth landing
+   rather than an invisible bonus. */
+const BOX_MODEL_GOLD = "assets/props/models/mystery-box-gold.glb";
 const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neighbouring tile
 
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
@@ -77,7 +81,7 @@ const Board3D = {
   _tiles: [], _token: null, _boxes: new Map(), _models: new Map(), _gltf: null,
   _raf: 0,
   /* The mystery box model, loaded once and cloned per box. */
-  _boxModel: null, _boxPending: [],
+  _boxModel: null, _boxModelGold: null,
   /* Frustum half-height from the last resize(), and the multiplier the box throw pulls the
      camera out by. Kept apart so the throw can widen the view without resize() having to know
      about it, and so a resize mid-throw still lands on the right base framing. */
@@ -593,29 +597,39 @@ const Board3D = {
     }
   },
 
-  setOverlays(indices) {
+  /* `boxes` is [{i, gold}] — which tiles hold a box and which of those are the clue ones. */
+  setOverlays(boxes) {
     if (!this.available) return;
+    const want = new Map(boxes.map(b => [b.i, !!b.gold]));
     for (const [i, mesh] of this._boxes) {
-      if (!indices.includes(i)) { this._scene.remove(mesh); this._boxes.delete(i); }
+      /* A box whose LOOK changed has to be rebuilt, not just left alone — that happens when a
+         pre-gold save is restored and its contents get drawn on the first landing. */
+      if (!want.has(i) || mesh.userData.gold !== want.get(i)) {
+        this._scene.remove(mesh); this._boxes.delete(i);
+      }
     }
-    indices.forEach(i => {
+    want.forEach((gold, i) => {
       if (this._boxes.has(i)) return;
-      this._boxes.set(i, this._addBox(i));
+      this._boxes.set(i, this._addBox(i, gold));
     });
   },
 
   /* One box, resting on its tile. Uses the generated model if it has arrived and a plain cube
      otherwise — the cube is not a placeholder to be removed later, it is the fallback for a
      missing or failed asset, exactly like the token's disc. */
-  _addBox(i) {
+  _addBox(i, gold) {
     const holder = new THREE.Group();
     const w = this._tileWorld(i);
     holder.position.set(w.x, TILE_H / 2, w.z);
-    holder.add(this._boxModel
-      ? this._boxModel.clone(true)
+    holder.userData.gold = !!gold;
+    /* Gold falls back to the plain box before it falls back to the cube: a wrong-coloured box
+       still reads as a box, where a cube reads as missing art. */
+    const model = (gold && this._boxModelGold) || this._boxModel;
+    holder.add(model
+      ? model.clone(true)
       : new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3),
-                       new THREE.MeshLambertMaterial({ color: COLORS.box })));
-    if (!this._boxModel) holder.children[0].position.y = 0.15;   // cube pivots at its middle
+                       new THREE.MeshLambertMaterial({ color: gold ? 0xffcb5c : COLORS.box })));
+    if (!model) holder.children[0].position.y = 0.15;   // cube pivots at its middle
     /* Turned to the camera like the piece: a wrapped box has a front (the bow's knot) and no
        board edge to align with, so it should read from wherever the player is sitting. */
     holder.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
@@ -626,9 +640,13 @@ const Board3D = {
   /* Load the box model once, then re-make any boxes already on the board so they pick it up.
      Called from build(); failure is logged and leaves the cubes, which is a working board. */
   _loadBoxModel() {
-    if (this._boxModel) return;
+    this._loadOneBoxModel(BOX_MODEL, "_boxModel");
+    this._loadOneBoxModel(BOX_MODEL_GOLD, "_boxModelGold");
+  },
+  _loadOneBoxModel(url, slot) {
+    if (this[slot]) return;
     if (!this._gltf) this._gltf = new GLTFLoader();
-    this._gltf.load(BOX_MODEL, (gltf) => {
+    this._gltf.load(url, (gltf) => {
       const model = gltf.scene;
       /* Measure from real vertices, not cached per-geometry boxes: setFromObject without the
          precise flag returns the box OF a rotated box, which reads high and renders the prop
@@ -640,14 +658,14 @@ const Board3D = {
         o.castShadow = !!cfg.envShadows;
         if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
       });
-      this._boxModel = model;
-      /* Anything already placed is still a cube — swap it now rather than waiting for the next
-         board rebuild, which might not come until the player rolls. */
-      const live = [...this._boxes.keys()];
-      live.forEach(i => { this._scene.remove(this._boxes.get(i)); this._boxes.delete(i); });
-      live.forEach(i => this._boxes.set(i, this._addBox(i)));
+      this[slot] = model;
+      /* Anything already placed is still a cube (or the wrong colour) — swap it now rather than
+         waiting for the next board rebuild, which might not come until the player rolls. */
+      const live = [...this._boxes].map(([i, m]) => [i, m.userData.gold]);
+      live.forEach(([i]) => { this._scene.remove(this._boxes.get(i)); this._boxes.delete(i); });
+      live.forEach(([i, gold]) => this._boxes.set(i, this._addBox(i, gold)));
     }, undefined, (e) => {
-      console.warn(`Board3D: mystery box ${BOX_MODEL} failed to load, keeping the cube`, e);
+      console.warn(`Board3D: mystery box ${url} failed to load, keeping the cube`, e);
     });
   },
 

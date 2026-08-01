@@ -62,6 +62,49 @@ test("consume removes the box and returns the opening plus one event per item", 
   ev.slice(1).forEach((e, i) => { ok(e.log, `item ${i + 1} has a log line`); ok(e.float, `item ${i + 1} has a float`); });
 });
 
+test("contents are decided when the box is PLACED, not when it is landed on", () => {
+  freshRun();
+  const box = OVERLAY_TYPES.mysteryBox;
+  box.spawn(6);
+  box.all().forEach(i => {
+    const d = box.dataAt(i);
+    ok(d, `tile ${i} must know what it holds the moment it is placed`);
+    ok(["coins", "energy", "clues"].includes(d.kind), d.kind);
+    ok(d.amount > 0);
+  });
+});
+
+test("a box is gold if and only if it holds clues", () => {
+  freshRun();
+  const box = OVERLAY_TYPES.mysteryBox;
+  box.spawn(26);
+  box.all().forEach(i => {
+    eq(box.isGold(i), box.dataAt(i).kind === "clues", `tile ${i}`);
+    eq(box.classAt(i).includes("gold"), box.dataAt(i).kind === "clues", `tile ${i} marker class`);
+  });
+});
+
+test("what a box shows is what it pays — the stored draw is honoured, not re-rolled", () => {
+  freshRun();
+  const box = OVERLAY_TYPES.mysteryBox;
+  state.clues = 0; state.cycleClues = 0;
+  box.positions().set(9, { kind: "clues", amount: 2, name: "Clues" });
+  ok(box.isGold(9), "shown as a clue box");
+  // force the TABLE to coins: a re-roll at landing would pay coins and betray the gold box
+  const [open] = forceDrop("coins", () => box.consume(9));
+  ok(open.boxOpen.clue, "a gold box must open as clues whatever the table now says");
+  eq(state.clues, 2);
+});
+
+test("a box saved before contents were decided still opens", () => {
+  freshRun();
+  // the old shape: a bare tile index with nothing stored alongside it
+  state.boxes = new Map([[9, null]]);
+  const ev = OVERLAY_TYPES.mysteryBox.consume(9);
+  ok(Array.isArray(ev) && ev.length === 3, "draws for it at landing, as the old code did");
+  ok(ev[0].boxOpen);
+});
+
 test("item 1 is always coins, whatever item 2 turns out to be", () => {
   freshRun();
   ["coins", "energy", "clues"].forEach(kind => {
@@ -161,7 +204,7 @@ test("an overlay resolves before the tile, and both pay out", () => {
   state.coins = 0;
   OVERLAY_TYPES.mysteryBox.clear();
   const tile = 9;
-  OVERLAY_TYPES.mysteryBox.positions().add(tile);
+  OVERLAY_TYPES.mysteryBox.positions().set(tile, { kind: "coins", amount: 10, name: "Coins" });
   state.pos = tile;
   const ev = forceDrop("coins", () => resolveLandingEvents(1));
   ok(ev[0].boxOpen, "the box opens before anything else resolves");
@@ -201,7 +244,7 @@ test("save then load restores a run", () => {
   state.energy = 17; state.pos = 23; state.mult = 5; state.rolls = 12;
   state.builder[2].tier = 3;
   OVERLAY_TYPES.mysteryBox.clear();
-  OVERLAY_TYPES.mysteryBox.positions().add(9);
+  OVERLAY_TYPES.mysteryBox.positions().set(9, { kind: "clues", amount: 2, name: "Clues" });
   saveState();
 
   freshRun();                                   // wipe in-memory state
@@ -215,8 +258,10 @@ test("save then load restores a run", () => {
   eq(state.mult, 5);
   eq(state.rolls, 12);
   eq(Builders.tier(2), 3);
-  ok(state.boxes instanceof Set, "boxes must come back as a Set");
+  ok(state.boxes instanceof Map, "boxes come back as a Map — the contents ride with the tile");
   ok(state.boxes.has(9));
+  // the draw happened when the box was PLACED, so a gold box must reopen as a gold box
+  eq(state.boxes.get(9).kind, "clues", "what was inside survives the round trip");
   eq(state.animating, false, "always restored idle");
   eq(state.lastCoins, state.coins, "tween baseline starts where we left off");
 });

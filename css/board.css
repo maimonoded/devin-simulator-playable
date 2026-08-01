@@ -78,6 +78,9 @@ body.board3d .board{display:none}
 .ovl{position:absolute;top:1px;left:2px;font-size:12px;
      transform:rotate(-45deg) rotateX(-52deg)}
 .box{animation:boxpulse 1.2s infinite ease-in-out;filter:drop-shadow(0 0 5px var(--gold))}
+/* The clue box, on the legacy CSS board. The 3D board swaps in a gold model instead; here the
+   emoji is all there is, so it gets a brighter, wider halo to read as the rarer one. */
+.box.gold{filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px var(--gold))}
 @keyframes boxpulse{0%,100%{opacity:.75;transform:rotate(-45deg) rotateX(-52deg) scale(1)}
                     50%{opacity:1;transform:rotate(-45deg) rotateX(-52deg) scale(1.18)}}
 
