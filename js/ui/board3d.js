@@ -630,11 +630,63 @@ const Board3D = {
       : new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3),
                        new THREE.MeshLambertMaterial({ color: gold ? 0xffcb5c : COLORS.box })));
     if (!model) holder.children[0].position.y = 0.15;   // cube pivots at its middle
+
+    /* The gold one has to be findable from across the board, where a tile is a few dozen pixels
+       and a colour difference alone is lost against the pale deck. So it is also bigger and
+       wears a halo — and it moves, which is what the eye actually catches. */
+    if (gold) {
+      holder.scale.setScalar(Math.max(0.2, +cfg.boxGoldScale || 1));
+      const glow = Math.max(0, +cfg.boxGoldGlow || 0);
+      if (glow > 0) {
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: this._glowTexture(), color: 0xffcb5c, transparent: true, opacity: glow,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        }));
+        s.scale.set(1.5, 1.5, 1);
+        s.position.y = BOX_SIZE * 0.55;
+        holder.add(s);
+        holder.userData.glow = s;
+      }
+    }
     /* Turned to the camera like the piece: a wrapped box has a front (the bow's knot) and no
        board edge to align with, so it should read from wherever the player is sitting. */
     holder.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
     this._scene.add(holder);
     return holder;
+  },
+
+  /* A soft radial blob, drawn once and reused as the gold box's halo. Cheaper and softer than
+     any geometry, and as a sprite it always faces the camera. */
+  _glowTexture() {
+    if (this._goldGlowTex) return this._goldGlowTex;
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g = c.getContext("2d").createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, "rgba(255,235,170,1)");
+    g.addColorStop(0.35, "rgba(255,203,92,0.55)");
+    g.addColorStop(1, "rgba(255,203,92,0)");
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+    this._goldGlowTex = new THREE.CanvasTexture(c);
+    return this._goldGlowTex;
+  },
+
+  /* Idle life on the gold boxes: a slow turn, a gentle bob and a breathing halo. Skipped while
+     any board tween is running — the throw and the opening own the transforms then, and a bob
+     added on top would fight them. */
+  _tickBoxes(t) {
+    if (this._anims.length) return;
+    for (const [i, g] of this._boxes) {
+      if (!g.userData.gold) continue;
+      const spin = Math.max(200, +cfg.boxGoldSpinMs || 4200);
+      g.rotation.y = (t / spin) * Math.PI * 2;
+      const bob = Math.max(0, +cfg.boxGoldBob || 0);
+      g.position.y = TILE_H / 2 + Math.sin(t / 620 + i) * bob;
+      if (g.userData.glow) {
+        const k = 1 + Math.sin(t / 480 + i) * 0.12;
+        g.userData.glow.scale.set(1.5 * k, 1.5 * k, 1);
+      }
+    }
   },
 
   /* Load the box model once, then re-make any boxes already on the board so they pick it up.
@@ -657,6 +709,14 @@ const Board3D = {
         if (!o.isMesh) return;
         o.castShadow = !!cfg.envShadows;
         if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
+        /* Self-lit, so the gold box stays the brightest thing on the deck wherever the sun is
+           pointing. Cloned first — the loaded material is shared by every clone of this model,
+           which is fine here (all gold boxes want it) but must not leak to the plain one. */
+        if (slot === "_boxModelGold" && o.material?.emissive) {
+          o.material = o.material.clone();
+          o.material.emissive = new THREE.Color(0xffb020);
+          o.material.emissiveIntensity = Math.max(0, +cfg.boxGoldEmissive || 0);
+        }
       });
       this[slot] = model;
       /* Anything already placed is still a cube (or the wrong colour) — swap it now rather than
@@ -914,6 +974,7 @@ const Board3D = {
     /* The board's own tweens (the box throw). Stepped before the camera so a zoom change lands
        in the same frame it was asked for rather than one late. */
     this._stepAnims(1000 / 60);
+    this._tickBoxes(performance.now());
     if (this._zoom !== this._zoomShown) this._applyFrustum();
     this._followCamera();
     Env3D.tick(1 / 60);

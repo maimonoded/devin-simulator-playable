@@ -17,6 +17,10 @@ A box's **item 2 is drawn when the box is placed**, not when it is landed on —
 clues is rendered in gold. That one change turns a box from an invisible bonus into somewhere
 worth crossing the board for: you can see the good one from four tiles away.
 
+Being *actually* visible took more than a colour swap — a tile is a few dozen pixels and the deck
+is pale cream. The gold box is bigger, self-lit, haloed and moving, and its art deliberately
+breaks the board's muted palette. → [assets/props/README.md](../../assets/props/README.md)
+
 **It costs the economy nothing.** It is the same `weighted(boxTable)` call on the same table, made
 earlier. The payout distribution is identical and the clue rate — which sets prediction accuracy —
 does not move at all. That was the deciding argument for doing it this way rather than adding

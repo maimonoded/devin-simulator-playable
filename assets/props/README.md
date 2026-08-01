@@ -14,6 +14,25 @@ landed on, so the board can say which one is worth crossing to. See
 falls back to the cube: a wrong-coloured box still reads as a box, where a cube reads as missing
 art.
 
+### The gold box deliberately breaks the palette
+
+The style block demands "muted dusty desaturated colours only, chalky and soft, never bright" —
+and the first gold box obeyed it. On a pale cream deck at tile size, a muted gold is nearly
+invisible next to the plum one; it read as "another box", which defeats the entire point of
+showing contents on the board.
+
+So this one is prompted **against** the house style: vivid saturated gold, with a deep burgundy
+ribbon for internal contrast, because gold-on-cream is low contrast however bright the gold is.
+`lorasScale` drops to 0.6 as well, since the LoRA is what pulls colours back toward the muted
+board palette. A rarity marker is signage, not scenery — it is supposed to stand out.
+
+Colour alone still was not enough at tile size, so the engine adds the rest (see
+`_addBox`/`_tickBoxes` in [js/ui/board3d.js](../../js/ui/board3d.js), all tunable under the
+drawer's "Gold (clue) box" group): it is **1.22×** the size of a plain box, **self-lit** via an
+emissive so the sun angle cannot dull it, wrapped in an additive **halo** sprite, and it **turns
+and bobs**. The motion is what the eye actually catches from across the board — the idle tick is
+skipped while a throw or an opening is running, since those own the transforms.
+
 | | |
 |---|---|
 | Footprint | normalized to 1 × 1, like a tile |

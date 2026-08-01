@@ -88,6 +88,12 @@ const DEFAULTS={
      so the clue sheet follows the numbers rather than racing them. On a clue box the spoils stay
      up until the sheet arrives, so the two never leave a blank gap between them. */
   boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxSpoilsMs:1200, boxCluePopupMs:2000,
+  /* ---- the gold (clue) box ----
+     A box is only a target if it can be picked out from across the board, and at tile size that
+     is a matter of pixels: colour alone loses against a pale cream board. So the gold one is also
+     bigger, self-lit, wrapped in a glow, and — the part that actually catches the eye — moving.
+     boxGoldGlow 0 turns the halo off, boxGoldSpinMs is one full turn. */
+  boxGoldScale:1.22, boxGoldGlow:0.7, boxGoldEmissive:0.45, boxGoldSpinMs:4200, boxGoldBob:0.09,
   /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
      gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
      this long if the player doesn't tap Collect. */
@@ -180,6 +186,12 @@ const TUNING=[
    ["boxOpenScale","Size it reaches (x board size)",0.25],
    ["boxSpoilsMs","3 · Winnings held on screen (ms)",50],
    ["boxCluePopupMs","4 · Clue sheet, after the winnings (ms)",50]]},
+ {group:"Gold (clue) box",items:[
+   ["boxGoldScale","Size vs a plain box (x)",0.02],
+   ["boxGoldEmissive","Self-lit glow on the model",0.05],
+   ["boxGoldGlow","Halo around it (0 = off)",0.05],
+   ["boxGoldSpinMs","One full turn (ms)",100],
+   ["boxGoldBob","Bob height (tile units)",0.01]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —
