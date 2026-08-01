@@ -87,7 +87,8 @@ function serializeState(){
     energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
     pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
     builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes],
-    epQueue:[...state.epQueue], epsWatched:state.epsWatched, epUnlockedCount:state.epUnlockedCount,
+    epQueue:[...state.epQueue], epsWatched:state.epsWatched,
+    pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
     streak:state.streak, bestStreak:state.bestStreak, rolls:state.rolls, predsMade:state.predsMade,
     seriesDone:state.seriesDone,
@@ -121,9 +122,17 @@ function loadState(){
     // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
     const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
     state.epQueue=rawQueue.filter(x=>Episodes.has(x));
-    // keep "unlocked" consistent with what survived, so the series bar doesn't
-    // count episodes that no longer exist
-    state.epUnlockedCount=Math.max(0,state.epUnlockedCount-(rawQueue.length-state.epQueue.length));
+    /* A sealed reveal is only worth restoring if its episode still exists and it still carries
+       a decided outcome — anything else would leave the player stuck being told to finish an
+       episode that cannot play. */
+    const pr=d.pendingReveal;
+    state.pendingReveal=(pr&&typeof pr==="object"&&Episodes.has(pr.id)&&typeof pr.won==="boolean")
+      ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0}
+      : null;
+    /* Nothing to restore for the library: Builders.unlockedEpisodeIds() derives it from the
+       builder tiers just restored above. That is what makes an OLD save work — a run that had
+       four episodes unlocked and three of them watched still shows four, where a stored list
+       would have needed migrating and a fallback to the queue showed only the one unwatched. */
     // no cap clamp on restore — purchased energy may legitimately exceed cfg.energyCap
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero

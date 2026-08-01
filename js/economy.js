@@ -343,6 +343,55 @@ const Economy = {
   /* Can a bet be placed at all? Unchanged rule: the minimum has to be affordable. */
   canWager(balance) { return cfg.minWager > 0 && balance >= cfg.minWager; },
 
+  /* ---------------- the train's two bonuses ---------------- */
+
+  /* The train pays one of exactly two outcomes. Both the amount AND which of the two it is are
+     decided here, before anything is shown, because each outcome opens its own bonus mini-game
+     and the mini-game is never allowed to invent the payout — it only presents it.
+     Reads cfg (not the model) so the tuning drawer stays live. */
+  trainDraw() {
+    const large = chance(cfg.trainLargeChance);
+    return { kind: large ? "large" : "small", base: large ? cfg.trainLarge : cfg.trainSmall };
+  },
+  /* Derived: what the pair is worth per landing ACCORDING TO THE MODEL. Nothing pays from it — it
+     is the single number the spreadsheet is reconciled against. Kept in step by apply(). */
+  trainEV() {
+    return cfg.trainSmall * (1 - cfg.trainLargeChance) + cfg.trainLarge * cfg.trainLargeChance;
+  },
+
+  /* ---------------- the large bonus's prize ladder ---------------- */
+
+  /* The large bonus is presented as a three-rung ladder (minigames/gala-match3.html), but the
+     model has exactly ONE number for it. So: the TOP rung is that number, the two lower rungs are
+     drawn beneath it as fractions, and the winning rung is an even pick of the three.
+
+     Consequence, deliberately not hidden: an even pick across 1/3, 2/3 and the top pays 2/3 of
+     the top, so the large bonus yields 210 where the model says 315. trainRealEV() is what the
+     board actually pays and trainEV() is what the sheet says; the gap is real and is tracked in
+     TODO.md. To close it, anchor the ladder on its MEAN rather than its top — multiply all three
+     rungs by 1.5, which makes the top rung 1.5x the model number and restores the EV exactly. */
+  TRAIN_TIER_FRACS: [1 / 3, 2 / 3],   // the two lower rungs, as fractions of the top
+
+  /* Build the ladder for one large bonus and pick its winner.
+     `top` is already scaled by boardScale and the roll multiplier, so the rungs are computed at
+     the size actually shown. Returns rungs ASCENDING. */
+  trainLadder(top) {
+    const tiers = this.TRAIN_TIER_FRACS.map(f => Math.round(top * f)).concat(top);
+    return { tiers, winIndex: Math.floor(Math.random() * 3) };
+  },
+  /* What one large bonus is worth on average once the ladder dilutes it: an even pick of
+     1/3, 2/3 and 1 of the top rung is 2/3 of the top rung. */
+  trainLargeEV() {
+    const f = this.TRAIN_TIER_FRACS;
+    return cfg.trainLarge * (f[0] + f[1] + 1) / 3;
+  },
+  /* What a train landing ACTUALLY pays on average. Diverges from trainEV() by the ladder's
+     dilution — compare the two rather than assuming they agree. */
+  trainRealEV() {
+    return cfg.trainSmall * (1 - cfg.trainLargeChance)
+         + this.trainLargeEV() * cfg.trainLargeChance;
+  },
+
   /* ---------------- projection onto cfg ---------------- */
 
   /* The cfg keys apply() owns. Everything else in cfg (camera, presentation, environment) is
@@ -351,7 +400,8 @@ const Economy = {
      kept, and tweaks made against a model that has since been replaced are dropped, so
      importing a new workbook is never masked by an old save. */
   OWNED_CFG_KEYS: ["energyCap", "regenMin", "sessionsPerDay", "secPerRoll", "tiers",
-                   "stdBase", "trainEV", "startPass", "startLand", "spaEnergy", "vipSeed",
+                   "stdBase", "trainSmall", "trainLarge", "trainLargeChance", "trainEV",
+                   "startPass", "startLand", "spaEnergy", "vipSeed",
                    "boardScale", "boxesPerUpgrade", "boxCoins", "buildings",
                    "accuracy", "accuracyPerClue", "accuracyMax", "avgOdds",
                    "wagerSafe", "wagerConfident", "wagerMax", "clueAlbumSize"],
@@ -368,11 +418,14 @@ const Economy = {
     cfg.tiers = e.structure.levelsPerBuilder;
 
     cfg.stdBase = e.tiles.stdBase;
-    /* The board still pays the train from an EV plus a spread (js/tiles/train-tile.js); the
-       workbook parameterises it from the other end, as a small/large pair. Derive the EV so
-       the money matches even though the felt shape does not. See TODO.md. */
-    cfg.trainEV = e.tiles.trainSmall * (1 - e.tiles.trainLargeChance)
-                + e.tiles.trainLarge * e.tiles.trainLargeChance;
+    /* The train's small/large pair now survives into cfg intact — js/tiles/train-tile.js draws
+       one of the two outcomes and hands it to the matching bonus mini-game, so the felt shape
+       and the modelled shape are finally the same thing. trainEV is derived and carried only so
+       the model has a single number to be checked against. */
+    cfg.trainSmall = e.tiles.trainSmall;
+    cfg.trainLarge = e.tiles.trainLarge;
+    cfg.trainLargeChance = e.tiles.trainLargeChance;
+    cfg.trainEV = this.trainEV();
     cfg.startPass = e.tiles.startPass;
     cfg.startLand = e.tiles.startLand;
     cfg.spaEnergy = e.tiles.spaEnergy;

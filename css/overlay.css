@@ -4,6 +4,16 @@
 @keyframes floatup{0%{opacity:0;transform:translate(-50%,0) scale(.7)}
                    20%{opacity:1}100%{opacity:0;transform:translate(-50%,-70px) scale(1.1)}}
 
+/* ---------- bonus mini-game (minigames/, js/ui/minigame.js) ----------
+   Fills the board scene rather than the viewport, so the 9:16 phone frame contains it. z-index
+   sits above the board's own DOM layers (labels 30, floats 40, reveal 45, playbar/nav 50) and
+   below the scrim (80), because a mini-game and a modal are never open at the same time. */
+.bonusHost{position:absolute;inset:0;z-index:70;display:none;background:#0e141c;
+           border-radius:inherit;overflow:hidden}
+.bonusHost.show{display:block;animation:bonusIn .28s ease}
+.bonusFrame{display:block;width:100%;height:100%;border:0}
+@keyframes bonusIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+
 /* ---------- center-of-board win/loss reveal ---------- */
 .centerfx{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:45;
           pointer-events:none;display:none;text-align:center;width:min(320px,80%)}
@@ -69,6 +79,55 @@
 .tier .tierPct{font-size:11px;color:var(--muted)}
 .tier .tierAmt{font-size:13px;font-weight:800;color:var(--gold)}
 .modal .foot{display:flex;gap:10px;margin-top:18px}
+/* ---------- in-scene sheet ----------
+   A modal that belongs to the GAME WINDOW rather than to the page. .scrim is position:fixed and
+   dims the whole viewport, which is right for a page dialog and wrong for something that is
+   part of the game — in ?view=mobile the two look identical, but on desktop a fixed scrim
+   escapes the board entirely. Mounted inside #boardScene, this is bounded by the board.
+   z-index sits above the board's own layers and below .bonusHost (70), since a mini-game takes
+   the whole frame. */
+.sheet{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+       padding:12px;background:rgba(6,8,24,.74);backdrop-filter:blur(3px);border-radius:inherit}
+.sheet.show{display:flex}
+/* The modal inside a sheet is bounded by the board, not by the viewport. */
+.sheet .modal{width:min(460px,100%);max-height:100%;display:flex;flex-direction:column}
+.sheet .modal .mbody{overflow-y:auto}
+
+/* Close, top-right of a sheet's header. The footer button stays as well — on a tall album the
+   footer is a scroll away, and the header one is always in reach. */
+.modal .top{position:relative}
+.sheetX{position:absolute;top:10px;right:12px;width:30px;height:30px;border-radius:50%;
+        background:rgba(6,8,24,.5);border:1px solid var(--line);color:#fff;font-size:13px;
+        display:flex;align-items:center;justify-content:center;line-height:1}
+.sheetX:active{transform:scale(.92)}
+
+/* ---------- clue found ---------- */
+.clueModal{width:min(400px,100%)}
+.clueFound{display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;
+           background:#1b2150;border:1px solid var(--teal);border-radius:10px;
+           padding:9px 11px;margin-top:8px;line-height:1.35}
+
+/* ---------- clue album ---------- */
+.modal.albumModal{width:min(520px,100%)}
+.albumBar{height:8px;background:#10143a;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.albumFill{height:100%;background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.albumScroll{max-height:54vh;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:10px}
+.albumScroll::-webkit-scrollbar{width:6px}.albumScroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.clueSet{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+.clueSet.done{border-color:var(--teal)}
+.clueSetHead{display:flex;justify-content:space-between;align-items:center;font-size:12px;
+             font-weight:800;margin-bottom:7px}
+.clueSetCount{color:var(--muted);font-variant-numeric:tabular-nums}
+.clueSet.done .clueSetCount{color:var(--teal)}
+.clueGrid{display:flex;flex-direction:column;gap:4px}
+/* Unowned slots stay visible as silhouettes — a collection you cannot see the shape of is not
+   a collection, so the empty rows are the point rather than clutter. */
+.clue{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);
+      background:#141a44;border:1px solid transparent;border-radius:8px;padding:5px 8px;opacity:.55}
+.clue.got{color:var(--text);opacity:1;border-color:var(--line);background:#1b2150}
+.clue .clueIco{width:16px;text-align:center;flex-shrink:0}
+.clue .clueName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ---------- episode video player ---------- */
 .modal.videoModal{width:auto}                      /* hug the portrait video instead of 480px */
 .vwrap{position:relative;margin-top:6px;cursor:pointer;line-height:0;border-radius:14px;overflow:hidden;
@@ -85,6 +144,14 @@
 .vfill{height:100%;width:0%;background:var(--pink);transition:width .2s linear}
 .vtime{position:absolute;right:8px;bottom:11px;font-size:11px;font-variant-numeric:tabular-nums;
        color:#fff;opacity:.85;text-shadow:0 1px 4px rgba(0,0,0,.9);pointer-events:none}
+/* Close. Top-right, clear of the 2x chip below it, and above the wrap's own click-to-pause
+   layer so tapping it ends playback rather than pausing. */
+.vclose{position:absolute;right:8px;top:8px;z-index:5;width:32px;height:32px;border-radius:50%;
+        background:rgba(6,8,24,.75);color:#fff;font-size:15px;line-height:1;
+        display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.vclose:active{transform:scale(.92)}
+/* the 2x chip shares that corner, so it drops below the close button */
+.vspeed{top:48px !important}
 .vsound{position:absolute;left:8px;top:8px;display:none;background:rgba(6,8,24,.72);
         border:1px solid var(--purple);border-radius:999px;padding:5px 11px;font-size:11px;
         font-weight:700;line-height:1;cursor:pointer}

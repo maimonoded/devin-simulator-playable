@@ -31,7 +31,7 @@ The tuning-drawer values each type reads are noted per type.
 | Type | File | Icon | Behavior on landing | Tuning values used |
 |---|---|---|---|---|
 | **standard** | [standard-tile.js](standard-tile.js) | — | Pays the tile's printed coin value: `stdBase × stdWeights[i]`. Weights rise around the board (mean 1), so late tiles pay more. Also renders the printed value via `valueLabel(i)`. No interruption — just a floating number. | `stdBase` |
-| **train** | [train-tile.js](train-tile.js) | 🚗 | Pays a variable bonus: a weighted draw from `TRAIN_MULT` (0.5×–4×), normalised so the expected value is exactly `trainEV`. Presents the **Collect popup**. | `trainEV`, `collectMinSec`, `collectMaxSec` |
+| **train** | [train-tile.js](train-tile.js) | 🚗 | The board's **two-bonus** tile. Pays one of exactly two outcomes from the economy model — the small bonus, or the large one at `trainLargeChance` — and opens **that bonus's own mini-game** ([minigames/](../../minigames/README.md)). The coins are banked before the game opens; the game only presents them. Falls back to the **Collect popup** when `bonusGames` is off or a game is missing. | `trainSmall`, `trainLarge`, `trainLargeChance`, `bonusGames`, `bonusLoadMs`, `bonusMaxMs`, `collectMinSec`, `collectMaxSec` |
 | **deck** | [deck-tile.js](deck-tile.js) | 🃏 | Draws a weighted card from the merged `deck` table (editable in tuning) and **shows the card** for `deckCardMs`: coins (can be a negative fine), energy, clues, VIP-pool seed, or **Advance to Start** (walks the token to Start and pays the full Start landing bonus). | deck table, `deckCardMs`, `startPass`, `startLand`, `vipSeed` |
 | **spa** | [spa-tile.js](spa-tile.js) | 💆 | Grants `spaEnergy` energy, topped up to `energyCap`. Energy win → confetti **plus the dice shower**. | `spaEnergy`, `energyCap`, `revealMs` |
 | **vip** | [vip-tile.js](vip-tile.js) | 🌟 | Collects the entire VIP pool as coins — or shows the sad "Empty" reveal if the pool is dry. The pool is seeded by laps past Start, Start landings, and the Fine/Paparazzi card. | `vipRevealMs` |
@@ -69,12 +69,18 @@ played in this fixed order by `playEvents()`:
 | `reveal: {big, sub, positive, energy, ms}` | **blocking** center-of-board reveal, held `ms` or `cfg.revealMs` (default 1500). `positive` → confetti + pop animation; otherwise the 😢 sad droop. `energy` → adds the dice shower |
 | `collect: {big, sub}` | **blocking** popup with a Collect button; waits for the click, or auto-closes after a random `cfg.collectMinSec`–`cfg.collectMaxSec` (default 10–20s). Clicking the backdrop also collects |
 | `card: {name, big, positive, energy}` | **blocking** drawn deck card, flipped onto the board centre and held `cfg.deckCardMs` (default 2000) |
+| `minigame: {game, amount, outcome, label, big, sub}` | **blocking** full-frame bonus game, opened over the board in an iframe and resolved when the player collects. `amount` is coins **already paid** — the game presents it and never decides it. Degrades to `collect` when `cfg.bonusGames` is 0 or `game` is unregistered. → [minigames/README.md](../../minigames/README.md) |
 | `pause: ms` | wait before the next event |
 
-`reveal`, `collect` and `card` block the roll loop, so **auto-play waits for them too** — that's
-why every timing is tunable rather than hardcoded. Presentation convention: standard tiles show
-only a float (no interruption), train tiles use `collect`, deck tiles use `card`, and the
-remaining non-standard tiles use `reveal`.
+`reveal`, `collect`, `card` and `minigame` block the roll loop, so **auto-play waits for them
+too** — that's why every timing is tunable rather than hardcoded. Presentation convention:
+standard tiles show only a float (no interruption), train tiles use `minigame`, deck tiles use
+`card`, and the remaining non-standard tiles use `reveal`.
+
+A blocking event's promise **must always resolve**. `roll()`'s `finally` is the only thing that
+clears `state.animating`, so one that never settles leaves the board soft-locked with Roll
+disabled. `showCollect` and `showMinigame` both use the same belt-and-braces shape: a `done` flag
+so it resolves exactly once, and an unconditional timer so it resolves even if nothing is clicked.
 
 ### Presentation timing (all in the drawer's "Presentation timing" group)
 
@@ -115,6 +121,7 @@ Shared helpers subclasses should call instead of reimplementing:
 | `gainClues(n, text?)` | adds clues, returns the float event |
 | `reveal(big, sub, positive, energy)` | builds the blocking center-reveal event |
 | `collect(big, sub)` | builds the blocking Collect-popup event |
+| `minigame(game, amount, opts)` | builds the blocking bonus-game event. Call it **after** `gainCoins` — `amount` is what was paid, not what might be |
 | `startLandingBonus(mult)` | pays `startPass + startLand`, seeds VIP pool, returns the amount |
 | `advanceToStart(fromPos, mult, pace, sub)` | moves token to Start, pays the bonus, **and reveals it**; `pace` scales `tokenStepMs` (deck uses ⅔, premiere 0.52) |
 

@@ -1,21 +1,36 @@
 "use strict";
 /* Visual effects & small DOM outputs: floats, activity log, toasts, confetti, dice faces, number tween. */
+/* One turn can pay out several times on the SAME tile — a two-item mystery box plus the tile's
+   own payout is three floats, all projecting to one point. Stacked, they render as a single
+   illegible smear and the player cannot tell what they actually collected. Each float in a
+   burst therefore steps down a row; the counter resets once the previous one has faded, so a
+   normal single payout is unaffected. */
+const FLOAT_LIFE_MS=1000, FLOAT_STEP_PX=21;
+let _floatSlot=0, _floatLast=0;
+function floatSlot(){
+  const now=performance.now();
+  if(now-_floatLast>FLOAT_LIFE_MS) _floatSlot=0;   // screen is clear again
+  _floatLast=now;
+  return _floatSlot++;
+}
 function floatAt(pos,text,color){
   const el=document.createElement("div"); el.className="float"; el.textContent=text;
   el.style.color=color||"var(--gold)";
+  const slot=floatSlot();
   if(typeof use3d==="function"&&use3d()){
     // project the tile into screen space and drop the float into the scene wrapper
     const p=Board3D.screenPosOf(pos,0.5);
     const host=$("#boardScene");
     if(!p||!host) return;
-    el.style.left=p.x+"px"; el.style.top=p.y+"px";
+    el.style.left=p.x+"px"; el.style.top=(p.y+slot*FLOAT_STEP_PX)+"px";
     host.appendChild(el);
   }else{
     const board=$("#board"),p=gridPos(pos);
-    el.style.left=((p.c+0.5)/11)*100+"%"; el.style.top=((p.r+0.3)/11)*100+"%";
+    el.style.left=((p.c+0.5)/11)*100+"%";
+    el.style.top=`calc(${((p.r+0.3)/11)*100}% + ${slot*FLOAT_STEP_PX}px)`;
     board.appendChild(el);
   }
-  setTimeout(()=>el.remove(),1000);
+  setTimeout(()=>el.remove(),FLOAT_LIFE_MS);
 }
 function floatToken(text,color){ floatAt(state.pos,text,color); }
 function log(icon,html){
@@ -91,10 +106,49 @@ function showReveal(r){
   if(r.energy) diceConfetti();   // energy wins get a dice shower on top
   return sleep(r.ms??cfg.revealMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
-/* Tear down any blocking overlay/popup — used to recover from a mid-roll error. */
+/* Clue found. Blocking, like the train's Collect popup, because a clue is the only collectible
+   in the game and the album is the only place it ever shows up again — a float would scroll
+   past before the player read what they got.
+
+   Mounted in #sheetHost, INSIDE the board scene, so it is framed by the game window rather than
+   by the browser. Auto-closes after cfg.clueCollectMs; an auto-play session uses the same fast
+   path the train popup does, so a batch run is never held up. */
+function showClue(c){
+  return new Promise(resolve=>{
+    const auto=typeof autoMode!=="undefined"&&autoMode==="session";
+    const ms=auto?Math.max(50,cfg.autoCollectMs):Math.max(0,cfg.clueCollectMs);
+    const host=$("#sheetHost");
+    const names=(c.names&&c.names.length?c.names:[]).map(n=>`<div class="clueFound">🔍 ${n}</div>`).join("");
+    host.innerHTML=`<div class="modal clueModal"><div class="top">
+        <div class="eyebrow">Clue found</div><h2>${c.count>1?`${c.count} new clues`:"A new clue"}</h2></div>
+      <div class="mbody">
+        ${names||`<div class="clueFound">🔍 +${c.count} for the album</div>`}
+        <div class="hint" style="margin-top:8px">Filed in your album · raises your next prediction's accuracy</div>
+        <button class="btn teal wide" id="clueBtn" style="margin-top:14px">Collect</button>
+      </div></div>`;
+    host.classList.add("show");
+    let done=false;
+    const finish=()=>{
+      if(done) return; done=true;
+      clearTimeout(t); host.classList.remove("show"); host.innerHTML=""; host.onclick=null;
+      resolve();
+    };
+    const t=setTimeout(finish,ms);
+    $("#clueBtn").onclick=finish;
+    host.onclick=(e)=>{ if(e.target===host) finish(); };   // tapping outside dismisses it too
+  });
+}
+
+/* Tear down any blocking overlay/popup — used to recover from a mid-roll error.
+   A bonus mini-game has to be closed through its own handle rather than by emptying its host:
+   dropping the iframe alone would leave the promise the roll loop is awaiting unresolved, and
+   that is the soft-lock. bonusOpen lives in js/ui/minigame.js, which loads after this file. */
 function clearOverlayFx(){
   const el=$("#centerFx"); el.className="centerfx"; el.innerHTML="";
   const sc=$("#scrim"); sc.onclick=null; sc.classList.remove("show"); sc.innerHTML="";
+  // the in-scene sheet (clue popup, album) blocks the roll loop the same way, so it clears too
+  const sh=$("#sheetHost"); if(sh){ sh.onclick=null; sh.classList.remove("show"); sh.innerHTML=""; }
+  if(bonusOpen) bonusOpen.finish();
 }
 /* Drawn deck card, flipped onto the board centre and held for cfg.deckCardMs. */
 function showCard(c){

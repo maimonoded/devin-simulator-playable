@@ -111,4 +111,7 @@ html.viewMobile {
 }
 html.viewMobile .playbar,
 html.viewMobile .buildersBar,
-html.viewMobile .navBtn:not(.back) { bottom: calc(14px + var(--safeB)); }
+html.viewMobile .bingeBtn { bottom: calc(14px + var(--safeB)); }
+html.viewMobile .bingeBtn { bottom: calc(78px + var(--safeB)); }
+/* Library clears the HUD strip, level with Back and the Store button. */
+html.viewMobile .libBtn { top: calc(74px + var(--safeT)); width: 44px; height: 44px; font-size: 19px; }

@@ -35,7 +35,7 @@ function resolveLandingEvents(mult){
    Manual play is a real prediction: you win only if sel matches the episode's correct
    answer. Auto runs can't meaningfully "pick", so they fall back to the modelled
    cfg.accuracy — that keeps batch economy runs independent of what a script clicks. */
-function resolvePrediction({wager,odds,sel,correct,auto}){
+function resolvePrediction({wager,odds,sel,correct,auto,id}){
   if(wager>0) state.coins-=wager;
   state.predsMade++;
   /* Clues banked since the last prediction buy accuracy, then are spent — the economy model
@@ -45,7 +45,12 @@ function resolvePrediction({wager,odds,sel,correct,auto}){
   const cluesSpent=state.cycleClues;
   state.cycleClues=0;
   const won=auto?chance(accuracy):sel===correct;
-  state.epsWatched++; state.epQueue.shift();
+  state.epsWatched++;
+  /* Remove THIS episode, not whichever happens to be at the front. The library can start a
+     prediction for any unwatched episode, so blindly shifting would mark the wrong one watched
+     and leave the played one queued forever. No id given → the old front-of-queue behaviour. */
+  if(id!=null){ const k=state.epQueue.indexOf(id); if(k>=0) state.epQueue.splice(k,1); }
+  else state.epQueue.shift();
   let payout=0;
   if(wager>0){
     if(won){ payout=wager*odds; state.coins+=payout; state.predWins++; state.streak++; state.bestStreak=Math.max(state.bestStreak,state.streak); }

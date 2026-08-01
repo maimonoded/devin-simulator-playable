@@ -24,6 +24,7 @@ const APP_FILES = [
   "js/state.js",
   "js/storage.js",
   "js/episodes.js",
+  "js/clues.js",
   ...fs.readdirSync(path.join(ROOT, "episodes"))
       .filter(f => /^\d+\.js$/.test(f)).sort().map(f => "episodes/" + f),
   /* xlsx.js is browser-only at runtime, but it must still LOAD in a bare context —

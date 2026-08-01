@@ -81,14 +81,63 @@ const Builders={
   /* ---------- series / episodes ----------
      One episode per completed builder, so the series length is the builder count. */
   totalEpisodes(){ return cfg.buildings; },
-  unlockedEpisodes(){ return Math.min(state.epUnlockedCount,this.totalEpisodes()); },
-  /* Queue this builder's episode. Content lives in episodes/NNN.js, keyed by the GLOBAL
-     builder number — series 2's first builder is global 61, so it unlocks "061".
+  /* One episode per completed builder, so this IS the completed-builder count. It used to be a
+     separate counter on state, which could only ever drift from the thing it was counting. */
+  unlockedEpisodes(){ return Math.min(this.doneCount(),this.totalEpisodes()); },
+
+  /* How many episodes have been earned: one per completed builder, plus every builder of the
+     series already behind us (a series cannot be left until all of it is maxed). */
+  unlockedCount(){
+    let n=0;
+    const cur=(state.series|0);
+    Economy.seriesShape().forEach((s,i)=>{ if(i<cur) n+=s.builders; });
+    return n+this.doneCount();
+  },
+
+  /* Every episode id unlocked so far — what the library lists.
+
+     DERIVED, not stored, and taken off the FRONT of the story rather than matched to whichever
+     builder was completed. Builders can be finished in any order; the episodes are one
+     serialised drama, so finishing builder 3 first still earns episode 1. What a builder
+     completion buys is "the next episode", not "its own episode".
+
+     That means the unlocked set is always a prefix of the library, which is also what makes
+     the ordering rule in firstUnwatchedId meaningful. */
+  unlockedEpisodeIds(){
+    const out=[], n=this.unlockedCount();
+    for(let k=0;k<n;k++){
+      const id=Episodes.idForBuilder(k);
+      if(id&&Episodes.has(id)&&!out.includes(id)) out.push(id);
+    }
+    return out;
+  },
+  /* The earliest episode still unwatched, in album order.
+
+     A first viewing always starts here, whichever row the player actually tapped in the
+     library: the episodes are one serialised story, so watching 5 before 4 spoils 4. Rewatching
+     is unrestricted — the constraint is only about seeing something for the first time.
+
+     Album order, not queue order: state.epQueue is push-order of unlocks, which diverges from
+     episode number as soon as builders are completed out of order. Falls back to the queue's
+     front so a queued episode from a previous series is still reachable. */
+  firstUnwatchedId(){
+    for(const id of this.unlockedEpisodeIds()) if(state.epQueue.includes(id)) return id;
+    return state.epQueue.length?state.epQueue[0]:null;
+  },
+
+  /* Queue the NEXT episode in the story. Called from upgrade() once a builder is maxed, so
+     doneCount() already includes it and unlockedCount()-1 is the episode just earned.
+
+     Deliberately NOT this builder's own episode: builders are bought in whatever order the
+     player can afford, and a serialised drama watched out of order spoils itself. Completing
+     builder 3 before 1 and 2 still earns episode 1.
      The queue holds ids; the prediction flow in js/ui/prediction.js looks them up. */
-  unlockEpisode(bIdx){
-    const id=Episodes.idForBuilder(Economy.globalOf(bIdx)-1);
+  unlockEpisode(){
+    const id=Episodes.idForBuilder(this.unlockedCount()-1);
     if(!id) return null;
-    state.epUnlockedCount++; state.epQueue.push(id);
+    /* Only the UNWATCHED queue is recorded. Which episodes exist at all is derived from the
+       builders — see unlockedEpisodeIds(). */
+    state.epQueue.push(id);
     return id;
   },
   /* Which series the run is in, and whether another one has content waiting. */
@@ -104,7 +153,6 @@ const Builders={
     state.series=next.index;
     Economy.apply();                 // cfg.buildings becomes the new series' length
     state.builder=this.fresh();
-    state.epUnlockedCount=0;
     state.seriesDone=false;
     return next;
   },
@@ -121,7 +169,7 @@ const Builders={
     state.coins-=cost; b.tier++;
     const spawned=OVERLAY_TYPES.mysteryBox.spawn(cfg.boxesPerUpgrade);
     const builderDone=this.isMaxed(bIdx);
-    const episodeId=builderDone?this.unlockEpisode(bIdx):null;
+    const episodeId=builderDone?this.unlockEpisode():null;
     const seriesDone=this.allMaxed();
     if(seriesDone) state.seriesDone=true;
     return {cost, level:b.tier, episodeId, title:episodeId?Episodes.titleOf(episodeId):null,

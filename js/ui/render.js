@@ -187,6 +187,24 @@ function renderBuilders(){
     `<b>${many&&s?`${s.name} · `:""}Buildings ${range}</b>
      <span>${Builders.doneCount()}/${Builders.count()} complete · set ${Builders.page()+1} of ${Builders.pageCount()}</span>`;
 
+  /* Episodes banked by "Binge later" — the only way back to them in the mobile layout, since
+     the side panel's Predict & watch button is not on screen there. */
+  /* A sealed reveal counts as something waiting: the bet is placed and the result is owed, so
+     the button has to stay reachable even when the queue itself is empty. */
+  const queued=state.epQueue.length+(state.pendingReveal?1:0);
+  const binge=$("#bingeBtn");
+  if(binge){
+    binge.style.display=queued?"flex":"none";
+    $("#bingeCount").textContent=queued;
+  }
+  /* The library button only exists once there is something in the library. */
+  const lib=$("#libraryBtn");
+  if(lib) lib.classList.toggle("on",Builders.unlockedEpisodeIds().length>0);
+  /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
+     rather than the lifetime total, which only ever grows and would leave the dot on forever. */
+  const adot=$("#albumDot");
+  if(adot) adot.classList.toggle("on",state.cycleClues>0);
+
   /* The board shows nothing about builders any more, so the only hint that there is something
      to spend on is a dot on the button that takes you there. */
   const any=Builders.all().some((_,i)=>Builders.canAfford(i));

@@ -108,8 +108,21 @@ body.board3d .board{display:none}
    The bar itself is pointer-events:none and only its children take input: the strip either side
    of the buttons stays part of the board, so a drag there still pans the camera. */
 .playbar{position:absolute;left:0;right:0;bottom:14px;z-index:35;
-         display:flex;align-items:center;gap:12px;justify-content:center;pointer-events:none}
+         display:flex;align-items:center;gap:10px;justify-content:center;pointer-events:none}
 .playbar>*{pointer-events:auto}
+/* One row, one height. The buttons are deliberately different WIDTHS — Roll is the primary and
+   should dominate — but a row that disagrees about its height reads as broken. Zeroing the
+   vertical padding and setting a min-height makes every control the same 52px whatever its
+   font size, so only the horizontal padding varies. */
+.playbar .btn{min-height:52px;padding-top:0;padding-bottom:0;line-height:1;border-radius:14px}
+.playbar .btn.roll{padding-left:26px;padding-right:26px}
+.playbar .btn.mult,
+.playbar .btn.album,
+.playbar .btn.navb{padding-left:15px;padding-right:15px;min-width:54px;justify-content:center}
+/* Builders. It used to be absolutely positioned in the corner, where it collided with the
+   centred group on a narrow screen — it belongs in the row with everything else. */
+.btn.navb{background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
+          font-size:20px;position:relative}
 /* The board art runs right under the buttons, so a soft scrim guarantees they stay legible
    over whatever tile happens to be down there. */
 .playbar::before{content:"";position:absolute;left:0;right:0;bottom:-14px;height:110px;z-index:-1;
@@ -119,6 +132,8 @@ body.board3d .board{display:none}
    Two overlays share the one 3D surface: .boardScene.showBuilders swaps which is on screen,
    while Board3D.setView() swaps which scene the renderer draws. Keeping the switch in one
    class means the DOM and the scene can never disagree about which view is up. */
+/* Only the builders view's Back button uses this now — the builders button moved into the
+   play row. */
 .navBtn{position:absolute;left:14px;bottom:14px;z-index:35;width:52px;height:52px;border-radius:16px;
         background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;font-size:22px;
         display:flex;align-items:center;justify-content:center;
@@ -164,6 +179,48 @@ body.board3d .board{display:none}
 .upb.cant{background:var(--panel2);color:var(--muted);box-shadow:none;border:1px solid var(--line)}
 .upb.max{background:transparent;border:1px solid var(--line);color:var(--gold);box-shadow:none}
 
+/* Banked episodes, sitting just above the upgrade row. The upgrade row is bottom:14 and about
+   50px tall, so this clears it; both track the same safe-area inset so they stay stacked on a
+   notched phone. var(--safeB, 0px) is 0 outside ?view=mobile, where the inset is not defined. */
+.bingeBtn{position:absolute;right:10px;bottom:calc(74px + var(--safeB, 0px));
+          display:none;align-items:center;gap:6px;
+          background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
+          border-radius:999px;padding:8px 14px;font-size:15px;font-weight:800;
+          box-shadow:0 4px 14px rgba(255,111,165,.35)}
+.bingeBtn:active{transform:translateY(2px)}
+.bingeCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px}
+
+/* Library, stacked above the builders button on the board's left edge. Deliberately NOT a
+   .navBtn: css/mobile.css re-anchors every .navBtn:not(.back) to the bottom inset, and that
+   selector out-specifies anything a modifier class here could say. */
+/* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's now. */
+.libBtn{position:absolute;left:14px;top:14px;z-index:35;
+        width:52px;height:52px;border-radius:16px;
+        background:var(--panel2);border:1px solid var(--line);color:#fff;font-size:22px;
+        display:none;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.28)}
+.libBtn.on{display:flex}
+.libBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
+/* it belongs to the board's layer, so it goes with the rest of it */
+.boardScene.showBuilders .libBtn{display:none}
+
+/* the library list */
+.libList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;padding-right:4px}
+.libList::-webkit-scrollbar{width:6px}.libList::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.libRow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+        background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.libRow:active{transform:translateY(1px)}
+.libRow .libNo{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
+.libRow .libTitle{flex:1;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.libRow .libTag{font-size:10px;color:var(--muted);flex-shrink:0}
+.libRow.new{border-color:var(--pink)}
+.libRow.new .libTag{color:var(--pink);font-weight:800}
+/* The one that will actually play — tapping any unwatched row starts this one. */
+.libRow.next{border-color:var(--gold);background:#2b2b52}
+.libRow.next .libTag{color:var(--gold)}
+/* Bet placed, not yet watched to the end — its result is still owed. */
+.libRow.sealed{border-color:var(--teal);background:#16303a}
+.libRow.sealed .libTag{color:var(--teal);font-weight:800}
+
 /* dice
    The 3D board throws real dice onto the middle of the board, so the DOM pair would be a
    second, contradicting set. Kept in the DOM rather than removed: js/ui/fx.js still writes
@@ -184,6 +241,15 @@ body.dice2d .dice{display:flex}
                  50%{transform:translateY(2px) rotate(10deg)}75%{transform:translateY(-3px) rotate(-6deg)}}
 .pip{border-radius:50%;background:#1b1b2b;width:7px;height:7px;align-self:center;justify-self:center}
 .pip.off{background:transparent}
+
+/* Clue album, to the right of Roll. Sized like the stake button so the row reads as
+   [stake] [ROLL] [album] with Roll the obvious primary. The dot marks clues banked for the
+   next prediction — the ones about to be spent. */
+.btn.album{background:var(--panel2);border:1px solid var(--line);color:#fff;
+           padding:12px 14px;font-size:17px;min-width:52px;justify-content:center;position:relative}
+.albumDot{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;
+          background:var(--teal);border:2px solid #10142f;display:none}
+.albumDot.on{display:block}
 
 /* Roll stake — one small button that cycles through MULTIPLIERS and wraps. It replaced a row
    of five, which the 9:16 framing had no room for. Always shows the ACTIVE stake, so it is

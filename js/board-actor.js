@@ -35,6 +35,21 @@ class BoardActor {
   /* Popup with a Collect button; auto-closes after a random
      cfg.collectMinSec–collectMaxSec if the player doesn't click. */
   collect(big,sub){ return {collect:{big,sub}}; }
+  /* Full-frame bonus mini-game (minigames/, rendered by js/ui/minigame.js).
+       game    — which file to open, by key in MINIGAMES
+       amount  — the coins ALREADY paid by gainCoins. The game is handed the number so it can
+                 present it; it never decides it, and it never adds coins of its own.
+       opts    — {outcome:"win"|"blocked", label} passed through to the game verbatim.
+     Falls back to the Collect popup when cfg.bonusGames is off or the file won't load, so a
+     missing mini-game costs presentation, never money. */
+  minigame(game,amount,opts){
+    const o=opts||{};
+    /* Anything else in opts (a prize ladder, a tier index, whatever the next game needs) rides
+       along untouched and is forwarded verbatim — the host does not need to learn each game's
+       payload, and `big`/`sub` keep the Collect-popup fallback readable. */
+    return {minigame:Object.assign({},o,{game,amount,outcome:o.outcome||"win",label:o.label||"",
+                                         big:"+"+fmt(amount),sub:o.label||""})};
+  }
   /* Drawn card held on screen for cfg.deckCardMs. opts: {positive, energy} */
   card(name,big,opts){
     const o=opts||{};

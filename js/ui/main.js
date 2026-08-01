@@ -6,7 +6,11 @@
    reveal and collect block the roll loop (and therefore auto-play) until they finish. */
 async function playEvents(events){
   for(const ev of events){
-    if(ev.float) floatToken(ev.float.text,ev.float.color);
+    /* renderHUD on a float too, not only on the blocking three below. A mystery box pays out
+       entirely in floats, so without this the coin and clue counters sat still through the
+       whole collection and only jumped at the end of the roll — which reads as "I collected
+       it and nothing happened". */
+    if(ev.float){ floatToken(ev.float.text,ev.float.color); renderHUD(); }
     if(ev.log) log(ev.log.icon,ev.log.msg);
     if(ev.move){ for(const p of ev.move.path){ state.pos=p; positionToken(); await sleep(ev.move.stepMs); } }
     if(ev.confetti) confetti();
@@ -14,6 +18,10 @@ async function playEvents(events){
     if(ev.card){ renderHUD(); await showCard(ev.card); }
     if(ev.reveal){ renderHUD(); await showReveal(ev.reveal); }
     if(ev.collect){ renderHUD(); await showCollect(ev.collect); }
+    if(ev.clue){ renderHUD(); await showClue(ev.clue); }
+    /* Last of the blocking three: a mini-game takes the whole frame, so anything else this
+       event carries should have been shown before it opens. */
+    if(ev.minigame){ renderHUD(); await showMinigame(ev.minigame); }
     if(ev.pause) await sleep(ev.pause);
   }
 }
@@ -65,6 +73,11 @@ function uiUpgrade(bIdx){
   }
   if(r.seriesDone) seriesComplete();
   renderAll();
+  /* Offer it the moment it unlocks — but only to a human, and only when the finale is not
+     already on screen. An auto run must never be stopped by a modal (that is the rule the two
+     auto modes are built on), and stacking this over seriesComplete() would bury the finale.
+     Either way the id stays queued, so nothing is lost by not asking. */
+  if(r.episodeId && !r.seriesDone && autoMode===null) openEpisodeUnlock(r.episodeId);
 }
 
 function nextSession(){
@@ -177,6 +190,11 @@ function setBuildersView(on){
 }
 $("#buildersBtn").onclick=()=>setBuildersView(true);
 $("#boardBtn").onclick=()=>setBuildersView(false);
+/* Straight into the prediction for the earliest unwatched episode — same ordering rule the
+   library enforces, so the two entry points can never disagree about what plays next. */
+$("#bingeBtn").onclick=()=>openPrediction(Builders.firstUnwatchedId());
+$("#libraryBtn").onclick=()=>openLibrary();
+$("#albumBtn").onclick=()=>openAlbum();
 $("#watchBtn").onclick=openPrediction;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;

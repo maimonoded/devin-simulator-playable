@@ -219,19 +219,86 @@ test("series length is one episode per builder", () => {
   eq(Builders.unlockedEpisodes(), 0);
 });
 
-test("unlockedEpisodes never exceeds the series length", () => {
+test("unlockedEpisodes counts completed builders, so it cannot exceed the series", () => {
   freshRun();
-  state.epUnlockedCount = 999;
+  state.builder.forEach(b => { b.tier = cfg.tiers; });
   eq(Builders.unlockedEpisodes(), Builders.totalEpisodes());
+  eq(Builders.unlockedEpisodes(), Builders.doneCount(),
+     "one episode per completed builder — no separate counter to drift");
 });
 
-test("unlockEpisode queues that builder's episode id", () => {
+/* The library is DERIVED from the builders, never stored. These are the tests that pin that:
+   the episode id is the builder number, so a completed builder IS an unlocked episode. */
+test("episodes come off the FRONT of the story, whatever order builders are finished in", () => {
   freshRun();
-  eq(Builders.unlockEpisode(0), "001");
+  deepEq(Builders.unlockedEpisodeIds(), [], "nothing built, nothing unlocked");
+  // finish builder 3 first — the drama is serialised, so this earns episode 1, not episode 3
+  state.builder[2].tier = cfg.tiers;
+  deepEq(Builders.unlockedEpisodeIds(), ["001"], "builder 3 done → episode 1");
+  state.builder[0].tier = cfg.tiers;
+  deepEq(Builders.unlockedEpisodeIds(), ["001", "002"], "two done → the first two episodes");
+  state.builder[1].tier = cfg.tiers - 1;                 // unfinished changes nothing
+  deepEq(Builders.unlockedEpisodeIds(), ["001", "002"]);
+  eq(Builders.unlockedCount(), 2);
+});
+
+test("the library keeps an episode after it has been watched", () => {
+  freshRun();
+  state.coins = 1000;
+  state.builder[0].tier = cfg.tiers;
+  Builders.unlockEpisode();
+  deepEq(state.epQueue, ["001"], "queued as unwatched");
+  resolvePrediction({ wager: 0, odds: 2, sel: 0, correct: 0, auto: false, id: "001" });
+  deepEq(state.epQueue, [], "watched, so it leaves the queue");
+  deepEq(Builders.unlockedEpisodeIds(), ["001"],
+         "but the library still has it — the builder is still built, which is the whole point");
+});
+
+test("firstUnwatchedId is the earliest unwatched in album order, not queue order", () => {
+  freshRun();
+  for (let i = 0; i < 5; i++) state.builder[i].tier = cfg.tiers;
+  deepEq(Builders.unlockedEpisodeIds(), ["001", "002", "003", "004", "005"]);
+  // 1-3 watched, 4 and 5 not — and queued in the "wrong" order, as out-of-order completion does
+  state.epQueue = ["005", "004"];
+  eq(Builders.firstUnwatchedId(), "004",
+     "tapping 5 must start 4: album order decides, not the order they happened to unlock");
+  state.epQueue = ["005"];
+  eq(Builders.firstUnwatchedId(), "005", "once 4 is watched, 5 is the earliest left");
+  state.epQueue = [];
+  eq(Builders.firstUnwatchedId(), null, "nothing unwatched");
+});
+
+test("firstUnwatchedId falls back to the queue for an episode outside the album", () => {
+  freshRun();
+  // e.g. a previous series' episode still queued after advanceSeries reset the builders
+  state.epQueue = ["007"];
+  deepEq(Builders.unlockedEpisodeIds(), [], "no builders complete in this series");
+  eq(Builders.firstUnwatchedId(), "007", "it must still be reachable");
+});
+
+test("the library survives a reload with no stored list at all", () => {
+  freshRun();
+  // an old save: builders done, some watched, and nothing recording which episodes existed
+  state.builder[0].tier = cfg.tiers; state.builder[1].tier = cfg.tiers;
+  state.builder[2].tier = cfg.tiers; state.builder[3].tier = cfg.tiers;
+  state.epQueue = ["004"];                                // three already watched
+  saveState();
+  freshRun();
+  loadState();
+  deepEq(Builders.unlockedEpisodeIds(), ["001", "002", "003", "004"],
+         "four unlocked, three watched — the library must still show all four");
+  deepEq(state.epQueue, ["004"], "and only the unwatched one is still queued");
+});
+
+test("unlockEpisode queues the next episode in the story, not the builder's own", () => {
+  freshRun();
+  // complete builder 5 first: it must still earn episode 1
+  state.builder[4].tier = cfg.tiers;
+  eq(Builders.unlockEpisode(), "001", "builder 5 done → episode 1");
   deepEq(state.epQueue, ["001"]);
-  eq(state.epUnlockedCount, 1);
-  Builders.unlockEpisode(4);
-  deepEq(state.epQueue, ["001", "005"]);
+  state.builder[2].tier = cfg.tiers;
+  eq(Builders.unlockEpisode(), "002", "then the next one along");
+  deepEq(state.epQueue, ["001", "002"]);
 });
 
 suite("builders: upgrade transaction");
@@ -283,7 +350,7 @@ test("episodes unlock only on the level that completes a builder", () => {
   const expected = new Array(cfg.tiers - 1).fill(null);
   deepEq(titles.slice(0, -1), expected, "intermediate levels must not unlock");
   ok(titles[titles.length - 1] !== null, "completing the builder must unlock");
-  eq(state.epUnlockedCount, 1);
+  eq(Builders.unlockedEpisodes(), 1);
   deepEq(state.epQueue, ["001"]);
 });
 
@@ -307,7 +374,7 @@ test("maxing every builder ends the series and unlocks one episode each", () => 
   ok(Builders.allMaxed());
   ok(state.seriesDone, "seriesDone flag");
   eq(lastResult.seriesDone, true);
-  eq(state.epUnlockedCount, cfg.buildings, "one episode per builder");
+  eq(Builders.unlockedEpisodes(), cfg.buildings, "one episode per builder");
   eq(state.epQueue.length, cfg.buildings);
   eq(Builders.doneCount(), cfg.buildings);
 });

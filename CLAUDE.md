@@ -39,6 +39,7 @@ vendor/             three.module.js (r169), vendored; no npm, no build step
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
 assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
 assets/dice/        the die: models/die.glb, built not reconstructed    → assets/dice/README.md
+minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
                     make-dice.py    — builds assets/dice/models/die.glb from one blank face
 claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles) and
@@ -60,6 +61,7 @@ js/
   state.js          the run state object
   storage.js        localStorage persistence for config and progress
   episodes.js       episode registry
+  clues.js          the clue album: its content, and which slots are owned
   board-actor.js    shared base: reward helpers + presentation event builders
   builders/         builder/series system                                    → js/builders/README.md
   tiles/            one file per tile type                                   → js/tiles/README.md
@@ -67,13 +69,16 @@ js/
   game.js           rolling, landing dispatch, prediction, session time
   ui/               everything that touches the DOM                          → js/ui/README.md
     fx.js           floats, log, toasts, confetti, dice, blocking overlays
+    minigame.js     opens a bonus game over the board; falls back to fx.js's Collect popup
     board3d.js      the WebGL board (three.js) — the module entry point; calls boot()
     env3d.js        the island, sea and props around the board (imported by board3d.js)
     dice3d.js       the dice, thrown onto the board (imported by board3d.js)
     builders3d.js   the buildings, in their own scene (imported by board3d.js)
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
-    prediction.js   predict & watch: bet → playback → result
+    prediction.js   predict & watch: bet → playback → result; the unlock popup
+    library.js      every unlocked episode, rewatchable
+    album.js        the clue album screen
     store.js        coin/energy top-up modal
     finale.js       series-complete celebration
     economy-panel.js  the drawer's Economy section: provenance, curve, series, .xlsx import
@@ -111,6 +116,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Several worlds live in `assets/env/scene.js` and `cfg.envScene` picks one live from the tuning drawer. Placement is data and the engine measures nothing: assets are conformed to a stated contract by `tools/normalize-env.py`, so a new environment needs no code change. `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
 | Dice | `js/dice-model.js` `js/ui/dice3d.js` | Thrown in from the bottom-left of the view and landing wherever the camera is aimed — the middle of the board is off-screen much of the time with `camFollow` on. `cfg.diceRevealMs` is the throw's length and the promise resolves at exactly that mark, `cfg.diceToMoveMs` still gates the token. Falls back to the DOM pair in `js/ui/fx.js` when `cfg.dice3d` is off or `die.glb` never loaded. |
+| Bonus mini-games | `minigames/` `js/ui/minigame.js` | The four train tiles pay one of **two** bonuses (small / large) and each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. → [README](js/overlays/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
@@ -164,7 +170,10 @@ There is no server yet, so the browser is the database: an imported model lives 
 
 ### Clues are two different things
 
-`state.clues` is the **album** — a lifetime total, cosmetic, never spent. `state.cycleClues` is
+`state.clues` is the **album** — a lifetime total, never spent, and it IS the album's
+progress: the clues you own are the first `state.clues` slots (`js/clues.js`), so the album
+stores nothing of its own. Content lives in `CLUE_SETS`; `cfg.clueAlbumSize` is the album's real
+size, so slots past the authored sets are numbered placeholders rather than missing entries. `state.cycleClues` is
 the **flow** — banked since the last prediction, it raises the modelled accuracy
 (`Economy.accuracyFor`: 0.55 + 0.04/clue, capped at 0.70) and is spent and reset by
 `resolvePrediction`. Mystery Box item 2 is the only source; the deck pays no clues, so one table
@@ -222,7 +231,7 @@ the hold without rolling.
 |---|---|---|
 | Buys upgrades | no | yes (cheapest first) |
 | Intent | simulates a real player | internal balancing tool |
-| Train Collect popup | full 10–20s player window | self-collects after `cfg.autoCollectMs` |
+| Train bonus game | plays it, and picks for itself after the 10–20s window (nobody is at the keyboard) | skipped — takes the Collect popup's fast path, so no WebGL page is opened per roll |
 | Episode video | plays in full | skipped, but logged with its length |
 | Prediction outcome | pick decides | modelled via `cfg.accuracy` |
 | Builder buttons | stay clickable (clicking stops the loop) | disabled |

@@ -100,6 +100,35 @@ test("a clue drop feeds both the album total and the per-prediction flow", () =>
   eq(state.cycleClues, state.clues, "and so does the flow that buys accuracy");
 });
 
+test("a clue drop carries a blocking popup naming the slots it just filled", () => {
+  freshRun();
+  state.clues = 0;
+  const [, second] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand());
+  ok(second.clue, "clues get a popup, not just a float — they are the only collectible");
+  eq(second.clue.count, state.clues);
+  eq(second.clue.names.length, state.clues, "one name per clue found");
+  // slots fill in order, so the ones named are the ones the album now shows as owned
+  second.clue.names.forEach((n, k) => eq(n, Clues.nameOf(k)));
+  ok(second.clue.names.every(n => n && n.length), "never a blank name");
+});
+
+test("a clue drop past the end of the album still reports honestly", () => {
+  freshRun();
+  state.clues = cfg.clueAlbumSize;          // album already full
+  const [, second] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand());
+  ok(second.clue, "still a popup");
+  ok(second.clue.count > 0);
+  deepEq(second.clue.names, [], "no slots left to name, and no fabricated ones");
+});
+
+test("coin and energy drops carry no clue popup", () => {
+  freshRun();
+  ["coins", "energy"].forEach(kind => {
+    const [, second] = forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand());
+    eq(second.clue, undefined, `${kind} must not open the clue popup`);
+  });
+});
+
 test("an energy drop cannot reduce an over-cap balance", () => {
   freshRun();
   state.energy = 500;
@@ -193,18 +222,44 @@ test("restore keeps energy bought above the cap", () => {
 test("loadState drops queue entries that aren't known episode ids", () => {
   freshRun();
   state.epQueue = ["001"];
-  state.epUnlockedCount = 1;
   saveState();
   // hand-edit the saved slot into the legacy format, which stored titles
   const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
   raw.epQueue = ["The Inheritance", "Rumors at Dawn", "002"];
-  raw.epUnlockedCount = 3;
   localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
 
   freshRun();
   loadState();
   deepEq(state.epQueue, ["002"], "unknown titles dropped, real ids kept");
-  eq(state.epUnlockedCount, 1, "counter reduced by the number dropped");
+});
+
+/* The library is no longer persisted at all — it is derived from the completed builders
+   (Builders.unlockedEpisodeIds), so there is nothing here to round-trip. The test that a
+   reload still shows every unlocked episode lives with the derivation, in 03-builders. */
+
+test("a sealed reveal survives a reload — closing the tab cannot duck the bet", () => {
+  freshRun();
+  state.pendingReveal = { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 };
+  saveState();
+  freshRun();
+  eq(state.pendingReveal, null, "gone in memory");
+  loadState();
+  deepEq(state.pendingReveal, { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 },
+         "restored, so the losing bet is still owed a reveal");
+});
+
+test("a sealed reveal for a missing or malformed episode is dropped", () => {
+  freshRun();
+  saveState();
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  [{ id: "999", wager: 10, odds: 2, won: true, payout: 20 },   // no such episode
+   { id: "001", wager: 10, odds: 2 },                          // no decided outcome
+   "nonsense", 7].forEach(bad => {
+    raw.pendingReveal = bad;
+    localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+    freshRun(); loadState();
+    eq(state.pendingReveal, null, `must not restore ${JSON.stringify(bad)}`);
+  });
 });
 
 test("loadState reports false when there is nothing saved", () => {

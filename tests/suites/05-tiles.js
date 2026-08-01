@@ -116,16 +116,77 @@ test("standard payout scales with the multiplier", () => {
   near(state.coins, cfg.stdBase * stdWeights[9] * 5, 1e-9);
 });
 
-test("train pays around trainEV on average and offers a Collect popup", () => {
+test("train pays around its REAL ev on average, not the model's", () => {
   freshRun();
   state.coins = 0;
-  const N = 4000;
+  const N = 8000;
   for (let k = 0; k < N; k++) TILE_TYPES.train.onLand({ mult: 1, bs: 1 });
-  near(state.coins / N, cfg.trainEV, cfg.trainEV * 0.08, "train EV should track cfg.trainEV");
+  const real = Economy.trainRealEV();
+  near(state.coins / N, real, real * 0.08, "train payout should track Economy.trainRealEV()");
+  // and that number is deliberately BELOW what the sheet says, because the large bonus is
+  // presented as a ladder and an even pick of 1/3, 2/3 and the top pays 2/3 of the top
+  ok(real < cfg.trainEV, `real ${real.toFixed(2)} must sit under model ${cfg.trainEV}`);
+  near(real, cfg.trainSmall * (1 - cfg.trainLargeChance)
+           + cfg.trainLarge * (2 / 3) * cfg.trainLargeChance, 1e-9);
+});
+
+test("train pays only the four values its two bonuses can produce", () => {
+  freshRun();
+  const seen = new Set();
+  for (let k = 0; k < 900; k++) {
+    state.coins = 0;
+    TILE_TYPES.train.onLand({ mult: 1, bs: 1 });
+    seen.add(state.coins);
+  }
+  const rungs = Economy.trainLadder(cfg.trainLarge).tiers;
+  const allowed = new Set([cfg.trainSmall, ...rungs]);
+  eq(seen.size, allowed.size, [...seen].sort((a, b) => a - b).join(" / "));
+  [...seen].forEach(v => ok(allowed.has(v), `unexpected payout ${v}`));
+});
+
+test("the large bonus ladder is exact thirds, ascending, topped by the model's number", () => {
+  const { tiers, winIndex } = Economy.trainLadder(300);
+  deepEq(tiers, [100, 200, 300]);
+  ok(tiers[0] < tiers[1] && tiers[1] < tiers[2], "rungs must ascend");
+  ok(winIndex >= 0 && winIndex <= 2, "winIndex must address a rung");
+  // the top rung is the model's number untouched, whatever the multiplier scaled it to
+  eq(Economy.trainLadder(cfg.trainLarge).tiers[2], cfg.trainLarge);
+});
+
+test("every rung wins sometimes, and only the three rungs ever do", () => {
+  const hits = [0, 0, 0];
+  for (let k = 0; k < 600; k++) hits[Economy.trainLadder(300).winIndex]++;
+  hits.forEach((h, i) => ok(h > 100, `rung ${i} came up ${h}/600 — should be about even`));
+});
+
+test("train opens a bonus mini-game carrying the amount it already paid", () => {
+  freshRun();
   state.coins = 0;
   const ev = TILE_TYPES.train.onLand({ mult: 1, bs: 1 });
-  eq(evField(ev, "collect").length, 1, "train must use the Collect popup");
+  const mg = evField(ev, "minigame");
+  eq(mg.length, 1, "train must open a mini-game");
   eq(evField(ev, "log").length, 1);
+  // the coins are banked BEFORE the game opens; the game is only handed the number
+  eq(mg[0].amount, state.coins, "the mini-game must be told exactly what was paid");
+  ok(["train-small", "train-large"].includes(mg[0].game), mg[0].game);
+  if (mg[0].game === "train-large") {
+    eq(mg[0].tiers.length, 3, "the large game gets the whole ladder to render");
+    eq(mg[0].tiers[mg[0].winIndex], mg[0].amount,
+       "the winning rung must be the amount that was actually paid");
+  } else {
+    eq(mg[0].amount, cfg.trainSmall);
+  }
+});
+
+test("the mini-game scales with the multiplier and never invents a payout", () => {
+  freshRun();
+  for (let k = 0; k < 200; k++) {
+    state.coins = 0;
+    const mg = evField(TILE_TYPES.train.onLand({ mult: 5, bs: 2 }), "minigame")[0];
+    eq(mg.amount, state.coins, "the game is handed exactly what was banked");
+    const top = (mg.game === "train-large" ? cfg.trainLarge : cfg.trainSmall) * 10;
+    ok(mg.amount <= top, `${mg.amount} must not exceed the scaled top rung ${top}`);
+  }
 });
 
 test("spa grants energy and flags the dice shower", () => {

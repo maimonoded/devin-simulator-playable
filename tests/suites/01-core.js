@@ -92,13 +92,12 @@ test("deck and box tables have their default copies preserved", () => {
   ok(deck !== defDeck, "defDeck must be a separate copy");
 });
 
-test("train multipliers normalise to a mean of 1", () => {
-  const totalW = TRAIN_MULT.reduce((a, x) => a + x.w, 0);
-  const mean = TRAIN_MULT.reduce((a, x) => a + x.m * x.w, 0) / totalW;
-  near(trainMean, mean, 1e-9);
-  // the payout formula divides by trainMean, so EV lands on cfg.trainEV
-  const ev = TRAIN_MULT.reduce((a, x) => a + (x.m / trainMean) * x.w, 0) / totalW;
-  near(ev, 1, 1e-9);
+test("the train's two bonuses are a well-formed pair", () => {
+  ok(typeof TRAIN_MULT === "undefined", "the old five-rung spread must be gone, not shadowed");
+  ok(cfg.trainSmall > 0 && cfg.trainLarge > cfg.trainSmall, "large must be the bigger of the two");
+  ok(cfg.trainLargeChance > 0 && cfg.trainLargeChance < 1, "both outcomes have to be reachable");
+  // cfg.trainEV is derived from the pair; nothing pays from it, but the model is checked against it
+  near(cfg.trainEV, Economy.trainEV(), 1e-9);
 });
 
 suite("board-model");

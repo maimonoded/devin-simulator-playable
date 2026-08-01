@@ -239,7 +239,7 @@ test("apply pushes the model's numbers onto the live tuning surface", () => {
   eq(cfg.boxCoins, e.box.item1Coins);
   eq(cfg.tiers, e.structure.levelsPerBuilder);
   near(cfg.trainEV, e.tiles.trainSmall * (1 - e.tiles.trainLargeChance) + e.tiles.trainLarge * e.tiles.trainLargeChance, 1e-9,
-       "the small/large pair collapses to the EV the train tile actually pays");
+       "cfg.trainEV is the MODEL's number — what the board pays is Economy.trainRealEV()");
   eq(deck.length, e.deck.length);
   eq(boxTable.length, e.box.item2.length);
   resetCfg();

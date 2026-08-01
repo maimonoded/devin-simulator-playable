@@ -5,6 +5,12 @@ const DEFAULTS={
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   fallbackSceneMs:1700, longPressMs:350,
+  /* Bonus mini-games — the full-frame games the train tile opens (minigames/, js/ui/minigame.js).
+     bonusGames 0 falls back to the plain Collect popup, which is also what happens on its own if
+     a game file fails to load. bonusLoadMs is the game's own opening animation. bonusMaxMs is a
+     belt-and-braces ceiling on the whole thing: a wedged game must never soft-lock the roll loop,
+     so the host closes it and pays out regardless once this elapses. */
+  bonusGames:1, bonusLoadMs:2200, bonusMaxMs:90000,
   /* How long Roll has to be held before it hands the loop to auto-roll. Long enough that a
      slow tap never trips it, short enough not to feel stuck. */
   autoRollHoldMs:1000,
@@ -42,9 +48,13 @@ const DEFAULTS={
   dice3d:1, diceSize:0.9, diceSpread:1.5, diceThrowFrom:4.0, diceArc:2.2,
   /* These mirror ECONOMY_DEFAULT in js/economy.js, so a fresh install already runs the
      shipped model and Economy.apply() is a no-op until a workbook is imported.
-     trainEV is the sheet's small/large pair collapsed to its expected value:
-     60 x 0.65 + 315 x 0.35. */
-  stdBase:40, trainEV:149.25, startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
+     The train pays the sheet's two-outcome pair directly: a small bonus most of the time,
+     a large one at trainLargeChance. trainEV is DERIVED from those three
+     (60 x 0.65 + 315 x 0.35 = 149.25) and kept in step by Economy.apply() and onCfgChange().
+     Nothing pays a player from it — it is the number the economy model is checked against,
+     which is why it is not in the drawer. */
+  stdBase:40, trainSmall:60, trainLarge:315, trainLargeChance:0.35, trainEV:149.25,
+  startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
   boardScale:1,
   /* Builder shape. The COST CURVE is not here — it is segmented and lives in js/economy.js,
      because no single formula holds for a whole run. `buildings` is the current series'
@@ -55,6 +65,10 @@ const DEFAULTS={
   builderPageSize:5,
   /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
   boxCoins:60, boxItemGapMs:260,
+  /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
+     gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
+     this long if the player doesn't tap Collect. */
+  clueCollectMs:3000,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
@@ -87,9 +101,11 @@ let boxTable=[
 const defDeck=JSON.parse(JSON.stringify(deck));
 const defBox=JSON.parse(JSON.stringify(boxTable));
 
-/* train bonus spread — mean normalised to 1 so EV == trainEV exactly */
-const TRAIN_MULT=[{m:0.5,w:30},{m:0.75,w:30},{m:1.0,w:20},{m:2.0,w:15},{m:4.0,w:5}];
-const trainMean=TRAIN_MULT.reduce((a,x)=>a+x.m*x.w,0)/TRAIN_MULT.reduce((a,x)=>a+x.w,0);
+/* The train's five-rung TRAIN_MULT spread used to live here, normalised so its mean landed on
+   cfg.trainEV. It is gone: the tile now pays the economy model's two-outcome pair directly
+   (cfg.trainSmall / cfg.trainLarge / cfg.trainLargeChance), which is the shape the spreadsheet
+   is written in and the shape the two bonus mini-games present. See TODO.md, "The train is
+   parameterised from the opposite end" — this is that decision, resolved in the model's favour. */
 
 /* Tuning drawer schema: [cfg key, label, input step] */
 const TUNING=[
@@ -107,13 +123,21 @@ const TUNING=[
    ["fallbackSceneMs","Episode w/o video: placeholder (ms)",100],
    ["longPressMs","Video: hold for 2× after (ms)",25],
    ["autoRollHoldMs","Roll: hold this long for auto-roll (ms)",100],
+   ["bonusGames","Bonus mini-games (0/1)",1],
+   ["bonusLoadMs","Bonus game: opening animation (ms)",100],
+   ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
    ["boxItemGapMs","Mystery box: gap between its two items (ms)",20],
+   ["clueCollectMs","Clue popup: auto-close after (ms)",100],
    ["deckCardMs","Deck: card on screen (ms)",100],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
    ["startRevealMs","Start: dwell on tile (ms)",50]]},
  {group:"Tile values (base coins)",items:[
-   ["stdBase","Standard base coins (avg)",1],["trainEV","Train bonus EV",10],
+   ["stdBase","Standard base coins (avg)",1],
+   /* The train's two outcomes, straight from the model. cfg.trainEV is derived from them
+      and so is deliberately not editable here. */
+   ["trainSmall","Train: small bonus",5],["trainLarge","Train: large bonus",5],
+   ["trainLargeChance","Train: chance of the large bonus",0.05],
    ["startPass","Start pass bonus",10],["startLand","Start landing extra",10],
    ["spaEnergy","Spa Day energy grant",1],["vipSeed","VIP seed per lap",5],
    ["boardScale","Board scale",0.1],

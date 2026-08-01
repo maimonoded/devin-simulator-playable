@@ -55,23 +55,43 @@
       </div>
       <!-- win/loss reveal, sits flat above the 3D board -->
       <div class="centerfx" id="centerFx"></div>
+      <!-- Bonus mini-games (minigames/, js/ui/minigame.js) mount an iframe here. Inside the
+           board scene rather than over the viewport, so ?view=mobile frames them like the
+           board itself instead of escaping the 9:16 window. -->
+      <div class="bonusHost" id="bonusHost"></div>
+      <!-- In-scene modal host. The page-level .scrim is position:fixed and covers the whole
+           viewport; a sheet mounted here is contained by the board window, so it frames like
+           part of the game rather than like a website dialog over it. -->
+      <div class="sheet" id="sheetHost"></div>
       <!-- Play controls ride ON the board as a flat 2D layer pinned to its bottom edge, so the
            scene reads as a game screen rather than a viewport with a toolbar under it. -->
+      <!-- One row, evenly spaced: builders · stake · ROLL · album. These were three separate
+           things (an absolutely-positioned corner button plus a centred group) which collided
+           on a narrow screen and disagreed about their height. -->
       <div class="playbar">
         <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
+        <!-- Into the builders view. Carries a dot when something is affordable, since the
+             board no longer shows builder progress at all. -->
+        <button class="btn navb" id="buildersBtn" title="Builders">🏗<i class="navDot" id="buildersDot"></i></button>
         <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
         <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
         <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
         <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
+        <!-- Clue album. Badged while there are clues banked for the next prediction, since
+             those are the ones about to be spent. -->
+        <button class="btn album" id="albumBtn" title="Clue album">🔍<i class="albumDot" id="albumDot"></i></button>
       </div>
-      <!-- Bottom-left: into the builders view. Carries a dot when something is affordable,
-           since the board no longer shows builder progress at all. -->
-      <button class="navBtn" id="buildersBtn" title="Builders">🏗<i class="navDot" id="buildersDot"></i></button>
+      <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
+           until something has actually been unlocked. -->
+      <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
       <!-- The builders view's own 2D layer. Board3D swaps the scene; .boardScene.showBuilders
            swaps which of these two overlays is on screen. -->
       <div class="buildersUi">
         <button class="navBtn back" id="boardBtn" title="Back to the board">←</button>
         <div class="buildersHead" id="buildersHead"></div>
+        <!-- Episodes banked by "Binge later", sitting just above the upgrade row. Hidden when
+             the queue is empty, so it only appears when there is something to watch. -->
+        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
         <div class="buildersBar" id="buildersBar"></div>
       </div>
     </div>
@@ -138,6 +158,8 @@
 <script src="js/config.js"></script>
 <script src="js/content.js"></script>
 <script src="js/episodes.js"></script>
+<!-- clue album content + the derivation that says which are owned -->
+<script src="js/clues.js"></script>
 <!-- episode content: one file per builder (see episodes/README.md) -->
 <script src="episodes/001.js"></script>
 <script src="episodes/002.js"></script>
@@ -177,9 +199,13 @@
 <script src="js/overlays/mystery-box.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui/fx.js"></script>
+<!-- after fx.js: falls back to its showCollect() when a game is off, missing or broken -->
+<script src="js/ui/minigame.js"></script>
 <script src="js/ui/render.js"></script>
 <script src="js/ui/player.js"></script>
 <script src="js/ui/prediction.js"></script>
+<script src="js/ui/library.js"></script>
+<script src="js/ui/album.js"></script>
 <script src="js/ui/store.js"></script>
 <script src="js/ui/finale.js"></script>
 <script src="js/ui/economy-panel.js"></script>

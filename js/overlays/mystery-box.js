@@ -25,7 +25,18 @@ class MysteryBoxOverlay extends Overlay {
     let ev,dice=false;
     if(drop.kind==="coins"){ const c=drop.amount*bs; ev=this.gainCoins(c,"+"+fmt(c)); }
     else if(drop.kind==="energy"){ ev=this.gainEnergy(drop.amount,"+"+drop.amount+"⚡"); dice=true; }
-    else { ev=this.gainClues(drop.amount,"+"+drop.amount+"🔍"); }
+    else {
+      /* Clues are the game's only collectible, so this one stops the board and says WHAT was
+         found rather than floating a number past. Slots fill in order (js/clues.js), so the
+         ones to name are those between the album's fill BEFORE this drop and after it — not
+         simply the last `amount`, which on a full album would re-announce clues already owned. */
+      const had=Math.min(Clues.total(),Math.floor(state.clues));
+      ev=this.gainClues(drop.amount,"+"+drop.amount+"🔍");
+      const now=Math.min(Clues.total(),Math.floor(state.clues));
+      const names=[];
+      for(let i=had;i<now;i++) names.push(Clues.nameOf(i));
+      ev.clue={names,count:drop.amount};
+    }
     ev.log={icon:"🎁",msg:`… and <b>${drop.name}</b>`};
     ev.dice=dice;   // energy drops get the dice shower
     ev.pause=120;

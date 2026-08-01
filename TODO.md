@@ -109,18 +109,39 @@ Imported from `Inputs!C9`, in the drawer, read by nothing. In-game time only mov
 
 ## Board & tiles
 
-### The train is parameterised from the opposite end
-Model: outcomes are the input (small 60 at 65%, large 315 at 35%), EV is derived → 149.25.
-Code: EV is the input (`cfg.trainEV`), outcomes come from a hardcoded 5-rung `TRAIN_MULT`
-ladder normalised so the mean is exactly `trainEV`.
+### ~~The train is parameterised from the opposite end~~ — DONE
+The model's shape won. `cfg.trainSmall` / `cfg.trainLarge` / `cfg.trainLargeChance` are now real
+tuning keys, projected by `Economy.apply()` and editable in the drawer; the 5-rung `TRAIN_MULT`
+ladder is deleted. `Economy.trainDraw()` picks one of the two outcomes and
+[js/tiles/train-tile.js](js/tiles/train-tile.js) pays it directly.
 
-`Economy.apply()` currently collapses the model's small/large pair into the EV, so **the money
-matches but the felt shape does not** — the code is mostly-below-EV with a rare 3.72× jackpot at
-5%, the model is a frequent two-outcome flip with a 2.11× top at 35%. There is no cfg key for a
-small bonus, a large bonus, or a large-bonus chance, and `TRAIN_MULT` is not in the tuning
-schema.
+`cfg.trainEV` survives as a **derived** number (`Economy.trainEV()`), kept in step by `apply()`.
+Nothing pays from it — it exists so the spreadsheet has one figure to be reconciled against, which
+is why it is no longer in the drawer.
 
-**Done when:** one shape wins. They cannot both survive.
+What made the decision concrete: each of the two outcomes now opens its own bonus mini-game
+([minigames/](minigames/README.md)), so the two-outcome shape is something the player *sees*, not
+just a distribution.
+
+### The large bonus's prize ladder pays 2/3 of what the model says
+The large bonus is presented as a three-rung ladder (`minigames/gala-match3.html`). The model has
+only ONE number for it, so the design is: **top rung = `cfg.trainLarge`, the two lower rungs are
+exactly 1/3 and 2/3 of it, and the winning rung is an even pick of the three.**
+
+An even pick of 1/3, 2/3 and 1 averages **2/3**. So:
+
+| | model | board |
+|---|---|---|
+| one large bonus | 315 | **210** |
+| per train landing | 149.25 (`Economy.trainEV`) | **112.5** (`Economy.trainRealEV`) |
+
+That is a **25% cut** to the train's output, which slows the builder curve. It is deliberate and
+measured rather than hidden — both numbers are computed and the tests assert the gap — but it is
+not reconciled with the spreadsheet.
+
+**Done when:** either the ladder is anchored on its MEAN instead of its top (multiply all three
+rungs by 1.5 — the top rung becomes 472 and the EV returns to exactly 315), or the workbook gains
+real cells for the three rungs and their odds, and `EconomyImport` learns to read them.
 
 ### Advance-to-Start pays double what the model prices
 `Tile.advanceToStart` pays `startPass + startLand` (200) and re-seeds the VIP pool. The workbook

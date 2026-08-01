@@ -110,6 +110,28 @@ test("a zero wager changes no coins but still resolves and counts", () => {
   eq(state.epsWatched, 1);
 });
 
+test("an id consumes THAT episode, not whichever is at the front", () => {
+  setupPrediction(1e9);
+  state.epQueue = ["001", "002", "003"];
+  resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false, id: "002" });
+  deepEq(state.epQueue, ["001", "003"],
+         "the library can play any unwatched episode, so the played one is the one removed");
+});
+
+test("with no id it still consumes the front of the queue", () => {
+  setupPrediction(1e9);
+  state.epQueue = ["001", "002", "003"];
+  resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
+  deepEq(state.epQueue, ["002", "003"]);
+});
+
+test("an id that is not queued leaves the queue alone", () => {
+  setupPrediction(1e9);
+  state.epQueue = ["001"];
+  resolvePrediction({ wager: 0, odds: 2, sel: 0, correct: 0, auto: false, id: "007" });
+  deepEq(state.epQueue, ["001"], "a replay must not silently eat a queued episode");
+});
+
 test("auto mode ignores the pick and uses the clue-driven accuracy", () => {
   setupPrediction(1e9);
   cfg.accuracy = 1; cfg.accuracyMax = 1;   // the cap binds first, so it has to move too

@@ -3,8 +3,19 @@
    Callers render playerMarkup(id) into a modal, then await playVideo(id).
 
    Controls: autoplay (muted fallback), click to pause/resume, press-and-hold or a
-   latching button for 2x, progress bar. There is deliberately no seek UI and no way
-   to exit early. Auto-play session skips playback entirely but still logs the watch.
+   latching button for 2x, progress bar, and a close button. There is still no seek UI —
+   seeking ahead of what has been watched is blocked below.
+
+   Closing ENDS PLAYBACK without cancelling the episode, and the promise resolves either way —
+   never rejects — so a caller's flow always continues. What it resolves WITH is the difference:
+
+     { completed: true }   the episode played to the end (or there was no video to play)
+     { completed: false }  the player closed it early
+
+   That distinction is what lets the prediction withhold its result: the video IS the reveal, so
+   walking out of it should forfeit the reveal rather than skip to it.
+
+   Auto-play session skips playback entirely but still logs the watch.
    See episodes/README.md for the player's behaviour table. */
 
 function mmss(s){ if(!isFinite(s)||s<0) s=0; const m=Math.floor(s/60); return m+":"+String(Math.floor(s%60)).padStart(2,"0"); }
@@ -13,6 +24,7 @@ function mmss(s){ if(!isFinite(s)||s<0) s=0; const m=Math.floor(s/60); return m+
 function playerMarkup(id){
   return `<div class="vwrap" id="vWrap">
       <video id="epVideo" class="epVideo" playsinline preload="auto" src="${Episodes.videoFor(id)}"></video>
+      <button class="vclose" id="vClose" title="Close">✕</button>
       <div class="vpause">▶</div>
       <div class="vsound" id="vSound">🔇 tap for sound</div>
       <div class="vspeed" id="vSpeed">2×</div>
@@ -27,7 +39,14 @@ function playVideo(id){
   return new Promise(resolve=>{
     const wrap=$("#vWrap"), v=$("#epVideo");
     let done=false, maxTime=0;
-    const finish=()=>{ if(done) return; done=true; try{ v&&v.pause(); }catch(e){} resolve(); };
+    /* completed:false ONLY for a deliberate early exit. A missing or broken video resolves
+       true — there was nothing to walk out of, and withholding the result then would punish
+       the player for a file that never loaded. */
+    const finish=(completed=true)=>{
+      if(done) return; done=true;
+      try{ v&&v.pause(); }catch(e){}
+      resolve({completed});
+    };
     /* no video (or it failed to load) → keep the old placeholder behaviour */
     const fallback=()=>{
       if(done) return;
@@ -59,7 +78,11 @@ function playVideo(id){
     }
 
     v.addEventListener("error",fallback);
-    v.addEventListener("ended",finish);
+    // wrapped, not passed directly: the listener's Event argument would land in `completed`
+    v.addEventListener("ended",()=>finish(true));
+    /* stopPropagation, or the click also reaches the wrap's pause toggle underneath. */
+    const closeBtn=$("#vClose");
+    if(closeBtn) closeBtn.onclick=(e)=>{ e.stopPropagation(); finish(false); };   // walked out
     v.addEventListener("contextmenu",e=>e.preventDefault());   // hide download / speed menu
 
     const fill=$("#vFill"), time=$("#vTime");
