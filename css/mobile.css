@@ -80,7 +80,11 @@ html.viewMobile .hud .brand { display: none; }
    number it is — and the energy pill gives up its 190px floor, which was on its own what
    forced the row to wrap onto a second line. */
 html.viewMobile .hud { flex-wrap: nowrap; }
-html.viewMobile .hud .pills { gap: 6px; flex-wrap: nowrap; min-width: 0; }
+/* Balances read from the LEFT here — the brand and day chip that used to hold that side are
+   hidden, so without this the pills' auto margin pushed everything to the right. The avatar
+   takes the auto margin instead and owns the right edge. */
+html.viewMobile .hud .pills { gap: 6px; flex-wrap: nowrap; min-width: 0; margin-left: 0; }
+html.viewMobile .avatarBtn { width: 34px; height: 34px; font-size: 16px; }
 html.viewMobile .hud .pill { padding: 4px 8px; gap: 5px; min-width: 0; }
 html.viewMobile .hud .pill .lb { display: none; }
 html.viewMobile .hud .pill .v { font-size: 13px; }

@@ -40,6 +40,14 @@ input{font-family:inherit}
 .daychip .d{font-size:20px;font-weight:800;font-family:Georgia,serif}
 .daychip .c{font-size:11px;color:var(--muted);margin-top:2px}
 .pills{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+/* Player avatar, hard right. margin-left:auto on the avatar rather than on .pills is what puts
+   the balances on the LEFT: whichever element carries the auto margin is the one pushed away. */
+.avatarBtn{margin-left:auto;flex-shrink:0;width:40px;height:40px;border-radius:50%;
+           background:radial-gradient(circle at 35% 30%,#fff,var(--pink) 60%,var(--purple-d));
+           box-shadow:0 3px 10px rgba(0,0,0,.45),0 0 0 2px rgba(255,255,255,.16);
+           display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;
+           transition:transform .08s}
+.avatarBtn:active{transform:scale(.94)}
 .pill{display:flex;align-items:center;gap:8px;background:var(--panel2);
       border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-width:96px}
 .pill .ic{font-size:16px}

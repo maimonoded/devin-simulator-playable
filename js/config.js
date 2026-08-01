@@ -77,6 +77,13 @@ const DEFAULTS={
      many there are. Ten boxes in the same window means they overlap more, not that it runs ten
      times as long — otherwise a big buy would strand the player watching a downpour. */
   boxZoomOut:1.45, boxZoomOutMs:420, boxThrowMs:900, boxZoomInMs:420,
+  /* ---- opening a box ----
+     Landing on one lifts it off its tile, floats it to the middle of the view swelling as it
+     goes, then pops it. boxRiseMs is the trip to the centre, boxSwellMs the last inflate before
+     it goes, boxOpenScale how many times its board size it reaches.
+     boxCluePopupMs is measured from the START of the whole thing, not from the pop, so the clue
+     sheet can be set to appear while the confetti is still falling rather than after it. */
+  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxCluePopupMs:1000,
   /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
      gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
      this long if the player doesn't tap Collect. */
@@ -163,6 +170,11 @@ const TUNING=[
    ["boxZoomOutMs","1 · Zoom out (ms)",20],
    ["boxThrowMs","2 · Throwing the boxes, total (ms)",20],
    ["boxZoomInMs","3 · Zoom back in (ms)",20]]},
+ {group:"Mystery box opening",items:[
+   ["boxRiseMs","1 · Float to the centre (ms)",20],
+   ["boxSwellMs","2 · Swell before the pop (ms)",20],
+   ["boxOpenScale","Size it reaches (x board size)",0.25],
+   ["boxCluePopupMs","Clue sheet, from the start (ms)",50]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —

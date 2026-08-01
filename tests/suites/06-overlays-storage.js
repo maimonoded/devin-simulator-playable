@@ -47,15 +47,19 @@ test("has / all / clear reflect placement", () => {
   ok(!box.has(t));
 });
 
-test("consume removes the box and returns an event for each of its two items", () => {
+test("consume removes the box and returns the opening plus one event per item", () => {
   freshRun();
   const box = OVERLAY_TYPES.mysteryBox;
   const [t] = box.spawn(1);
   const ev = box.consume(t);
   ok(!box.has(t), "must be removed from the board");
   ok(Array.isArray(ev), "a two-item box has to return two events — one float per event");
-  eq(ev.length, 2);
-  ev.forEach((e, i) => { ok(e.log, `item ${i + 1} has a log line`); ok(e.float, `item ${i + 1} has a float`); });
+  eq(ev.length, 3, "the opening, then one event per item");
+  // the opening comes first: the box has to pop before its numbers come out of the burst
+  ok(ev[0].boxOpen, "the opening leads");
+  eq(ev[0].boxOpen.tile, t, "and it knows which box to fly");
+  ok(!ev[0].float && !ev[0].log, "it pays nothing itself — it only shows what was already banked");
+  ev.slice(1).forEach((e, i) => { ok(e.log, `item ${i + 1} has a log line`); ok(e.float, `item ${i + 1} has a float`); });
 });
 
 test("item 1 is always coins, whatever item 2 turns out to be", () => {
@@ -75,21 +79,24 @@ function forceDrop(kind, fn) {
   try { return fn(); } finally { boxTable.forEach((c, i) => { c.weight = saved[i]; }); }
 }
 
-test("a coin drop pays coins and does not fire the dice shower", () => {
+test("a coin drop rains coins and no energy", () => {
   freshRun();
   state.coins = 0;
-  const [, second] = forceDrop("coins", () => OVERLAY_TYPES.mysteryBox.onLand());
+  const [open, , second] = forceDrop("coins", () => OVERLAY_TYPES.mysteryBox.onLand(3));
   ok(state.coins > 0);
-  eq(second.dice, false);
+  eq(open.boxOpen.energy, 0, "nothing electrical to shower");
+  eq(open.boxOpen.coins, state.coins, "the coin shower is sized by what was actually won");
   eq(second.pause, 120);
 });
 
-test("an energy drop grants energy and fires the dice shower", () => {
+test("an energy drop rains energy as well as the guaranteed coins", () => {
   freshRun();
   state.energy = 0;
-  const [, second] = forceDrop("energy", () => OVERLAY_TYPES.mysteryBox.onLand());
+  const [open] = forceDrop("energy", () => OVERLAY_TYPES.mysteryBox.onLand(3));
   ok(state.energy > 0);
-  eq(second.dice, true);
+  ok(open.boxOpen.energy > 0, "energy drops get their own shower");
+  // item 1 is always coins, so a coin shower fires on every box whatever item 2 was
+  ok(open.boxOpen.coins > 0, "the guaranteed coins still rain");
 });
 
 test("a clue drop feeds both the album total and the per-prediction flow", () => {
@@ -103,29 +110,32 @@ test("a clue drop feeds both the album total and the per-prediction flow", () =>
 test("a clue drop carries a blocking popup naming the slots it just filled", () => {
   freshRun();
   state.clues = 0;
-  const [, second] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand());
-  ok(second.clue, "clues get a popup, not just a float — they are the only collectible");
-  eq(second.clue.count, state.clues);
-  eq(second.clue.names.length, state.clues, "one name per clue found");
+  // the popup rides on the OPENING, not the payout: it is timed from the start of the pop
+  // (cfg.boxCluePopupMs) so it can slide in while the confetti is still falling
+  const [open] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand(3));
+  const clue = open.boxOpen.clue;
+  ok(clue, "clues get a popup, not just a float — they are the only collectible");
+  eq(clue.count, state.clues);
+  eq(clue.names.length, state.clues, "one name per clue found");
   // slots fill in order, so the ones named are the ones the album now shows as owned
-  second.clue.names.forEach((n, k) => eq(n, Clues.nameOf(k)));
-  ok(second.clue.names.every(n => n && n.length), "never a blank name");
+  clue.names.forEach((n, k) => eq(n, Clues.nameOf(k)));
+  ok(clue.names.every(n => n && n.length), "never a blank name");
 });
 
 test("a clue drop past the end of the album still reports honestly", () => {
   freshRun();
   state.clues = cfg.clueAlbumSize;          // album already full
-  const [, second] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand());
-  ok(second.clue, "still a popup");
-  ok(second.clue.count > 0);
-  deepEq(second.clue.names, [], "no slots left to name, and no fabricated ones");
+  const [open] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand(3));
+  ok(open.boxOpen.clue, "still a popup");
+  ok(open.boxOpen.clue.count > 0);
+  deepEq(open.boxOpen.clue.names, [], "no slots left to name, and no fabricated ones");
 });
 
 test("coin and energy drops carry no clue popup", () => {
   freshRun();
   ["coins", "energy"].forEach(kind => {
-    const [, second] = forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand());
-    eq(second.clue, undefined, `${kind} must not open the clue popup`);
+    const [open] = forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand(3));
+    ok(!open.boxOpen.clue, `${kind} must not open the clue popup`);
   });
 });
 
@@ -154,7 +164,8 @@ test("an overlay resolves before the tile, and both pay out", () => {
   OVERLAY_TYPES.mysteryBox.positions().add(tile);
   state.pos = tile;
   const ev = forceDrop("coins", () => resolveLandingEvents(1));
-  ok(ev[0].log && ev[0].log.msg.includes("Mystery Box"), "box event must come first");
+  ok(ev[0].boxOpen, "the box opens before anything else resolves");
+  ok(ev[1].log && ev[1].log.msg.includes("Mystery Box"), "then the box pays, ahead of the tile");
   const tilePay = cfg.stdBase * stdWeights[tile] * cfg.boardScale;
   ok(state.coins > tilePay, "should include both the box and the tile payout");
   ok(!OVERLAY_TYPES.mysteryBox.has(tile), "box consumed");

@@ -101,6 +101,16 @@
         display:flex;align-items:center;justify-content:center;line-height:1}
 .sheetX:active{transform:scale(.92)}
 
+/* ---------- player panel ---------- */
+.profileModal{width:min(400px,100%)}
+.profileGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pstat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.pstat .v{font-size:17px;font-weight:800;font-family:Georgia,serif}
+.pstat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+/* Armed: it looks like the destructive thing it is about to do. */
+.btn.danger.armed{background:var(--bad);color:#fff;border-color:transparent}
+
 /* ---------- clue found ---------- */
 .clueModal{width:min(400px,100%)}
 .clueFound{display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;
@@ -194,6 +204,11 @@
 .dicefx{position:fixed;top:-24px;z-index:91;pointer-events:none;line-height:1;
         filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
 @keyframes dicefall{to{transform:translate(var(--drift,0),108vh) rotate(1080deg);opacity:.35}}
+/* What a popped mystery box rains: the reward itself rather than dice. Same fall, so they can
+   overlap without looking like two different effects. */
+.coinfx,.energyfx{position:fixed;top:-24px;z-index:91;pointer-events:none;line-height:1}
+.coinfx{filter:drop-shadow(0 3px 8px rgba(255,203,92,.55))}
+.energyfx{filter:drop-shadow(0 3px 10px rgba(45,212,191,.6))}
 
 /* ---------- toast ---------- */
 .toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:95;display:flex;flex-direction:column;gap:8px;align-items:center}

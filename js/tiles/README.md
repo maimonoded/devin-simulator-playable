@@ -70,6 +70,7 @@ played in this fixed order by `playEvents()`:
 | `collect: {big, sub}` | **blocking** popup with a Collect button; waits for the click, or auto-closes after a random `cfg.collectMinSec`–`cfg.collectMaxSec` (default 10–20s). Clicking the backdrop also collects |
 | `card: {name, big, positive, energy}` | **blocking** drawn deck card, flipped onto the board centre and held `cfg.deckCardMs` (default 2000) |
 | `minigame: {game, amount, outcome, label, big, sub}` | **blocking** full-frame bonus game, opened over the board in an iframe and resolved when the player collects. `amount` is coins **already paid** — the game presents it and never decides it. Degrades to `collect` when `cfg.bonusGames` is 0 or `game` is unregistered. → [minigames/README.md](../../minigames/README.md) |
+| `boxOpen: {tile, coins, energy, clue}` | **blocking** mystery-box opening: the box flies to the centre of the view, swells and pops, then confetti and a shower of whatever was inside. Carries what to *show* — the rewards were already banked. → [js/overlays/README.md](../overlays/README.md) |
 | `pause: ms` | wait before the next event |
 
 `reveal`, `collect`, `card` and `minigame` block the roll loop, so **auto-play waits for them

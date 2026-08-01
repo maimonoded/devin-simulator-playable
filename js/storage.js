@@ -150,4 +150,12 @@ let _cfgT=null,_stateT=null;
 function scheduleSaveConfig(){ if(!storageOK) return; clearTimeout(_cfgT); _cfgT=setTimeout(saveConfig,300); }
 function scheduleSaveState(){ if(!storageOK) return; clearTimeout(_stateT); _stateT=setTimeout(saveState,300); }
 /* Flush pending writes if the tab goes away mid-animation. */
-window.addEventListener("beforeunload",()=>{ if(!storageOK) return; clearTimeout(_cfgT); clearTimeout(_stateT); saveConfig(); saveState(); });
+/* Reset-then-reload has to stop this handler putting the run straight back: clearState()
+   empties the slot, then unload would immediately re-save the still-live in-memory state and
+   the reset would appear to do nothing. */
+let _skipUnloadSave=false;
+function suppressUnloadSave(){ _skipUnloadSave=true; }
+window.addEventListener("beforeunload",()=>{
+  if(!storageOK||_skipUnloadSave) return;
+  clearTimeout(_cfgT); clearTimeout(_stateT); saveConfig(); saveState();
+});

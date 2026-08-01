@@ -11,6 +11,35 @@ Today there's one: the **mystery box**.
 |---|---|---|---|---|
 | `mysteryBox` | [mystery-box.js](mystery-box.js) | 🎁 (pulsing) | standard tiles only | Earned by builder upgrades (`cfg.boxesPerUpgrade` per level) but **banked, not placed** — see below. Landing on one draws from the editable `boxTable` — coins, energy, or clues — then the tile pays out normally. Energy drops also fire the dice shower. On the 3D board it is a real model ([assets/props/](../../assets/props/README.md)); the emoji is the legacy CSS board's version. |
 
+## Opening one
+
+Landing on a box no longer just floats two numbers past. The box lifts off its tile, floats to
+the middle of the view swelling as it goes, strains, and **pops** — and what was inside rains
+down. The `boxOpen` event leads the box's event list and blocks, so the numbers appear out of the
+burst rather than over a box still sitting on its tile.
+
+| On the pop | |
+|---|---|
+| always | confetti + a **coin** shower — item 1 is always coins, so every box rains money |
+| item 2 = energy | an **energy** shower on top |
+| item 2 = clues | the clue sheet, on its own timer |
+
+The clue sheet is timed from the **start** of the opening (`cfg.boxCluePopupMs`, default 1000ms),
+not from the pop, so it can be tuned to slide in while the confetti is still falling. That is why
+`showBoxOpen` owns it rather than leaving it to the payout event.
+
+`boxOpen` carries what to *show*, never what to pay — the coins, energy and clues were already
+banked by the `gain*` helpers before it was built. Same split the bonus mini-games use.
+
+The three knobs live in the drawer's "Mystery box opening" group: `boxRiseMs` (the trip to the
+centre), `boxSwellMs` (the last inflate), `boxOpenScale` (how big it gets), plus
+`boxCluePopupMs`. Auto-play session skips the whole thing and just takes the reward.
+
+**A box in flight is cancellable.** `Board3D.cancelBoxFx()` — called from `clearOverlayFx()` on a
+mid-roll error — removes a stranded box, puts every other box back on its tile, restores the
+camera, and **settles the promise**. That last part is the one that matters: `roll()`'s `finally`
+is what clears `state.animating`, and it only runs once the await returns.
+
 ## Boxes are banked, then thrown
 
 An upgrade does **not** put a box on the board. It adds to `state.pendingBoxes`, because the

@@ -58,6 +58,56 @@ function diceConfetti(){
     document.body.appendChild(d); setTimeout(()=>d.remove(),3200);
   }
 }
+/* Coins and energy raining down, for the moment a mystery box pops.
+
+   Separate from diceConfetti on purpose: the shower should be made of the thing you just won.
+   The dice shower stays what an energy win looks like everywhere else (spa, deck) — this pair is
+   for the box, where the whole point of the beat is showing WHAT was inside. */
+function rainFx(cls, glyph, n, big) {
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement("div"); d.className = cls; d.textContent = glyph;
+    d.style.left = Math.random() * 100 + "vw";
+    d.style.fontSize = rand(big ? 22 : 15, big ? 40 : 28).toFixed(0) + "px";
+    d.style.setProperty("--drift", rand(-110, 110).toFixed(0) + "px");
+    d.style.animation = `dicefall ${rand(1.4, 2.5)}s cubic-bezier(.35,.05,.6,1) ${Math.random() * 0.5}s forwards`;
+    document.body.appendChild(d); setTimeout(() => d.remove(), 3200);
+  }
+}
+function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
+function energyShower(){ rainFx("energyfx", "⚡", 16, true); }
+
+/* Opening a mystery box: it floats to the middle of the screen, swells and pops, and what was
+   inside rains down. Blocks the roll loop until the box is gone and the clue sheet (if there was
+   one) has been dismissed.
+
+   The clue sheet is on its own timer measured from the START of the whole beat, so it can be
+   tuned to slide in while the confetti is still falling rather than queueing politely after it.
+   That is why this owns the sheet rather than leaving it to the payout event's ev.clue.
+
+   Resolves — never rejects — on every path, including no WebGL and auto-play. */
+function showBoxOpen(b){
+  const auto=typeof autoMode!=="undefined"&&autoMode==="session";
+  /* The batch balancing tool takes the reward without the ceremony, like everything else. */
+  if(auto) return b.clue?showClue(b.clue):Promise.resolve();
+
+  let clueDone=Promise.resolve();
+  if(b.clue){
+    clueDone=new Promise(res=>{
+      setTimeout(()=>showClue(b.clue).then(res),Math.max(0,cfg.boxCluePopupMs||0));
+    });
+  }
+  const popped=(use3d()&&window.Board3D&&Board3D.available)
+    ? Board3D.openBox(b.tile)
+    : sleep(Math.max(0,cfg.boxRiseMs||0)+Math.max(0,cfg.boxSwellMs||0));
+
+  return popped.then(()=>{
+    confetti();
+    if(b.coins) coinShower(b.coins>=(cfg.boxCoins||0)*2);   // a bigger haul rains harder
+    if(b.energy) energyShower();
+    return clueDone;                                        // already running; just wait it out
+  });
+}
+
 /* Show the roll for cfg.diceRevealMs, then land on the real numbers. Awaited by roll(), so
    it paces the whole turn either way.
 
@@ -149,6 +199,9 @@ function clearOverlayFx(){
   // the in-scene sheet (clue popup, album) blocks the roll loop the same way, so it clears too
   const sh=$("#sheetHost"); if(sh){ sh.onclick=null; sh.classList.remove("show"); sh.innerHTML=""; }
   if(bonusOpen) bonusOpen.finish();
+  /* A box caught mid-flight has to be cleaned up too — and more importantly its promise settled,
+     since roll()'s finally is what clears state.animating. */
+  if(typeof use3d==="function"&&use3d()&&window.Board3D&&Board3D.available) Board3D.cancelBoxFx();
 }
 /* Drawn deck card, flipped onto the board centre and held for cfg.deckCardMs. */
 function showCard(c){

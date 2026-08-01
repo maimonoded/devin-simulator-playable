@@ -10,6 +10,8 @@ async function playEvents(events){
        entirely in floats, so without this the coin and clue counters sat still through the
        whole collection and only jumped at the end of the roll — which reads as "I collected
        it and nothing happened". */
+    /* Before the floats: the box has to pop before its numbers can come out of the burst. */
+    if(ev.boxOpen){ renderHUD(); await showBoxOpen(ev.boxOpen); }
     if(ev.float){ floatToken(ev.float.text,ev.float.color); renderHUD(); }
     if(ev.log) log(ev.log.icon,ev.log.msg);
     if(ev.move){ for(const p of ev.move.path){ state.pos=p; positionToken(); await sleep(ev.move.stepMs); } }
@@ -220,6 +222,7 @@ $("#boardBtn").onclick=()=>setBuildersView(false);
 $("#bingeBtn").onclick=()=>openPrediction(Builders.firstUnwatchedId());
 $("#libraryBtn").onclick=()=>openLibrary();
 $("#albumBtn").onclick=()=>openAlbum();
+$("#avatarBtn").onclick=()=>openProfile();
 $("#watchBtn").onclick=openPrediction;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;

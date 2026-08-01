@@ -82,8 +82,11 @@ const Board3D = {
      camera out by. Kept apart so the throw can widen the view without resize() having to know
      about it, and so a resize mid-throw still lands on the right base framing. */
   _fit: 0, _aspect: 1, _zoom: 1, _zoomShown: 1,
-  /* Per-frame animations owned by the board (the box throw). Same shape the mini-games use. */
-  _anims: [],
+  /* Per-frame animations owned by the board (the box throw and the box opening). Same shape the
+     mini-games use. _fxDone holds the resolve of anything currently awaiting one of them, so a
+     teardown can settle it rather than leaving the roll loop waiting on an animation that will
+     never finish. */
+  _anims: [], _fxDone: [], _flying: null,
   /* "board" | "builders" — which scene the one renderer is drawing. See setView(). */
   _view: "board",
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
@@ -678,6 +681,7 @@ const Board3D = {
     falling.forEach(g => { g.visible = false; });
 
     return new Promise(resolve => {
+      this._fxDone.push(resolve);
       const done = () => { falling.forEach((g, k) => { g.visible = true; g.position.y = rest[k]; g.rotation.z = 0; }); resolve(); };
       this._tween(outMs, k => { this._zoom = 1 + (zoomOut - 1) * ease(k); }, () => {
         falling.forEach((g, k) => {
@@ -693,11 +697,93 @@ const Board3D = {
         });
         this._tween(throwMs, () => {}, () => {
           this._tween(inMs, k => { this._zoom = zoomOut + (1 - zoomOut) * ease(k); }, () => {
-            this._zoom = 1; done();
+            this._zoom = 1;
+            this._fxDone = this._fxDone.filter(r => r !== resolve);
+            done();
           });
         });
       });
     });
+  },
+
+  /* ---------------- opening a box ----------------
+     Lift it off its tile, float it to the middle of the view swelling as it goes, hold on a last
+     inflate, then pop. Resolves at the POP, not after — the caller fires the confetti and the
+     showers on that moment, and the box has to be gone by then.
+
+     The box is animated where it already is, in the board scene, rather than being re-drawn as a
+     DOM element over the canvas: it is a lit 3D object with a real texture, and a flat copy of it
+     floating over the board would not match. Flying it to the camera's aim point is what puts it
+     in the middle of the screen whatever the camera is following. */
+  openBox(i) {
+    if (!this.available) return Promise.resolve();
+    const g = this._boxes.get(i);
+    if (!g) return Promise.resolve();
+
+    const riseMs = Math.max(1, +cfg.boxRiseMs || 1);
+    const swellMs = Math.max(0, +cfg.boxSwellMs || 0);
+    const grow = Math.max(1, +cfg.boxOpenScale || 1);
+
+    const from = g.position.clone();
+    const s0 = g.scale.x;
+    /* The middle of the screen in world terms is what the camera is aimed at, lifted so the box
+       floats clear of the board rather than sinking into it. */
+    const to = this._camTarget.clone();
+    to.y = from.y + 2.2;
+
+    /* Nothing else may be resolving on this box while it flies — take it out of the map now, so
+       a renderOverlays() mid-flight (the state no longer lists it) can't remove it underneath us. */
+    this._boxes.delete(i);
+
+    return new Promise(resolve => {
+      /* Registered so a mid-roll error can settle this instead of stranding an inflated box in
+         mid-air and leaving roll() awaiting a pop that never comes. */
+      this._flying = g;
+      this._fxDone.push(resolve);
+      const finish = () => {
+        this._flying = null;
+        this._fxDone = this._fxDone.filter(r => r !== resolve);
+        resolve();
+      };
+      this._tween(riseMs, k => {
+        const e = ease(k);
+        g.position.lerpVectors(from, to, e);
+        /* A little arc on the way up, and a slow turn so the ribbon catches the light. */
+        g.position.y += Math.sin(e * Math.PI) * 0.6;
+        g.scale.setScalar(s0 * (1 + (grow - 1) * e));
+        g.rotation.y += 0.06;
+      }, () => {
+        this._tween(swellMs, k => {
+          /* The tell: it strains, wobbling faster and faster, just before it goes. */
+          const puff = 1 + 0.16 * k + Math.sin(k * Math.PI * 6) * 0.05 * k;
+          g.scale.setScalar(s0 * grow * puff);
+          g.rotation.z = Math.sin(k * Math.PI * 8) * 0.09 * k;
+        }, () => {
+          this._scene.remove(g);
+          finish();
+        });
+      });
+    });
+  },
+
+  /* Stop every board animation and clean up after it. Called from clearOverlayFx() when a roll
+     dies mid-way: an inflated box left hanging over the board is the visible symptom, but the
+     one that actually matters is the promise — roll()'s finally is what clears state.animating,
+     and it only runs once the await returns. */
+  cancelBoxFx() {
+    if (!this.available) return;
+    this._anims.length = 0;
+    if (this._flying) { this._scene.remove(this._flying); this._flying = null; }
+    /* Anything caught mid-throw is invisible or in the air — put every box back on its tile, so
+       the board matches state whichever frame we stopped on. */
+    for (const [i, g] of this._boxes) {
+      const w = this._tileWorld(i);
+      g.visible = true; g.position.set(w.x, TILE_H / 2, w.z); g.rotation.z = 0;
+    }
+    const waiting = this._fxDone; this._fxDone = [];
+    waiting.forEach(r => r());
+    /* The throw may have died with the camera pulled out — put it back. */
+    if (this._zoom !== 1) { this._zoom = 1; this._applyFrustum(); }
   },
 
   /* A frame-stepped tween. delay lets the throw stagger without a nest of setTimeouts, which
