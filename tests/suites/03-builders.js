@@ -354,15 +354,44 @@ test("episodes unlock only on the level that completes a builder", () => {
   deepEq(state.epQueue, ["001"]);
 });
 
-test("each upgrade spawns the configured number of mystery boxes", () => {
+test("each upgrade BANKS the configured number of mystery boxes", () => {
   freshRun();
   state.coins = 1e9;
   cfg.boxesPerUpgrade = 2;
   const r = Builders.upgrade(0);
-  eq(r.spawned.length, 2);
-  eq(state.boxes.size, 2);
-  r.spawned.forEach(i => eq(tileType(i), "standard", "boxes only go on standard tiles"));
+  eq(r.boxes, 2);
+  // banked, not placed — the player is on the builders screen and would never see them land
+  eq(state.pendingBoxes, 2, "the buy banks boxes rather than dropping them on the board");
+  eq(state.boxes.size, 0, "nothing reaches the board until the player goes back to it");
+  eq(r.pendingBoxes, 2);
+  Builders.upgrade(0);
+  eq(state.pendingBoxes, 4, "banked boxes accumulate across upgrades");
   resetCfg();
+});
+
+test("banked boxes land on standard tiles when they are finally spawned", () => {
+  freshRun();
+  state.coins = 1e9;
+  cfg.boxesPerUpgrade = 3;
+  Builders.upgrade(0);
+  const spawned = OVERLAY_TYPES.mysteryBox.spawn(state.pendingBoxes);
+  eq(spawned.length, 3);
+  eq(state.boxes.size, 3);
+  spawned.forEach(i => eq(tileType(i), "standard", "boxes only go on standard tiles"));
+  resetCfg();
+});
+
+test("a full board keeps the leftover boxes banked instead of eating them", () => {
+  freshRun();
+  // fill every eligible tile, then ask for two more
+  const box = OVERLAY_TYPES.mysteryBox;
+  const room = box.spawn(40).length;
+  ok(room > 0 && state.boxes.size === room, "board filled to capacity");
+  state.pendingBoxes = 2;
+  const spawned = box.spawn(state.pendingBoxes);
+  eq(spawned.length, 0, "no free tiles left");
+  // this is the rule deliverBoxes() relies on to avoid losing a paid-for reward
+  eq(Math.max(0, state.pendingBoxes - spawned.length), 2, "both stay banked for the next trip");
 });
 
 test("maxing every builder ends the series and unlocks one episode each", () => {

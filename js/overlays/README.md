@@ -9,7 +9,37 @@ Today there's one: the **mystery box**.
 
 | Overlay | File | Marker | Placed on | Behavior |
 |---|---|---|---|---|
-| `mysteryBox` | [mystery-box.js](mystery-box.js) | 🎁 (pulsing) | standard tiles only | Spawned by builder upgrades (`cfg.boxesPerUpgrade` per level). Landing on one draws from the editable `boxTable` — coins, energy, or clues — then the tile pays out normally. Energy drops also fire the dice shower. |
+| `mysteryBox` | [mystery-box.js](mystery-box.js) | 🎁 (pulsing) | standard tiles only | Earned by builder upgrades (`cfg.boxesPerUpgrade` per level) but **banked, not placed** — see below. Landing on one draws from the editable `boxTable` — coins, energy, or clues — then the tile pays out normally. Energy drops also fire the dice shower. On the 3D board it is a real model ([assets/props/](../../assets/props/README.md)); the emoji is the legacy CSS board's version. |
+
+## Boxes are banked, then thrown
+
+An upgrade does **not** put a box on the board. It adds to `state.pendingBoxes`, because the
+player is looking at the builders screen when they buy — a box appearing on a board they cannot
+see is a reward nobody witnesses. The counter in the corner of the builders view acknowledges the
+purchase instead, and the boxes are thrown on together when the player goes back to the board.
+
+```
+Builders.upgrade()      state.pendingBoxes += cfg.boxesPerUpgrade   (nothing on the board yet)
+  └─ renderBoxCounter()  the chip pops                              (js/ui/render.js)
+
+setBuildersView(false)
+  └─ deliverBoxes()      spawn() picks the tiles, pendingBoxes cleared   (js/ui/main.js)
+       └─ Board3D.throwOverlays()   zoom out → rain them down → zoom back
+```
+
+**The state moves first and the animation is decoration on top.** `spawn()` places the boxes and
+clears the count synchronously, so a reload, a view switch or a missing WebGL context mid-throw
+all leave the boxes correctly on the board — the only thing that can be interrupted is the
+picture. `state.pendingBoxes` persists, so boxes bought and never delivered are not lost.
+
+If the board has fewer free tiles than there are boxes, the remainder **stays banked** rather than
+being silently dropped: they were paid for.
+
+The throw's three phases each have their own config key (`boxZoomOutMs`, `boxThrowMs`,
+`boxZoomInMs`, plus `boxZoomOut` for how far the camera pulls back) in the drawer's
+"Mystery box throw" group. `boxThrowMs` is the total for the throw rather than per box, so a big
+purchase overlaps more instead of stranding the player watching a downpour. Auto-play session
+skips the animation entirely and just takes the boxes.
 
 ## How it fits together
 

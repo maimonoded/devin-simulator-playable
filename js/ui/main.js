@@ -187,6 +187,31 @@ function setBuildersView(on){
   $("#boardScene").classList.toggle("showBuilders",!!on);
   if(use3d()&&window.Board3D&&Board3D.available) Board3D.setView(on?"builders":"board");
   renderAll();
+  if(!on) deliverBoxes();
+}
+/* Boxes bought while the builders screen was up are thrown onto the board now that it is back.
+
+   The state moves FIRST and the animation is decoration on top: spawn() picks the tiles and
+   clears the pending count synchronously, so a reload, a view switch or a missing WebGL context
+   mid-throw all leave the boxes correctly on the board rather than lost. The only thing that can
+   be interrupted is the picture.
+
+   Not awaited by anything: the player is back on the board and free to roll, and roll() blocks
+   on state.animating rather than on this. */
+function deliverBoxes(){
+  const n=state.pendingBoxes|0;
+  if(n<=0) return;
+  const spawned=OVERLAY_TYPES.mysteryBox.spawn(n);
+  /* Fewer free tiles than boxes: the rest stay banked for the next trip back, so a full board
+     never silently eats a reward the player paid for. */
+  state.pendingBoxes=Math.max(0,n-spawned.length);
+  renderAll();
+  if(!spawned.length) return;
+  log("🎁",`<b>${spawned.length}</b> mystery box${spawned.length>1?"es":""} dropped on the board`);
+  /* Auto-play session is the batch tool — thousands of upgrades, nobody watching. It gets the
+     boxes without the show, exactly as it skips episode video and the bonus games. */
+  if(autoMode==="session"||!use3d()||!window.Board3D||!Board3D.available) return;
+  Board3D.throwOverlays(OVERLAYS.flatMap(o=>o.all()),spawned);
 }
 $("#buildersBtn").onclick=()=>setBuildersView(true);
 $("#boardBtn").onclick=()=>setBuildersView(false);

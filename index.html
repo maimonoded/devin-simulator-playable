@@ -88,6 +88,10 @@
            swaps which of these two overlays is on screen. -->
       <div class="buildersUi">
         <button class="navBtn back" id="boardBtn" title="Back to the board">←</button>
+        <!-- Mystery boxes banked by upgrades and waiting to be thrown onto the board. This is
+             the only acknowledgement a purchase gets while the board is out of sight, so it
+             pops each time it changes. -->
+        <div class="boxCounter" id="boxCounter"><span class="boxIco">🎁</span><span id="boxCount">0</span></div>
         <div class="buildersHead" id="buildersHead"></div>
         <!-- Episodes banked by "Binge later", sitting just above the upgrade row. Hidden when
              the queue is empty, so it only appears when there is something to watch. -->

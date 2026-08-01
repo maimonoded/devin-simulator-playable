@@ -154,6 +154,23 @@ function renderOverlays(){
     if(el){ const b=document.createElement("div"); b.className="ovl "+o.cssClass; b.textContent=o.icon; el.appendChild(b); }
   }));
 }
+/* Mystery boxes bought but not yet thrown onto the board.
+
+   The pop is driven by comparing against the last number SHOWN rather than being fired from the
+   upgrade handler, so every path that banks a box gets the same acknowledgement — including a
+   reload that restores a pending count. It only fires on an increase: the drop to zero after a
+   throw is the boxes leaving, and celebrating that would be backwards. */
+let _boxShown = null;
+function renderBoxCounter(){
+  const el=$("#boxCounter"); if(!el) return;
+  const n=Math.max(0,state.pendingBoxes|0);
+  el.classList.toggle("on",n>0);
+  $("#boxCount").textContent=n;
+  if(_boxShown!==null&&n>_boxShown){
+    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+  }
+  _boxShown=n;
+}
 /* The builders view's 2D layer: the page header, and one upgrade button per building on the
    page. The buildings themselves are 3D and live in js/ui/builders3d.js — this is only the
    part you press.
@@ -247,7 +264,7 @@ function renderStory(){
 }
 /* Reflect state.mult on the stake button (needed after a restore or user reset). */
 function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
-function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderStats();renderStory();
+function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderBoxCounter();renderStats();renderStory();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
   const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;

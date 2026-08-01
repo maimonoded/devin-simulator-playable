@@ -158,6 +158,26 @@ body.board3d .board{display:none}
 .boardScene.showBuilders .boardLabels,
 .boardScene.showBuilders #buildersBtn{display:none}
 
+/* Mystery boxes waiting to be thrown onto the board. Top-right of the builders view, clear of
+   the centred header. It is the only feedback a purchase gets while the board is out of sight,
+   so the whole chip pops when the count changes — and the box itself gets a shake, because a
+   number ticking up is easy to miss when you are looking at the price you just paid. */
+/* Directly under the Store button, which already owns the very top of this corner in both
+   layouts (and in ?view=mobile the HUD owns the strip above that). Stacking beneath it keeps the
+   chip in the corner the player is told to look at without either one moving. */
+.boxCounter{position:absolute;right:16px;top:58px;display:none;align-items:center;gap:6px;
+            background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
+            border-radius:999px;padding:6px 12px;font-size:14px;font-weight:800;
+            box-shadow:0 4px 14px rgba(139,109,255,.35);pointer-events:none}
+.boxCounter.on{display:flex}
+.boxCounter .boxIco{font-size:16px;line-height:1}
+.boxCounter.bump{animation:boxBump .5s cubic-bezier(.2,1.4,.4,1)}
+.boxCounter.bump .boxIco{animation:boxShake .5s ease}
+@keyframes boxBump{0%{transform:scale(1)}35%{transform:scale(1.22)}100%{transform:scale(1)}}
+@keyframes boxShake{0%,100%{transform:rotate(0) translateY(0)}
+                    25%{transform:rotate(-14deg) translateY(-3px)}
+                    60%{transform:rotate(12deg) translateY(-1px)}}
+
 .buildersHead{position:absolute;left:0;right:0;top:14px;text-align:center;line-height:1.35;
               text-shadow:0 2px 6px rgba(0,0,0,.75);pointer-events:none}
 .buildersHead b{display:block;font-size:15px}

@@ -99,6 +99,8 @@ html.viewMobile .daychip { display: none; }
 html.viewMobile .storeBtn { top: calc(74px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
 html.viewMobile .navBtn.back { top: calc(74px + var(--safeT)); left: 12px; width: 44px; height: 44px; }
 html.viewMobile .buildersHead { top: calc(80px + var(--safeT)); }
+/* Under the store button, which is itself pushed clear of the HUD here. */
+html.viewMobile .boxCounter { top: calc(120px + var(--safeT)); right: 12px; }
 
 /* ---- notch and home indicator ----
    The frame runs edge to edge (viewport-fit=cover in index.html), which is what we want for the

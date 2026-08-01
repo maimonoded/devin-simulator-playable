@@ -86,7 +86,7 @@ function serializeState(){
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
     energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
     pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
-    builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes],
+    builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes], pendingBoxes:state.pendingBoxes,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
@@ -119,6 +119,9 @@ function loadState(){
       : Builders.fresh();
     if(state.builder.length!==Builders.count()) Builders.reshape();
     state.boxes=new Set(Array.isArray(d.boxes)?d.boxes:[]);
+    /* Boxes bought but never thrown survive a reload — they are paid for, so losing them would
+       be losing a reward. They land the next time the player leaves the builders view. */
+    state.pendingBoxes=Math.max(0,Math.floor(+d.pendingBoxes||0));
     // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
     const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
     state.epQueue=rawQueue.filter(x=>Episodes.has(x));

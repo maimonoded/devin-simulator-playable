@@ -65,6 +65,18 @@ const DEFAULTS={
   builderPageSize:5,
   /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
   boxCoins:60, boxItemGapMs:260,
+  /* ---- the box throw ----
+     Boxes bought in the builders view are thrown onto the board when the player goes back to it,
+     in three phases: pull the camera out, rain the boxes down, put the camera back.
+
+     boxZoomOut is how far the camera pulls back (1 = not at all; 1.45 shows the whole ring).
+     The three times are the three phases, so the whole thing costs
+     boxZoomOutMs + boxThrowMs + boxZoomInMs whatever it is tuned to.
+
+     boxThrowMs is the TOTAL for the throw, not one box: the last box lands exactly on it however
+     many there are. Ten boxes in the same window means they overlap more, not that it runs ten
+     times as long — otherwise a big buy would strand the player watching a downpour. */
+  boxZoomOut:1.45, boxZoomOutMs:420, boxThrowMs:900, boxZoomInMs:420,
   /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
      gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
      this long if the player doesn't tap Collect. */
@@ -144,6 +156,13 @@ const TUNING=[
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],
    ["board3d","3D board (0/1) — reload to apply",1]]},
+ /* The three phases of the box throw, each its own knob so the pacing can be tuned by feel
+    rather than by one number that moves all of it at once. */
+ {group:"Mystery box throw",items:[
+   ["boxZoomOut","Camera zoom out (x, 1 = none)",0.05],
+   ["boxZoomOutMs","1 · Zoom out (ms)",20],
+   ["boxThrowMs","2 · Throwing the boxes, total (ms)",20],
+   ["boxZoomInMs","3 · Zoom back in (ms)",20]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —

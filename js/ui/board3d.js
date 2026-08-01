@@ -30,6 +30,11 @@ const TILE_H = 0.16;             // tile slab thickness
 const EXTENT = N * TILE;         // board footprint
 /* The player piece. Absent file = the placeholder disc stays, so this is safe to remove. */
 const TOKEN_MODEL = "assets/token/token.glb";
+/* The mystery box sitting on a tile. Same deal: absent file falls back to the plain cube, so the
+   board never depends on the asset having been generated. Normalized to a 1x1 footprint with its
+   origin at the base, like the tiles, so BOX_SIZE is just how big it is in tile units. */
+const BOX_MODEL = "assets/props/models/mystery-box.glb";
+const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neighbouring tile
 
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
@@ -53,6 +58,17 @@ const COLORS = {
   box:      0xffcb5c,
 };
 
+/* Smooth in and out — the camera moves, which should never start or stop abruptly. */
+const ease = (k) => k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+/* A falling box: most of the way down fast, then a small overshoot and settle. Reads as weight
+   without a physics step, and unlike a real bounce it always ends exactly at 1 — the box has to
+   come to rest ON the tile, not near it. */
+const bounce = (k) => {
+  if (k >= 1) return 1;
+  const p = 1 - Math.pow(1 - k, 2.2);
+  return p + Math.sin(k * Math.PI) * 0.06 * (1 - k);
+};
+
 const Board3D = {
   available: false,
   ready: false,
@@ -60,6 +76,14 @@ const Board3D = {
   _renderer: null, _scene: null, _camera: null, _host: null,
   _tiles: [], _token: null, _boxes: new Map(), _models: new Map(), _gltf: null,
   _raf: 0,
+  /* The mystery box model, loaded once and cloned per box. */
+  _boxModel: null, _boxPending: [],
+  /* Frustum half-height from the last resize(), and the multiplier the box throw pulls the
+     camera out by. Kept apart so the throw can widen the view without resize() having to know
+     about it, and so a resize mid-throw still lands on the right base framing. */
+  _fit: 0, _aspect: 1, _zoom: 1, _zoomShown: 1,
+  /* Per-frame animations owned by the board (the box throw). Same shape the mini-games use. */
+  _anims: [],
   /* "board" | "builders" — which scene the one renderer is drawing. See setView(). */
   _view: "board",
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
@@ -187,16 +211,28 @@ const Board3D = {
     const zoom = follow ? Math.min(1, Math.max(0.05, want || 1)) : 1;
     const halfW = (EXTENT * Math.SQRT2 / 2) * (follow ? zoom : envMargin());
     const halfH = halfW * Math.sin(THREE.MathUtils.degToRad(ENV_CAM.el));
-    const fit = Math.max(halfH, halfW / aspect);
-    this._camera.left = -fit * aspect;
-    this._camera.right = fit * aspect;
-    this._camera.top = fit;
-    this._camera.bottom = -fit;
-    this._camera.updateProjectionMatrix();
+    /* Stored rather than applied directly: the box throw multiplies this to pull the camera out,
+       and keeping the base separate means a resize mid-throw re-fits the board without also
+       cancelling the zoom. */
+    this._fit = Math.max(halfH, halfW / aspect);
+    this._aspect = aspect;
+    this._applyFrustum();
     /* The builders scene shares this canvas, so it re-fits on the same events — otherwise it
        would still be framed for whatever size the window was when it was last shown. */
     Builders3D.resize(w, h);
     if (window.syncBoardLabels) window.syncBoardLabels();
+  },
+
+  /* The camera's frustum = the fit resize() worked out, widened by whatever the box throw is
+     currently asking for. Cheap enough to call every frame while the zoom is moving. */
+  _applyFrustum() {
+    const fit = this._fit * this._zoom, a = this._aspect;
+    this._camera.left = -fit * a;
+    this._camera.right = fit * a;
+    this._camera.top = fit;
+    this._camera.bottom = -fit;
+    this._camera.updateProjectionMatrix();
+    this._zoomShown = this._zoom;
   },
 
   /* world position of a tile's centre (top surface) */
@@ -313,6 +349,7 @@ const Board3D = {
     }
 
     this._buildToken();
+    this._loadBoxModel();
     this.setTokenTile(state.pos, true);
   },
 
@@ -560,16 +597,115 @@ const Board3D = {
     }
     indices.forEach(i => {
       if (this._boxes.has(i)) return;
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.3, 0.3),
-        new THREE.MeshLambertMaterial({ color: COLORS.box }),
-      );
-      const w = this._tileWorld(i);
-      mesh.position.set(w.x, TILE_H + 0.2, w.z);
-      mesh.rotation.y = Math.PI / 4;
-      this._scene.add(mesh);
-      this._boxes.set(i, mesh);
+      this._boxes.set(i, this._addBox(i));
     });
+  },
+
+  /* One box, resting on its tile. Uses the generated model if it has arrived and a plain cube
+     otherwise — the cube is not a placeholder to be removed later, it is the fallback for a
+     missing or failed asset, exactly like the token's disc. */
+  _addBox(i) {
+    const holder = new THREE.Group();
+    const w = this._tileWorld(i);
+    holder.position.set(w.x, TILE_H / 2, w.z);
+    holder.add(this._boxModel
+      ? this._boxModel.clone(true)
+      : new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3),
+                       new THREE.MeshLambertMaterial({ color: COLORS.box })));
+    if (!this._boxModel) holder.children[0].position.y = 0.15;   // cube pivots at its middle
+    /* Turned to the camera like the piece: a wrapped box has a front (the bow's knot) and no
+       board edge to align with, so it should read from wherever the player is sitting. */
+    holder.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
+    this._scene.add(holder);
+    return holder;
+  },
+
+  /* Load the box model once, then re-make any boxes already on the board so they pick it up.
+     Called from build(); failure is logged and leaves the cubes, which is a working board. */
+  _loadBoxModel() {
+    if (this._boxModel) return;
+    if (!this._gltf) this._gltf = new GLTFLoader();
+    this._gltf.load(BOX_MODEL, (gltf) => {
+      const model = gltf.scene;
+      /* Measure from real vertices, not cached per-geometry boxes: setFromObject without the
+         precise flag returns the box OF a rotated box, which reads high and renders the prop
+         small. Same trap the tile loader documents. */
+      const size = new THREE.Box3().setFromObject(model, true).getSize(new THREE.Vector3());
+      model.scale.setScalar(BOX_SIZE / (Math.max(size.x, size.y, size.z) || 1));
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = !!cfg.envShadows;
+        if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
+      });
+      this._boxModel = model;
+      /* Anything already placed is still a cube — swap it now rather than waiting for the next
+         board rebuild, which might not come until the player rolls. */
+      const live = [...this._boxes.keys()];
+      live.forEach(i => { this._scene.remove(this._boxes.get(i)); this._boxes.delete(i); });
+      live.forEach(i => this._boxes.set(i, this._addBox(i)));
+    }, undefined, (e) => {
+      console.warn(`Board3D: mystery box ${BOX_MODEL} failed to load, keeping the cube`, e);
+    });
+  },
+
+  /* ---------------- the box throw ----------------
+     Pull the camera out, rain the boxes onto their tiles, put the camera back. Returns a promise
+     that resolves when the whole thing is done, so the caller can await it before handing the
+     board back to the player.
+
+     Resolves — never rejects — on every path, including no boxes, no WebGL and a mid-throw view
+     switch. The caller clears state.pendingBoxes on the strength of it. */
+  throwOverlays(all, fresh) {
+    /* `all` is every box that should be on the board, `fresh` only the ones to animate. Boxes
+       already sitting there from earlier trips must not leap into the air again. */
+    this.setOverlays(all);
+    if (!this.available) return Promise.resolve();
+    const falling = (fresh || all).map(i => this._boxes.get(i)).filter(Boolean);
+    if (!falling.length) return Promise.resolve();
+
+    const zoomOut = Math.max(1, +cfg.boxZoomOut || 1);
+    const outMs = Math.max(0, +cfg.boxZoomOutMs || 0);
+    const throwMs = Math.max(1, +cfg.boxThrowMs || 1);
+    const inMs = Math.max(0, +cfg.boxZoomInMs || 0);
+
+    /* The whole throw fits in boxThrowMs however many boxes there are: each one falls for a
+       fixed share of the window and the starts are spread across what is left, so the last box
+       lands exactly on time. Ten boxes overlap more; they do not take ten times as long. */
+    const fallMs = throwMs * 0.62;
+    const gap = falling.length > 1 ? (throwMs - fallMs) / (falling.length - 1) : 0;
+
+    const rest = falling.map(g => g.position.y);
+    falling.forEach(g => { g.visible = false; });
+
+    return new Promise(resolve => {
+      const done = () => { falling.forEach((g, k) => { g.visible = true; g.position.y = rest[k]; g.rotation.z = 0; }); resolve(); };
+      this._tween(outMs, k => { this._zoom = 1 + (zoomOut - 1) * ease(k); }, () => {
+        falling.forEach((g, k) => {
+          const start = k * gap, spin = (k % 2 ? -1 : 1) * (0.5 + Math.random() * 0.7);
+          this._tween(fallMs, (t) => {
+            g.visible = true;
+            /* Fall from above with a squash-free bounce: overshoot slightly past the tile and
+               settle, which reads as weight without needing physics. */
+            const p = bounce(t);
+            g.position.y = rest[k] + (1 - p) * 7;
+            g.rotation.z = (1 - p) * spin;
+          }, null, start);
+        });
+        this._tween(throwMs, () => {}, () => {
+          this._tween(inMs, k => { this._zoom = zoomOut + (1 - zoomOut) * ease(k); }, () => {
+            this._zoom = 1; done();
+          });
+        });
+      });
+    });
+  },
+
+  /* A frame-stepped tween. delay lets the throw stagger without a nest of setTimeouts, which
+     matters because these have to stop when the board does — a pending timeout firing into a
+     torn-down scene is how the dice used to throw after a reset. */
+  _tween(dur, step, end, delay = 0) {
+    if (dur <= 0 && delay <= 0) { step && step(1); end && end(); return; }
+    this._anims.push({ t: -delay, dur: Math.max(1, dur), step, end });
   },
 
   /* The buildings live in their own scene now (js/ui/builders3d.js) — the board's middle is
@@ -671,6 +807,10 @@ const Board3D = {
       this._renderer.render(Builders3D.scene(), Builders3D.camera());
       return;
     }
+    /* The board's own tweens (the box throw). Stepped before the camera so a zoom change lands
+       in the same frame it was asked for rather than one late. */
+    this._stepAnims(1000 / 60);
+    if (this._zoom !== this._zoomShown) this._applyFrustum();
     this._followCamera();
     Env3D.tick(1 / 60);
     Dice3D.tick();
@@ -799,6 +939,19 @@ const Board3D = {
     const lim = EXTENT / 2 + (cfg.camEdgePad ?? 0.5);
     v.x = Math.max(-lim, Math.min(lim, v.x));
     v.z = Math.max(-lim, Math.min(lim, v.z));
+  },
+
+  /* Advance the board's tweens by one frame. Iterated backwards so an `end` callback that queues
+     the next phase (which the throw does at every step) can push onto the list mid-iteration. */
+  _stepAnims(ms) {
+    for (let n = this._anims.length - 1; n >= 0; n--) {
+      const a = this._anims[n];
+      a.t += ms;
+      if (a.t < 0) continue;                      // still in its stagger delay
+      const k = Math.min(1, a.t / a.dur);
+      a.step && a.step(k);
+      if (k >= 1) { this._anims.splice(n, 1); a.end && a.end(); }
+    }
   },
 
   _followCamera() {

@@ -210,6 +210,26 @@ test("save then load restores a run", () => {
   eq(state.lastCoins, state.coins, "tween baseline starts where we left off");
 });
 
+test("boxes bought but not yet thrown survive a reload", () => {
+  freshRun();
+  state.pendingBoxes = 3;
+  saveState();
+  freshRun();
+  eq(state.pendingBoxes, 0, "fresh state starts with none banked");
+  ok(loadState());
+  // they are paid for — losing them on a reload would be losing a reward
+  eq(state.pendingBoxes, 3, "banked boxes are restored, ready for the next trip to the board");
+});
+
+test("a corrupt pending-box count degrades to none rather than NaN", () => {
+  freshRun();
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1") || "{}");
+  raw.pendingBoxes = "not a number";
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  ok(loadState());
+  eq(state.pendingBoxes, 0, "a bad value must not poison the counter");
+});
+
 test("restore keeps energy bought above the cap", () => {
   freshRun();
   state.energy = 900;

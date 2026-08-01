@@ -167,12 +167,16 @@ const Builders={
     const b=state.builder[bIdx]; if(!b||b.tier>=cfg.tiers) return null;
     const cost=this.cost(bIdx,b.tier); if(state.coins<cost) return null;
     state.coins-=cost; b.tier++;
-    const spawned=OVERLAY_TYPES.mysteryBox.spawn(cfg.boxesPerUpgrade);
+    /* Banked, not placed. The player is on the builders screen when they buy, so a box landing
+       on the board behind them is a reward nobody sees — they are thrown on together when the
+       player goes back to the board. The counter in the corner is what acknowledges the buy
+       until then (renderBoxCounter in js/ui/render.js). */
+    state.pendingBoxes+=cfg.boxesPerUpgrade;
     const builderDone=this.isMaxed(bIdx);
     const episodeId=builderDone?this.unlockEpisode():null;
     const seriesDone=this.allMaxed();
     if(seriesDone) state.seriesDone=true;
     return {cost, level:b.tier, episodeId, title:episodeId?Episodes.titleOf(episodeId):null,
-            builderDone, seriesDone, spawned};
+            builderDone, seriesDone, boxes:cfg.boxesPerUpgrade, pendingBoxes:state.pendingBoxes};
   },
 };

@@ -11,6 +11,11 @@ function initState(){
     energy:cfg.energyCap, coins:0, clues:0, cycleClues:0, vip:0,
     pos:0, mult:1, boardNum:1, series:0,
     builder:Builders.fresh(), boxes:new Set(),
+    /* Boxes EARNED but not yet on the board. Upgrades bank them here rather than dropping them
+       straight onto tiles, because the player is looking at the builders screen when they buy —
+       a box appearing on a board they cannot see is a reward nobody witnesses. They are thrown
+       on when the player returns to the board (setBuildersView in js/ui/main.js). */
+    pendingBoxes:0,
     /* epQueue is what is still UNWATCHED, and it shrinks as episodes are watched. Which
        episodes exist at all is NOT stored — it is derived from the completed builders, since
        the episode id is the builder number (Builders.unlockedEpisodeIds). */
