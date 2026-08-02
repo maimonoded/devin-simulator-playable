@@ -80,15 +80,28 @@ What gives it away is the *shape* of the footprint, since a person is wider acro
 than front to back: Simon and Carl came back `(1.00, 0.78)` and `(1.00, 0.76)`, Victoria
 `(0.77, 1.00)`. **When a figure's footprint is deeper than it is wide, it is a quarter turn out.**
 
-Whatever places these on the board has to carry the offset as data, the way `assets/env/scene.js`
-carries `yaw` per piece — do not bake it into the mesh and do not have the engine guess. A future
-NPC in a long coat or a dress will land somewhere else again, and one number in a manifest is
-cheaper than re-generating an asset that is otherwise correct.
+So the offset is carried as data, in [npcs.js](npcs.js), the way `assets/env/scene.js` carries
+`yaw` per piece — not baked into the mesh and never guessed at load. A future character in a long
+coat or a dress will land somewhere else again, and one field in a manifest is cheaper than
+re-generating an asset that is otherwise correct.
 
 ### Missing files are normal
 
 Same contract as the tile art, the player piece and the mystery box: an absent or broken `.glb`
-costs the NPC, never the game. Whatever draws them degrades to drawing nothing.
+costs that one character and nothing else. `NPC3D._load()` warns and carries on, so the rest of
+the cast still walks; a missing `npcs.js` leaves the board empty of people and otherwise intact.
+
+## What draws them
+
+[npcs.js](npcs.js) is the cast — who walks, where each starts, how fast, and the yaw offset.
+[js/ui/npc3d.js](../../js/ui/npc3d.js) walks them: one tile at a time, clockwise, on the
+**inner** edge of the ring, each with its own random dwell between steps so three figures do not
+end up marching in formation. Everything timed is in `cfg` under the drawer's **NPCs** group.
+
+They are scenery on purpose. They own no state, are not persisted, and cost nothing to meet —
+which keeps them outside the event list that every other board effect reaches the player through
+([js/tiles/README.md](../../js/tiles/README.md)). If they ever earn a mechanic it belongs in
+[js/overlays/](../../js/overlays/) with the mystery box, resolving before the tile it stands on.
 
 ## How they were made
 

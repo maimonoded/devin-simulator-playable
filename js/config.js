@@ -40,6 +40,17 @@ const DEFAULTS={
   /* Player piece height in tile units — a tile is 1. The model is scaled to this rather
      than to a footprint, since a piece reads by how tall it stands beside a tile. */
   tokenHeight:1.15,
+  /* The cast walking the ring (assets/npcs/npcs.js, js/ui/npc3d.js) — scenery, no mechanic.
+     npcHeight is in tile units like tokenHeight, and is deliberately UNDER it: a figure that
+     walks in front of the token must never hide it, and the occlusion budget for something
+     standing at its tile's centre is exactly the token's own height.
+     npcLane is how far toward the board's middle they walk. The tile's centre is taken — art
+     detail, the mystery box and the token all live there — so they use the inner edge, which
+     is the one strip of every tile that is reliably clear.
+     The pause is a RANGE because a fixed one makes three figures walk in formation; each step
+     draws its own, so they drift apart instead of syncing up over a lap. */
+  npcs:1, npcHeight:0.75, npcStepMs:900, npcPauseMinMs:400, npcPauseMaxMs:2600,
+  npcLane:0.3, npcBob:0.05,
   diceRevealMs:500, diceToMoveMs:30,
   /* 3D dice. diceRevealMs doubles as the length of the throw, so the pacing knob that already
      existed keeps meaning the same thing: click to numbers-on-screen. The rest is the throw's
@@ -211,6 +222,16 @@ const TUNING=[
    ["camTokenInset","Token must stay within frame ×",0.05,{min:0.1,max:1}]]},
  {group:"Player piece",items:[
    ["tokenHeight","Size — height in tiles",0.05,{min:0.2,max:2}]]},
+ {group:"NPCs",items:[
+   ["npcs","Walk the board (0/1)",1],
+   /* Capped at cfg.tokenHeight's default rather than at 2 like the piece: past that a figure
+      starts hiding the token it walks in front of, which is the one thing this must not do. */
+   ["npcHeight","Size — height in tiles",0.05,{min:0.2,max:1.15}],
+   ["npcStepMs","One tile step (ms)",25,{min:200,max:3000}],
+   ["npcPauseMinMs","Pause between steps — min (ms)",50,{min:0,max:6000}],
+   ["npcPauseMaxMs","Pause between steps — max (ms)",50,{min:0,max:12000}],
+   ["npcLane","Walk this far inside the tile centre",0.02,{min:0,max:0.45}],
+   ["npcBob","Bob height while stepping (tiles)",0.01,{min:0,max:0.3}]]},
  {group:"Dice",items:[
    /* The throw's length is cfg.diceRevealMs, over in Presentation timing — it is the same
       "click → numbers" window the DOM dice used, so it stays where it always was. */

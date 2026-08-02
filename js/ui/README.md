@@ -12,6 +12,7 @@ it mutates `state` and returns *event lists* that `playEvents()` here plays back
 | [store.js](store.js) | The coin/energy top-up modal. |
 | [finale.js](finale.js) | The series-complete celebration. |
 | [drawer.js](drawer.js) | The tuning drawer: builds inputs from the `TUNING` schema, live-binds edits, and owns **Reset config** / **Reset user**. |
+| [npc3d.js](npc3d.js) | The series' characters walking the board (imported by [board3d.js](board3d.js)). Scenery only — no state, no persistence, no payout, and the roll loop never waits for it. |
 | [main.js](main.js) | Orchestration and boot: `roll()`, `playEvents()`, the two auto modes, upgrade clicks, session advance, all button wiring, and the boot sequence. |
 
 ## The event-playback contract

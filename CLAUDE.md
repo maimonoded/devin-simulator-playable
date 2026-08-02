@@ -76,6 +76,7 @@ js/
     env3d.js        the island, sea and props around the board (imported by board3d.js)
     dice3d.js       the dice, thrown onto the board (imported by board3d.js)
     builders3d.js   the buildings, in their own scene (imported by board3d.js)
+    npc3d.js        the series' characters, walking the ring (imported by board3d.js)
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
     prediction.js   predict & watch: bet → playback → result; the unlock popup
@@ -122,7 +123,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. Mystery boxes are **banked** by upgrades and thrown onto the board when the player returns to it — state first, animation on top. A box's contents are drawn when it is **placed**, so one holding clues shows up **gold** from across the board; the draw moving earlier changes no expectation. → [README](js/overlays/README.md) |
 | Board props | `assets/props/` | 3D objects that sit *on* a tile rather than being one (the mystery box). Normalized like a tile, scaled in code, and optional: a missing file falls back to a plain cube. → [README](assets/props/README.md) |
-| NPCs | `assets/npcs/` | Simon, Victoria and Carl, to stand on tiles rather than be them. Scaled by **height** like the player piece, not by footprint like a prop, and held at 0.75 tile units — under `cfg.tokenHeight`, so a figure that walks in front of the token can never bury it. Facing is per-file data, not a convention: two front +Z and Victoria fronts −X. → [README](assets/npcs/README.md) |
+| NPCs | `assets/npcs/` `js/ui/npc3d.js` | Simon, Victoria and Carl, walking the ring clockwise on the tiles' **inner** edge — the tile centre is taken by art, boxes and the token. **Scenery, deliberately**: they own no state, are not persisted, and pay nothing, so they stay outside the event list that everything else reaches the player through. Scaled by **height** like the player piece and held under `cfg.tokenHeight`, so a figure walking in front of the token can never bury it. Who walks and which way each faces is data in `assets/npcs/npcs.js` — facing is not a convention here, since one of the three fronts −X. → [README](assets/npcs/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |

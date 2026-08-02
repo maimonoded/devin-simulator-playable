@@ -20,6 +20,7 @@ import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
 import { Dice3D } from "./dice3d.js";
 import { Builders3D } from "./builders3d.js";
+import { NPC3D } from "./npc3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -175,6 +176,13 @@ const Board3D = {
     /* Init once, not per build(): the dice hang off their own group, which build() leaves
        alone, so they survive a board rebuild the way the token does. */
     Dice3D.init(this._scene);
+    /* Same deal, and handed the board's own geometry rather than deriving the ring a second
+       time. anisotropy is passed as a function because the renderer's capability is only
+       meaningful once it exists, which it does by here but would not at module scope. */
+    NPC3D.init(this._scene, {
+      tileWorld: (i) => this._tileWorld(i),
+      anisotropy: () => this._renderer.capabilities.getMaxAnisotropy(),
+    });
     this._initDrag(this._renderer.domElement);
 
     this.available = true;
@@ -900,6 +908,7 @@ const Board3D = {
     Env3D.rebuild();
     this.syncPageBackground();
     this.setTokenHeight();   // cfg.tokenHeight is live too, and must not reload the model
+    NPC3D.setHeight();       // and cfg.npcHeight, for the same reason
     this.resize();
   },
 
@@ -975,6 +984,10 @@ const Board3D = {
        in the same frame it was asked for rather than one late. */
     this._stepAnims(1000 / 60);
     this._tickBoxes(performance.now());
+    /* The cast keeps walking through a box throw, unlike the boxes' own idle tick: nothing here
+       shares an object with the board's tweens, and a world that freezes whenever something else
+       is happening reads worse than one that carries on. */
+    NPC3D.tick(1000 / 60);
     if (this._zoom !== this._zoomShown) this._applyFrustum();
     this._followCamera();
     Env3D.tick(1 / 60);
