@@ -40,6 +40,7 @@ assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, leg
 assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
 assets/dice/        the die: models/die.glb, built not reconstructed    → assets/dice/README.md
 assets/props/       objects that sit ON a tile (the mystery box)        → assets/props/README.md
+assets/npcs/        the series' characters, to stand on tiles           → assets/npcs/README.md
 minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
                     make-dice.py    — builds assets/dice/models/die.glb from one blank face
@@ -121,6 +122,7 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | Overlays | `js/overlays/` | Resolve *before* the tile they sit on. Mystery boxes are **banked** by upgrades and thrown onto the board when the player returns to it — state first, animation on top. A box's contents are drawn when it is **placed**, so one holding clues shows up **gold** from across the board; the draw moving earlier changes no expectation. → [README](js/overlays/README.md) |
 | Board props | `assets/props/` | 3D objects that sit *on* a tile rather than being one (the mystery box). Normalized like a tile, scaled in code, and optional: a missing file falls back to a plain cube. → [README](assets/props/README.md) |
+| NPCs | `assets/npcs/` | Simon, Victoria and Carl, to stand on tiles rather than be them. Scaled by **height** like the player piece, not by footprint like a prop, and held at 0.75 tile units — under `cfg.tokenHeight`, so a figure that walks in front of the token can never bury it. Facing is per-file data, not a convention: two front +Z and Victoria fronts −X. → [README](assets/npcs/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
 | Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
