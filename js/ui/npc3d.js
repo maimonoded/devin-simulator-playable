@@ -23,6 +23,19 @@ import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 const TILE_H = 0.16;          // tile slab thickness, as in board3d.js
 const TILES = 40;
 
+/* Where a pair of feet goes: the slab's TOP, which is TILE_H above the board plane and exactly
+   where setTokenTile stands the player's piece.
+
+   Not TILE_H/2. That is the mystery box's height, and copying it is wrong here for a reason worth
+   writing down: TILE_H/2 is where board3d.js GROUNDS A TILE MODEL (`holder.position.y +=
+   TILE_H / 2 - box.min.y`), so it is the underside of the tile's own paving rather than the
+   surface you walk on. A figure placed there stands in the pavement to its ankles — measured at
+   0.08 against a slab whose top is 0.16, i.e. sunk by half a tile's thickness.
+
+   The box gets away with it because a chunky object reads as sitting on a tile whether or not its
+   bottom centimetre is buried. A person does not: feet are where the eye checks contact. */
+const FOOT_Y = TILE_H;
+
 /* Ease a step so a figure sets off and arrives gently instead of sliding at a constant rate.
    The same curve board3d.js uses for the camera, and for the same reason. */
 const ease = (k) => k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
@@ -129,7 +142,7 @@ export const NPC3D = {
   /* Park a figure on its current tile, facing along the step it is about to take. */
   _place(w) {
     const a = this._lane(w.tile);
-    w.obj.position.set(a.x, TILE_H / 2, a.z);
+    w.obj.position.set(a.x, FOOT_Y, a.z);
     this._face(w, a, this._lane((w.tile + 1) % TILES));
   },
 
@@ -175,7 +188,7 @@ export const NPC3D = {
       const k = ease(w.t);
       w.obj.position.set(
         a.x + (b.x - a.x) * k,
-        TILE_H / 2 + Math.sin(w.t * Math.PI) * bob,
+        FOOT_Y + Math.sin(w.t * Math.PI) * bob,
         a.z + (b.z - a.z) * k,
       );
       this._face(w, a, b);
