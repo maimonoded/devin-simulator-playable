@@ -40,6 +40,19 @@ const BOX_MODEL = "assets/props/models/mystery-box.glb";
    rather than an invisible bonus. */
 const BOX_MODEL_GOLD = "assets/props/models/mystery-box-gold.glb";
 const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neighbouring tile
+/* Where a box's base goes: the slab's TOP, the same surface the token stands on and the same
+   value js/ui/npc3d.js calls FOOT_Y.
+
+   Not TILE_H/2, which is what this used to be. TILE_H/2 is where _loadModel GROUNDS A TILE MODEL
+   (`holder.position.y += TILE_H / 2 - box.min.y`), i.e. the underside of the tile's own paving —
+   half a slab BELOW the surface things stand on. A box placed there sinks 0.08 into its tile.
+   It got away with it for a while because a chunky object still reads as sitting on a tile when
+   its bottom centimetre is buried; the NPCs are what made the same mistake visible.
+
+   Every box height has to come from here: the resting place, the gold box's idle bob, and the
+   put-everything-back path after a cancelled throw. The throw itself captures the resting y and
+   restores it, so it follows on its own — but only because all three agree. */
+const BOX_Y = TILE_H;
 
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
@@ -628,7 +641,7 @@ const Board3D = {
   _addBox(i, gold) {
     const holder = new THREE.Group();
     const w = this._tileWorld(i);
-    holder.position.set(w.x, TILE_H / 2, w.z);
+    holder.position.set(w.x, BOX_Y, w.z);
     holder.userData.gold = !!gold;
     /* Gold falls back to the plain box before it falls back to the cube: a wrong-coloured box
        still reads as a box, where a cube reads as missing art. */
@@ -689,7 +702,7 @@ const Board3D = {
       const spin = Math.max(200, +cfg.boxGoldSpinMs || 4200);
       g.rotation.y = (t / spin) * Math.PI * 2;
       const bob = Math.max(0, +cfg.boxGoldBob || 0);
-      g.position.y = TILE_H / 2 + Math.sin(t / 620 + i) * bob;
+      g.position.y = BOX_Y + Math.sin(t / 620 + i) * bob;
       if (g.userData.glow) {
         const k = 1 + Math.sin(t / 480 + i) * 0.12;
         g.userData.glow.scale.set(1.5 * k, 1.5 * k, 1);
@@ -864,7 +877,7 @@ const Board3D = {
        the board matches state whichever frame we stopped on. */
     for (const [i, g] of this._boxes) {
       const w = this._tileWorld(i);
-      g.visible = true; g.position.set(w.x, TILE_H / 2, w.z); g.rotation.z = 0;
+      g.visible = true; g.position.set(w.x, BOX_Y, w.z); g.rotation.z = 0;
     }
     const waiting = this._fxDone; this._fxDone = [];
     waiting.forEach(r => r());

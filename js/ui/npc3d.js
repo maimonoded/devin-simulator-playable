@@ -26,14 +26,15 @@ const TILES = 40;
 /* Where a pair of feet goes: the slab's TOP, which is TILE_H above the board plane and exactly
    where setTokenTile stands the player's piece.
 
-   Not TILE_H/2. That is the mystery box's height, and copying it is wrong here for a reason worth
-   writing down: TILE_H/2 is where board3d.js GROUNDS A TILE MODEL (`holder.position.y +=
-   TILE_H / 2 - box.min.y`), so it is the underside of the tile's own paving rather than the
-   surface you walk on. A figure placed there stands in the pavement to its ankles — measured at
-   0.08 against a slab whose top is 0.16, i.e. sunk by half a tile's thickness.
+   Not TILE_H/2, which is the trap here: that is where board3d.js GROUNDS A TILE MODEL
+   (`holder.position.y += TILE_H / 2 - box.min.y`), so it is the underside of the tile's own
+   paving rather than the surface you walk on. A figure placed there stands in the pavement to
+   its ankles — measured at 0.08 against a slab whose top is 0.16, sunk by half a slab.
 
-   The box gets away with it because a chunky object reads as sitting on a tile whether or not its
-   bottom centimetre is buried. A person does not: feet are where the eye checks contact. */
+   The mystery box used to make exactly this mistake and got away with it for a while, because a
+   chunky object still reads as sitting on a tile when its bottom centimetre is buried. A person
+   does not: feet are where the eye checks contact, which is what made it visible. The box now
+   agrees — board3d.js's BOX_Y is this same value. */
 const FOOT_Y = TILE_H;
 
 /* Ease a step so a figure sets off and arrives gently instead of sliding at a constant rate.
