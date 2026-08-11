@@ -1,8 +1,9 @@
 # Harbour Heights — predictive-narrative economy simulator
 
-A Monopoly-GO-style board game used to model a short-drama app's economy: roll dice around a
-40-tile board, spend the coins on builders, completing a builder unlocks a story episode, and
-watching an episode means betting on what happens next.
+A Monopoly-GO-style board game used to model a short-drama app's economy: pull a card from a
+54-card deck to move around a 40-tile board, the two JOKERS are tickets, five tickets
+unlock a story episode, and watching an episode means betting on what happens next. Coins earned
+on the board buy the next deck.
 
 ## Running it
 
@@ -38,13 +39,13 @@ serve.py            dev server (Range + no-store) — the way to run the project
 vendor/             three.module.js (r169), vendored; no npm, no build step
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
 assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
-assets/dice/        the die: models/die.glb, built not reconstructed    → assets/dice/README.md
+assets/cards/       painted card art: back.png + the two jokers        → claude-skills/card-deck-art
 assets/props/       objects that sit ON a tile (the mystery box)        → assets/props/README.md
 minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
-                    make-dice.py    — builds assets/dice/models/die.glb from one blank face
-claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles) and
-                    board-env-art (the world around them). Run link-skills.sh once after
+claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles),
+                    board-env-art (the world around them) and card-deck-art (the deck's
+                    back and jokers). Run link-skills.sh once after
                     cloning — it runs each skill's setup.sh, then symlinks them into
                     .claude/skills, which is git-ignored. Both need the Scenario MCP server
 css/                base · board · panels · drawer · overlay · mobile (loaded last)
@@ -58,37 +59,47 @@ js/
   economy-import.js workbook → model, and the structural check that gates it
   board-model.js    tile index → type and → grid cell, pathToStart
   env-model.js      environment geometry: datums, what's on screen, the height budget
-  dice-model.js     which turn puts a rolled number on top, and where a throw lands
+  shoe.js           the card shoe: minting a pack, dealing, pulling, buying
   state.js          the run state object
   storage.js        localStorage persistence for config and progress
   episodes.js       episode registry
   clues.js          the clue album: its content, and which slots are owned
+  tickets.js        the ticket row: placeholders, the row rule, episode unlocks
   board-actor.js    shared base: reward helpers + presentation event builders
-  builders/         builder/series system                                    → js/builders/README.md
   tiles/            one file per tile type                                   → js/tiles/README.md
   overlays/         things that sit on top of tiles (mystery box)            → js/overlays/README.md
-  game.js           rolling, landing dispatch, prediction, session time
+  game.js           landing dispatch, prediction, session time and card regen
   ui/               everything that touches the DOM                          → js/ui/README.md
-    fx.js           floats, log, toasts, confetti, dice, blocking overlays
+    card-art.js     the deck's look: card faces and the back, drawn to canvas
+    fx.js           floats, log, toasts, confetti, the flat card, blocking overlays
     minigame.js     opens a bonus game over the board; falls back to fx.js's Collect popup
     board3d.js      the WebGL board (three.js) — the module entry point; calls boot()
     env3d.js        the island, sea and props around the board (imported by board3d.js)
-    dice3d.js       the dice, thrown onto the board (imported by board3d.js)
-    builders3d.js   the buildings, in their own scene (imported by board3d.js)
+    shoe3d.js       the deck and the ticket placeholders (imported by board3d.js)
+    npc3d.js        the cast walking the ring — scenery only, and ships OFF (cfg.npcs)
     render.js       state → DOM; renderAll() is the entry point
     player.js       episode video player (markup + behaviour)
     prediction.js   predict & watch: bet → playback → result; the unlock popup
     library.js      every unlocked episode, rewatchable
     album.js        the clue album screen
-    store.js        coin/energy top-up modal
+    store.js        deck / coin / ticket store modal
     finale.js       series-complete celebration
     economy-panel.js  the drawer's Economy section: provenance, curve, series, .xlsx import
     drawer.js       tuning drawer + the two reset buttons
-    main.js         roll(), playEvents(), auto modes, wiring, boot
+    main.js         pull(), playEvents(), auto modes, wiring, boot
 ```
 
 Note the naming: `js/overlays/` are **board overlays** (things sitting on a tile, like the
 mystery box). Modal dialogs live in `js/ui/` — there is no `ui/overlays.js`.
+
+**And note "deck", which means three unrelated things.** The one that matters is the 54-card
+pack the player pulls from (`js/shoe.js`, `state.shoe`) — that one is never called `deck` in
+code. The global `twistDeck` is the *Plot Twist* card table behind the six board tiles at
+indices 3/8/13/18/23/28, whose tile type is still spelled `"deck"` in `js/board-model.js`
+because renaming it would reach the 3D palette and the CSS for no gain. And `ENV_Y.deck` in
+`js/env-model.js` is the ground slab the board stands on. Vocabulary for the pull deck is
+**pack** (a unit of 50), **shoe** (what you hold) and **pull** (one card); it never borrows the
+other word.
 
 ## The one architectural rule
 
@@ -97,14 +108,14 @@ ordered *event list*; `playEvents()` in `js/ui/main.js` renders it with animatio
 makes pacing data-driven and lets auto-play block correctly on popups.
 
 ```
-roll()  →  resolveLandingEvents()  →  [{float}, {log}, {move}, {card}, {reveal}, {collect}, …]
+pull()  →  resolveLandingEvents()  →  [{float}, {log}, {move}, {card}, {reveal}, {collect}, …]
                                    →  playEvents() animates them
 ```
 
 Event vocabulary and the tile/overlay contracts are documented in
 [js/tiles/README.md](js/tiles/README.md) and [js/overlays/README.md](js/overlays/README.md).
 `Tile` and `Overlay` both extend `BoardActor` (`js/board-actor.js`), which owns the reward
-helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation builders
+helpers (`gainCoins`/`gainCards`/`gainTickets`/`gainClues`) and the blocking presentation builders
 (`reveal`/`collect`/`card`) so neither side duplicates them.
 
 ## Systems
@@ -116,17 +127,17 @@ helpers (`gainCoins`/`gainEnergy`/`gainClues`) and the blocking presentation bui
 | Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
 | Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Several worlds live in `assets/env/scene.js` and `cfg.envScene` picks one live from the tuning drawer. Placement is data and the engine measures nothing: assets are conformed to a stated contract by `tools/normalize-env.py`, so a new environment needs no code change. `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
-| Dice | `js/dice-model.js` `js/ui/dice3d.js` | Thrown in from the bottom-left of the view and landing wherever the camera is aimed — the middle of the board is off-screen much of the time with `camFollow` on. `cfg.diceRevealMs` is the throw's length and the promise resolves at exactly that mark, `cfg.diceToMoveMs` still gates the token. Falls back to the DOM pair in `js/ui/fx.js` when `cfg.dice3d` is off or `die.glb` never loaded. |
+| The deck | `js/shoe.js` `js/ui/shoe3d.js` `js/ui/card-art.js` | A **pack** is a real deck: four suits of 1–13 plus the jokers, shuffled. A card is a short string — `"s7"` is the 7 of Stars, `"J1"` is Victoria — and its RANK is how many tiles it moves. The four suits are the show: ⭐ Stars (the Walk of Fame), ❤️ Hearts (romance), 💎 Diamonds (the real stone, cut as a brilliant rather than the flat playing-card rhombus) and 🎭 Masks (the drama). The **jokers are the tickets**, and they are the two leads — so `cfg.ticketsPerPack` is the joker count, one number for both, and there is deliberately no second key. It ships at **10**, not the natural 2, dealt round-robin so there are five of each lead. **The 52 numbered cards are fixed and jokers are added on top**, which makes `packSize` **derived, never set**: 52 + jokers, so ten jokers is a pack of **62**. `Shoe.packSize()` is the truth and `Economy.apply()` caches it onto `cfg.packSize` for everything that reads a cap; `ECONOMY_DEFAULT.cards` carries no pack size and the tuning drawer has no box for one, because a second number saying the same thing is free to drift — and when it did, raising the joker count silently ate the 12s and 13s off the top of the deck and changed how far the token moves. Note the knock-on: pack size is also the free-card cap, so a bigger pack is a slightly longer leash on the clock. `ticketsPerPack` is **economy-owned**: change it in `ECONOMY_DEFAULT.cards` and bump the model version, or a returning player's save pins the old value. `state.shoe` is an array of **concrete cards** in pull order, never a count and never a seed: a seed only re-derives under an identical RNG, and a count cannot express how many tickets are still in there, which is the invariant the economy rests on. The card flies off the deck to the middle of the screen; `cfg.pullRevealMs` is the flight and the promise resolves at exactly that mark on a **timer, not a frame**, `cfg.pullToMoveMs` gates the token. **A joker is celebrated, a number is not**: it presents at `cfg.jokerScale` times the usual size with a late overshoot that settles back, turns once in its own plane, holds for `cfg.jokerHoldMs` and takes confetti with it — all of it after the reveal has resolved or inside the same flight, so the turn is not one frame slower. **The deck on the board is the count**, as **one stack, always**: full whenever the shoe holds a pack or more (one pack or twenty is the same picture — the exact number is on the HUD, and the deck's job is the feeling of running low), then falling on a curve through the last pack, the steps bunched near empty where they carry information rather than one step every N cards. Fourteen heights, ending at a single card lying flat. Pulled from `Shoe.count()` every frame, never pushed. Drawing extra packs as separate piles was tried and reverted: two similar stacks a step apart reads as a half-finished riffle, and got reported as a stuck shuffle. Falls back to a flat DOM card when `cfg.shoe3d` is off or the deck failed to build. |
 | Bonus mini-games | `minigames/` `js/ui/minigame.js` | The four train tiles pay one of **two** bonuses (small / large) and each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
-| Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
-| Overlays | `js/overlays/` | Resolve *before* the tile they sit on. Mystery boxes are **banked** by upgrades and thrown onto the board when the player returns to it — state first, animation on top. A box's contents are drawn when it is **placed**, so one holding clues shows up **gold** from across the board; the draw moving earlier changes no expectation. → [README](js/overlays/README.md) |
+| The cast | `assets/npcs/` `js/ui/npc3d.js` | Figures walking the ring, on the inner edge of each tile because the centre is taken (art detail, the mystery box, the token). **Scenery and nothing else** — no state, not persisted, nothing to land on, and the pull loop never waits for them; a figure that moved coins from outside the event list is the one thing that could desync the economy from what the player was shown. **`cfg.npcs` ships at 0**, and off means the models are never fetched: `NPC3D.init()` deliberately does not load, `tick()` does on the first frame it runs enabled, so the drawer toggle still works with no reload. Switching back off hides them rather than dropping them. |
+| Overlays | `js/overlays/` | Resolve *before* the tile they sit on. Mystery boxes are dropped one per ticket earned (`cfg.boxesPerTicketCard`), straight onto the board — state first, animation on top. **They are thrown FROM the card that earned them**: `Board3D.throwOverlays(all, fresh, from)` takes an optional world-space origin and `dropBoxes` passes `Board3D.cardWorldPos()`, so on the joker path — the only one where a card is on the stage, since the boxes go while it is still held up — the reward is seen coming out of the ticket instead of dropping from nowhere. A null origin keeps the original fall-from-above, which is what every other path gets. A thrown box leaves the card at `cfg.boxThrowScale` times its size and shrinks to normal as it travels, on the same ease as the distance — the camera is orthographic, so nothing gets smaller with distance on its own and faking it is the only thing selling the depth of the trip. **The scale is a MULTIPLIER on the box's own resting size** (`userData.restScale`, stamped in `_addBox`), because a gold box already rests at `cfg.boxGoldScale` and an absolute scale would silently shrink every gold box it threw; `cancelBoxFx()` restores that same value, or a throw killed mid-flight strands a 4× box on the board for the rest of the run. A box is hidden behind the presented card for the first part of the trip and emerges past its edge; that is the effect, not a defect. A box's contents are drawn when it is **placed**, so one holding clues shows up **gold** from across the board; the draw moving earlier changes no expectation. → [README](js/overlays/README.md) |
 | Board props | `assets/props/` | 3D objects that sit *on* a tile rather than being one (the mystery box). Normalized like a tile, scaled in code, and optional: a missing file falls back to a plain cube. → [README](assets/props/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
-| Builders / series | `js/builders/` | Coin sink; completing a builder unlocks one episode. → [README](js/builders/README.md) |
+| Tickets / series | `js/tickets.js` | `cfg.ticketsPerEpisode` tickets fill one episode placeholder and unlock one episode. The board shows a **row** of `cfg.episodeRowSize` placeholders, and the row only advances once every episode on it is full **and watched** — which is the game's only stop condition. |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
-| Session & time | `js/game.js` `advanceSession()` | Rolls cost energy (`mult` per roll), never coins. "Next session" advances the clock by the greater of a full refill (`regenMin` minutes per energy point) and one session slot (`1440 / sessionsPerDay` minutes), refills energy and pays a login reward on each day rollover. |
+| Session & time | `js/game.js` `advanceSession()` | A pull costs one card, never coins. "Next session" advances the clock by the greater of a full deal (`cardRegenMin` minutes per card) and one session slot (`1440 / sessionsPerDay` minutes), deals free cards toward the cap and pays a login reward on each day rollover. **This is the game's clock** — see the note under the economy model. |
 | Persistence | `js/storage.js` | Two independent localStorage slots — config and progress — with separate **Reset config** and **Reset user** buttons in the tuning drawer. Everything is guarded, so blocked storage degrades to "don't persist". |
-| Store | `js/ui/overlays.js` `openStore()` | Button top-right of the board. Instant grants: coins 10k/100k/1M, energy 100/1k/10k. |
+| Store | `js/ui/store.js` `openStore()` | Button top-right of the board. A **deck** is bought with coins at the curve's price for the next pack (also on the play row, `#buyDeckBtn`). Coins 10k/100k/1M and tickets 5/25/100 are real-money grants — **coins can never buy a ticket**, which is the wall the free player walks up to. |
 
 ### The economy model vs `cfg`
 
@@ -138,20 +149,36 @@ Two layers, deliberately separate:
 - **`cfg`** is the *live tuning surface* — flat scalars the drawer edits by hand.
 
 They meet in `Economy.apply()`, which projects the model's flat values onto `cfg` and rebuilds
-`deck`/`boxTable`. So tile code still just reads `cfg.stdBase` and nothing downstream had to
-learn about the model. `Economy.OWNED_CFG_KEYS` is the list `apply()` writes.
+`twistDeck`/`boxTable`. So tile code still just reads `cfg.stdBase` and nothing downstream had
+to learn about the model. `Economy.OWNED_CFG_KEYS` is the list `apply()` writes, and a key
+`apply()` sets but the list omits produces **no error at all** — a returning player simply keeps
+their old value forever and an imported workbook appears to do nothing for them.
+
+`apply()` may only rebuild **templates and scalars, never the live shoe.** It runs on every
+drawer edit, every series change, every `loadState` and at boot, so building `state.shoe` there
+would reshuffle a player's remaining cards each time a designer nudged a slider.
+
+**The curve prices tickets.** `Economy.costFor(episode, ticket)` is exactly what
+`costFor(builder, level)` used to be — the mapping is 1:1, one builder of five levels became one
+episode of five tickets, so the six fitted segments and every number in them survived the rework
+untouched. `Economy.packPrice(state.ticketsPriced)` sums the next `cfg.ticketsPerPack` rungs, and
+`state.ticketsPriced` advances when a pack is **minted**, not when a ticket is spent: buying a
+pack immediately raises the price of the next one, so stockpiling cheap packs is not a strategy.
 
 **The cost curve is a list of segments and the last one must have no `to`.** A bounded final
-rule would leave builders past it unpriced and deadlock the game; `Economy.validateCurve()`
-refuses it. One formula never holds for a whole run — a new rule from builder 500 is an
-appended segment, not a code change.
+rule leaves every later episode unpriced, and since a pack's price is the sum of two rungs that
+does not disable one button — it makes every future pack cost `Infinity` and removes the game's
+only coin sink. `Economy.validateCurve()` refuses it. One formula never holds for a whole run —
+a new rule from episode 500 is an appended segment, not a code change.
 
 **The shipped curve is six segments**, fitted to economy model v3.12, whose pacing is phased
 rather than steady: 6 episodes/day, stepping to 5 at day 5 and 4 at day 15, easing to 3.5 by
-day 60. Builders 29 and 74 are where those steps land. The fit preserves the cumulative cost
+day 60. Episodes 29 and 74 are where those steps land. The fit preserves the cumulative cost
 over each segment rather than any single price, because days-to-finish is a running total —
-it reproduces the model's full run exactly and series 1 to within 12 minutes, with no builder
-more than 1% off the spreadsheet. **`EconomyImport` cannot yet produce this shape** — it still
+it reproduces the model's full run exactly and series 1 to within 12 minutes, with no episode
+more than 1% off the spreadsheet. A consequence worth knowing before "fixing" it: the price
+**steps down slightly** at each segment boundary, and a pack's price saw-tooths within an
+episode because the ramp resets at every episode. Both are the shape that was fitted. **`EconomyImport` cannot yet produce this shape** — it still
 builds one segment from the v3 layout, so importing any workbook today flattens the pacing.
 See [TODO.md](TODO.md).
 
@@ -168,7 +195,23 @@ shifts values but not labels, so a bare "is this a number" test would happily im
 one. `Guide!B2` is the model's identity, and re-importing a version already imported is refused.
 
 There is no server yet, so the browser is the database: an imported model lives in
-`localStorage` under `pmdrama.econ.v1`, with its source filename kept for reference.
+`localStorage` under `pmdrama.econ.v3`, with its source filename kept for reference.
+
+**All three storage slots are v3 and each also refuses a payload whose own `v` is not 3.** Belt
+and braces, because the failure mode is not a refusal but a *partial* restore: `loadState()`'s
+copy loop walks `Object.keys(serializeState())` and silently ignores saved keys that no longer
+exist, so a pre-rework save would restore coins, day, clock, clues, position and every streak
+counter and leave a run with an empty shoe, no tickets and a board position inherited from a
+dice game — with nothing thrown and nothing logged.
+
+### The deck is the whole clock
+
+Worth stating plainly, because it is the one thing the rework changed about *pacing* rather than
+about mechanics. Fifty pulls earn far more coins than the next pack costs — roughly 4,000
+against 400 early on — so **coins never gate anything**. If a player could buy packs freely the
+game would have no pacing at all. The rate free cards arrive at (`cfg.cardRegenMin`, dealt by
+`advanceSession`) is therefore the entire clock, exactly where the energy allowance used to be,
+and bought packs are the accelerator on top of it.
 
 ### Clues are two different things
 
@@ -178,24 +221,31 @@ stores nothing of its own. Content lives in `CLUE_SETS`; `cfg.clueAlbumSize` is 
 size, so slots past the authored sets are numbered placeholders rather than missing entries. `state.cycleClues` is
 the **flow** — banked since the last prediction, it raises the modelled accuracy
 (`Economy.accuracyFor`: 0.55 + 0.04/clue, capped at 0.70) and is spent and reset by
-`resolvePrediction`. Mystery Box item 2 is the only source; the deck pays no clues, so one table
+`resolvePrediction`. Mystery Box item 2 is the only source; no card pays clues, so one table
 sets the rate.
 
 Accuracy only decides the outcome in **auto** runs — a manual pick still wins on its merits.
 That gap is open design, tracked in [TODO.md](TODO.md).
 
-### Energy may exceed the cap
+### The shoe may exceed the cap
 
-Store energy packs are far larger than `cfg.energyCap`. **Overflow is legitimate**, so nothing
-may clamp energy downward. Anything that adds energy must top up *toward* the cap without
-reducing a balance already above it:
+Buying a deck **merges** the new pack into whatever is left of the old one and reshuffles the
+lot, so a shoe over `cfg.packSize` is the ordinary state of affairs rather than an edge case.
+**Overflow is legitimate**, and nothing may trim the shoe downward. Anything that adds free
+cards tops up *toward* the cap without reducing a shoe already above it:
 
 ```js
-state.energy = Math.max(state.energy, Math.min(cfg.energyCap, state.energy + n));
+const room = Math.max(0, cfg.packSize - state.shoe.length);
+Shoe.dealFree(Math.min(n, room));        // and dealFree applies the same rule internally
 ```
 
-This applies to `BoardActor.gainEnergy` and the `advanceSession` regen. `onCfgChange` and
-`loadState` deliberately do **not** clamp. Adding a new clamp will silently delete purchases.
+Four enforcement sites, and **two of them are "do nothing" comments** — which is why a rewrite
+that adds a plain `Math.min` passes every test by luck: `BoardActor.gainCards` and
+`Shoe.dealFree`, the `advanceSession` deal, and then `onCfgChange` and `loadState`, which
+deliberately do **not** clamp. Adding a new clamp will silently delete cards the player bought.
+
+This rule was inherited from energy, and it matters *more* now: energy only ever overflowed via
+the store, where the shoe overflows on the ordinary buy-a-deck path.
 
 ### `index.html?view=mobile` — the player's-eye view
 
@@ -203,7 +253,7 @@ Everything that exists for development is hidden — side panels, action bar, tu
 its button, and the second controls row — and `.wrap` becomes a 9:16 frame filling the
 viewport. What is left is what a player sees: the board, the play controls already riding on
 it, the store, and the HUD, which moves *inside* the frame as an overlay rather than being
-hidden with the rest (a board with no coin or energy balance is not the game).
+hidden with the rest (a board with no coin or card balance is not the game).
 
 Two things worth knowing before changing it:
 
@@ -220,23 +270,27 @@ inflating selectors.
 ### The two auto modes
 
 `autoMode` in `js/ui/main.js` is `null | "roll" | "session"`; both drive one shared loop and only
-one can own it. Either stops on a second click or when energy can't cover the multiplier.
+one can own it. (The string is still `"roll"` — it is also `#rollBtn`'s id and the class the CSS
+keys off, and renaming it buys nothing.) Either stops on a second click, when the shoe runs dry,
+or when the ticket row fills. **Both conditions are re-checked every pass**, because both can
+become true mid-run, and they must agree with `pull()`'s own guard and `cantRoll` in
+`js/ui/render.js` — teach one and not the others and the buttons lie about a loop that is still
+going.
 
-**Auto roll has no button of its own — it is a state of Roll.** Tap Roll to roll once, hold it
+**Auto pull has no button of its own — it is a state of Pull.** Tap Pull to pull once, hold it
 for `cfg.autoRollHoldMs` to hand the loop over, tap again to stop. That is why `renderAll()`
 keeps `#rollBtn` enabled while `autoMode === "roll"`: it is the only way out, so disabling it
 mid-loop would strand the player. The handler uses pointer events, not click, because the tap
 and the hold have to be told apart before a click would fire; sliding off the button cancels
-the hold without rolling.
+the hold without pulling.
 
-|  | **Auto roll** (hold Roll) | **Auto-play session** |
+|  | **Auto pull** (hold Pull) | **Auto-play session** |
 |---|---|---|
-| Buys upgrades | no | yes (cheapest first) |
+| Buys decks | no — it stops and says the deck is empty | yes, whenever coins cover the next pack |
 | Intent | simulates a real player | internal balancing tool |
-| Train bonus game | plays it, and picks for itself after the 10–20s window (nobody is at the keyboard) | skipped — takes the Collect popup's fast path, so no WebGL page is opened per roll |
+| Train bonus game | plays it, and picks for itself after the 10–20s window (nobody is at the keyboard) | skipped — takes the Collect popup's fast path, so no WebGL page is opened per pull |
 | Episode video | plays in full | skipped, but logged with its length |
 | Prediction outcome | pick decides | modelled via `cfg.accuracy` |
-| Builder buttons | stay clickable (clicking stops the loop) | disabled |
 
 Neither mode opens the prediction modal on its own — episodes are only watched when the player
 clicks **Predict & watch**.
@@ -249,7 +303,7 @@ node tests/run.js
 
 Zero-dependency runner that loads the real scripts into a `vm` context — no framework, no build,
 no mocked app modules. Covers the DOM-free layers: util, config invariants, board model,
-episodes, builders, game (prediction/session), tiles, overlays and storage. **Run it after
+episodes, tickets, the card shoe, game (prediction/session), tiles, overlays and storage. **Run it after
 changing any of those.** See [tests/README.md](tests/README.md), which also carries two lists we
 have not acted on yet: functionality that would need heavy mocking, and logic currently trapped
 inside DOM-building functions.
@@ -262,29 +316,46 @@ inside DOM-building functions.
   existing saves pick up new defaults. Removing a key leaves a harmless stray in old saves.
 - **New persisted state** must be added to `serializeState()` in `js/storage.js`; unlisted fields
   are treated as transient. `loadState` also drops queue entries that aren't known episode ids.
-- **`roll()` and `autoPlay()` use try/finally.** `state.animating` must always clear — if it
-  doesn't, the board soft-locks with Roll permanently disabled.
-- **The buildings are not on the board.** They have their own 3D scene (`js/ui/builders3d.js`),
-  reached by the 🏗 button. One renderer draws both scenes — a second `WebGLRenderer` would take
-  a second GL context, and browsers cap those. `Board3D.setView()` swaps the scene and
-  `.boardScene.showBuilders` swaps the DOM overlay; both happen in `setBuildersView()` so they
-  cannot disagree.
-- **The builders view shows `cfg.builderPageSize` buildings and the page is derived, not
-  stored.** `Builders.page()` is the first page still holding an unmaxed builder, so finishing
-  them out of order can never skip one and nothing needs persisting.
-- **Prices in that row use `fmtShort`** (`2.5k`, `1.2m`, `14b`), capped at four characters, so
-  five buttons fit one phone line whatever the economy charges.
+- **`pull()` and `autoPlay()` use try/finally.** `state.animating` must always clear — if it
+  doesn't, the board soft-locks with Pull permanently disabled.
+- **A ticket card must `return` before the landing is resolved**, not merely skip the move loop.
+  `resolveLandingEvents()` runs unconditionally after the loop and resolves overlays *before* the
+  tile, so falling through on a card that moved the token zero tiles re-collects whatever mystery
+  box the player is standing on — a free box on every ticket, with nothing in the logs.
+- **The ticket row shows `cfg.episodeRowSize` placeholders and the row is derived, not stored.**
+  `Tickets.page()` is the first row still holding an episode that is not *(full and watched)*, so
+  filling them out of order can never skip a row and nothing extra needs persisting. Watchedness
+  is read off `state.epQueue` and `state.pendingReveal`, both already saved — and a sealed but
+  unwatched bet counts as **not** watched, or ducking out mid-episode would advance the row.
+- **A full row is not a dead end.** It is the only stop condition in the game, so Pull stays
+  enabled, says "Watch to continue", and opens the prediction. A disabled primary button with no
+  explanation reads as a soft-lock.
+- **The ticket placeholders are buttons.** A completed one draws a play triangle, so it has to
+  actually be tappable — `Board3D.slotAt()` raycasts the row's sprites and `window.onSlotTap`
+  in `js/ui/main.js` opens the prediction. Two traps: the row is rebuilt whenever a ticket
+  lands and a fresh sprite's world matrix is stale until the next render, so `slotAt` updates
+  the matrices before testing; and **slot 0 is a legitimate hit and is falsy**, so callers must
+  test `!= null`. The tap also has to be told apart from a camera pan, which is why the pick
+  runs on pointerup only when the pointer travelled under a few pixels.
+- **A pulled card lands at a FIXED spot on the board, not on the screen.** Every card flies to
+  `Shoe3D._discardPos()` (the board centre by default) and the next one lands on top of it, so
+  only the last card pulled is ever visible and the scene holds exactly one. Deliberately unlike
+  the mystery box, which flies to the camera's aim: a box is a momentary burst that must be
+  centre-screen wherever the camera is looking, where a card is the board's memory of the last
+  turn and belongs somewhere the player learns.
+- **Prices use `fmtShort`** (`2.5k`, `1.2m`, `14b`), capped at four characters, so the play row
+  fits one phone line whatever the economy charges.
 - The activity log keeps the last 60 entries; older lines are trimmed.
 
 ## Known dead config
 
-`secPerRoll` and `avgOdds` are in the tuning drawer but read by nothing. Both are still used by
-the economy spreadsheet (seconds-per-roll derives its "active minutes per session"; average odds
+`secPerPull` and `avgOdds` are in the tuning drawer but read by nothing. Both are still used by
+the economy spreadsheet (seconds-per-pull derives its "active minutes per session"; average odds
 derives the prediction edge), so wiring them up is defensible — see [TODO.md](TODO.md).
 `avgOdds` is a *reference* number: real odds are per-answer in the episode files, so the model's
 single average has no honest call site until something needs to check the library against it.
 
-Four of the model's five relative knobs are imported and ignored; only `builderCost` is read.
+Four of the model's five relative knobs are imported and ignored; only `ticketCost` is read.
 `clues` are now spent — see "Clues are two different things" above.
 
 The **wager tiers are wired**: `wagerSafe/wagerConfident/wagerMax` project onto `cfg` and

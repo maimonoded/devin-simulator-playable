@@ -30,7 +30,7 @@ const Episodes={
   /* Video path for an episode — always the id with an .mp4 extension. */
   videoFor(id){ return `episodes/${id}.mp4`; },
   /* Episode for a 0-based builder index. Builders beyond the available files
-     cycle through them so a raised cfg.buildings still gets content. */
+     cycle through them so a raised cfg.episodesInSeries still gets content. */
   idForBuilder(bIdx){
     const ids=this.ids(); if(!ids.length) return null;
     const want=String(bIdx+1).padStart(3,"0");

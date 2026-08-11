@@ -20,10 +20,10 @@ function openProfile(){
     <div class="mbody">
       <div class="profileGrid">
         <div class="pstat"><div class="v">${fmt(state.coins)}</div><div class="l">Coins</div></div>
-        <div class="pstat"><div class="v">${state.rolls}</div><div class="l">Rolls</div></div>
+        <div class="pstat"><div class="v">${state.pulls}</div><div class="l">Pulls</div></div>
         <div class="pstat"><div class="v">${state.epsWatched}</div><div class="l">Episodes watched</div></div>
         <div class="pstat"><div class="v">${acc}</div><div class="l">Prediction accuracy</div></div>
-        <div class="pstat"><div class="v">${Builders.doneCount()}/${Builders.count()}</div><div class="l">Builders done</div></div>
+        <div class="pstat"><div class="v">${Tickets.doneCount()}/${Tickets.count()}</div><div class="l">Episodes complete</div></div>
         <div class="pstat"><div class="v">${Clues.collected()}/${Clues.total()}</div><div class="l">Clues</div></div>
       </div>
       <button class="btn ghost wide danger" id="resetPlayer" style="margin-top:14px">🗑 Reset player progress</button>

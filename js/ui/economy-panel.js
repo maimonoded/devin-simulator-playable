@@ -22,17 +22,17 @@ function buildEconomyPanel(body){
   /* Cost curve, read-only: it is segmented data, not a scalar, so the number-box rows the
      drawer builds from TUNING cannot represent it. */
   const ct=document.createElement("table"); ct.className="ttable";
-  ct.innerHTML=`<tr><th>Builders</th><th>Rule</th><th>Lvl 1 cost</th><th>Lvl ${cfg.tiers} cost</th></tr>`;
+  ct.innerHTML=`<tr><th>Builders</th><th>Rule</th><th>Lvl 1 cost</th><th>Lvl ${cfg.ticketsPerEpisode} cost</th></tr>`;
   e.costCurve.forEach(seg=>{
     const from=seg.from||1;
     const span=seg.to==null?`${from} →`:`${from}–${seg.to}`;
     const rule=seg.kind==="explicit"
       ? `explicit table (${(seg.levels||[]).length} rows)`
-      : `${Math.round(seg.base)} × ${seg.levelGrowth}<sup>L−1</sup> × b<sup>${seg.exponent.toFixed(4)}</sup>`;
+      : `${Math.round(seg.base)} × ${seg.ticketGrowth}<sup>L−1</sup> × b<sup>${seg.exponent.toFixed(4)}</sup>`;
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${span}${seg.to==null?' <span class="hint">(open-ended)</span>':""}</td><td>${rule}</td>
       <td>${fmt(Math.round(Economy.costFor(from,1)))}</td>
-      <td>${fmt(Math.round(Economy.costFor(from,cfg.tiers)))}</td>`;
+      <td>${fmt(Math.round(Economy.costFor(from,cfg.ticketsPerEpisode)))}</td>`;
     ct.appendChild(tr);
   });
   wrap.appendChild(ct);
@@ -48,12 +48,12 @@ function buildEconomyPanel(body){
   st.innerHTML=`<tr><th>Series</th><th>Builders</th><th>Global #</th><th></th></tr>`;
   shape.forEach(s=>{
     const cur=s.index===state.series;
-    const short=s.builders<s.declared;
+    const short=s.episodes<s.declared;
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${s.name}${cur?' <b style="color:var(--gold)">◀ here</b>':""}</td>
-      <td>${s.builders}${short?` <span class="hint">of ${s.declared}</span>`:""}</td>
-      <td>${s.builders?`${s.from}–${s.to}`:"—"}</td>
-      <td class="hint">${s.builders?"":"needs episodes"}</td>`;
+      <td>${s.episodes}${short?` <span class="hint">of ${s.declared}</span>`:""}</td>
+      <td>${s.episodes?`${s.from}–${s.to}`:"—"}</td>
+      <td class="hint">${s.episodes?"":"needs episodes"}</td>`;
     st.appendChild(tr);
   });
   wrap.appendChild(st);
@@ -104,7 +104,7 @@ async function importEconomyFile(f){
   /* A new model means a new series shape, so the run may be pointing past the end of it. */
   if(state.series>=Economy.playableSeries().length) state.series=0;
   Economy.apply();
-  Builders.reshape();
+  Tickets.reshape();
   saveEconomy(); saveConfig();
   afterEconomyChange();
   const warn=res.warnings.length
@@ -118,7 +118,7 @@ async function importEconomyFile(f){
    message it just wrote has to be re-applied by the caller if it should survive. */
 function afterEconomyChange(){
   const keep=$("#econMsg")?$("#econMsg").innerHTML:"";
-  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); renderAll();
+  Tickets.reshape(); buildTuning(); buildBoard(); onCfgChange(); renderAll();
   if(keep&&$("#econMsg")) $("#econMsg").innerHTML=keep;
 }
 

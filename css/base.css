@@ -55,6 +55,9 @@ input{font-family:inherit}
 .pill .lb{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .pill.coins .v{color:var(--gold)}
 .pill.clues .v{color:var(--teal)}
-.energywrap{min-width:190px}
+/* The cards pill carries the only bar in the app, and css/mobile.css overrides this floor to
+   stop the 9:16 HUD wrapping to two rows. Renaming this class without renaming that override
+   reproduces exactly the bug the comment there documents. */
+.cardswrap{min-width:190px}
 .ebar{height:9px;background:#10143a;border-radius:6px;overflow:hidden;margin-top:5px;border:1px solid var(--line)}
 .efill{height:100%;background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}

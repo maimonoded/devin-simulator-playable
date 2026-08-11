@@ -16,7 +16,9 @@ async function playEvents(events){
     if(ev.log) log(ev.log.icon,ev.log.msg);
     if(ev.move){ for(const p of ev.move.path){ state.pos=p; positionToken(); await sleep(ev.move.stepMs); } }
     if(ev.confetti) confetti();
-    if(ev.dice) diceConfetti();
+    /* A ticket may be awarded from inside a played event (the Plot Twist card, the mystery
+       box), so the announcement rides along with it rather than being fired by a button. */
+    if(ev.ticketAward){ renderHUD(); announceTickets(ev.ticketAward); }
     if(ev.card){ renderHUD(); await showCard(ev.card); }
     if(ev.reveal){ renderHUD(); await showReveal(ev.reveal); }
     if(ev.collect){ renderHUD(); await showCollect(ev.collect); }
@@ -28,19 +30,51 @@ async function playEvents(events){
   }
 }
 
-async function roll(){
-  if(state.animating||state.energy<state.mult) return;
+/* One pull: take a card off the shoe, show it, then act on it.
+
+   A TICKET CARD RETURNS EARLY — it must not fall through to resolveLandingEvents(). The token
+   does not move, so the landing would re-resolve the tile it is already standing on AND consume
+   any mystery box sitting there (resolveLandingEvents runs overlays first), handing out a free
+   re-collect on every ticket. Skipping the move loop is not enough; the return is the fix. */
+async function pull(){
+  if(state.animating||Shoe.isEmpty()||Tickets.rowFull()||state.seriesDone) return;
   state.animating=true; renderAll();
   // try/finally: if anything below throws, the animating flag must still clear —
-  // otherwise the board soft-locks with Roll permanently disabled.
+  // otherwise the board soft-locks with Pull permanently disabled.
   try{
-    const mult=state.mult;
-    spendRoll(mult);
-    const {d1,d2,steps}=rollDice();
-    await rollDiceAnim(d1,d2);          // click → reveal (cfg.diceRevealMs)
-    await sleep(cfg.diceToMoveMs);      // reveal → token starts moving
+    const card=Shoe.pull();
+    if(card==null) return;
+    await pullCardAnim(card);           // tap → card face up (cfg.pullRevealMs)
+    await sleep(cfg.pullToMoveMs);      // face up → token starts moving
+
+    if(Shoe.isTicket(card)){
+      /* The DOM half of the joker celebration; Shoe3D owns the 3D half (the card comes up big,
+         punches, spins, and is collected by the row). Fired here rather than inside the flight
+         because this is the moment it has arrived at full size and the player is looking at it.
+         Skipped for the batch balancing tool, which runs thousands of pulls with nobody at the
+         keyboard and would otherwise spend every one of them building forty divs. */
+      if(autoMode!=="session" && typeof confetti==="function") confetti();
+      log("🎟","Pulled a <b>ticket</b>");
+      await playEvents(ticketPullEvents());
+      /* HOLD THE TURN OPEN UNTIL THE CELEBRATION IS OVER — the one place the pull deliberately
+         waits on presentation, and the exception that proves the rule above it.
+
+         Everything else about a card's second beat is off the critical path on purpose. A joker
+         is different in kind: it is not the card being tidied away, it IS the reward, and it is
+         the only one the game shows rather than tells. Without this the auto loop comes back
+         round 60ms after pull() returns and the next card puts the celebration away mid-hold —
+         so the louder it got, the less of it anyone actually saw.
+
+         Skipped for the batch balancing tool, which takes the fast path through videos, box
+         throws and bonus games for the same reason: nobody is watching, and a second and a bit
+         per ticket is real money across a run of thousands. */
+      if(autoMode!=="session" && use3d() && window.Board3D && Board3D.available && Board3D.cardStageClear)
+        await Board3D.cardStageClear(cfg.jokerHoldMs + cfg.cardToTableMs + 600);
+      return;                           // ← see the header. Not a break, not a skip: a return.
+    }
 
     let passedStart=false;
+    const steps=Shoe.rank(card);        // the rank is the move; the suit is only ever art
     for(let s=0;s<steps;s++){
       state.pos=(state.pos+1)%40;
       if(state.pos===0) passedStart=true;
@@ -50,71 +84,94 @@ async function roll(){
     }
     // pass-start (lap) reward if we crossed 0 but did not land there
     if(passedStart && state.pos!==0){
-      const pass=applyPassStart(mult);
+      const pass=applyPassStart(1);
       floatToken("+"+fmt(pass),"var(--gold)"); log("⭐",`Passed Start · +<b>${fmt(pass)}</b> coins`);
     }
-    await playEvents(resolveLandingEvents(mult));
+    await playEvents(resolveLandingEvents(1));
   }catch(e){
-    console.error("roll failed:",e);
-    log("⚠️","<b>Something went wrong mid-roll</b> — board recovered.");
+    console.error("pull failed:",e);
+    log("⚠️","<b>Something went wrong mid-pull</b> — board recovered.");
     clearOverlayFx();
   }finally{
     state.animating=false; renderAll();
   }
 }
 
-/* Upgrade button handler: apply in logic, announce in UI. */
-function uiUpgrade(bIdx){
-  const r=Builders.upgrade(bIdx); if(!r) return;
-  log("🏗️",`Builder ${bIdx+1} → level ${r.level}/${Builders.maxTier()} · −<b>${fmt(r.cost)}</b>`);
-  if(r.builderDone) log("🏗️",`<b>Builder ${bIdx+1} fully upgraded</b> (${Builders.doneCount()}/${Builders.count()} done)`);
-  // episodes unlock only when a builder is completed
-  if(r.title){
-    toast(`🎬 Episode unlocked — <b>${r.title}</b>`);
-    log("🎬",`Episode unlocked · <b>${r.title}</b>`);
-  }
+/* What a ticket card does: fills a placeholder and drops mystery boxes on the board.
+   State first, animation second — dropBoxes() picks the tiles synchronously, so a reload or a
+   lost WebGL context mid-throw still leaves the boxes correctly on the board. */
+function ticketPullEvents(){
+  const ev=[];
+  const award=Tickets.award(1);
+  ev.push({float:{text:"+1🎟",color:"var(--pink)"},ticketAward:award,
+           log:{icon:"🎟",msg:`Ticket collected · <b>${Tickets.doneCount()}/${Tickets.count()}</b> episodes`}});
+  dropBoxes(cfg.boxesPerTicketCard);
+  return ev;
+}
+
+/* Announce what a ticket award did. Called from playEvents (the card and the box) and from the
+   store, so all three paths say the same thing in the same order. */
+function announceTickets(r){
+  if(!r) return;
+  r.titles.filter(Boolean).forEach(t=>{
+    toast(`🎬 Episode unlocked — <b>${t}</b>`);
+    log("🎬",`Episode unlocked · <b>${t}</b>`);
+  });
+  if(r.banked) log("🎟",`<b>${r.banked}</b> ticket${r.banked>1?"s":""} banked — watch this row to spend them`);
   if(r.seriesDone) seriesComplete();
   renderAll();
   /* Offer it the moment it unlocks — but only to a human, and only when the finale is not
      already on screen. An auto run must never be stopped by a modal (that is the rule the two
      auto modes are built on), and stacking this over seriesComplete() would bury the finale.
      Either way the id stays queued, so nothing is lost by not asking. */
-  if(r.episodeId && !r.seriesDone && autoMode===null) openEpisodeUnlock(r.episodeId);
+  const id=r.episodeIds&&r.episodeIds[0];
+  if(id && !r.seriesDone && autoMode===null) openEpisodeUnlock(id);
 }
 
 function nextSession(){
   const r=advanceSession();
   r.rewards.forEach(x=>log("🎁",`Day ${x.day} login reward · +<b>${fmt(x.amount)}</b> coins`));
   if(r.isNewDay) toast(`☀️ <b>Day ${state.day}</b> — welcome back`);
-  log("⏭",`New session · energy refilled to <b>${Math.floor(state.energy)}</b>`);
+  /* "dealt N, now M" rather than "refilled to the cap": the shoe can already be over the cap
+     from a bought pack, in which case a session deals nothing and "refilled" would be a lie. */
+  log("⏭",`New session · +<b>${r.cards}</b> card${r.cards===1?"":"s"} · <b>${Shoe.count()}</b> in hand`);
   renderAll();
 }
 
-/* Two auto modes, each a toggle (click to start, click again to stop after the current roll):
-     "roll"    — rolls only, nothing else. Stops when energy can't cover the multiplier.
-     "session" — rolls AND spends coins on the cheapest upgrades (internal balancing tool).
-   Only one can own the loop at a time. */
+/* Two auto modes, each a toggle (click to start, click again to stop after the current pull):
+     "roll"    — pulls only, nothing else. Stops when the shoe runs dry or the row fills.
+     "session" — pulls AND buys packs with the coins it earns (internal balancing tool).
+   Only one can own the loop at a time. The name "roll" is kept because it is also the
+   #rollBtn's id and the class the CSS keys off; renaming it is churn for no gain. */
 let autoMode=null;   // null | "roll" | "session"
 async function runAuto(mode){
   if(autoMode===mode){ autoMode=null; renderAll(); return; }   // same button again → stop
   if(autoMode!==null||state.animating) return;                  // the other mode owns the loop
   autoMode=mode; renderAll();
-  let outOfEnergy=false;
+  let stopReason=null;
   try{
     while(autoMode===mode && !state.seriesDone){
-      if(state.energy<state.mult){ outOfEnergy=true; break; }   // re-checked each pass: mult can change mid-run
-      await roll();
-      if(state.animating) break;   // a roll bailed out unexpectedly — don't spin
-      if(mode==="session"){
-        // opportunistically upgrade the cheapest available builder to keep the loop turning
-        let up=Builders.cheapest();
-        while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=Builders.cheapest(); }
+      /* Re-checked every pass, not once: the shoe empties mid-run and the row fills mid-run.
+         These two conditions must match pull()'s own guard and render.js's cantRoll — teach
+         one and not the others and the buttons lie about a loop that is still going. */
+      if(Tickets.rowFull()){ stopReason="row"; break; }
+      if(Shoe.isEmpty()){
+        /* The balancing tool buys its own cards — without this it stops at the first empty
+           shoe and models nothing. Decks are real money now, so what it models is the SPENDING
+           player: the upper bound on how fast a run can go when cards are never the constraint.
+           A human's auto-pull stops instead and is told why. */
+        if(mode==="session") Shoe.buyPack();
+        else { stopReason="cards"; break; }
       }
+      await pull();
+      if(state.animating) break;   // a pull bailed out unexpectedly — don't spin
       await sleep(60);
     }
   }finally{
     autoMode=null;
-    if(outOfEnergy) log("⏹",`${mode==="roll"?"Auto roll":"Auto-play"} stopped · needs <b>${state.mult}</b>⚡ for a ×${state.mult} roll, have <b>${Math.floor(state.energy)}</b>`);
+    const what=mode==="roll"?"Auto pull":"Auto-play";
+    if(stopReason==="cards") log("⏹",`${what} stopped · the deck is empty — wait for cards, or buy a deck ($${Shoe.priceUsd().toFixed(2)})`);
+    if(stopReason==="row") log("⏹",`${what} stopped · all ${Tickets.pageSlots().length} episodes ready — watch them to keep pulling`);
     renderAll();
   }
 }
@@ -122,13 +179,39 @@ const autoRoll=()=>runAuto("roll");
 const autoPlay=()=>runAuto("session");
 function stopAuto(){ if(autoMode!==null){ autoMode=null; renderAll(); } }
 
-/* Builder button click. Upgrades stay clickable during auto-roll, so buying one is
-   also how you take manual control: stop the loop, let the in-flight roll finish
-   (Builders.upgrade refuses mid-animation), then buy. */
-async function onUpgradeClick(bIdx){
+/* The riffle: the deck already on the table and the one just bought, shuffled into one.
+
+   PLAYED WHEN THE BOARD IS ACTUALLY VISIBLE, which is the whole reason it is a separate step.
+   Buying from the store happens with a modal over the board, so the shuffle is owed and paid on
+   the way out; buying from the play row has nothing in the way, so it plays at once. Same rule
+   the mystery boxes follow — a reward animated behind a panel is a reward nobody sees.
+
+   Deliberately NOT persisted: the cards are already in the shoe (Shoe.buyPack merges before any
+   of this), so a reload mid-store costs a flourish and nothing else. Persisting it would mean a
+   saved run could owe an animation forever.
+
+   Blocks the pull loop while it runs, so a card cannot fly off a deck that is mid-riffle. */
+let _shuffleOwed=false;
+async function playDeckShuffle(){
+  _shuffleOwed=false;
+  /* The batch balancing tool buys constantly and nobody is watching — same fast path it takes
+     for the box throw, the bonus games and the episode video. */
+  if(autoMode==="session"||!use3d()||!window.Board3D||!Board3D.available) return;
+  state.animating=true; renderAll();
+  try{ await Board3D.shuffleDeck(); }
+  catch(e){ console.error("deck shuffle failed:",e); }
+  finally{ state.animating=false; renderAll(); }
+}
+/* Buying a deck is also how you take manual control of an auto-pull: stop the loop, let the
+   in-flight pull finish, then buy. */
+async function onBuyDeck(){
   stopAuto();
   while(state.animating) await sleep(50);
-  uiUpgrade(bIdx);
+  const r=Shoe.buyPack();
+  toast(`🃏 <b>+${cfg.packSize}</b> cards`);
+  log("🃏",`Bought a deck ($${r.usd.toFixed(2)}) · ${r.size} cards in hand`);
+  renderAll();
+  await playDeckShuffle();          // nothing covering the board here, so play it now
 }
 
 /* ---------------- wiring ---------------- */
@@ -145,14 +228,15 @@ if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE){
   const scene=$("#boardScene");
   if(scene) [$(".hud"),$(".storeBtn")].forEach(el=>{ if(el) scene.appendChild(el); });
 }
-/* Roll is one button with two modes: tap it to roll once, hold it to hand the loop over to
-   auto-roll, tap it again to stop. Auto-roll used to be its own button; folding it into Roll
-   keeps the primary action in one place, which matters most in the 9:16 phone framing where
-   the control row is tight.
+/* Pull is one button with three modes: tap it to pull once, hold it to hand the loop over to
+   auto-pull, tap it again to stop. And when the ticket row is full it is the way INTO the
+   prediction — a full row is the game asking you to watch, not a dead end, so the button
+   redirects rather than greying out. That matters more than it did: with dice and energy gone
+   this is the only stop condition left in the game.
 
    Pointer events rather than click, because the tap and the hold have to be told apart before
    the click would fire. The hold is cancelled if the pointer leaves the button, so sliding off
-   is the way to back out without rolling. */
+   is the way to back out without pulling. */
 (function wireRoll(){
   const btn=$("#rollBtn");
   let holdT=null, startedAuto=false;
@@ -175,52 +259,78 @@ if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE){
        by now autoMode is already "roll", so without this the mode would flick on and off in
        one gesture. Only a fresh press counts as the stop. */
     if(startedAuto){ startedAuto=false; return; }
-    if(autoMode==="roll") autoRoll();        // tap while auto-rolling = stop
-    else if(wasTap) roll();
+    if(autoMode==="roll") autoRoll();        // tap while auto-pulling = stop
+    else if(wasTap){
+      // a full row means "go and watch", not "nothing happens"
+      if(Tickets.rowFull()&&!state.seriesDone) openPrediction(Tickets.firstUnwatchedId());
+      else pull();
+    }
   });
   btn.addEventListener("pointerleave",endHold);
   btn.addEventListener("pointercancel",endHold);
 })();
 $("#autoBtn").onclick=autoPlay;
-/* Builders view. The buildings are a separate 3D scene, so switching means moving the DOM
-   overlay AND the scene the renderer draws — doing both here is what keeps them from ever
-   disagreeing about which view is up. */
-function setBuildersView(on){
-  $("#boardScene").classList.toggle("showBuilders",!!on);
-  if(use3d()&&window.Board3D&&Board3D.available) Board3D.setView(on?"builders":"board");
-  renderAll();
-  if(!on) deliverBoxes();
-}
-/* Boxes bought while the builders screen was up are thrown onto the board now that it is back.
+$("#buyDeckBtn").onclick=onBuyDeck;
+/* Tapping a ticket placeholder on the board.
+
+   A completed placeholder draws a play triangle, so it has to actually BE a button — an
+   affordance that does nothing reads as a broken game, and once the row is full it is the only
+   thing on screen that looks like the way forward.
+
+   The ordering rule is the library's, verbatim rather than re-derived: any unwatched episode
+   starts the EARLIEST unwatched one, because the story is serialised and jumping ahead spoils
+   what was skipped — and it SAYS so, or being handed a different episode than the one you
+   pressed just reads as a bug. A sealed bet always resumes on its own episode, whichever slot
+   was tapped, because the result is owed on that one. Board3D calls this through a global so
+   the module does not have to know what a prediction is. */
+window.onSlotTap=function(slot){
+  if(state.animating||autoMode!==null) return;
+  const id=Tickets.idAt(slot);
+  if(!id) return;
+  if(!Tickets.isFull(slot)){
+    const per=Tickets.perEpisode();
+    toast(`🎟 <b>${Tickets.held(slot)}/${per}</b> tickets — keep pulling to unlock this one`);
+    return;
+  }
+  if(state.pendingReveal) return openPrediction(state.pendingReveal.id);
+  if(!state.epQueue.includes(id)) return openLibrary();   // already watched — offer the rewatch
+  const next=Tickets.firstUnwatchedId()||id;
+  if(next!==id) toast(`▶ Episodes play in order — starting <b>${Episodes.titleOf(next)}</b>`);
+  openPrediction(next);
+};
+/* Drop mystery boxes on the board — one per ticket earned.
 
    The state moves FIRST and the animation is decoration on top: spawn() picks the tiles and
-   clears the pending count synchronously, so a reload, a view switch or a missing WebGL context
-   mid-throw all leave the boxes correctly on the board rather than lost. The only thing that can
-   be interrupted is the picture.
+   clears the pending count synchronously, so a reload or a missing WebGL context mid-throw
+   still leave the boxes correctly on the board rather than lost. The only thing that can be
+   interrupted is the picture.
 
-   Not awaited by anything: the player is back on the board and free to roll, and roll() blocks
-   on state.animating rather than on this. */
-function deliverBoxes(){
-  const n=state.pendingBoxes|0;
-  if(n<=0) return;
-  const spawned=OVERLAY_TYPES.mysteryBox.spawn(n);
-  /* Fewer free tiles than boxes: the rest stay banked for the next trip back, so a full board
-     never silently eats a reward the player paid for. */
-  state.pendingBoxes=Math.max(0,n-spawned.length);
+   Not awaited by anything: pull() blocks on state.animating, not on this. */
+function dropBoxes(n){
+  const want=Math.max(0,(n|0))+(state.pendingBoxes|0);
+  if(want<=0) return;
+  const spawned=OVERLAY_TYPES.mysteryBox.spawn(want);
+  /* Fewer free tiles than boxes: the rest stay banked for the next drop, so a full board never
+     silently eats a reward the player earned. */
+  state.pendingBoxes=Math.max(0,want-spawned.length);
   renderAll();
   if(!spawned.length) return;
   log("🎁",`<b>${spawned.length}</b> mystery box${spawned.length>1?"es":""} dropped on the board`);
-  /* Auto-play session is the batch tool — thousands of upgrades, nobody watching. It gets the
+  /* Auto-play session is the batch tool — thousands of pulls, nobody watching. It gets the
      boxes without the show, exactly as it skips episode video and the bonus games. */
   if(autoMode==="session"||!use3d()||!window.Board3D||!Board3D.available) return;
+  /* Thrown FROM the card when there is one on the stage — which on the path that matters, a
+     joker, there always is: the boxes go while it is still held up. So the reward is seen to
+     come out of the ticket that earned it instead of dropping from nowhere. Null on every other
+     path (and if the card has already been collected), and throwOverlays falls back to the
+     drop-from-above it has always done. */
   Board3D.throwOverlays(
-    OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))),spawned);
+    OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))),spawned,
+    Board3D.cardWorldPos&&Board3D.cardWorldPos());
 }
-$("#buildersBtn").onclick=()=>setBuildersView(true);
-$("#boardBtn").onclick=()=>setBuildersView(false);
 /* Straight into the prediction for the earliest unwatched episode — same ordering rule the
    library enforces, so the two entry points can never disagree about what plays next. */
-$("#bingeBtn").onclick=()=>openPrediction(Builders.firstUnwatchedId());
+$("#bingeBtn").onclick=()=>openPrediction(Tickets.firstUnwatchedId());
 $("#libraryBtn").onclick=()=>openLibrary();
 $("#albumBtn").onclick=()=>openAlbum();
 $("#avatarBtn").onclick=()=>openProfile();
@@ -254,14 +364,6 @@ function applyPhoneView(on){
      change — the ResizeObserver would not fire in that case and the frustum would be stale. */
   if(use3d()&&window.Board3D&&Board3D.available) Board3D.resize();
 }
-/* One stake button instead of a row: each tap steps to the next multiplier and wraps.
-   indexOf returning -1 for a stake that is no longer in the list (an old save, or a shortened
-   MULTIPLIERS) lands on index 0, so a restore can never strand the player on a dead value. */
-$("#multBtn").onclick=()=>{
-  if(state.animating||autoMode!==null) return;   // can't change the stake mid-spin
-  state.mult=MULTIPLIERS[(MULTIPLIERS.indexOf(state.mult)+1)%MULTIPLIERS.length];
-  renderAll();
-};
 $("#drawerBtn").onclick=()=>$("#drawer").classList.add("open");
 $("#closeDrawer").onclick=()=>$("#drawer").classList.remove("open");
 
@@ -276,13 +378,16 @@ function boot(){
      version gate that decides how much of the save survives. */
   loadEconomy();
   Economy.apply();
-  loadConfig();                 // initState() reads cfg.energyCap, so this must precede it
+  /* initState() mints the opening shoe and reads cfg.packSize to size it, so loadConfig must
+     precede it — initialising the shoe first would size every fresh run from DEFAULTS rather
+     than from an imported model. Do not reorder these three. */
+  loadConfig();
   initState();
   const restored=loadState();   // overlay saved progress, if any
-  buildBoard(); buildTuning(); setDice(3,4); syncMultButton(); renderAll();
+  buildBoard(); buildTuning(); renderAll();
   applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
-  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
-  else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");
+  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.pulls} pulls so far.`);
+  else log("✨","Welcome to <b>Harbour Heights</b>. Pull to move, collect tickets, predict to win.");
   if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
 }
 window.boot=boot;

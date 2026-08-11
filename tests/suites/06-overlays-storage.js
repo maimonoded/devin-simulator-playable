@@ -69,7 +69,7 @@ test("contents are decided when the box is PLACED, not when it is landed on", ()
   box.all().forEach(i => {
     const d = box.dataAt(i);
     ok(d, `tile ${i} must know what it holds the moment it is placed`);
-    ok(["coins", "energy", "clues"].includes(d.kind), d.kind);
+    ok(["coins", "tickets", "clues"].includes(d.kind), d.kind);
     ok(d.amount > 0);
   });
 });
@@ -107,7 +107,7 @@ test("a box saved before contents were decided still opens", () => {
 
 test("item 1 is always coins, whatever item 2 turns out to be", () => {
   freshRun();
-  ["coins", "energy", "clues"].forEach(kind => {
+  ["coins", "tickets", "clues"].forEach(kind => {
     state.coins = 0;
     forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand());
     ok(state.coins >= cfg.boxCoins * cfg.boardScale, `guaranteed coins still paid on a ${kind} draw`);
@@ -122,22 +122,21 @@ function forceDrop(kind, fn) {
   try { return fn(); } finally { boxTable.forEach((c, i) => { c.weight = saved[i]; }); }
 }
 
-test("a coin drop rains coins and no energy", () => {
+test("a coin drop rains coins and no tickets", () => {
   freshRun();
   state.coins = 0;
   const [open, , second] = forceDrop("coins", () => OVERLAY_TYPES.mysteryBox.onLand(3));
   ok(state.coins > 0);
-  eq(open.boxOpen.energy, 0, "nothing electrical to shower");
+  eq(open.boxOpen.tickets, 0, "no ticket to shower");
   eq(open.boxOpen.coins, state.coins, "the coin shower is sized by what was actually won");
   eq(second.pause, 120);
 });
 
-test("an energy drop rains energy as well as the guaranteed coins", () => {
+test("a ticket drop rains tickets as well as the guaranteed coins", () => {
   freshRun();
-  state.energy = 0;
-  const [open] = forceDrop("energy", () => OVERLAY_TYPES.mysteryBox.onLand(3));
-  ok(state.energy > 0);
-  ok(open.boxOpen.energy > 0, "energy drops get their own shower");
+  const [open] = forceDrop("tickets", () => OVERLAY_TYPES.mysteryBox.onLand(3));
+  ok(Tickets.held(0) > 0, "the ticket lands on a placeholder");
+  ok(open.boxOpen.tickets > 0, "ticket drops get their own shower");
   // item 1 is always coins, so a coin shower fires on every box whatever item 2 was
   ok(open.boxOpen.coins > 0, "the guaranteed coins still rain");
 });
@@ -176,17 +175,18 @@ test("a clue drop past the end of the album still reports honestly", () => {
 
 test("coin and energy drops carry no clue popup", () => {
   freshRun();
-  ["coins", "energy"].forEach(kind => {
+  ["coins", "tickets"].forEach(kind => {
     const [open] = forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand(3));
     ok(!open.boxOpen.clue, `${kind} must not open the clue popup`);
   });
 });
 
-test("an energy drop cannot reduce an over-cap balance", () => {
+test("a ticket drop goes through Tickets.award, never straight to a counter", () => {
   freshRun();
-  state.energy = 500;
-  forceDrop("energy", () => OVERLAY_TYPES.mysteryBox.onLand());
-  eq(state.energy, 500);
+  const before = Tickets.doneCount();
+  forceDrop("tickets", () => OVERLAY_TYPES.mysteryBox.onLand());
+  eq(Tickets.held(0), 1);
+  eq(Tickets.doneCount(), before, "one ticket is not a completed episode");
 });
 
 suite("game: landing dispatch");
@@ -226,23 +226,25 @@ suite("storage");
 
 test("serializeState captures progress and omits transient fields", () => {
   freshRun();
-  state.coins = 1234; state.day = 3; state.rolls = 7;
+  state.coins = 1234; state.day = 3; state.pulls = 7;
   state.animating = true;                       // transient
   const s = serializeState();
   eq(s.coins, 1234);
   eq(s.day, 3);
-  eq(s.rolls, 7);
+  eq(s.pulls, 7);
   eq("animating" in s, false, "animating must not be persisted");
   eq("lastCoins" in s, false, "tween baselines must not be persisted");
   ok(Array.isArray(s.boxes), "sets are serialised as arrays");
-  ok(Array.isArray(s.builder));
+  ok(Array.isArray(s.tickets));
+  ok(Array.isArray(s.shoe), "the shoe is saved as concrete cards");
 });
 
 test("save then load restores a run", () => {
   freshRun();
   state.coins = 4321; state.clues = 6; state.vip = 99; state.day = 4;
-  state.energy = 17; state.pos = 23; state.mult = 5; state.rolls = 12;
-  state.builder[2].tier = 3;
+  state.pos = 23; state.pulls = 12;
+  state.tickets[2] = 3;
+  state.shoe = ["s4", "J1", "m9"];
   OVERLAY_TYPES.mysteryBox.clear();
   OVERLAY_TYPES.mysteryBox.positions().set(9, { kind: "clues", amount: 2, name: "Clues" });
   saveState();
@@ -255,9 +257,9 @@ test("save then load restores a run", () => {
   eq(state.vip, 99);
   eq(state.day, 4);
   eq(state.pos, 23);
-  eq(state.mult, 5);
-  eq(state.rolls, 12);
-  eq(Builders.tier(2), 3);
+  eq(state.pulls, 12);
+  deepEq(state.shoe, ["s4", "J1", "m9"], "the exact cards come back, in order");
+  eq(Tickets.held(2), 3);
   ok(state.boxes instanceof Map, "boxes come back as a Map — the contents ride with the tile");
   ok(state.boxes.has(9));
   // the draw happened when the box was PLACED, so a gold box must reopen as a gold box
@@ -279,20 +281,21 @@ test("boxes bought but not yet thrown survive a reload", () => {
 
 test("a corrupt pending-box count degrades to none rather than NaN", () => {
   freshRun();
-  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1") || "{}");
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v3") || "{}");
   raw.pendingBoxes = "not a number";
-  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  localStorage.setItem("pmdrama.state.v3", JSON.stringify(raw));
   ok(loadState());
   eq(state.pendingBoxes, 0, "a bad value must not poison the counter");
 });
 
-test("restore keeps energy bought above the cap", () => {
+test("restore keeps a shoe merged above the cap", () => {
   freshRun();
-  state.energy = 900;
+  state.shoe = Shoe.mintPack().concat(Shoe.mintPack());
+  const big = Shoe.count();
   saveState();
   freshRun();
   loadState();
-  eq(state.energy, 900, "no cap clamp on restore");
+  eq(Shoe.count(), big, "no cap clamp on restore");
 });
 
 test("loadState drops queue entries that aren't known episode ids", () => {
@@ -300,18 +303,18 @@ test("loadState drops queue entries that aren't known episode ids", () => {
   state.epQueue = ["001"];
   saveState();
   // hand-edit the saved slot into the legacy format, which stored titles
-  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v3"));
   raw.epQueue = ["The Inheritance", "Rumors at Dawn", "002"];
-  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  localStorage.setItem("pmdrama.state.v3", JSON.stringify(raw));
 
   freshRun();
   loadState();
   deepEq(state.epQueue, ["002"], "unknown titles dropped, real ids kept");
 });
 
-/* The library is no longer persisted at all — it is derived from the completed builders
-   (Builders.unlockedEpisodeIds), so there is nothing here to round-trip. The test that a
-   reload still shows every unlocked episode lives with the derivation, in 03-builders. */
+/* The library is no longer persisted at all — it is derived from the filled placeholders
+   (Tickets.unlockedEpisodeIds), so there is nothing here to round-trip. The test that a
+   reload still shows every unlocked episode lives with the derivation, in 03-tickets. */
 
 test("a sealed reveal survives a reload — closing the tab cannot duck the bet", () => {
   freshRun();
@@ -327,28 +330,28 @@ test("a sealed reveal survives a reload — closing the tab cannot duck the bet"
 test("a sealed reveal for a missing or malformed episode is dropped", () => {
   freshRun();
   saveState();
-  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v3"));
   [{ id: "999", wager: 10, odds: 2, won: true, payout: 20 },   // no such episode
    { id: "001", wager: 10, odds: 2 },                          // no decided outcome
    "nonsense", 7].forEach(bad => {
     raw.pendingReveal = bad;
-    localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+    localStorage.setItem("pmdrama.state.v3", JSON.stringify(raw));
     freshRun(); loadState();
     eq(state.pendingReveal, null, `must not restore ${JSON.stringify(bad)}`);
   });
 });
 
 test("loadState reports false when there is nothing saved", () => {
-  localStorage.removeItem("pmdrama.state.v1");
+  localStorage.removeItem("pmdrama.state.v3");
   freshRun();
   eq(loadState(), false);
 });
 
 test("corrupt saved data is ignored rather than throwing", () => {
-  localStorage.setItem("pmdrama.state.v1", "{not json");
+  localStorage.setItem("pmdrama.state.v3", "{not json");
   freshRun();
   eq(loadState(), false);
-  localStorage.removeItem("pmdrama.state.v1");
+  localStorage.removeItem("pmdrama.state.v3");
 });
 
 test("config round-trips, and saved values merge onto DEFAULTS", () => {
@@ -357,9 +360,9 @@ test("config round-trips, and saved values merge onto DEFAULTS", () => {
   cfg.tokenStepMs = 42;
   saveConfig();
   // simulate a build that added a new key after this save was written
-  const raw = JSON.parse(localStorage.getItem("pmdrama.cfg.v1"));
+  const raw = JSON.parse(localStorage.getItem("pmdrama.cfg.v3"));
   delete raw.cfg.revealMs;
-  localStorage.setItem("pmdrama.cfg.v1", JSON.stringify(raw));
+  localStorage.setItem("pmdrama.cfg.v3", JSON.stringify(raw));
 
   resetCfg();
   ok(loadConfig());
@@ -376,8 +379,8 @@ test("clearConfig and clearState empty their own slots only", () => {
   freshRun();
   saveState();
   clearConfig();
-  eq(localStorage.getItem("pmdrama.cfg.v1"), null);
-  ok(localStorage.getItem("pmdrama.state.v1") !== null, "progress must survive a config reset");
+  eq(localStorage.getItem("pmdrama.cfg.v3"), null);
+  ok(localStorage.getItem("pmdrama.state.v3") !== null, "progress must survive a config reset");
   clearState();
-  eq(localStorage.getItem("pmdrama.state.v1"), null);
+  eq(localStorage.getItem("pmdrama.state.v3"), null);
 });

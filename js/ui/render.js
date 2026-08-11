@@ -1,14 +1,13 @@
 "use strict";
-/* All read-only rendering of state → DOM. No state mutation here
-   (the builder-list upgrade buttons delegate to uiUpgrade in ui/main.js). */
+/* All read-only rendering of state → DOM. No state mutation here — the play controls delegate
+   to js/ui/main.js. */
 /* Push timing configs into CSS custom properties so the animations match the sim's pacing.
    Token glide/hop stay just inside one cfg.tokenStepMs beat (capped at the original
-   .13s/.14s so slow settings don't feel mushy); the dice shake spans its reveal window. */
+   .13s/.14s so slow settings don't feel mushy). */
 function applyFxTiming(){
   const s=document.documentElement.style;
   s.setProperty("--stepDur",Math.min(130,cfg.tokenStepMs*0.96)+"ms");
   s.setProperty("--hopDur",Math.min(140,cfg.tokenStepMs)+"ms");
-  s.setProperty("--shakeDur",Math.max(120,cfg.diceRevealMs)+"ms");
   // tile-art fit: tunable because the board's perspective makes the tile diamond's aspect
   // vary by position, so no one value suits every piece of art
   s.setProperty("--artScale",cfg.tileArtScale);
@@ -94,32 +93,9 @@ function syncBoardLabels(){
   });
 }
 
-/* SHOW the DOM pair only when the 3D dice can't replace them. If cfg.dice3d is off, or
-   die.glb never loaded, rollDiceAnim falls back to shaking them and they have to be on screen.
-   They stay in the DOM either way — setDice() keeps them truthful and this only toggles
-   visibility, so nothing downstream has to guard against a missing #die1.
-
-   The test asks whether the 3D dice are EXPECTED to handle the throw, not whether they have
-   finished downloading. Those differ for the few hundred ms die.glb takes to arrive, and
-   keying off "downloaded" is what made the DOM pair flash on every single load: boot ran while
-   the model was still in flight, showed the fallback, then hid it again the moment the file
-   landed. Nothing is lost by waiting — Dice3D.throwDice queues a throw made before the model
-   arrives and still resolves on time, so a roll in that window is animated by the 3D dice a
-   fraction late rather than by the DOM pair.
-
-   Called again from onDiceReady(), which now fires on BOTH outcomes: on success to keep the
-   pair hidden, and on failure to bring it back, since at that point nothing else will draw
-   a die. */
-function syncDiceMode(){
-  const dice3dWorks=use3d()&&cfg.dice3d&&window.Board3D&&Board3D.diceFailed&&!Board3D.diceFailed();
-  document.body.classList.toggle("dice2d",!dice3dWorks);
-}
-function onDiceReady(){ syncDiceMode(); }
-
 function buildBoard(){
   applyFxTiming();
   document.body.classList.toggle("board3d",!!use3d());   // hides the legacy DOM board
-  syncDiceMode();
   if(use3d()){ Board3D.build(); buildBoardLabels(); return; }
   const board=$("#board");
   board.querySelectorAll(".tile").forEach(t=>t.remove());
@@ -159,59 +135,15 @@ function renderOverlays(){
     if(el){ const b=document.createElement("div"); b.className="ovl "+o.classAt(i); b.textContent=o.icon; el.appendChild(b); }
   }));
 }
-/* Mystery boxes bought but not yet thrown onto the board.
+/* The board's own 2D chrome — the three things that outlived the builders view.
 
-   The pop is driven by comparing against the last number SHOWN rather than being fired from the
-   upgrade handler, so every path that banks a box gets the same acknowledgement — including a
-   reload that restores a pending count. It only fires on an increase: the drop to zero after a
-   throw is the boxes leaving, and celebrating that would be backwards. */
-let _boxShown = null;
-function renderBoxCounter(){
-  const el=$("#boxCounter"); if(!el) return;
-  const n=Math.max(0,state.pendingBoxes|0);
-  el.classList.toggle("on",n>0);
-  $("#boxCount").textContent=n;
-  if(_boxShown!==null&&n>_boxShown){
-    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
-  }
-  _boxShown=n;
-}
-/* The builders view's 2D layer: the page header, and one upgrade button per building on the
-   page. The buildings themselves are 3D and live in js/ui/builders3d.js — this is only the
-   part you press.
-
-   Every button on the row is the same width and shows a COMPACT price (fmtShort), because the
-   row has to fit cfg.builderPageSize of them across a phone whatever the economy charges:
-   "2.5k" costs four characters where "2,500" costs five and "1,240,000" costs nine. */
-function renderBuilders(){
-  const page=Builders.pageBuilders();
-  // clickable while auto-roll is running (buying stops it), but not during a manual roll
-  const live=!state.animating||autoMode==="roll";
-  const bar=$("#buildersBar"); bar.innerHTML="";
-  page.forEach(i=>{
-    const done=Builders.isMaxed(i);
-    const afford=Builders.canAfford(i);
-    const b=document.createElement("button");
-    b.className="upb"+(done?" max":afford?"":" cant");
-    b.disabled=done||!afford||!live;
-    b.dataset.b=i;
-    b.innerHTML=done
-      ? `<span class="upbName">#${i+1}</span><span class="upbCost">MAX</span>`
-      : `<span class="upbName">#${i+1} · Lv${Builders.tier(i)+1}</span>
-         <span class="upbCost">🪙 ${fmtShort(Builders.nextCost(i))}</span>`;
-    bar.appendChild(b);
-  });
-  bar.querySelectorAll("button[data-b]").forEach(bt=>bt.onclick=()=>onUpgradeClick(+bt.dataset.b));
-
-  const s=Builders.series(), many=Economy.playableSeries().length>1;
-  const range=page.length?`${page[0]+1}–${page[page.length-1]+1}`:"—";
-  $("#buildersHead").innerHTML=
-    `<b>${many&&s?`${s.name} · `:""}Buildings ${range}</b>
-     <span>${Builders.doneCount()}/${Builders.count()} complete · set ${Builders.page()+1} of ${Builders.pageCount()}</span>`;
-
+   They used to hang off renderBuilders(), which is gone with the view it drew. Keeping them in
+   one named function rather than scattering them into renderAll() is what stops the next
+   person wondering why the binge button is rendered from three different places. */
+function renderBoardChrome(){
   /* Episodes banked by "Binge later" — the only way back to them in the mobile layout, since
-     the side panel's Predict & watch button is not on screen there. */
-  /* A sealed reveal counts as something waiting: the bet is placed and the result is owed, so
+     the side panel's Predict & watch button is not on screen there.
+     A sealed reveal counts as something waiting: the bet is placed and the result is owed, so
      the button has to stay reachable even when the queue itself is empty. */
   const queued=state.epQueue.length+(state.pendingReveal?1:0);
   const binge=$("#bingeBtn");
@@ -221,17 +153,22 @@ function renderBuilders(){
   }
   /* The library button only exists once there is something in the library. */
   const lib=$("#libraryBtn");
-  if(lib) lib.classList.toggle("on",Builders.unlockedEpisodeIds().length>0);
+  if(lib) lib.classList.toggle("on",Tickets.unlockedEpisodeIds().length>0);
   /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
      rather than the lifetime total, which only ever grows and would leave the dot on forever. */
   const adot=$("#albumDot");
   if(adot) adot.classList.toggle("on",state.cycleClues>0);
-
-  /* The board shows nothing about builders any more, so the only hint that there is something
-     to spend on is a dot on the button that takes you there. */
-  const any=Builders.all().some((_,i)=>Builders.canAfford(i));
-  $("#buildersDot").classList.toggle("on",any);
-  if(use3d()&&window.Board3D&&Board3D.available&&Board3D.setBuilders) Board3D.setBuilders();
+  /* Buy-a-deck. A deck is a real-money product, so there is no affordability state at all —
+     it is live whenever the board is idle. The dot lights when the shoe is running dry, which
+     is the only moment buying one is the obvious thing to do. */
+  const buy=$("#buyDeckBtn"), dot=$("#buyDot");
+  if(buy){
+    buy.title=`Buy a deck — $${Shoe.priceUsd().toFixed(2)}`;
+    buy.disabled=state.animating||autoMode!==null;
+  }
+  if(dot) dot.classList.toggle("on",Shoe.count()<=Math.max(1,Math.round(cfg.packSize*0.2)));
+  /* The ticket placeholders live in the 3D scene, not the DOM. */
+  if(use3d()&&window.Board3D&&Board3D.available&&Board3D.setTicketSlots) Board3D.setTicketSlots();
 }
 function renderHUD(){
   $("#hDay").textContent="Day "+state.day;
@@ -246,17 +183,22 @@ function renderHUD(){
               v=>state.clues>=cfg.clueAlbumSize?fmt(v):`${fmt(v)}/${fmt(cfg.clueAlbumSize)}`);
   state.lastClues=state.clues;
   $("#hVip").textContent=fmt(state.vip);
-  $("#hEnergy").textContent=Math.floor(state.energy);
-  $("#hEnergyCap").textContent=cfg.energyCap;
-  $("#hEfill").style.width=Math.max(0,Math.min(100,(state.energy/cfg.energyCap)*100))+"%";
+  /* Cards left in the shoe. The COUNT is never clamped — a bought pack merges onto whatever was
+     left, so being over the cap is normal — but the BAR is, or an over-cap shoe would render a
+     fill wider than its own track. */
+  $("#hCards").textContent=Shoe.count();
+  $("#hCardCap").textContent=cfg.packSize;
+  $("#hCfill").style.width=Math.max(0,Math.min(100,(Shoe.count()/cfg.packSize)*100))+"%";
 }
 function renderStats(){
   $("#sEps").textContent=state.epsWatched;
   const tot=state.predWins+state.predLoss;
   $("#sAcc").textContent=tot? Math.round(state.predWins/tot*100)+"%":"—";
   $("#sStreak").textContent=state.streak;
-  $("#sBoards").textContent=Builders.doneCount()+"/"+Builders.count();
-  $("#sRolls").textContent=state.rolls;
+  /* Same pair of calls as the profile sheet (js/ui/profile.js) — change one and the other has
+     to change with it or the two surfaces disagree. */
+  $("#sBoards").textContent=Tickets.doneCount()+"/"+Tickets.count();
+  $("#sRolls").textContent=state.pulls;
   $("#sSessions").textContent=state.sessionsToday;
 }
 function renderStory(){
@@ -265,25 +207,33 @@ function renderStory(){
   $("#epBadge").textContent=n+" ready";
   $("#watchBtn").disabled=!n||state.animating;
   $("#storyHint").innerHTML= n? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} unlocked — place your prediction before watching.`
-                              : "Fully upgrade a builder to unlock the next episode.";
+                              : `Collect ${Tickets.perEpisode()} tickets to unlock the next episode.`;
 }
-/* Reflect state.mult on the stake button (needed after a restore or user reset). */
-function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
-function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderBoxCounter();renderStats();renderStory();
+function renderAll(){ renderHUD();renderOverlays();renderBoardChrome();renderStats();renderStory();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
-  const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;
-  /* Roll IS the auto-roll control (hold to start, tap to stop), so while auto-roll owns the
+  /* Three reasons a pull is impossible, and all three must agree with the two gates in
+     js/ui/main.js (pull()'s own guard and runAuto's per-pass re-check) — teach one and not the
+     others and either the button lies about a loop still running, or auto-pull spins against a
+     stopped board. */
+  const rowFull=Tickets.rowFull();
+  const cantRoll=state.animating||Shoe.isEmpty()||rowFull||state.seriesDone;
+  /* Pull IS the auto-pull control (hold to start, tap to stop), so while auto-pull owns the
      loop it has to stay live to act as Stop — otherwise there'd be no way out. The session
      loop still locks it, since that mode owns the loop instead. */
   const rollIsAuto=autoMode==="roll";
   const rollBtn=$("#rollBtn");
   rollBtn.disabled=rollIsAuto?false:(autoBusy||cantRoll);
-  rollBtn.innerHTML=rollIsAuto?"⏸ Stop auto roll":"🎲 Roll";
+  /* A full row is not a dead end, it is the game asking you to watch. Say so on the button and
+     let it route into the prediction rather than greying out — a disabled Pull with no
+     explanation reads as a soft-lock, and this is now the ONLY stop condition in the game. */
+  rollBtn.innerHTML=rollIsAuto?"⏸ Stop auto pull"
+                   :rowFull&&!state.animating?"🎬 Watch to continue"
+                   :Shoe.isEmpty()&&!state.animating?"🃏 Out of cards"
+                   :"🃏 Pull";
+  if(rowFull&&!state.animating&&!autoBusy&&!state.seriesDone) rollBtn.disabled=false;
   rollBtn.classList.toggle("auto",rollIsAuto);
-  // the multiplier is the stake for the roll in flight — lock it mid-spin and during auto
-  $("#multBtn").disabled=state.animating||autoBusy;
-  syncMultButton();
+  rollBtn.classList.toggle("needsWatch",rowFull&&!rollIsAuto);
   // the running mode's own button stays clickable so it can act as Stop; the other is locked out
   [["#autoBtn","session","▶ Auto-play session","⏸ Stop auto-play"]].forEach(([sel,mode,idle,active])=>{
     const b=$(sel), mine=autoMode===mode;
@@ -291,7 +241,10 @@ function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderBoxCou
     b.disabled=mine?false:(autoBusy||cantRoll);
   });
   $("#nextBtn").disabled=state.animating;
-  $("#storeBtn").disabled=state.animating||autoBusy;   // would fight the roll's own overlays
-  const gap=Math.max((cfg.energyCap-state.energy)*cfg.regenMin, 1440/cfg.sessionsPerDay);
-  $("#nextHint").textContent=`advances ${(gap/60).toFixed(1)} h · refills to ${cfg.energyCap}⚡`;
+  $("#storeBtn").disabled=state.animating||autoBusy;   // would fight the pull's own overlays
+  /* The same expression advanceSession() uses to derive the gap. They are deliberately not
+     shared — but if you change one, change the other, or the hint quietly reports a wait the
+     button does not honour. */
+  const gap=Math.max(Math.max(0,cfg.packSize-Shoe.count())*cfg.cardRegenMin, 1440/cfg.sessionsPerDay);
+  $("#nextHint").textContent=`advances ${(gap/60).toFixed(1)} h · deals up to ${cfg.packSize}🃏`;
 }

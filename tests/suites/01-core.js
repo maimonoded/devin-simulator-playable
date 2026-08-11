@@ -86,14 +86,20 @@ test("tuning keys are unique", () => {
   eq(keys.length, new Set(keys).size, "duplicate tuning key");
 });
 
-test("deck and box tables have their default copies preserved", () => {
-  eq(deck.length, defDeck.length);
+test("Plot Twist and box tables have their default copies preserved", () => {
+  eq(twistDeck.length, defTwistDeck.length);
   eq(boxTable.length, defBox.length);
-  ok(deck !== defDeck, "defDeck must be a separate copy");
+  ok(twistDeck !== defTwistDeck, "defTwistDeck must be a separate copy");
 });
 
 test("the train's two bonuses are a well-formed pair", () => {
   ok(typeof TRAIN_MULT === "undefined", "the old five-rung spread must be gone, not shadowed");
+  /* The rework's deletions, asserted the same way: a global that still exists somewhere is a
+     global something can still accidentally read. */
+  ok(typeof MULTIPLIERS === "undefined", "the roll stake spread is gone with the multiplier");
+  ok(typeof rollDice === "undefined", "the dice are gone");
+  ok(typeof Builders === "undefined", "builders are gone — Tickets replaced them");
+  ok(typeof deck === "undefined", "the bare `deck` global is gone; the Plot Twist table is twistDeck");
   ok(cfg.trainSmall > 0 && cfg.trainLarge > cfg.trainSmall, "large must be the bigger of the two");
   ok(cfg.trainLargeChance > 0 && cfg.trainLargeChance < 1, "both outcomes have to be reachable");
   // cfg.trainEV is derived from the pair; nothing pays from it, but the model is checked against it

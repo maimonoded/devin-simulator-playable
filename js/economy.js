@@ -8,7 +8,7 @@
    two-item mystery box.
 
    The two meet in Economy.apply(), which projects the model's flat values onto cfg and rebuilds
-   `deck`/`boxTable`. So the tile code keeps reading cfg.stdBase and nothing downstream had to
+   `twistDeck`/`boxTable`. So the tile code keeps reading cfg.stdBase and nothing downstream had to
    learn about this file. Editing a value in the drawer changes the live game; re-applying the
    model puts it back.
 
@@ -18,16 +18,23 @@
 /* ---------------------------------------------------------------------------
    The cost curve
 
-   cost(b, L) = base x levelGrowth^(L-1) x b^exponent
-   ... which is a POWER LAW in the builder index b, not an exponential. That distinction is
-   the whole design: the shipped exponents grow the price 1.43x across 240 builders, where a
-   1.05^b exponential would grow 115,942x. Pacing is meant to come from the level ramp and the
-   sheer number of builders, not from later builders escalating.
+   cost(e, t) = base x ticketGrowth^(t-1) x e^exponent
+
+   e is the global EPISODE number and t is which of that episode's cfg.ticketsPerEpisode
+   tickets is being paid for. Before the rework this same curve priced builder LEVELS, and the
+   numbers are unchanged because the mapping is 1:1: one builder of five levels became one
+   episode of five tickets. That is why the six fitted segments below, the boundaries at 29 and
+   74, and the whole v3.12 pacing story survive the rework verbatim.
+
+   It is a POWER LAW in the episode index e, not an exponential. That distinction is
+   the whole design: the shipped exponents grow the price 1.43x across 240 episodes, where a
+   1.05^e exponential would grow 115,942x. Pacing is meant to come from the ticket ramp and the
+   sheer number of episodes, not from later episodes escalating.
 
    ONE power law is not enough, because pacing is not one rate. The v3.12 model asks for a fast
    opening that steps down twice — 6 episodes/day, then 5 from day 5, then 4 from day 15 easing
    to 3.5 by day 60. The workbook expresses that as a rate schedule and prints the 240 resulting
-   builder prices; a single b^exponent cannot follow it (the local exponent it implies swings
+   episode prices; a single e^exponent cannot follow it (the local exponent it implies swings
    between 0.008 and 0.21).
 
    So the curve is a LIST of segments, each its own power law over a builder range. Six of them
@@ -54,13 +61,33 @@
 const ECONOMY_DEFAULT = {
   /* Identity — Guide!B2 of the workbook this came from, or the model this was transcribed
      from when nothing has been imported. */
-  version: "Economy Model v3.13 - segmented cost curve, 240 builders / 240 episodes",
+  /* BUMPED WHEN A VALUE HERE CHANGES, not only when a workbook is imported — this string IS the
+     gate. js/storage.js stamps the saved config with it and drops every OWNED_CFG_KEYS entry from
+     the save when it no longer matches, so changing a number here without bumping the version
+     leaves anyone who has played before on their old value forever, with nothing thrown and
+     nothing logged. v3.16 is v3.14 with ten jokers added to the pack instead of two. */
+  version: "Economy Model v3.16 - 52 cards + 10 jokers, segmented cost curve, 240 episodes x 5 tickets",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
-  energy: { cap: 30, regenMin: 3, sessionsPerDay: 2.5, dailyAllowance: 240, secPerRoll: 5 },
+  /* The deck, which is what energy became. `regenMin` is minutes of game clock per free card
+     and is now the ONLY pacing gate in the game: a pack earns far more coins than it costs, so
+     nothing else stops a player buying packs back to back. The workbook's dailyAllowance is
+     gone rather than renamed — it was imported and never read. */
+  /* ticketsPerPack IS THE JOKER COUNT — the jokers are the tickets (js/shoe.js), so there is one
+     number for both and never two that can disagree. Ten rather than the natural two: at two, a
+     five-ticket episode takes two and a half packs, which is a long way to walk to see the ticket
+     path work at all.
 
-  structure: { totalBuilders: 240, levelsPerBuilder: 5, episodesPerSeries: 60 },
+     THERE IS NO packSize HERE, deliberately. The 52 numbered cards are fixed and jokers are added
+     on top, so the size is derived (Shoe.packSize(), 62 at ten jokers) and apply() computes it.
+     A packSize in this table would be a second number saying the same thing, free to drift from
+     the joker count and silently eat ranks off the top of the deck when it did. Note the one
+     knock-on: pack size is also the free-card cap, so a bigger pack is a slightly longer leash
+     on the game's clock — 62 cards between top-ups rather than 54. */
+  cards: { ticketsPerPack: 10, regenMin: 3, sessionsPerDay: 2.5, secPerPull: 5 },
+
+  structure: { totalEpisodes: 240, ticketsPerEpisode: 5, episodesPerSeries: 60 },
 
   /* Six segments, fitted to the phased pacing curve v3.12 printed as 240 builder rows. The
      boundaries at 29 and 74 are the model's own: they are where its day-5 and day-15 steps land
@@ -72,43 +99,43 @@ const ECONOMY_DEFAULT = {
      same way. They still have to be kept in step by hand until EconomyImport can read that
      block; see TODO.md. */
   costCurve: [
-    { from: 1,   to: 14,  kind: "power", base: 158.722823, levelGrowth: 1.5, exponent: 0.017804825,
+    { from: 1,   to: 14,  kind: "power", base: 158.722823, ticketGrowth: 1.5, exponent: 0.017804825,
       bIndex: "global", baseMode: "absolute" },
-    { from: 15,  to: 28,  kind: "power", base: 130.940527, levelGrowth: 1.5, exponent: 0.091685906,
+    { from: 15,  to: 28,  kind: "power", base: 130.940527, ticketGrowth: 1.5, exponent: 0.091685906,
       bIndex: "global", baseMode: "absolute" },
-    { from: 29,  to: 63,  kind: "power", base: 113.831949, levelGrowth: 1.5, exponent: 0.131745838,
+    { from: 29,  to: 63,  kind: "power", base: 113.831949, ticketGrowth: 1.5, exponent: 0.131745838,
       bIndex: "global", baseMode: "absolute" },
-    { from: 64,  to: 73,  kind: "power", base:  65.134193, levelGrowth: 1.5, exponent: 0.268494329,
+    { from: 64,  to: 73,  kind: "power", base:  65.134193, ticketGrowth: 1.5, exponent: 0.268494329,
       bIndex: "global", baseMode: "absolute" },
-    { from: 74,  to: 227, kind: "power", base: 148.768898, levelGrowth: 1.5, exponent: 0.074138555,
+    { from: 74,  to: 227, kind: "power", base: 148.768898, ticketGrowth: 1.5, exponent: 0.074138555,
       bIndex: "global", baseMode: "absolute" },
-    { from: 228,          kind: "power", base: 101.359660, levelGrowth: 1.5, exponent: 0.146500821,
+    { from: 228,          kind: "power", base: 101.359660, ticketGrowth: 1.5, exponent: 0.146500821,
       bIndex: "global", baseMode: "absolute" },
   ],
 
   tiles: {
     stdBase: 40, trainSmall: 60, trainLarge: 315, trainLargeChance: 0.35,
-    startPass: 100, startLand: 100, spaEnergy: 5, vipSeed: 60, boardScale: 1,
+    startPass: 100, startLand: 100, spaCards: 1, vipSeed: 60, boardScale: 1,
   },
 
-  deck: [
-    { name: "Small coins",      weight: 40, coins:  30, energy: 0, clues: 0, vip:  0 },
-    { name: "Medium coins",     weight: 15, coins:  80, energy: 0, clues: 0, vip:  0 },
-    { name: "Windfall",         weight:  5, coins: 300, energy: 0, clues: 0, vip:  0 },
-    { name: "Small energy",     weight: 15, coins:   0, energy: 2, clues: 0, vip:  0 },
-    { name: "Insider tip",      weight: 10, coins:  50, energy: 0, clues: 0, vip:  0 },
-    { name: "Fine / Paparazzi", weight: 10, coins: -80, energy: 0, clues: 0, vip: 80 },
-    { name: "Advance to Start", weight:  5, coins:   0, energy: 0, clues: 0, vip:  0, advance: true },
+  plotTwist: [
+    { name: "Small coins",      weight: 40, coins:  30, tickets: 0, clues: 0, vip:  0 },
+    { name: "Medium coins",     weight: 15, coins:  80, tickets: 0, clues: 0, vip:  0 },
+    { name: "Windfall",         weight:  5, coins: 300, tickets: 0, clues: 0, vip:  0 },
+    { name: "Backstage pass",    weight: 15, coins:   0, tickets: 1, clues: 0, vip:  0 },
+    { name: "Insider tip",      weight: 10, coins:  50, tickets: 0, clues: 0, vip:  0 },
+    { name: "Fine / Paparazzi", weight: 10, coins: -80, tickets: 0, clues: 0, vip: 80 },
+    { name: "Advance to Start", weight:  5, coins:   0, tickets: 0, clues: 0, vip:  0, advance: true },
   ],
 
   /* Two items every box. Item 1 is always coins; item 2 is one weighted draw of three.
      The split is what supplies clues — the deck no longer pays any. */
   box: {
-    boxesPerUpgrade: 1,
+    boxesPerTicketCard: 1,
     item1Coins: 60,
     item2: [
       { name: "Coins",  kind: "coins",  weight: 33, amount: 60 },
-      { name: "Energy", kind: "energy", weight: 33, amount:  3 },
+      { name: "Ticket", kind: "tickets", weight: 33, amount:  1 },
       { name: "Clues",  kind: "clues",  weight: 33, amount:  2 },
     ],
   },
@@ -123,12 +150,12 @@ const ECONOMY_DEFAULT = {
   /* Relative knobs, all 1.00x. They scale whole groups so the economy can move proportionally
      without editing base numbers. Deliberately separate from tiles.boardScale, which scales
      income AND cost together and so has no pacing effect at all. */
-  knobs: { earn: 1, builderCost: 1, energySupply: 1, sessionFreq: 1, wagerAppetite: 1 },
+  knobs: { earn: 1, ticketCost: 1, cardSupply: 1, sessionFreq: 1, wagerAppetite: 1 },
 
   /* What the workbook itself predicts. Nothing reads these — they are here so a run can be
      checked against the model that produced it. */
   reference: {
-    coinsPerRoll: 81.275, energyPerRoll: 0.17,
+    coinsPerPull: 81.275,
     coinsPerDayEngaged: 7344.126506, totalDays: 59.58355042, episodesPerDay: 4.027957352,
   },
 };
@@ -173,36 +200,75 @@ const Economy = {
     const prev = economy.costCurve[i - 1];
     const at = seg.from || 1;
     const prevLevel1 = prev.kind === "explicit"
-      ? this._explicitLevel1Tail(prev)
+      ? this._explicitTicket1Tail(prev)
       : prev.base * Math.pow(this._indexIn(prev, at), prev.exponent);
     if (!isFinite(prevLevel1) || prevLevel1 <= 0) return seg.base;
     return prevLevel1 / Math.pow(this._indexIn(seg, at), seg.exponent);
   },
   /* An explicit segment has no formula to extrapolate, so continuity picks up from its last
      row's level-1 price. */
-  _explicitLevel1Tail(seg) {
+  _explicitTicket1Tail(seg) {
     const rows = seg.levels || [];
     const last = rows[rows.length - 1];
     return last && last.length ? last[0] : NaN;
   },
 
-  /* Price of level L (1-based) on global builder b (1-based).
+  /* Price of ticket t (1-based) of global episode e (1-based).
      boardScale comes from cfg, not from the model: it is the live knob the drawer edits and
      every income source already reads it there, so taking it from the model would let the two
-     drift apart and make board scale stop being a redenomination. */
-  costFor(b, level) {
-    const seg = this.segmentFor(b);
+     drift apart and make board scale stop being a redenomination.
+
+     An explicit segment's per-episode rows are still called `levels` — that is the shape the
+     workbook prints, and the importer reads it verbatim. */
+  costFor(e, t) {
+    const seg = this.segmentFor(e);
     if (!seg) return Infinity;                   // validateCurve exists to make this unreachable
-    const scale = cfg.boardScale * economy.knobs.builderCost;
+    const scale = cfg.boardScale * economy.knobs.ticketCost;
     if (seg.kind === "explicit") {
-      const row = (seg.levels || [])[b - (seg.from || 1)];
-      const c = row && row[level - 1];
+      const row = (seg.levels || [])[e - (seg.from || 1)];
+      const c = row && row[t - 1];
       return c == null ? Infinity : c * scale;
     }
     return this._baseOf(seg)
-      * Math.pow(seg.levelGrowth, level - 1)
-      * Math.pow(this._indexIn(seg, b), seg.exponent)
+      * Math.pow(seg.ticketGrowth, t - 1)
+      * Math.pow(this._indexIn(seg, e), seg.exponent)
       * scale;
+  },
+
+  /* ---------------- tickets, and what a pack costs ----------------
+
+     Tickets are bought in PACKS, never singly: a pack is cfg.packSize cards containing exactly
+     cfg.ticketsPerPack of them (js/shoe.js). So the curve is walked by a running ORDINAL —
+     state.ticketsPriced, the number of rungs already consumed — rather than by asking how many
+     tickets the player happens to hold.
+
+     THE POINTER ADVANCES WHEN A TICKET IS MINTED OR GRANTED, NOT WHEN ONE IS SPENT. Minting a
+     pack advances it by ticketsPerPack; a ticket from a mystery box or a Plot Twist card
+     advances it by one. Two consequences, both intended: buying a pack immediately raises the
+     price of the next one, so stockpiling cheap packs is not a strategy; and free tickets raise
+     the price of what remains, so the run's total spend still tracks the workbook's cumulative
+     curve rather than falling short of it.
+
+     The alternative — index by tickets actually banked — also looks right in a spot check and
+     produces a materially different run length. This one is pinned by a test. */
+  ticketsPerEpisode() { return Math.max(1, Math.round(cfg.ticketsPerEpisode || 1)); },
+  /* Ticket ordinal (1-based, global) → which episode it belongs to and which of its tickets.
+     Episode boundaries need no special case: with 5 per episode, ordinal 5 is (ep 1, ticket 5)
+     and ordinal 6 is (ep 2, ticket 1). A pack of 2 straddling that boundary is priced correctly
+     by summing the two rungs. */
+  ticketSlot(n) {
+    const L = this.ticketsPerEpisode();
+    return { episode: Math.floor((n - 1) / L) + 1, ticket: ((n - 1) % L) + 1 };
+  },
+  ticketCost(n) { const s = this.ticketSlot(n); return this.costFor(s.episode, s.ticket); },
+  /* What the next pack costs, given how many rungs have already been consumed. Inherits
+     boardScale and the ticketCost knob from costFor — do NOT re-apply either at the call site. */
+  packPrice(priced) {
+    const p = Math.max(0, Math.floor(priced || 0));
+    const per = Math.max(1, Math.round(cfg.ticketsPerPack || 1));
+    let total = 0;
+    for (let i = 1; i <= per; i++) total += this.ticketCost(p + i);
+    return total;
   },
 
   /* Solve the exponent from pacing anchors, the way the workbook does. */
@@ -222,7 +288,7 @@ const Economy = {
       const where = `Cost curve segment ${i + 1}`;
       const from = seg.from;
       if (!(typeof from === "number" && isFinite(from) && from >= 1))
-        errs.push(`${where}: "from" must be a builder number of 1 or more.`);
+        errs.push(`${where}: "from" must be an episode number of 1 or more.`);
       if (seg.to != null && !(seg.to >= from))
         errs.push(`${where}: "to" (${seg.to}) is before "from" (${from}).`);
       if (i > 0) {
@@ -233,26 +299,29 @@ const Economy = {
       if (seg.kind === "explicit") {
         if (!Array.isArray(seg.levels) || !seg.levels.length) errs.push(`${where}: an explicit segment needs a "levels" table.`);
       } else {
-        ["base", "levelGrowth", "exponent"].forEach(k => {
+        ["base", "ticketGrowth", "exponent"].forEach(k => {
           if (typeof seg[k] !== "number" || !isFinite(seg[k])) errs.push(`${where}: "${k}" must be a number.`);
         });
-        if (seg.levelGrowth <= 0) errs.push(`${where}: "levelGrowth" must be above zero.`);
+        if (seg.ticketGrowth <= 0) errs.push(`${where}: "ticketGrowth" must be above zero.`);
       }
     });
-    /* The invariant that keeps the game playable forever. */
+    /* The invariant that keeps the game playable forever — and it now guards MORE than it did.
+       costFor returns Infinity past the last rule and packPrice sums two of those, so a bounded
+       final segment does not disable one upgrade button: it makes every future pack cost
+       Infinity and takes out the game's only coin sink entirely. */
     if (curve[curve.length - 1].to != null)
-      errs.push("The last cost-curve segment must have no \"to\" — without an open-ended final rule the economy stops at that builder.");
+      errs.push("The last cost-curve segment must have no \"to\" — without an open-ended final rule no pack past that episode can be priced, and the deck can never be bought again.");
     return errs;
   },
 
   /* ---------------- series ---------------- */
 
-  /* The series as DECLARED by the model: totalBuilders split into runs of episodesPerSeries.
+  /* The series as DECLARED by the model: totalEpisodes split into runs of episodesPerSeries.
      Sizes here ignore whether the content exists yet. */
   seriesPlan() {
     const s = economy.structure;
     const per = Math.max(1, Math.round(s.episodesPerSeries || 1));
-    const total = Math.max(1, Math.round(s.totalBuilders || 1));
+    const total = Math.max(1, Math.round(s.totalEpisodes || 1));
     const out = [];
     for (let from = 1, i = 0; from <= total; i++) {
       const declared = Math.min(per, total - from + 1);
@@ -262,26 +331,29 @@ const Economy = {
     return out;
   },
 
-  /* The series as PLAYABLE, given the episodes that actually exist. Completing a builder is
-     what unlocks an episode, so a series can never be longer than the content left for it:
+  /* The series as PLAYABLE, given the episodes that actually exist. Filling an episode's last
+     ticket is what unlocks it, so a series can never be longer than the content left for it:
      each series takes what it can from the remaining pool and the rest come back empty and
-     stay locked. Builder numbers stay contiguous across what is really played, so the cost
-     curve sees no gap when a series is short on content. */
+     stay locked. Episode numbers stay contiguous across what is really played, so the cost
+     curve sees no gap when a series is short on content.
+
+     Note the consequence for the ticket row: the last row of a series is genuinely SHORT when
+     the content runs out — three placeholders, not five. Nothing may assume a full row. */
   seriesShape(available) {
     const eps = available != null
       ? available
       : (typeof Episodes !== "undefined" ? Episodes.count() : 0);
     let left = eps, from = 1;
     return this.seriesPlan().map(s => {
-      const builders = Math.max(0, Math.min(s.declared, left));
-      left -= builders;
-      const shaped = { index: s.index, name: s.name, declared: s.declared, builders, from, to: from + builders - 1 };
-      from += builders;
+      const episodes = Math.max(0, Math.min(s.declared, left));
+      left -= episodes;
+      const shaped = { index: s.index, name: s.name, declared: s.declared, episodes, from, to: from + episodes - 1 };
+      from += episodes;
       return shaped;
     });
   },
   /* Series that have content and can be played. */
-  playableSeries() { return this.seriesShape().filter(s => s.builders > 0); },
+  playableSeries() { return this.seriesShape().filter(s => s.episodes > 0); },
   seriesAt(i) { return this.seriesShape()[i] || null; },
   /* The series the run is currently in, falling back to the first. */
   currentSeries() {
@@ -292,13 +364,13 @@ const Economy = {
   nextSeries() {
     const i = (typeof state !== "undefined" && state && state.series) || 0;
     const s = this.seriesAt(i + 1);
-    return s && s.builders > 0 ? s : null;
+    return s && s.episodes > 0 ? s : null;
   },
-  /* 0-based builder index within the current series → 1-based GLOBAL builder number, which is
+  /* 0-based episode slot within the current series → 1-based GLOBAL episode number, which is
      what the cost curve and the episode registry are indexed by. */
-  globalOf(bIdx) {
+  globalEpisodeOf(slotIdx) {
     const s = this.currentSeries();
-    return (s ? s.from : 1) + bIdx;
+    return (s ? s.from : 1) + slotIdx;
   },
 
   /* ---------------- prediction ---------------- */
@@ -399,23 +471,38 @@ const Economy = {
      what a saved config may override: tweaks made against the model that is still loaded are
      kept, and tweaks made against a model that has since been replaced are dropped, so
      importing a new workbook is never masked by an old save. */
-  OWNED_CFG_KEYS: ["energyCap", "regenMin", "sessionsPerDay", "secPerRoll", "tiers",
+  /* Every key apply() assigns must appear here — a missing one produces no error and no
+     warning, it just means a returning player keeps their old value forever and an imported
+     workbook appears to do nothing for them. There is a test that walks apply() and diffs it
+     against this list, because nothing else would catch it.
+     There is deliberately NO pack-price key: a pack is priced per purchase from the curve
+     (Economy.packPrice), never stored as a scalar that could drift from it. */
+  OWNED_CFG_KEYS: ["packSize", "ticketsPerPack", "cardRegenMin", "sessionsPerDay", "secPerPull",
+                   "ticketsPerEpisode",
                    "stdBase", "trainSmall", "trainLarge", "trainLargeChance", "trainEV",
-                   "startPass", "startLand", "spaEnergy", "vipSeed",
-                   "boardScale", "boxesPerUpgrade", "boxCoins", "buildings",
+                   "startPass", "startLand", "spaCards", "vipSeed",
+                   "boardScale", "boxesPerTicketCard", "boxCoins", "episodesInSeries",
                    "accuracy", "accuracyPerClue", "accuracyMax", "avgOdds",
                    "wagerSafe", "wagerConfident", "wagerMax", "clueAlbumSize"],
 
   /* Push the model's flat values onto the live tuning surface and rebuild the editable tables.
-     Everything downstream keeps reading cfg/deck/boxTable exactly as before. */
+     Everything downstream keeps reading cfg/twistDeck/boxTable exactly as before. */
   apply() {
     const e = economy;
-    cfg.energyCap = e.energy.cap;
-    cfg.regenMin = e.energy.regenMin;
-    cfg.sessionsPerDay = e.energy.sessionsPerDay;
-    cfg.secPerRoll = e.energy.secPerRoll;
+    /* Templates and scalars only — apply() must NEVER touch state.shoe. It runs on every
+       drawer edit, every series change, every loadState and every boot, so building the live
+       shoe here would reshuffle a player's remaining cards each time a designer nudged a
+       slider. The shoe is state; this is tuning. */
+    cfg.ticketsPerPack = e.cards.ticketsPerPack;
+    /* DERIVED, not copied — the model states a joker count and the pack size follows from it.
+       Set after ticketsPerPack, since that is what it is derived from. Shoe loads after this
+       file but apply() only ever runs at boot or later, by which point it is there. */
+    cfg.packSize = Shoe.packSize();
+    cfg.cardRegenMin = e.cards.regenMin;
+    cfg.sessionsPerDay = e.cards.sessionsPerDay;
+    cfg.secPerPull = e.cards.secPerPull;
 
-    cfg.tiers = e.structure.levelsPerBuilder;
+    cfg.ticketsPerEpisode = e.structure.ticketsPerEpisode;
 
     cfg.stdBase = e.tiles.stdBase;
     /* The train's small/large pair now survives into cfg intact — js/tiles/train-tile.js draws
@@ -428,11 +515,11 @@ const Economy = {
     cfg.trainEV = this.trainEV();
     cfg.startPass = e.tiles.startPass;
     cfg.startLand = e.tiles.startLand;
-    cfg.spaEnergy = e.tiles.spaEnergy;
+    cfg.spaCards = e.tiles.spaCards;
     cfg.vipSeed = e.tiles.vipSeed;
     cfg.boardScale = e.tiles.boardScale;
 
-    cfg.boxesPerUpgrade = e.box.boxesPerUpgrade;
+    cfg.boxesPerTicketCard = e.box.boxesPerTicketCard;
     cfg.boxCoins = e.box.item1Coins;
 
     cfg.accuracy = e.prediction.baseAccuracy;   // the no-clue floor; clues raise it per prediction
@@ -451,12 +538,13 @@ const Economy = {
        What the game owes the model is the choice it presupposes, so Skip & watch is always
        offered rather than only appearing when the minimum is unaffordable. */
 
-    deck = JSON.parse(JSON.stringify(e.deck));
+    twistDeck = JSON.parse(JSON.stringify(e.plotTwist));
     boxTable = JSON.parse(JSON.stringify(e.box.item2));
 
-    /* Builders in the CURRENT series — the shape the board and the builder list render. */
+    /* Episodes in the CURRENT series — the number of ticket placeholders the run is playing
+       toward, and the length of state.tickets. */
     const s = this.currentSeries();
-    cfg.buildings = s && s.builders > 0 ? s.builders : 1;
+    cfg.episodesInSeries = s && s.episodes > 0 ? s.episodes : 1;
   },
 
   /* Swap in a whole new model (from an import or a restore) and project it. */

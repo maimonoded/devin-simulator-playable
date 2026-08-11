@@ -47,34 +47,28 @@ function confetti(){ const cols=["#ffcb5c","#8b6dff","#2dd4bf","#ff6fa5"];
     c.style.left=Math.random()*100+"vw"; c.style.background=cols[i%4];
     c.style.animation=`fall ${rand(1.4,2.4)}s ease-in ${Math.random()*0.3}s forwards`;
     document.body.appendChild(c); setTimeout(()=>c.remove(),2800); } }
-/* Tumbling dice, layered on top of the regular confetti for wins that include energy. */
-function diceConfetti(){
-  for(let i=0;i<18;i++){
-    const d=document.createElement("div"); d.className="dicefx"; d.textContent="🎲";
-    d.style.left=Math.random()*100+"vw";
-    d.style.fontSize=rand(16,30).toFixed(0)+"px";
-    d.style.setProperty("--drift",rand(-90,90).toFixed(0)+"px");
-    d.style.animation=`dicefall ${rand(1.5,2.6)}s cubic-bezier(.35,.05,.6,1) ${Math.random()*0.45}s forwards`;
-    document.body.appendChild(d); setTimeout(()=>d.remove(),3200);
-  }
-}
-/* Coins and energy raining down, for the moment a mystery box pops.
+/* Things raining down, for the moment a reward lands.
 
-   Separate from diceConfetti on purpose: the shower should be made of the thing you just won.
-   The dice shower stays what an energy win looks like everywhere else (spa, deck) — this pair is
-   for the box, where the whole point of the beat is showing WHAT was inside. */
+   One shower per kind of thing, because the shower should be made of what you just won — that
+   was the whole point of the box's coin/clue pair and it now covers cards and tickets too. */
 function rainFx(cls, glyph, n, big) {
   for (let i = 0; i < n; i++) {
     const d = document.createElement("div"); d.className = cls; d.textContent = glyph;
     d.style.left = Math.random() * 100 + "vw";
     d.style.fontSize = rand(big ? 22 : 15, big ? 40 : 28).toFixed(0) + "px";
     d.style.setProperty("--drift", rand(-110, 110).toFixed(0) + "px");
-    d.style.animation = `dicefall ${rand(1.4, 2.5)}s cubic-bezier(.35,.05,.6,1) ${Math.random() * 0.5}s forwards`;
+    d.style.animation = `fxfall ${rand(1.4, 2.5)}s cubic-bezier(.35,.05,.6,1) ${Math.random() * 0.5}s forwards`;
     document.body.appendChild(d); setTimeout(() => d.remove(), 3200);
   }
 }
 function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
-function energyShower(){ rainFx("energyfx", "⚡", 16, true); }
+function cardShower(){ rainFx("cardfx", "🃏", 16, true); }
+function ticketShower(){ rainFx("ticketfx", "🎟", 16, true); }
+/* One place that turns a reveal/card event's `shower` string into the right rain. */
+function playShower(kind){
+  if(kind==="cards") cardShower();
+  else if(kind==="tickets") ticketShower();
+}
 
 /* Opening a mystery box: it floats to the middle of the screen, swells and pops, and what was
    inside rains down. Blocks the roll loop until the box is gone and the clue sheet (if there was
@@ -97,7 +91,7 @@ async function showBoxOpen(b){
 
   confetti();
   if(b.coins) coinShower(b.coins>=(cfg.boxCoins||0)*2);     // a bigger haul rains harder
-  if(b.energy) energyShower();
+  if(b.tickets) ticketShower();
 
   /* 3 · the winnings, where the box just was. A float over the token is too small and too far
      from where the player is looking after a burst in the middle of the board. */
@@ -116,7 +110,7 @@ function showBoxSpoils(b,ms){
   const el=$("#centerFx");
   const rows=[];
   if(b.coins) rows.push(`<div class="spoilRow"><span class="spoilIco">🪙</span><span class="spoilAmt">+${fmt(b.coins)}</span></div>`);
-  if(b.energy) rows.push(`<div class="spoilRow"><span class="spoilIco">⚡</span><span class="spoilAmt teal">+${b.energy}</span></div>`);
+  if(b.tickets) rows.push(`<div class="spoilRow"><span class="spoilIco">🎟</span><span class="spoilAmt teal">+${b.tickets}</span></div>`);
   if(b.clue&&b.clue.count) rows.push(`<div class="spoilRow"><span class="spoilIco">🔍</span><span class="spoilAmt teal">+${b.clue.count}</span></div>`);
   if(!rows.length) return;
   el.className="centerfx show spoils";
@@ -128,42 +122,49 @@ function showBoxSpoils(b,ms){
   },Math.max(200,ms));
 }
 
-/* Show the roll for cfg.diceRevealMs, then land on the real numbers. Awaited by roll(), so
-   it paces the whole turn either way.
+/* The pulled card, held face up in the middle of the screen for cfg.pullRevealMs. Awaited by
+   pull(), so it paces the whole turn either way.
 
-   Two presentations behind one call. On the 3D board the dice are thrown onto the middle of
-   the board (js/ui/dice3d.js); otherwise the DOM pair shakes with its faces scrambling. The
-   fallback is not just for cfg.board3d = 0 — it also covers die.glb failing to load.
+   Two presentations behind one call: on the 3D board the card flies off the deck to the centre
+   (js/ui/shoe3d.js), otherwise a flat DOM card fades up in the middle. The fallback is not just
+   for cfg.shoe3d = 0 — it also covers the card model failing to load.
 
-   It asks whether the model FAILED, not whether it has arrived: a throw made while the file is
-   still downloading is queued by Dice3D and appears when it lands, and the promise resolves on
-   cfg.diceRevealMs either way, so the turn is paced correctly. Falling back on "not arrived
-   yet" would instead shake a DOM pair that syncDiceMode is deliberately keeping hidden. */
-async function rollDiceAnim(d1,d2){
-  if(use3d() && cfg.dice3d && Board3D.diceFailed && !Board3D.diceFailed()){
-    setDice(d1,d2);                  // keep the DOM pair truthful for anything still reading it
-    await Board3D.throwDice([d1,d2]);
+   It asks whether the 3D deck FAILED, not whether it has arrived. Those differ for the few
+   hundred ms the model takes to download, and keying off "arrived" is what used to make the
+   fallback flash on every page load. A pull in that window is animated by the 3D deck a
+   fraction late rather than by the DOM card.
+
+   RESOLVES ON A TIMER, NOT ON A FRAME. Whichever presentation runs, this settles at
+   cfg.pullRevealMs from a setTimeout. The tween loop is driven by requestAnimationFrame, which
+   a background tab suspends — and the pull is the core loop, so a frame-driven resolve would
+   leave pull() awaiting forever with state.animating stuck true and the board soft-locked. */
+async function pullCardAnim(card){
+  if(use3d() && cfg.shoe3d && window.Board3D && Board3D.shoeFailed && !Board3D.shoeFailed()){
+    await Board3D.pullCard(card);
     return;
   }
-  const a=$("#die1"),b=$("#die2");
-  a.classList.add("roll"); b.classList.add("roll");
-  const total=Math.max(0,cfg.diceRevealMs), t0=performance.now();
-  const tick=Math.max(30,Math.min(70,total/3||30));
-  let left;
-  // scramble until the window is nearly up, clipping the last wait so the reveal lands on
-  // cfg.diceRevealMs rather than overshooting a whole tick. The >25 floor avoids queueing
-  // pointless sub-frame timers (which browsers clamp anyway).
-  while((left=total-(performance.now()-t0))>25){
-    setDice(Math.floor(rand(1,7)),Math.floor(rand(1,7)));
-    await sleep(Math.min(tick,left));
-  }
-  setDice(d1,d2);                                  // reveal
-  a.classList.remove("roll"); b.classList.remove("roll");
+  showFlatCard(card);
+  await sleep(Math.max(0,cfg.pullRevealMs));
+  const el=$("#centerFx");
+  if(el.classList.contains("pullcard")){ el.className="centerfx"; el.innerHTML=""; }
 }
-function setDice(a,b){
-  const faces={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
-  [["#die1",a],["#die2",b]].forEach(([sel,v])=>{ const d=$(sel); d.innerHTML="";
-    for(let k=0;k<9;k++){ const p=document.createElement("div"); p.className="pip"+(faces[v].includes(k)?"":" off"); d.appendChild(p);} });
+/* The fallback presentation: the card's face, centred, with no 3D involved.
+
+   The SAME canvas the 3D board textures — CardArt owns the deck's look, and the two
+   presentations must not drift into being two different decks. Appended rather than drawn to,
+   so the painted override repaints it in place here too. */
+function showFlatCard(card){
+  const el=$("#centerFx");
+  const ticket=(typeof Shoe!=="undefined"&&Shoe.isTicket(card));
+  el.className="centerfx show pullcard"+(ticket?" ticket":"");
+  el.innerHTML="";
+  const wrap=document.createElement("div");
+  wrap.className="pcard";
+  wrap.appendChild(CardArt.face(card));
+  const sub=document.createElement("div");
+  sub.className="csub";
+  sub.textContent=ticket?"Ticket!":"Move "+Shoe.rank(card);
+  el.appendChild(wrap); el.appendChild(sub);
 }
 /* Center-of-board win/loss reveal. Holds for r.ms (or cfg.revealMs) before resolving, so the
    roll loop (and auto-play) waits for it. Wins get confetti, losses a sad droop. */
@@ -173,7 +174,7 @@ function showReveal(r){
   el.innerHTML=`<div class="cico">${r.positive?"🎉":"😢"}</div>
     <div class="cbig">${r.big}</div><div class="csub">${r.sub||""}</div>`;
   if(r.positive) confetti();
-  if(r.energy) diceConfetti();   // energy wins get a dice shower on top
+  playShower(r.shower);   // rain made of whatever was won
   return sleep(r.ms??cfg.revealMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
 /* Clue found. Blocking, like the train's Collect popup, because a clue is the only collectible
@@ -234,7 +235,7 @@ function showCard(c){
       ${c.big?`<div class="pcAmt">${c.big}</div>`:""}
     </div>`;
   if(c.positive) confetti();
-  if(c.energy) diceConfetti();
+  playShower(c.shower);
   return sleep(cfg.deckCardMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
 /* Blocking Collect popup (train tiles). Resolves on click, or automatically after a

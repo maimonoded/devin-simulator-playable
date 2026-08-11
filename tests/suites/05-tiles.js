@@ -16,20 +16,28 @@ test("gainCoins adds coins and returns a float event", () => {
   eq(ev.float.text, "+50");
 });
 
-test("gainEnergy tops up to the cap", () => {
+test("gainCards tops the shoe up to the cap", () => {
   freshRun();
-  const t = TILE_TYPES.standard;
-  state.energy = cfg.energyCap - 2;
-  t.gainEnergy(10);
-  eq(state.energy, cfg.energyCap, "clamped to the cap");
+  state.shoe = state.shoe.slice(0, cfg.packSize - 2);
+  TILE_TYPES.standard.gainCards(10);
+  eq(Shoe.count(), cfg.packSize, "clamped to the cap");
 });
 
-test("gainEnergy never reduces a balance already above the cap", () => {
+/* The overflow rule, transplanted from energy onto cards — and it matters MORE now: energy only
+   overflowed via the store, but a bought pack merges onto the leftovers, so this is the
+   ordinary path rather than an edge case. */
+test("gainCards never reduces a shoe already above the cap", () => {
   freshRun();
-  const t = TILE_TYPES.standard;
-  state.energy = 500;                      // bought from the store
-  t.gainEnergy(5);
-  eq(state.energy, 500, "an over-cap balance must not be clamped down");
+  state.shoe = Shoe.mintPack().concat(Shoe.mintPack());   // two packs merged, as a purchase does
+  const before = Shoe.count();
+  TILE_TYPES.standard.gainCards(5);
+  eq(Shoe.count(), before, "an over-cap shoe must not be trimmed");
+});
+
+test("gainTickets fills placeholders through Tickets.award", () => {
+  freshRun();
+  TILE_TYPES.standard.gainTickets(2);
+  eq(Tickets.held(0), 2, "the lowest unfilled placeholder takes them");
 });
 
 test("gainClues adds clues", () => {
@@ -41,12 +49,14 @@ test("gainClues adds clues", () => {
 
 test("presentation builders produce well-formed events", () => {
   const t = TILE_TYPES.standard;
-  deepEq(t.reveal("+5", "sub", { positive: true, energy: true, ms: 900 }),
-         { reveal: { big: "+5", sub: "sub", positive: true, energy: true, ms: 900 } });
-  deepEq(t.reveal("x", "y"), { reveal: { big: "x", sub: "y", positive: false, energy: false, ms: undefined } });
+  /* `shower` is a STRING now, not a boolean: there are two kinds of thing to rain and the
+     shower should be made of what was actually won. */
+  deepEq(t.reveal("+5", "sub", { positive: true, shower: "cards", ms: 900 }),
+         { reveal: { big: "+5", sub: "sub", positive: true, shower: "cards", ms: 900 } });
+  deepEq(t.reveal("x", "y"), { reveal: { big: "x", sub: "y", positive: false, shower: null, ms: undefined } });
   deepEq(t.collect("+9", "Train bonus"), { collect: { big: "+9", sub: "Train bonus" } });
   deepEq(t.card("Windfall", "+300", { positive: true }),
-         { card: { name: "Windfall", big: "+300", positive: true, energy: false } });
+         { card: { name: "Windfall", big: "+300", positive: true, shower: null } });
 });
 
 test("startLandingBonus pays pass + land and seeds VIP", () => {
@@ -189,14 +199,25 @@ test("the mini-game scales with the multiplier and never invents a payout", () =
   }
 });
 
-test("spa grants energy and flags the dice shower", () => {
+test("spa deals cards and flags the card shower", () => {
   freshRun();
-  state.energy = 0;
+  state.shoe = [];
   const ev = TILE_TYPES.spa.onLand({});
-  eq(state.energy, cfg.spaEnergy);
+  eq(Shoe.count(), cfg.spaCards);
   const r = ev.find(e => e.reveal).reveal;
   eq(r.positive, true);
-  eq(r.energy, true, "energy wins get the dice shower");
+  eq(r.shower, "cards", "a card grant rains cards");
+});
+
+/* Spa cards come off the pack tail like every other free card. If it minted loose cards the
+   two-tickets-per-pack invariant would leak away one Spa landing at a time. */
+test("spa cards are dealt off the pack, not minted loose", () => {
+  freshRun();
+  state.shoe = []; state.packTail = [];
+  const priced = state.ticketsPriced;
+  TILE_TYPES.spa.onLand({});
+  eq(state.ticketsPriced, priced + cfg.ticketsPerPack, "one pack minted, not one loose card");
+  eq(state.packTail.length, cfg.packSize - cfg.spaCards, "the rest of that pack is kept for next time");
 });
 
 test("vip collects the whole pool, then leaves it empty", () => {
@@ -239,9 +260,9 @@ test("premiere sweeps to Start at the configured speed", () => {
 suite("tiles: deck cards");
 
 function forceCard(name, fn) {
-  const saved = deck.map(c => c.weight);
-  deck.forEach(c => { c.weight = c.name === name ? 100 : 0; });
-  try { return fn(); } finally { deck.forEach((c, i) => { c.weight = saved[i]; }); }
+  const saved = twistDeck.map(c => c.weight);
+  twistDeck.forEach(c => { c.weight = c.name === name ? 100 : 0; });
+  try { return fn(); } finally { twistDeck.forEach((c, i) => { c.weight = saved[i]; }); }
 }
 
 test("a coin card pays and shows the drawn card", () => {
@@ -258,28 +279,27 @@ test("a coin card pays and shows the drawn card", () => {
 test("a fine costs coins, seeds VIP and reads as a loss", () => {
   freshRun();
   state.coins = 1000; state.vip = 0;
-  const fine = deck.find(c => c.name === "Fine / Paparazzi");
+  const fine = twistDeck.find(c => c.name === "Fine / Paparazzi");
   const ev = forceCard("Fine / Paparazzi", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
   eq(state.coins, 1000 + fine.coins, "the loss comes off the balance");
   eq(state.vip, fine.vip, "and is recycled into the VIP pool");
   eq(ev.find(e => e.card).card.positive, false);
 });
 
-test("an energy card flags the dice shower", () => {
+test("a ticket card fills a placeholder and flags the ticket shower", () => {
   freshRun();
-  state.energy = 0;
-  const ev = forceCard("Small energy", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.energy, 2);
-  eq(ev.find(e => e.card).card.energy, true);
+  const ev = forceCard("Backstage pass", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
+  eq(Tickets.held(0), 1);
+  eq(ev.find(e => e.card).card.shower, "tickets");
 });
 
 /* The deck pays no clues: the economy model moved every clue to the Mystery Box so that one
    table sets the rate a prediction runs on. A card that grants clues would double-count. */
 test("no deck card grants clues — the Mystery Box is the only source", () => {
   freshRun();
-  eq(deck.filter(c => c.clues > 0).length, 0);
+  eq(twistDeck.filter(c => c.clues > 0).length, 0);
   state.clues = 0; state.cycleClues = 0;
-  deck.forEach(c => forceCard(c.name, () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 })));
+  twistDeck.forEach(c => forceCard(c.name, () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 })));
   eq(state.clues, 0, "the album total stays put");
   eq(state.cycleClues, 0, "and so does the flow");
 });

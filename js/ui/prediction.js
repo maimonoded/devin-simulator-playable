@@ -9,11 +9,11 @@ function closeEpisodeUi(){
   $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null;
 }
 
-/* A builder just completed, so an episode came with it. Ask rather than launch: banking several
+/* A placeholder just filled, so an episode came with it. Ask rather than launch: banking several
    and watching them back to back is how the show is actually consumed, and interrupting a roll
    streak to sit through a video is not a choice the game should make for the player.
 
-   Declining costs nothing — the id stays in state.epQueue, and the builders view grows a button
+   Declining costs nothing — the id stays in state.epQueue, and the board grows a 🎬 button
    for whatever is waiting there. */
 function openEpisodeUnlock(id){
   const ep=Episodes.get(id);
@@ -213,6 +213,6 @@ function showEpisodeResult(ep,r){
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${ep.title}</h2></div>
     <div class="mbody">${resultHtml}${ctaHtml}</div></div>`;
   $("#closeEp").onclick=()=>{ closeEpisodeUi(); renderAll(); };
-  if(more) $("#nextEp").onclick=()=>openPrediction(Builders.firstUnwatchedId());
+  if(more) $("#nextEp").onclick=()=>openPrediction(Tickets.firstUnwatchedId());
   renderAll();
 }

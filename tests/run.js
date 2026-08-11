@@ -19,7 +19,7 @@ const APP_FILES = [
   "js/content.js",
   "js/board-model.js",
   "js/env-model.js",
-  "js/dice-model.js",
+  "js/shoe.js",
   "assets/env/scene.js",
   "js/state.js",
   "js/storage.js",
@@ -34,7 +34,7 @@ const APP_FILES = [
   "js/economy.js",
   "js/economy-import.js",
   "js/board-actor.js",
-  "js/builders/builders.js",
+  "js/tickets.js",
   "js/tiles/tile.js",
   ...fs.readdirSync(path.join(ROOT, "js/tiles"))
       .filter(f => f.endsWith("-tile.js")).sort().map(f => "js/tiles/" + f),
@@ -116,7 +116,7 @@ Object.assign(ctx, { suite, test, ok, eq, near, deepEq, throws, fail, APP_ROOT: 
 vm.runInContext(`
   function resetCfg(){
     Object.assign(cfg, JSON.parse(JSON.stringify(DEFAULTS)));
-    deck = JSON.parse(JSON.stringify(defDeck));
+    twistDeck = JSON.parse(JSON.stringify(defTwistDeck));
     boxTable = JSON.parse(JSON.stringify(defBox));
   }
   function freshRun(){

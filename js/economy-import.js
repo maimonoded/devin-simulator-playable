@@ -33,14 +33,24 @@ const EconomyImport = {
      itself configurable ("Target days for all 240"). */
   FIELDS: [
     // --- Inputs: energy & sessions ---
-    ["Inputs", "B5",  "Energy cap",                          "C5",  "energy.cap"],
-    ["Inputs", "B6",  "Regen minutes per 1 energy",          "C6",  "energy.regenMin"],
-    ["Inputs", "B7",  "Daily energy allowance (hard cap)",   "C7",  "energy.dailyAllowance"],
-    ["Inputs", "B8",  "Sessions per day (engaged)",          "C8",  "energy.sessionsPerDay"],
-    ["Inputs", "B9",  "Seconds per roll",                    "C9",  "energy.secPerRoll"],
+    /* EVERY expectedLabel below is still the word the WORKBOOK prints, not the word the game
+       uses. That is deliberate and it is the whole point of the gate: the check is that the
+       label next to a value still says what it said in v3, so an inserted row is caught. Change
+       a label to match the game's new vocabulary and the importer refuses every workbook that
+       exists; repoint a path while leaving the label and it imports the right cell. So paths
+       move, labels never do.
+
+       Rows 5-7 are energy, which the game no longer has. They land on _dead and are deleted
+       before assembly (like _anchors and _costBase) — that keeps the layout gate covering those
+       three rows without importing a concept the game dropped. */
+    ["Inputs", "B5",  "Energy cap",                          "C5",  "_dead.energyCap"],
+    ["Inputs", "B6",  "Regen minutes per 1 energy",          "C6",  "_dead.regenMin"],
+    ["Inputs", "B7",  "Daily energy allowance (hard cap)",   "C7",  "_dead.dailyAllowance"],
+    ["Inputs", "B8",  "Sessions per day (engaged)",          "C8",  "cards.sessionsPerDay"],
+    ["Inputs", "B9",  "Seconds per roll",                    "C9",  "cards.secPerPull"],
     // --- Inputs: structure & pacing anchors ---
-    ["Inputs", "B12", "Total builders",                      "C12", "structure.totalBuilders"],
-    ["Inputs", "B13", "Levels per builder",                  "C13", "structure.levelsPerBuilder"],
+    ["Inputs", "B12", "Total builders",                      "C12", "structure.totalEpisodes"],
+    ["Inputs", "B13", "Levels per builder",                  "C13", "structure.ticketsPerEpisode"],
     ["Inputs", "B14", "Episodes in series 1",                "C14", "structure.episodesPerSeries"],
     ["Inputs", "B15", "Target days to finish series 1",      "C15", "_anchors.daysSeries1"],
     ["Inputs", "B16", { prefix: "Target days for all" },     "C16", "_anchors.totalDays"],
@@ -54,12 +64,12 @@ const EconomyImport = {
     ["Inputs", "B34", "Train: chance of the large bonus",    "C34", "tiles.trainLargeChance"],
     ["Inputs", "B35", "Start: pass bonus",                   "C35", "tiles.startPass"],
     ["Inputs", "B36", "Start: extra bonus on landing",       "C36", "tiles.startLand"],
-    ["Inputs", "B37", "Spa Day corner: energy grant",        "C37", "tiles.spaEnergy"],
+    ["Inputs", "B37", "Spa Day corner: energy grant",        "C37", "tiles.spaCards"],
     ["Inputs", "B38", "VIP Lounge: pool seed per lap",       "C38", "tiles.vipSeed"],
     // --- Inputs: builder costs ---
     ["Inputs", "B41", "Base level-1 cost (builder 1)",       "C41", "_costBase"],
-    ["Inputs", "B42", "Level cost growth (x per level)",     "C42", "_levelGrowth"],
-    ["Inputs", "B43", "Boxes per level upgrade",             "C43", "box.boxesPerUpgrade"],
+    ["Inputs", "B42", "Level cost growth (x per level)",     "C42", "_ticketGrowth"],
+    ["Inputs", "B43", "Boxes per level upgrade",             "C43", "box.boxesPerTicketCard"],
     // --- Inputs: prediction & wager ---
     ["Inputs", "B46", { prefix: "Wager participation" },     "C46", "prediction.participation"],
     ["Inputs", "B49", { prefix: "Wager tier 1" },            "C49", "prediction.wagerSafe"],
@@ -72,14 +82,14 @@ const EconomyImport = {
     ["Inputs", "B56", { prefix: "Clue album size" },         "C56", "prediction.clueAlbumSize"],
     // --- Tuning: the five relative knobs ---
     ["Tuning", "B6",  { prefix: "Earn rate knob" },          "C6",  "knobs.earn"],
-    ["Tuning", "B7",  { prefix: "Builder cost knob" },       "C7",  "knobs.builderCost"],
-    ["Tuning", "B8",  { prefix: "Energy supply knob" },      "C8",  "knobs.energySupply"],
+    ["Tuning", "B7",  { prefix: "Builder cost knob" },       "C7",  "knobs.ticketCost"],
+    ["Tuning", "B8",  { prefix: "Energy supply knob" },      "C8",  "knobs.cardSupply"],
     ["Tuning", "B9",  "Session frequency knob",              "C9",  "knobs.sessionFreq"],
     ["Tuning", "B10", "Wager appetite knob",                 "C10", "knobs.wagerAppetite"],
     // --- MysteryBox: the guaranteed first item ---
     ["MysteryBox", "B6", "Coins",                            "C6",  "box.item1Coins"],
     // --- what the workbook predicts, kept so a run can be checked against it ---
-    ["Board",       "B14", "TOTAL per roll",                 "D14", "reference.coinsPerRoll"],
+    ["Board",       "B14", "TOTAL per roll",                 "D14", "reference.coinsPerPull"],
     ["Archetypes",  "B11", "Board coins per day",            "D11", "reference.coinsPerDayEngaged"],
     ["Progression", "B11", "Total days (engaged)",           "C11", "reference.totalDays"],
     ["Progression", "B12", "Average episodes/day",           "C12", "reference.episodesPerDay"],
@@ -175,7 +185,9 @@ const EconomyImport = {
     for (const [ref, want] of deckHeaders)
       if (!this.labelMatches(wb.label("Deck", ref), want))
         errors.push(`Deck!${ref} should read "${want}" but reads "${wb.label("Deck", ref) || "(empty)"}".`);
-    const deckT = this.readTable(wb, "Deck", 5, { weight: "C", coins: "D", energy: "E", clues: "F", vip: "G" }, "Total weight");
+    /* Column E still PRINTS "Energy"; the game reads it as tickets. Same rule as the Inputs
+       rows above — the header assertion is unchanged, the destination moved. */
+    const deckT = this.readTable(wb, "Deck", 5, { weight: "C", coins: "D", tickets: "E", clues: "F", vip: "G" }, "Total weight");
     errors.push(...deckT.errs);
     if (!deckT.rows.length) errors.push("Deck has no cards.");
     if (deckT.rows.some(r => r.weight < 0)) errors.push("Deck has a negative weight.");
@@ -193,12 +205,17 @@ const EconomyImport = {
         errors.push(`MysteryBox!${ref} should read "${want}" but reads "${wb.label("MysteryBox", ref) || "(empty)"}".`);
     const boxT = this.readTable(wb, "MysteryBox", 10, { weight: "C", amount: "D" }, "Total weight");
     errors.push(...boxT.errs);
-    const KINDS = { coins: "coins", energy: "energy", clues: "clues" };
+    /* THE ONE PLACE THE TWO VOCABULARIES MEET: sheet word on the left, game kind on the right.
+       A workbook's "Energy" row is the game's ticket drop. Both spellings are accepted so a
+       sheet updated to say "Ticket" also imports, and the loop below iterates the SHEET-side
+       names so the error message names the word a designer will actually find in their file. */
+    const KINDS = { coins: "coins", energy: "tickets", ticket: "tickets", tickets: "tickets", clues: "clues" };
+    const REQUIRED = ["coins", "energy", "clues"];
     boxT.rows.forEach(r => { r.kind = KINDS[this.norm(r.name)]; });
     const unknown = boxT.rows.filter(r => !r.kind).map(r => r.name);
-    if (unknown.length) errors.push(`Mystery Box item 2 has outcome${unknown.length > 1 ? "s" : ""} the game cannot pay out: ${unknown.join(", ")}. Only Coins, Energy and Clues are understood.`);
-    for (const k of Object.keys(KINDS))
-      if (!boxT.rows.some(r => r.kind === k)) errors.push(`Mystery Box item 2 is missing its "${k}" outcome.`);
+    if (unknown.length) errors.push(`Mystery Box item 2 has outcome${unknown.length > 1 ? "s" : ""} the game cannot pay out: ${unknown.join(", ")}. Only Coins, Energy (read as tickets) and Clues are understood.`);
+    for (const k of REQUIRED)
+      if (!boxT.rows.some(r => r.kind === KINDS[k])) errors.push(`Mystery Box item 2 is missing its "${k}" outcome.`);
     if (boxT.rows.reduce((a, r) => a + (r.weight || 0), 0) <= 0) errors.push("Mystery Box item-2 weights sum to zero.");
 
     if (errors.length) return fail();
@@ -207,8 +224,8 @@ const EconomyImport = {
     draft.version = version.trim();
     draft.filename = filename || null;
     draft.loadedAt = new Date().toISOString();
-    draft.deck = deckT.rows.map(r => ({
-      name: r.name, weight: r.weight, coins: r.coins, energy: r.energy, clues: r.clues,
+    draft.plotTwist = deckT.rows.map(r => ({
+      name: r.name, weight: r.weight, coins: r.coins, tickets: r.tickets, clues: r.clues,
       vip: r.vip, ...(r.advance ? { advance: true } : {}),
     }));
     draft.box.item2 = boxT.rows.map(r => ({ name: r.name, kind: r.kind, weight: r.weight, amount: r.amount }));
@@ -216,7 +233,7 @@ const EconomyImport = {
     const anchors = {
       episodesSeries1: draft.structure.episodesPerSeries,
       daysSeries1: draft._anchors.daysSeries1,
-      totalEpisodes: draft.structure.totalBuilders,
+      totalEpisodes: draft.structure.totalEpisodes,
       totalDays: draft._anchors.totalDays,
     };
     /* The workbook prints the solved exponent AND the anchors it came from. Recompute it and
@@ -229,29 +246,39 @@ const EconomyImport = {
 
     draft.costCurve = [{
       from: 1, kind: "power",
-      base: draft._costBase, levelGrowth: draft._levelGrowth, exponent: draft._exponent,
+      base: draft._costBase, ticketGrowth: draft._ticketGrowth, exponent: draft._exponent,
       bIndex: "global", baseMode: "absolute", anchors,
     }];
-    delete draft._anchors; delete draft._exponent; delete draft._costBase; delete draft._levelGrowth;
+    delete draft._anchors; delete draft._exponent; delete draft._costBase; delete draft._ticketGrowth;
+    delete draft._dead;   // energy rows: gated for layout, never installed
 
     const curveErrs = Economy.validateCurve(draft.costCurve);
     if (curveErrs.length) { errors.push(...curveErrs); return fail(); }
 
     /* --- 7. sanity, not structure: things that parse but would break a run --- */
-    if (draft.structure.levelsPerBuilder < 1) errors.push("Levels per builder must be at least 1.");
-    if (draft.structure.totalBuilders < 1) errors.push("Total builders must be at least 1.");
-    if (draft.energy.cap <= 0) errors.push("Energy cap must be above zero.");
-    if (draft.energy.regenMin <= 0) errors.push("Regen minutes per energy must be above zero.");
-    if (draft.energy.sessionsPerDay <= 0) errors.push("Sessions per day must be above zero.");
+    /* The workbook still speaks in builders and levels; the game reads them as episodes and
+       tickets. The labels are asserted verbatim above, so these messages name the workbook's
+       word and the game's meaning together — a designer has to find the cell, not the concept. */
+    if (draft.structure.ticketsPerEpisode < 1) errors.push("Levels per builder (Inputs!C13) must be at least 1 — it is how many tickets fill one episode.");
+    if (draft.structure.totalEpisodes < 1) errors.push("Total builders (Inputs!C12) must be at least 1 — it is the number of episodes in the run.");
+    if (draft.cards.sessionsPerDay <= 0) errors.push("Sessions per day must be above zero.");
+    /* The deck's own invariants. ticketsPerPack < 1 is the new deadlock: with no tickets in a
+       pack no episode could ever be completed, and unlike a bad price it fails silently. */
+    /* Nothing checks a pack SIZE any more: it is derived from this count (Shoe.packSize — the
+       52 numbered cards plus the jokers), so it cannot be out of range without this being. The
+       two checks that used to live here compared draft.cards.packSize, which no longer exists;
+       left in place they would have read undefined, compared false and passed everything. */
+    if (draft.cards.ticketsPerPack < 1) errors.push("Tickets per pack must be at least 1 — with none, no episode can ever be completed.");
+    if (draft.cards.regenMin <= 0) errors.push("Regen minutes per card must be above zero.");
     if (draft.prediction.maxAccuracy < draft.prediction.baseAccuracy)
       errors.push("Max accuracy is below base accuracy, so clues would make predictions worse.");
     if (errors.length) return fail();
 
     /* Warnings: legitimate, but a designer would want to know. */
-    if (draft.structure.totalBuilders > Episodes.count())
-      warnings.push(`The model wants ${draft.structure.totalBuilders} builders but only ${Episodes.count()} episodes exist, so later series stay locked until more content ships.`);
+    if (draft.structure.totalEpisodes > Episodes.count())
+      warnings.push(`The model wants ${draft.structure.totalEpisodes} episodes but only ${Episodes.count()} exist, so later series stay locked until more content ships.`);
     if (draft.tiles.boardScale !== 1)
-      warnings.push(`Board scale is ${draft.tiles.boardScale}. In this game it scales income AND builder cost together, so it redenominates the currency without changing pacing.`);
+      warnings.push(`Board scale is ${draft.tiles.boardScale}. In this game it scales income AND ticket cost together, so it redenominates the currency without changing pacing.`);
 
     return { ok: true, errors, warnings, version: draft.version, economy: draft };
   },

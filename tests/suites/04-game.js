@@ -1,31 +1,36 @@
 "use strict";
-/* game.js — dice, lap bonus, prediction resolution, session/time */
+/* game.js — the pull, lap bonus, prediction resolution, session/time */
 
-suite("game: dice & rolling");
+suite("game: pulling");
 
-test("rollDice returns two faces in 1..6 and their sum", () => {
-  for (let i = 0; i < 200; i++) {
-    const { d1, d2, steps } = rollDice();
-    ok(Number.isInteger(d1) && d1 >= 1 && d1 <= 6, "d1 out of range: " + d1);
-    ok(Number.isInteger(d2) && d2 >= 1 && d2 <= 6, "d2 out of range: " + d2);
-    eq(steps, d1 + d2);
-  }
-});
-
-test("rollDice can produce both extremes", () => {
-  withRandom([0], () => deepEq(rollDice(), { d1: 1, d2: 1, steps: 2 }));
-  withRandom([0.999], () => deepEq(rollDice(), { d1: 6, d2: 6, steps: 12 }));
-});
-
-test("spendRoll charges energy equal to the multiplier and counts the roll", () => {
+test("every card moves 1..13 tiles, or is a joker and moves nothing", () => {
   freshRun();
-  state.energy = 30;
-  spendRoll(5);
-  eq(state.energy, 25);
-  eq(state.rolls, 1);
-  spendRoll(1);
-  eq(state.energy, 24);
-  eq(state.rolls, 2);
+  Shoe.mintPack().forEach(c => {
+    ok(Shoe.isLegal(c), "illegal card: " + c);
+    const r = Shoe.rank(c);
+    if (Shoe.isTicket(c)) eq(r, 0, "a joker moves nothing");
+    else ok(r >= 1 && r <= 13, `${c} moves ${r}`);
+  });
+});
+
+test("a pull takes exactly one card off the front and counts it", () => {
+  freshRun();
+  state.shoe = ["s7", "J1", "d3"];
+  eq(Shoe.pull(), "s7");
+  eq(state.pulls, 1);
+  deepEq(state.shoe, ["J1", "d3"], "off the FRONT, in order");
+  eq(Shoe.pull(), "J1");
+  eq(state.pulls, 2);
+});
+
+/* The dice never ran out, so nothing downstream was written to expect an empty draw. Returning
+   null rather than undefined is what lets pull() bail cleanly instead of moving the token by
+   NaN tiles. */
+test("pulling an empty shoe returns null rather than undefined", () => {
+  freshRun();
+  state.shoe = [];
+  eq(Shoe.pull(), null);
+  eq(state.pulls, 0, "a pull that produced nothing is not counted");
 });
 
 test("applyPassStart pays the lap bonus and seeds the VIP pool", () => {
@@ -160,18 +165,20 @@ test("manual mode ignores cfg.accuracy entirely", () => {
 
 suite("game: session & time");
 
-test("advanceSession refills energy to the cap", () => {
+test("advanceSession deals the shoe back up to the cap", () => {
   freshRun();
-  state.energy = 0;
+  state.shoe = [];
   advanceSession();
-  eq(state.energy, cfg.energyCap);
+  eq(Shoe.count(), cfg.packSize);
 });
 
-test("advanceSession never drains energy bought above the cap", () => {
+/* The overflow rule again, at the third of its four enforcement sites. */
+test("advanceSession never trims a shoe merged above the cap", () => {
   freshRun();
-  state.energy = 1000;                       // a store purchase
+  state.shoe = Shoe.mintPack().concat(Shoe.mintPack());   // a bought pack on top of leftovers
+  const big = Shoe.count();
   advanceSession();
-  eq(state.energy, 1000, "over-cap balance must survive");
+  eq(Shoe.count(), big, "an over-cap shoe must survive");
 });
 
 test("advancing within a day increments the session counter", () => {
@@ -188,7 +195,7 @@ test("advancing within a day increments the session counter", () => {
 test("crossing midnight rolls the day and pays a login reward", () => {
   freshRun();
   state.clock = 23 * 60;                     // late in day 1
-  state.energy = cfg.energyCap;              // so the gap is the session slot, not a refill
+  state.shoe = Shoe.mintPack();              // full, so the gap is the session slot
   const r = advanceSession();
   eq(r.isNewDay, true);
   eq(state.day, 2);
@@ -210,7 +217,7 @@ test("login rewards are actually credited", () => {
 test("skipping several days pays one reward per day", () => {
   freshRun();
   cfg.sessionsPerDay = 0.25;                 // 5760-minute gap = 4 days
-  state.energy = cfg.energyCap;
+  state.shoe = Shoe.mintPack();
   const r = advanceSession();
   eq(state.day, 5);
   eq(r.rewards.length, 4, "one per day crossed");
@@ -218,11 +225,11 @@ test("skipping several days pays one reward per day", () => {
   resetCfg();
 });
 
-test("the gap is the greater of a full refill and one session slot", () => {
+test("the gap is the greater of a full deal and one session slot", () => {
   freshRun();
   cfg.sessionsPerDay = 2;                    // 720-minute slot
-  cfg.regenMin = 3;                          // 30 energy => 90 minutes to refill
-  state.energy = 0;
+  cfg.cardRegenMin = 3;                      // 50 cards => 150 minutes to refill
+  state.shoe = [];
   const before = state.clock;
   advanceSession();
   eq(state.clock - before, 720, "session slot dominates a short refill");

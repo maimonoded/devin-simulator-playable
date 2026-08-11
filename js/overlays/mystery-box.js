@@ -1,10 +1,13 @@
 "use strict";
-/* Mystery box — spawned on standard tiles by builder upgrades (cfg.boxesPerUpgrade each).
+/* Mystery box — dropped on standard tiles when a ticket is earned (cfg.boxesPerTicketCard each).
    Landing on one opens it before the tile pays out.
 
    TWO items every box, which is what the economy model is balanced around:
      item 1  always coins (cfg.boxCoins)
-     item 2  one weighted draw from the editable boxTable — coins, energy or clues
+     item 2  one weighted draw from the editable boxTable — coins, a ticket, or clues.
+             Note the loop that creates: a ticket drops a box, and a box can hold a ticket. It
+             is bounded, not runaway — a box has to be LANDED on to pay out, and at a 1-in-3
+             weight the geometric sum is only a 1.5x multiplier even if every box is collected.
    Item 2 is the only source of clues in the game, so its weight is what sets the clue rate
    a prediction runs on. Two rewards means two playback events (an event carries one float
    and one log), separated by cfg.boxItemGapMs so they don't stack on top of each other.
@@ -41,7 +44,7 @@ class MysteryBoxOverlay extends Overlay {
     if(!drop) drop=this.roll();
     let ev,clue=null;
     if(drop.kind==="coins"){ const c=drop.amount*bs; ev=this.gainCoins(c,"+"+fmt(c)); }
-    else if(drop.kind==="energy"){ ev=this.gainEnergy(drop.amount,"+"+drop.amount+"⚡"); }
+    else if(drop.kind==="tickets"){ ev=this.gainTickets(drop.amount,"+"+drop.amount+"🎟"); }
     else {
       /* Clues are the game's only collectible, so this one stops the board and says WHAT was
          found rather than floating a number past. Slots fill in order (js/clues.js), so the
@@ -64,7 +67,7 @@ class MysteryBoxOverlay extends Overlay {
        already banked above by gain*(). This is presentation deciding what to show, not what to
        pay, which is the same split the bonus mini-games use. */
     const open={boxOpen:{tile:i,coins:c1+(drop.kind==="coins"?drop.amount*bs:0),
-                         energy:drop.kind==="energy"?drop.amount:0, clue}};
+                         tickets:drop.kind==="tickets"?drop.amount:0, clue}};
     return [open,first,ev];
   }
 }

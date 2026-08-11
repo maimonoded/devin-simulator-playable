@@ -36,9 +36,13 @@
       <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
       <div class="pill clues"><span class="ic">🔍</span><div><div class="v" id="hClues">0</div><div class="lb">Clues</div></div></div>
       <div class="pill"><span class="ic">🌟</span><div><div class="v" id="hVip">0</div><div class="lb">VIP Pool</div></div></div>
-      <div class="pill energywrap"><span class="ic">⚡</span><div style="flex:1">
-        <div class="v"><span id="hEnergy">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hEnergyCap">50</span></span></div>
-        <div class="ebar"><div class="efill" id="hEfill"></div></div></div></div>
+      <!-- Cards left in the shoe. Keeps the energy pill's exact shape and the .ebar/.efill bar:
+           css/mobile.css relies on this one pill carrying the bar to stop the 9:16 HUD wrapping
+           to two rows. The count can exceed the cap — a bought pack merges onto the leftovers —
+           so only the BAR is clamped, never the number. -->
+      <div class="pill cardswrap"><span class="ic">🃏</span><div style="flex:1">
+        <div class="v"><span id="hCards">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hCardCap">50</span></span></div>
+        <div class="ebar"><div class="efill" id="hCfill"></div></div></div></div>
     </div>
     <!-- Player. Not changeable yet — it is the handle for the profile panel, which for now
          holds only the progress reset. Pushed to the far right so the balances read left. -->
@@ -68,18 +72,14 @@
       <div class="sheet" id="sheetHost"></div>
       <!-- Play controls ride ON the board as a flat 2D layer pinned to its bottom edge, so the
            scene reads as a game screen rather than a viewport with a toolbar under it. -->
-      <!-- One row, evenly spaced: builders · stake · ROLL · album. These were three separate
-           things (an absolutely-positioned corner button plus a centred group) which collided
-           on a narrow screen and disagreed about their height. -->
+      <!-- One row, evenly spaced: buy · PULL · album. -->
       <div class="playbar">
-        <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
-        <!-- Into the builders view. Carries a dot when something is affordable, since the
-             board no longer shows builder progress at all. -->
-        <button class="btn navb" id="buildersBtn" title="Builders">🏗<i class="navDot" id="buildersDot"></i></button>
-        <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
-        <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
-        <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
-        <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
+        <!-- Buy a pack of cards. The deck is the game's clock, so when it runs dry this is the
+             one thing left to do — which is why it sits on the play row rather than only in
+             the store. Shows the curve's price for the next pack. -->
+        <button class="btn navb" id="buyDeckBtn" title="Buy a deck">🃏<i class="navDot" id="buyDot"></i></button>
+        <!-- Pull is also the auto-pull control: hold it to hand the loop over, tap again to stop. -->
+        <button class="btn roll" id="rollBtn" title="Tap to pull · hold to auto-pull">🃏 Pull</button>
         <!-- Clue album. Badged while there are clues banked for the next prediction, since
              those are the ones about to be spent. -->
         <button class="btn album" id="albumBtn" title="Clue album">🔍<i class="albumDot" id="albumDot"></i></button>
@@ -87,20 +87,10 @@
       <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
            until something has actually been unlocked. -->
       <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
-      <!-- The builders view's own 2D layer. Board3D swaps the scene; .boardScene.showBuilders
-           swaps which of these two overlays is on screen. -->
-      <div class="buildersUi">
-        <button class="navBtn back" id="boardBtn" title="Back to the board">←</button>
-        <!-- Mystery boxes banked by upgrades and waiting to be thrown onto the board. This is
-             the only acknowledgement a purchase gets while the board is out of sight, so it
-             pops each time it changes. -->
-        <div class="boxCounter" id="boxCounter"><span class="boxIco">🎁</span><span id="boxCount">0</span></div>
-        <div class="buildersHead" id="buildersHead"></div>
-        <!-- Episodes banked by "Binge later", sitting just above the upgrade row. Hidden when
-             the queue is empty, so it only appears when there is something to watch. -->
-        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
-        <div class="buildersBar" id="buildersBar"></div>
-      </div>
+      <!-- Episodes banked by "Binge later". Re-homed onto the board when the builders view was
+           deleted: in ?view=mobile the side panel is hidden, so this is the ONLY route back to
+           a waiting episode. Hidden when the queue is empty. -->
+      <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">
@@ -115,7 +105,7 @@
          (the 🏗 button on the board), which is the only surface for it in either layout. -->
     <div class="card">
       <h3>🎬 Story <span id="epBadge" class="badge" style="margin-left:auto;display:none">0 ready</span></h3>
-      <div class="hint" id="storyHint">Upgrade a landmark to unlock the next episode.</div>
+      <div class="hint" id="storyHint">Collect tickets to unlock the next episode.</div>
       <button class="btn pink wide" id="watchBtn" style="margin-top:10px" disabled>Predict &amp; watch episode</button>
     </div>
 
@@ -125,8 +115,8 @@
         <div class="stat"><div class="v teal" id="sEps">0</div><div class="l">Episodes watched</div></div>
         <div class="stat"><div class="v gold" id="sAcc">—</div><div class="l">Prediction accuracy</div></div>
         <div class="stat"><div class="v" id="sStreak">0</div><div class="l">Current streak</div></div>
-        <div class="stat"><div class="v" id="sBoards">0</div><div class="l">Builders done</div></div>
-        <div class="stat"><div class="v" id="sRolls">0</div><div class="l">Total rolls</div></div>
+        <div class="stat"><div class="v" id="sBoards">0</div><div class="l">Episodes complete</div></div>
+        <div class="stat"><div class="v" id="sRolls">0</div><div class="l">Total pulls</div></div>
         <div class="stat"><div class="v" id="sSessions">1</div><div class="l">Session today</div></div>
       </div>
     </div>
@@ -139,7 +129,7 @@
 
   <!-- action bar -->
   <div class="actionbar">
-    <button class="btn teal" id="nextBtn">⏭ Wait for full energy → next session</button>
+    <button class="btn teal" id="nextBtn">⏭ Wait for cards → next session</button>
     <span class="hint" id="nextHint"></span>
     <span class="sep"></span>
     <span class="hint">Editing any value in <b style="color:var(--purple)">Tuning</b> updates the sim live.</span>
@@ -180,6 +170,12 @@
 <script src="episodes/010.js"></script>
 <script src="episodes/011.js"></script>
 <script src="episodes/012.js"></script>
+<script src="episodes/013.js"></script>
+<script src="episodes/014.js"></script>
+<script src="episodes/015.js"></script>
+<script src="episodes/016.js"></script>
+<script src="episodes/017.js"></script>
+<script src="episodes/018.js"></script>
 <!-- economy: the loaded model and its maths, the .xlsx reader, and the importer that gates it.
      After the episode files because the series shape is bounded by how much content exists. -->
 <script src="js/xlsx.js"></script>
@@ -187,12 +183,14 @@
 <script src="js/economy-import.js"></script>
 <script src="js/board-model.js"></script>
 <script src="js/env-model.js"></script>
-<script src="js/dice-model.js"></script>
+<script src="js/shoe.js"></script>
 <!-- environment placement manifest (see assets/env/ART-BRIEF-ENV.md) -->
 <script src="assets/env/scene.js"></script>
+<!-- who walks the board, and which way each one faces (see assets/npcs/README.md) -->
+<script src="assets/npcs/npcs.js"></script>
 <script src="js/state.js"></script>
 <script src="js/storage.js"></script>
-<script src="js/builders/builders.js"></script>
+<script src="js/tickets.js"></script>
 <script src="js/board-actor.js"></script>
 <script src="js/tiles/tile.js"></script>
 <script src="js/tiles/standard-tile.js"></script>
@@ -205,6 +203,9 @@
 <script src="js/overlays/overlay.js"></script>
 <script src="js/overlays/mystery-box.js"></script>
 <script src="js/game.js"></script>
+<!-- the deck's look: card faces and the back, drawn to canvas. Before fx.js and read by the
+     board module too, so both presentations show the same deck. -->
+<script src="js/ui/card-art.js"></script>
 <script src="js/ui/fx.js"></script>
 <!-- after fx.js: falls back to its showCollect() when a game is off, missing or broken -->
 <script src="js/ui/minigame.js"></script>

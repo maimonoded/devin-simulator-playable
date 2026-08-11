@@ -62,8 +62,8 @@ test("the six segments reproduce the model's pacing", () => {
 test("segmentFor picks the rule that owns a builder, and the open-ended one owns the tail", () => {
   const saved = Economy.model().costCurve;
   Economy.model().costCurve = [
-    { from: 1, to: 10, kind: "power", base: 100, levelGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
-    { from: 11, kind: "power", base: 200, levelGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
+    { from: 1, to: 10, kind: "power", base: 100, ticketGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
+    { from: 11, kind: "power", base: 200, ticketGrowth: 1.5, exponent: 0.05, bIndex: "global", baseMode: "absolute" },
   ];
   eq(Economy.segmentFor(10).base, 100);
   eq(Economy.segmentFor(11).base, 200);
@@ -74,8 +74,8 @@ test("segmentFor picks the rule that owns a builder, and the open-ended one owns
 test("bIndex 'segment' restarts the builder index inside the segment", () => {
   const saved = Economy.model().costCurve;
   Economy.model().costCurve = [
-    { from: 1, to: 10, kind: "power", base: 100, levelGrowth: 2, exponent: 0.5, bIndex: "global", baseMode: "absolute" },
-    { from: 11, kind: "power", base: 100, levelGrowth: 2, exponent: 0.5, bIndex: "segment", baseMode: "absolute" },
+    { from: 1, to: 10, kind: "power", base: 100, ticketGrowth: 2, exponent: 0.5, bIndex: "global", baseMode: "absolute" },
+    { from: 11, kind: "power", base: 100, ticketGrowth: 2, exponent: 0.5, bIndex: "segment", baseMode: "absolute" },
   ];
   near(Economy.costFor(11, 1), 100, 1e-9, "builder 11 is the segment's b=1, so it pays the bare base");
   near(Economy.costFor(14, 1), 100 * Math.pow(4, 0.5), 1e-9, "and builder 14 is its b=4");
@@ -92,13 +92,13 @@ test("seriesPlan splits the declared builders into runs of one series each", () 
   eq(plan.reduce((a, s) => a + s.declared, 0), 240);
 });
 
-test("seriesShape never promises more builders than there are episodes", () => {
+test("seriesShape never promises more episodes than exist", () => {
   const shape = Economy.seriesShape(150);
-  eq(shape[0].builders, 60);
-  eq(shape[1].builders, 60);
-  eq(shape[2].builders, 30, "the third series gets what is left");
-  eq(shape[3].builders, 0, "and the fourth has no content at all");
-  eq(Economy.seriesShape(0).every(s => s.builders === 0), true);
+  eq(shape[0].episodes, 60);
+  eq(shape[1].episodes, 60);
+  eq(shape[2].episodes, 30, "the third series gets what is left");
+  eq(shape[3].episodes, 0, "and the fourth has no content at all");
+  eq(Economy.seriesShape(0).every(s => s.episodes === 0), true);
 });
 
 test("builder numbers stay contiguous when a series is short on content", () => {
@@ -107,21 +107,21 @@ test("builder numbers stay contiguous when a series is short on content", () => 
   eq(shape[1].from, 61); eq(shape[1].to, 70, "no gap in the numbering the cost curve sees");
 });
 
-test("globalOf translates a series-local builder to its global number", () => {
+test("globalEpisodeOf translates a series-local slot to its global episode number", () => {
   freshRun();
   eq(state.series, 0);
-  eq(Economy.globalOf(0), 1);
-  eq(Economy.globalOf(5), 6);
+  eq(Economy.globalEpisodeOf(0), 1);
+  eq(Economy.globalEpisodeOf(5), 6);
 });
 
-test("a later series prices and unlocks from its global builder number", () => {
+test("a later series prices and unlocks from its global episode number", () => {
   freshRun();
   const shape = Economy.seriesShape();
-  if (shape[1] && shape[1].builders > 0) {
+  if (shape[1] && shape[1].episodes > 0) {
     state.series = 1;
-    eq(Economy.globalOf(0), shape[1].from);
-    near(Builders.cost(0, 0), Economy.costFor(shape[1].from, 1), 1e-9,
-         "series 2's first builder is priced as its global number, not as builder 1");
+    eq(Economy.globalEpisodeOf(0), shape[1].from);
+    near(Tickets.cost(0, 0), Economy.costFor(shape[1].from, 1), 1e-9,
+         "series 2's first placeholder is priced as its global number, not as episode 1");
     state.series = 0;
   } else {
     // only one series has content in this library, which is itself the documented behaviour
@@ -130,7 +130,7 @@ test("a later series prices and unlocks from its global builder number", () => {
 });
 
 test("playableSeries drops the ones with no content", () => {
-  const playable = Economy.seriesShape(70).filter(s => s.builders > 0);
+  const playable = Economy.seriesShape(70).filter(s => s.episodes > 0);
   eq(playable.length, 2);
 });
 
@@ -233,14 +233,20 @@ test("apply pushes the model's numbers onto the live tuning surface", () => {
   resetCfg();
   const e = Economy.model();
   Economy.apply();
-  eq(cfg.energyCap, e.energy.cap);
+  eq(cfg.ticketsPerPack, e.cards.ticketsPerPack);
+  /* packSize is DERIVED from the joker count, not copied — the model deliberately carries no
+     pack size for it to disagree with. */
+  eq(cfg.packSize, Shoe.packSize());
+  eq(e.cards.packSize, undefined, "the model states the jokers; the size follows from them");
+  eq(cfg.cardRegenMin, e.cards.regenMin);
+  eq(cfg.spaCards, e.tiles.spaCards);
   eq(cfg.stdBase, e.tiles.stdBase);
   eq(cfg.vipSeed, e.tiles.vipSeed);
   eq(cfg.boxCoins, e.box.item1Coins);
-  eq(cfg.tiers, e.structure.levelsPerBuilder);
+  eq(cfg.ticketsPerEpisode, e.structure.ticketsPerEpisode);
   near(cfg.trainEV, e.tiles.trainSmall * (1 - e.tiles.trainLargeChance) + e.tiles.trainLarge * e.tiles.trainLargeChance, 1e-9,
        "cfg.trainEV is the MODEL's number — what the board pays is Economy.trainRealEV()");
-  eq(deck.length, e.deck.length);
+  eq(twistDeck.length, e.plotTwist.length);
   eq(boxTable.length, e.box.item2.length);
   resetCfg();
 });
@@ -248,7 +254,12 @@ test("apply pushes the model's numbers onto the live tuning surface", () => {
 test("the shipped config defaults already match the built-in model", () => {
   resetCfg();
   const e = ECONOMY_DEFAULT;
-  eq(DEFAULTS.energyCap, e.energy.cap);
+  eq(DEFAULTS.ticketsPerPack, e.cards.ticketsPerPack);
+  /* The shipped default has to already BE the derived size, or a fresh install runs one boot
+     with the wrong cap before apply() corrects it. */
+  eq(DEFAULTS.packSize, Shoe.NUMBERED + e.cards.ticketsPerPack);
+  eq(DEFAULTS.cardRegenMin, e.cards.regenMin);
+  eq(DEFAULTS.spaCards, e.tiles.spaCards);
   eq(DEFAULTS.stdBase, e.tiles.stdBase);
   eq(DEFAULTS.vipSeed, e.tiles.vipSeed);
   eq(DEFAULTS.boxCoins, e.box.item1Coins);
@@ -256,7 +267,7 @@ test("the shipped config defaults already match the built-in model", () => {
   eq(DEFAULTS.accuracyPerClue, e.prediction.accuracyPerClue);
   eq(DEFAULTS.accuracyMax, e.prediction.maxAccuracy);
   eq(defBox.length, e.box.item2.length, "the box table ships as the model's item 2");
-  eq(defDeck.filter(c => c.clues > 0).length, 0, "and the deck ships with no clue card");
+  eq(defTwistDeck.filter(c => c.clues > 0).length, 0, "and the deck ships with no clue card");
 });
 
 suite("economy: importing a workbook");
@@ -278,7 +289,7 @@ function stubWorkbook(over) {
     "_anchors.totalDays": 60,
     "_exponent": 0.0497678368,
     "_costBase": 164,
-    "_levelGrowth": 1.5,
+    "_ticketGrowth": 1.5,
   };
 
   put("Guide", "B2", "Economy Model v9 - test fixture");
@@ -289,12 +300,12 @@ function stubWorkbook(over) {
   });
   [["B4", "Card"], ["C4", "Weight"], ["D4", "Coins"], ["E4", "Energy"], ["F4", "Clues"], ["G4", "To VIP pool"]]
     .forEach(([ref, t]) => put("Deck", ref, t));
-  e.deck.forEach((c, i) => {
+  e.plotTwist.forEach((c, i) => {
     const r = 5 + i;
     put("Deck", "B" + r, c.name); put("Deck", "C" + r, c.weight); put("Deck", "D" + r, c.coins);
-    put("Deck", "E" + r, c.energy); put("Deck", "F" + r, c.clues); put("Deck", "G" + r, c.vip);
+    put("Deck", "E" + r, c.tickets); put("Deck", "F" + r, c.clues); put("Deck", "G" + r, c.vip);
   });
-  put("Deck", "B" + (5 + e.deck.length), "Total weight");
+  put("Deck", "B" + (5 + e.plotTwist.length), "Total weight");
   [["B9", "Outcome"], ["C9", "Weight"], ["D9", "Amount"]].forEach(([ref, t]) => put("MysteryBox", ref, t));
   e.box.item2.forEach((c, i) => {
     const r = 10 + i;
@@ -321,10 +332,12 @@ test("a well-formed workbook imports and round-trips the model", () => {
   eq(res.version, "Economy Model v9 - test fixture");
   eq(res.economy.filename, "fixture.xlsx");
   ok(res.economy.loadedAt, "the load time is recorded");
-  eq(res.economy.energy.cap, ECONOMY_DEFAULT.energy.cap);
-  eq(res.economy.deck.length, ECONOMY_DEFAULT.deck.length);
-  eq(res.economy.deck.filter(c => c.advance).length, 1, "the teleport card is found by name");
-  eq(res.economy.box.item2.map(r => r.kind).sort().join(","), "clues,coins,energy");
+  eq(res.economy.cards.packSize, ECONOMY_DEFAULT.cards.packSize);
+  eq(res.economy.plotTwist.length, ECONOMY_DEFAULT.plotTwist.length);
+  eq(res.economy.plotTwist.filter(c => c.advance).length, 1, "the teleport card is found by name");
+  /* The workbook still prints "Energy"; the game reads that row as its ticket drop. This is
+     the only place the two vocabularies meet, and it is asserted rather than assumed. */
+  eq(res.economy.box.item2.map(r => r.kind).sort().join(","), "clues,coins,tickets");
   eq(res.economy.costCurve.length, 1);
   eq(res.economy.costCurve[0].to, undefined, "the imported curve is open-ended");
   deepEq(Economy.validateCurve(res.economy.costCurve), []);
@@ -401,7 +414,9 @@ test("a workbook whose exponent was typed over the formula still loads, with a w
 });
 
 test("nonsense that parses is still refused", () => {
-  ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C5", 0)), "x.xlsx", null).ok, "zero energy cap");
+  ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C8", 0)), "x.xlsx", null).ok, "zero sessions per day");
+  ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C13", 0)), "x.xlsx", null).ok,
+     "zero tickets per episode — no episode could ever complete");
   ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C54", 0.1)), "x.xlsx", null).ok,
      "an accuracy cap below the floor would make clues harmful");
 });

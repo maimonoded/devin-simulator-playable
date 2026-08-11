@@ -5,11 +5,12 @@
    Event fields (any subset per event, played in this order):
      float:{text,color} · log:{icon,msg} · move:{path:[tileIdx,...],stepMs} · confetti:true · pause:ms */
 
-/* Builders, upgrades and episode unlocks live in js/builders/builders.js. */
+/* Tickets and episode unlocks live in js/tickets.js; the card shoe in js/shoe.js. */
 
-/* ---------- rolling ---------- */
-function rollDice(){ const d1=Math.floor(rand(1,7)),d2=Math.floor(rand(1,7)); return {d1,d2,steps:d1+d2}; }
-function spendRoll(mult){ state.energy-=mult; state.rolls++; }
+/* ---------- pulling ----------
+   The card comes off the shoe in js/shoe.js (which also counts the pull). A NUMBER card is a
+   step count; a TICKET card moves nothing at all — see the ticket branch in pull() in
+   js/ui/main.js, which must return before the landing is resolved. */
 
 /* Lap bonus when passing (not landing on) Start. Returns the coin amount. */
 function applyPassStart(mult){
@@ -21,7 +22,7 @@ function applyPassStart(mult){
 /* Resolve whatever the token landed on. Mutates state fully; returns events for the UI to play.
    Overlays (js/overlays/) resolve first since they sit on top of the tile; per-type landing
    behavior lives in js/tiles/. Nothing tile-specific belongs in this function. */
-function resolveLandingEvents(mult){
+function resolveLandingEvents(mult=1){
   const ev=[]; const i=state.pos;
   // an overlay may pay out more than once, so it may hand back an array (see js/overlays/overlay.js)
   OVERLAYS.forEach(o=>{ if(o.has(i)){ const e=o.consume(i); if(e) ev.push(...[].concat(e)); } });
@@ -60,13 +61,23 @@ function resolvePrediction({wager,odds,sel,correct,auto,id}){
 }
 
 /* ---------- time ---------- */
-/* Advance the clock to the next session, refill energy, grant login rewards on day change. */
+/* Advance the clock to the next session, deal free cards, grant login rewards on day change.
+
+   THIS IS THE GAME'S CLOCK. A pack of 50 cards earns far more coins than the next pack costs,
+   so coins alone never gate anything — the rate free cards arrive at is what sets episodes per
+   day, exactly as the energy allowance used to.
+
+   NO FRACTIONAL CREDIT IS CARRIED, and none is needed: `gap` is the MAX of the deficit's own
+   refill time and one session slot, so gap/cardRegenMin is always at least the deficit itself.
+   The entitlement therefore always covers the room in the shoe and a session always deals up to
+   the cap — a carried remainder could never change the outcome. (The energy version had the
+   same property. If the gap ever stops being derived from the deficit — real elapsed time, say —
+   this stops being true and the remainder starts to matter.) */
 function advanceSession(){
-  const refill=(cfg.energyCap-state.energy)*cfg.regenMin;
-  const gap=Math.max(refill, 1440/cfg.sessionsPerDay);
-  const regened=Math.floor(gap/cfg.regenMin);
-  // refills to the cap, but never drains a purchased overflow balance
-  state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+regened));
+  const missing=Math.max(0,Math.round(cfg.packSize||1)-state.shoe.length);
+  const gap=Math.max(missing*cfg.cardRegenMin, 1440/cfg.sessionsPerDay);
+  // tops up toward the cap, but never trims a shoe already over it (a bought pack merges on top)
+  const dealt=Shoe.dealFree(Math.floor(gap/cfg.cardRegenMin));
   state.clock+=gap;
   const newDay=Math.floor(state.clock/1440)+1;
   const rewards=[];
@@ -74,5 +85,5 @@ function advanceSession(){
     for(let d=state.day;d<newDay;d++){ const rw=LOGIN_REWARDS[d%7]*cfg.boardScale; state.coins+=rw; rewards.push({day:d+1,amount:rw}); }
     state.day=newDay; state.sessionsToday=1;
   } else { state.sessionsToday++; }
-  return {isNewDay:rewards.length>0, rewards};
+  return {isNewDay:rewards.length>0, rewards, cards:dealt};
 }

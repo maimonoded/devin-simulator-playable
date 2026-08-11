@@ -18,8 +18,8 @@
 import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
-import { Dice3D } from "./dice3d.js";
-import { Builders3D } from "./builders3d.js";
+import { Shoe3D } from "./shoe3d.js";
+import { NPC3D } from "./npc3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -39,6 +39,19 @@ const BOX_MODEL = "assets/props/models/mystery-box.glb";
    rather than an invisible bonus. */
 const BOX_MODEL_GOLD = "assets/props/models/mystery-box-gold.glb";
 const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neighbouring tile
+/* Where a box's base goes: the slab's TOP, the same surface the token stands on and the same
+   value js/ui/npc3d.js calls FOOT_Y.
+
+   Not TILE_H/2, which is what this used to be. TILE_H/2 is where _loadModel GROUNDS A TILE MODEL
+   (`holder.position.y += TILE_H / 2 - box.min.y`), i.e. the underside of the tile's own paving —
+   half a slab BELOW the surface things stand on. A box placed there sinks 0.08 into its tile.
+   It got away with it for a while because a chunky object still reads as sitting on a tile when
+   its bottom centimetre is buried; the walking figures are what made the same mistake visible.
+
+   Every box height has to come from here: the resting place, the gold box's idle bob, and the
+   put-everything-back path after a cancelled throw. The throw itself captures the resting y and
+   restores it, so it follows on its own — but only because all three agree. */
+const BOX_Y = TILE_H;
 
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
@@ -72,6 +85,10 @@ const bounce = (k) => {
   const p = 1 - Math.pow(1 - k, 2.2);
   return p + Math.sin(k * Math.PI) * 0.06 * (1 - k);
 };
+/* How high a box lobs on its way from the card to its tile. Shape, not pacing, so it is a
+   constant here while the throw's timings stay in cfg — it has to keep its proportion to the
+   board whatever boxThrowMs is tuned to, and it is measured in tiles like everything else. */
+const THROW_ARC = 0.9;
 
 const Board3D = {
   available: false,
@@ -91,8 +108,6 @@ const Board3D = {
      teardown can settle it rather than leaving the roll loop waiting on an animation that will
      never finish. */
   _anims: [], _fxDone: [], _flying: null,
-  /* "board" | "builders" — which scene the one renderer is drawing. See setView(). */
-  _view: "board",
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
   /* _camTarget is where the camera is looking now, _camWant where it is heading. Keeping
      them apart is what makes the follow trail rather than snap. */
@@ -169,12 +184,18 @@ const Board3D = {
     }
 
     Env3D.init(this._scene);
-    /* Its own scene, drawn by this renderer — see setView(). */
-    Builders3D.init();
     this.syncPageBackground();
-    /* Init once, not per build(): the dice hang off their own group, which build() leaves
-       alone, so they survive a board rebuild the way the token does. */
-    Dice3D.init(this._scene);
+    /* Init once, not per build(): the deck and the ticket placeholders hang off their own
+       groups, which build() leaves alone, so they survive a board rebuild the way the token
+       does. build() also re-runs on every reset and would re-fetch their models. */
+    Shoe3D.init(this._scene);
+    /* Same deal, and handed the board's own geometry rather than deriving the ring a second
+       time. anisotropy is passed as a function because the renderer's capability is only
+       meaningful once it exists, which it does by here but would not at module scope. */
+    NPC3D.init(this._scene, {
+      tileWorld: (i) => this._tileWorld(i),
+      anisotropy: () => this._renderer.capabilities.getMaxAnisotropy(),
+    });
     this._initDrag(this._renderer.domElement);
 
     this.available = true;
@@ -224,9 +245,6 @@ const Board3D = {
     this._fit = Math.max(halfH, halfW / aspect);
     this._aspect = aspect;
     this._applyFrustum();
-    /* The builders scene shares this canvas, so it re-fits on the same events — otherwise it
-       would still be framed for whatever size the window was when it was last shown. */
-    Builders3D.resize(w, h);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },
 
@@ -620,7 +638,7 @@ const Board3D = {
   _addBox(i, gold) {
     const holder = new THREE.Group();
     const w = this._tileWorld(i);
-    holder.position.set(w.x, TILE_H / 2, w.z);
+    holder.position.set(w.x, BOX_Y, w.z);
     holder.userData.gold = !!gold;
     /* Gold falls back to the plain box before it falls back to the cube: a wrong-coloured box
        still reads as a box, where a cube reads as missing art. */
@@ -648,6 +666,12 @@ const Board3D = {
         holder.userData.glow = s;
       }
     }
+    /* THE SIZE THIS BOX RETURNS TO, stamped rather than assumed to be 1. A gold box is already
+       scaled up (cfg.boxGoldScale), so the throw — which multiplies scale on its way in — and
+       cancelBoxFx putting a box back both need this box's OWN resting size. Reading it off the
+       holder here keeps the gold rule stated once, above, instead of re-derived at two more
+       call sites that could drift from it. */
+    holder.userData.restScale = holder.scale.x;
     /* Turned to the camera like the piece: a wrapped box has a front (the bow's knot) and no
        board edge to align with, so it should read from wherever the player is sitting. */
     holder.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
@@ -681,7 +705,7 @@ const Board3D = {
       const spin = Math.max(200, +cfg.boxGoldSpinMs || 4200);
       g.rotation.y = (t / spin) * Math.PI * 2;
       const bob = Math.max(0, +cfg.boxGoldBob || 0);
-      g.position.y = TILE_H / 2 + Math.sin(t / 620 + i) * bob;
+      g.position.y = BOX_Y + Math.sin(t / 620 + i) * bob;
       if (g.userData.glow) {
         const k = 1 + Math.sin(t / 480 + i) * 0.12;
         g.userData.glow.scale.set(1.5 * k, 1.5 * k, 1);
@@ -736,7 +760,16 @@ const Board3D = {
 
      Resolves — never rejects — on every path, including no boxes, no WebGL and a mid-throw view
      switch. The caller clears state.pendingBoxes on the strength of it. */
-  throwOverlays(all, fresh) {
+  /* `from` is an optional world-space origin — the card that earned the boxes. Given one, they
+     ARRIVE FROM IT rather than dropping out of the sky, so the player sees where the reward came
+     from instead of being told in the log. Omitted (or null) keeps the original fall, which is
+     what every non-joker path still gets and what a joker gets if the card has already left.
+
+     The card is drawn over everything while it is presented (Shoe3D._setOverlay), so a box is
+     hidden behind it for the first part of the trip and emerges past its edge. That is the
+     effect, not a defect: it reads as coming OUT of the card rather than from a point that
+     happens to be near it. */
+  throwOverlays(all, fresh, from) {
     /* `all` is every box that should be on the board, `fresh` only the ones to animate. Boxes
        already sitting there from earlier trips must not leap into the air again. */
     this.setOverlays(all);
@@ -755,21 +788,51 @@ const Board3D = {
     const fallMs = throwMs * 0.62;
     const gap = falling.length > 1 ? (throwMs - fallMs) / (falling.length - 1) : 0;
 
-    const rest = falling.map(g => g.position.y);
+    /* The whole resting POSE now, not just its height: a box thrown from the card moves in x and
+       z too, so those have to be restorable — done() and cancelBoxFx() both put it back exactly
+       on its tile whichever frame the throw stopped on. */
+    const rest = falling.map(g => g.position.clone());
+    /* Multiplied, never assigned: a gold box rests at cfg.boxGoldScale, and a throw that set an
+       absolute scale would quietly shrink every gold box it threw back to the ordinary size. */
+    const restScale = falling.map(g => +g.userData.restScale || g.scale.x || 1);
+    const throwScale = Math.max(1, +cfg.boxThrowScale || 1);
     falling.forEach(g => { g.visible = false; });
 
     return new Promise(resolve => {
       this._fxDone.push(resolve);
-      const done = () => { falling.forEach((g, k) => { g.visible = true; g.position.y = rest[k]; g.rotation.z = 0; }); resolve(); };
+      const done = () => { falling.forEach((g, k) => {
+        g.visible = true; g.position.copy(rest[k]); g.scale.setScalar(restScale[k]); g.rotation.z = 0;
+      }); resolve(); };
       this._tween(outMs, k => { this._zoom = 1 + (zoomOut - 1) * ease(k); }, () => {
         falling.forEach((g, k) => {
           const start = k * gap, spin = (k % 2 ? -1 : 1) * (0.5 + Math.random() * 0.7);
           this._tween(fallMs, (t) => {
             g.visible = true;
-            /* Fall from above with a squash-free bounce: overshoot slightly past the tile and
-               settle, which reads as weight without needing physics. */
+            /* Fall with a squash-free bounce: overshoot slightly past the tile and settle, which
+               reads as weight without needing physics. */
             const p = bounce(t);
-            g.position.y = rest[k] + (1 - p) * 7;
+            const r = rest[k];
+            if (from) {
+              /* Thrown: across on a plain ease, down on the bounce, plus an arc so it is lobbed
+                 rather than dragged. The HORIZONTAL deliberately does not use bounce — the box
+                 would visibly sail past its tile and slide back, which reads as a miscalculation
+                 rather than as weight. Height is where an overshoot looks like landing. */
+              const e = ease(t);
+              g.position.set(
+                from.x + (r.x - from.x) * e,
+                from.y + (r.y - from.y) * p + Math.sin(t * Math.PI) * THROW_ARC,
+                from.z + (r.z - from.z) * e,
+              );
+              /* BIG AT THE CARD, ordinary at the tile. It leaves the card at cfg.boxThrowScale
+                 and shrinks to its resting size as it travels, on the SAME ease as the distance
+                 so the two stay in step — which is what makes it read as receding rather than
+                 as deflating. The camera is orthographic, so there is no perspective to do this
+                 for us: an object does not get smaller as it moves away, and faking it here is
+                 the only thing selling the depth of the trip. */
+              g.scale.setScalar(restScale[k] * (1 + (throwScale - 1) * (1 - e)));
+            } else {
+              g.position.y = r.y + (1 - p) * 7;
+            }
             g.rotation.z = (1 - p) * spin;
           }, null, start);
         });
@@ -850,13 +913,20 @@ const Board3D = {
      and it only runs once the await returns. */
   cancelBoxFx() {
     if (!this.available) return;
+    /* The deck's fx have their own queue, and a mid-pull error must settle both or pull()
+       awaits a promise nothing will ever resolve. */
+    Shoe3D.cancel();
     this._anims.length = 0;
     if (this._flying) { this._scene.remove(this._flying); this._flying = null; }
     /* Anything caught mid-throw is invisible or in the air — put every box back on its tile, so
        the board matches state whichever frame we stopped on. */
     for (const [i, g] of this._boxes) {
       const w = this._tileWorld(i);
-      g.visible = true; g.position.set(w.x, TILE_H / 2, w.z); g.rotation.z = 0;
+      g.visible = true; g.position.set(w.x, BOX_Y, w.z); g.rotation.z = 0;
+      /* Scale too, now that a thrown box arrives oversized: a throw killed mid-flight would
+         otherwise leave a box sitting on its tile at up to cfg.boxThrowScale for the rest of the
+         run, which is the loudest possible way for an error path to be visible. */
+      g.scale.setScalar(+g.userData.restScale || g.scale.x || 1);
     }
     const waiting = this._fxDone; this._fxDone = [];
     waiting.forEach(r => r());
@@ -872,25 +942,11 @@ const Board3D = {
     this._anims.push({ t: -delay, dur: Math.max(1, dur), step, end });
   },
 
-  /* The buildings live in their own scene now (js/ui/builders3d.js) — the board's middle is
-     where dice land and reveals play, which is no place for a progress readout. */
-  setBuilders() {
+  /* The ticket placeholders sit inside the board ring and are redrawn whenever a ticket
+     lands. One scene, one camera — the builders' second scene is gone with the builders. */
+  setTicketSlots() {
     if (!this.available) return;
-    Builders3D.build();
-    if (this._view === "builders") this.resize();   // slot count may have changed the fit
-  },
-
-  /* ---------------- views ----------------
-     One renderer, one canvas, two scenes. A second WebGLRenderer would take a second GL
-     context and browsers cap those — losing one silently kills the board. */
-  view() { return this._view; },
-  setView(name) {
-    const next = name === "builders" ? "builders" : "board";
-    if (next === this._view) return this._view;
-    this._view = next;
-    if (next === "builders") Builders3D.build();
-    this.resize();                     // each scene fits the canvas its own way
-    return this._view;
+    Shoe3D.syncSlots();
   },
 
   /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
@@ -900,6 +956,7 @@ const Board3D = {
     Env3D.rebuild();
     this.syncPageBackground();
     this.setTokenHeight();   // cfg.tokenHeight is live too, and must not reload the model
+    NPC3D.setHeight();       // and cfg.npcHeight, for the same reason
     this.resize();
   },
 
@@ -927,13 +984,27 @@ const Board3D = {
      following, the token when it is, wherever the player dragged to otherwise. Handing it
      over is what makes the dice land in view rather than at the middle of the board, which
      with camFollow on is often off-screen entirely. */
-  throwDice(values) {
-    return Dice3D.throwDice(values, { x: this._camTarget.x, z: this._camTarget.z });
+  /* Two poses, two owners. The card is PRESENTED at the camera's aim — centre of the screen,
+     square to the view, wherever the camera happens to be looking — and then DEALT to a fixed
+     spot on the board that the player learns. So the aim goes over (live objects, read every
+     frame, because camFollow moves it mid-flight) but the destination does not: that one is
+     Shoe3D._discardPos(). */
+  pullCard(card) {
+    return Shoe3D.pullCard(card, { aim: this._camTarget, camera: this._camera });
   },
-  diceReady() { return Dice3D.available(); },
-  /* Definitively failed, as opposed to merely not downloaded yet. */
-  diceFailed() { return Dice3D.failed(); },
-  clearDice() { Dice3D.clear(); },
+  /* Resolves once nothing is being presented — the joker's hold and its flight into the episode
+     row included. pull() awaits it on a ticket so the celebration is watched instead of being
+     put away by the next card; every other path ignores it and loses nothing. */
+  cardStageClear(maxMs) { return Shoe3D.whenClear(maxMs); },
+  /* Where the presented card is, for throwOverlays to launch a joker's boxes from. Null when
+     nothing is on the stage, which is the signal to fall from above instead. */
+  cardWorldPos() { return Shoe3D.presentedPos(); },
+  /* A bought deck being riffled into the one already on the table. Decoration only — the cards
+     are in the shoe before this is called. Resolves, never rejects. */
+  shuffleDeck() { return Shoe3D.shuffleDeck(); },
+  /* Definitively failed, as opposed to merely not downloaded yet — fx.js keys its fallback off
+     this, so that distinction is what stops the flat card flashing on every page load. */
+  shoeFailed() { return Shoe3D.failed(); },
 
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */
   screenPosOf(i, lift = 0) {
@@ -964,21 +1035,18 @@ const Board3D = {
         p.y = TILE_H;
       }
     }
-    /* Only the active scene ticks and draws. The board's camera-follow and the dice are
-       pointless work while the builders screen is up, and the tile labels are hidden there. */
-    if (this._view === "builders") {
-      Builders3D.tick(1 / 60);
-      this._renderer.render(Builders3D.scene(), Builders3D.camera());
-      return;
-    }
     /* The board's own tweens (the box throw). Stepped before the camera so a zoom change lands
        in the same frame it was asked for rather than one late. */
     this._stepAnims(1000 / 60);
     this._tickBoxes(performance.now());
+    /* The cast keeps walking through a box throw, unlike the boxes' own idle tick: nothing here
+       shares an object with the board's tweens, and a world that freezes whenever something else
+       is happening reads worse than one that carries on. */
+    NPC3D.tick(1000 / 60);
     if (this._zoom !== this._zoomShown) this._applyFrustum();
     this._followCamera();
     Env3D.tick(1 / 60);
-    Dice3D.tick();
+    Shoe3D.tick();
     this._renderer.render(this._scene, this._camera);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },
@@ -1003,13 +1071,41 @@ const Board3D = {
 
      The grabbed point stays under the pointer as a result, which is the whole trick — the
      view feels dragged rather than nudged. */
+  /* Which ticket placeholder is under a screen point, or null.
+
+     Sprites, so a plain Raycaster works — but the row is drawn with depthWrite off and sits
+     over the board, and three.js reports sprite hits in camera order, so the nearest hit is the
+     one the player believes they touched. */
+  slotAt(clientX, clientY) {
+    if (!this.available) return null;
+    const r = this._renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - r.left) / r.width) * 2 - 1,
+      -((clientY - r.top) / r.height) * 2 + 1);
+    if (!this._ray) this._ray = new THREE.Raycaster();
+    this._ray.setFromCamera(ndc, this._camera);
+    /* The row is rebuilt whenever a ticket lands, and a fresh sprite's world matrix is stale
+       until the next render — so a tap in the frame right after a ticket arrives would miss
+       every placeholder. Update before testing rather than trusting the render loop to have
+       got there first. */
+    const sprites = Shoe3D.slotSprites();
+    sprites.forEach(s => s.updateMatrixWorld());
+    const hits = this._ray.intersectObjects(sprites, false);
+    /* Slot 0 is a legitimate answer and is falsy — every caller must test against null. */
+    return hits.length ? hits[0].object.userData.slot : null;
+  },
+
   _initDrag(canvas) {
     const el = THREE.MathUtils.degToRad(ENV_CAM.el);
     const right = new THREE.Vector3(), fwd = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 
     canvas.style.cursor = "grab";
     canvas.addEventListener("pointerdown", (e) => {
-      if (!cfg.camDrag || e.button !== 0) return;
+      if (e.button !== 0) return;
+      /* Remember where the press started so pointerup can tell a TAP from a PAN. Without this
+         every attempt to tap a placeholder that moved the cursor a pixel would pan instead. */
+      this._press = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
+      if (!cfg.camDrag) return;          // picking still works; only panning is off
       this._drag = { x: e.clientX, y: e.clientY };
       this._camManual = true;
       canvas.setPointerCapture(e.pointerId);
@@ -1019,6 +1115,7 @@ const Board3D = {
       if (!this._drag) return;
       const dx = e.clientX - this._drag.x, dy = e.clientY - this._drag.y;
       this._drag.x = e.clientX; this._drag.y = e.clientY;
+      if (this._press) this._press.moved += Math.abs(dx) + Math.abs(dy);
 
       const c = this._camera, r = canvas.getBoundingClientRect();
       const wppX = (c.right - c.left) / r.width;      // world units per screen pixel
@@ -1037,11 +1134,30 @@ const Board3D = {
       this._camWant.y = 0;
     });
     const end = (e) => {
-      if (!this._drag) return;
-      this._drag = null;
-      canvas.style.cursor = "grab";
-      if (e.pointerId != null && canvas.hasPointerCapture?.(e.pointerId)) {
-        canvas.releasePointerCapture(e.pointerId);
+      /* RELEASE THE DRAG FIRST, ALWAYS. The tap-pick below runs game code — a raycast, then
+         whatever onSlotTap opens — and if any of it throws before the drag is cleared the board
+         is left believing the button is still down: every later mouse move pans the camera, with
+         no way out short of a reload. That is exactly what happened when slotSprites() went
+         missing. Panning is the essential half of this handler and picking is the optional half,
+         so the essential half cannot sit downstream of the optional one.
+
+         Same shape as pull()'s try/finally, and for the same reason. */
+      const p = this._press; this._press = null;
+      if (this._drag) {
+        this._drag = null;
+        canvas.style.cursor = "grab";
+        if (e.pointerId != null && canvas.hasPointerCapture?.(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      }
+      /* A tap, not a pan: under a few pixels of travel. Outside the cfg.camDrag guard, so
+         picking still works with panning turned off. */
+      if (!(p && p.moved < 6 && e.clientX != null && window.onSlotTap)) return;
+      try {
+        const slot = this.slotAt(e.clientX, e.clientY);
+        if (slot != null) window.onSlotTap(slot);
+      } catch (err) {
+        console.error("slot pick failed:", err);
       }
     };
     canvas.addEventListener("pointerup", end);

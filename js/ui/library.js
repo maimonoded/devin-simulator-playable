@@ -1,8 +1,8 @@
 "use strict";
 /* The episode library — everything unlocked so far, in one list, rewatchable.
 
-   The list is DERIVED, not stored: Builders.unlockedEpisodeIds() reads it off the completed
-   builders, because the episode id is the builder number ("003" is builder 3). state.epQueue
+   The list is DERIVED, not stored: Tickets.unlockedEpisodeIds() reads it off the completed
+   placeholders, because the episode id is its number ("003" is the third episode). state.epQueue
    only says which of them are still UNWATCHED, and it shrinks as they are watched — reading the
    library off that showed a player with four unlocked episodes just the one they had not seen.
 
@@ -18,10 +18,10 @@
    not only whichever happens to be at the front of the queue. */
 
 function openLibrary(){
-  const ids=Builders.unlockedEpisodeIds();
-  if(!ids.length){ toast("🎞 Nothing unlocked yet — complete a builder"); return; }
+  const ids=Tickets.unlockedEpisodeIds();
+  if(!ids.length){ toast(`🎞 Nothing unlocked yet — collect ${Tickets.perEpisode()} tickets`); return; }
   const unwatched=ids.filter(id=>state.epQueue.includes(id)).length;
-  const next=Builders.firstUnwatchedId();
+  const next=Tickets.firstUnwatchedId();
   const sealed=state.pendingReveal?state.pendingReveal.id:null;
   const rows=ids.map(id=>{
     const ep=Episodes.get(id);
@@ -55,7 +55,7 @@ function openLibrary(){
     /* Any unwatched row starts the EARLIEST unwatched episode, not the one tapped — the story
        is serialised, so jumping ahead spoils what was skipped. Say so, or being handed a
        different episode than the one you pressed just reads as a bug. */
-    const next=Builders.firstUnwatchedId()||id;
+    const next=Tickets.firstUnwatchedId()||id;
     if(next!==id) toast(`▶ Episodes play in order — starting <b>${Episodes.titleOf(next)}</b>`);
     openPrediction(next);
   });

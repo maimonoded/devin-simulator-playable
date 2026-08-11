@@ -119,11 +119,10 @@ body.board3d .board{display:none}
    font size, so only the horizontal padding varies. */
 .playbar .btn{min-height:52px;padding-top:0;padding-bottom:0;line-height:1;border-radius:14px}
 .playbar .btn.roll{padding-left:26px;padding-right:26px}
-.playbar .btn.mult,
 .playbar .btn.album,
 .playbar .btn.navb{padding-left:15px;padding-right:15px;min-width:54px;justify-content:center}
-/* Builders. It used to be absolutely positioned in the corner, where it collided with the
-   centred group on a narrow screen — it belongs in the row with everything else. */
+/* Buy-a-deck. Sits in the play row rather than in a corner, where it would collide with the
+   centred group on a narrow screen. */
 .btn.navb{background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
           font-size:20px;position:relative}
 /* The board art runs right under the buttons, so a soft scrim guarantees they stay legible
@@ -131,80 +130,10 @@ body.board3d .board{display:none}
 .playbar::before{content:"";position:absolute;left:0;right:0;bottom:-14px;height:110px;z-index:-1;
                  background:linear-gradient(180deg,transparent,rgba(9,13,38,.6));pointer-events:none}
 
-/* ---------- builders view ----------
-   Two overlays share the one 3D surface: .boardScene.showBuilders swaps which is on screen,
-   while Board3D.setView() swaps which scene the renderer draws. Keeping the switch in one
-   class means the DOM and the scene can never disagree about which view is up. */
-/* Only the builders view's Back button uses this now — the builders button moved into the
-   play row. */
-.navBtn{position:absolute;left:14px;bottom:14px;z-index:35;width:52px;height:52px;border-radius:16px;
-        background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;font-size:22px;
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 5px 0 rgba(0,0,0,.28);transition:transform .08s}
-.navBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-/* Back sits TOP-left, not bottom-left where the 🏗 button was: the upgrade row owns the whole
-   bottom edge, and five buttons plus a back button do not fit one phone line. */
-.navBtn.back{background:var(--panel2);border:1px solid var(--line);font-size:24px;
-             top:14px;left:14px;bottom:auto}
-/* The board shows nothing about builders now, so this dot is the only nudge that there is
-   something affordable waiting. */
-.navDot{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;
-        background:var(--gold);border:2px solid #10142f;display:none}
-.navDot.on{display:block}
-
-.buildersUi{position:absolute;inset:0;z-index:35;display:none;pointer-events:none}
-.buildersUi>*{pointer-events:auto}
-.boardScene.showBuilders .buildersUi{display:block}
-/* While the builders view is up the board's own layer is not just hidden but inert — a stray
-   tap must not roll the dice behind a screen the player thinks they are on. */
-.boardScene.showBuilders .playbar,
-.boardScene.showBuilders .boardLabels,
-.boardScene.showBuilders #buildersBtn{display:none}
-
-/* Mystery boxes waiting to be thrown onto the board. Top-right of the builders view, clear of
-   the centred header. It is the only feedback a purchase gets while the board is out of sight,
-   so the whole chip pops when the count changes — and the box itself gets a shake, because a
-   number ticking up is easy to miss when you are looking at the price you just paid. */
-/* Directly under the Store button, which already owns the very top of this corner in both
-   layouts (and in ?view=mobile the HUD owns the strip above that). Stacking beneath it keeps the
-   chip in the corner the player is told to look at without either one moving. */
-.boxCounter{position:absolute;right:16px;top:58px;display:none;align-items:center;gap:6px;
-            background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
-            border-radius:999px;padding:6px 12px;font-size:14px;font-weight:800;
-            box-shadow:0 4px 14px rgba(139,109,255,.35);pointer-events:none}
-.boxCounter.on{display:flex}
-.boxCounter .boxIco{font-size:16px;line-height:1}
-.boxCounter.bump{animation:boxBump .5s cubic-bezier(.2,1.4,.4,1)}
-.boxCounter.bump .boxIco{animation:boxShake .5s ease}
-@keyframes boxBump{0%{transform:scale(1)}35%{transform:scale(1.22)}100%{transform:scale(1)}}
-@keyframes boxShake{0%,100%{transform:rotate(0) translateY(0)}
-                    25%{transform:rotate(-14deg) translateY(-3px)}
-                    60%{transform:rotate(12deg) translateY(-1px)}}
-
-.buildersHead{position:absolute;left:0;right:0;top:14px;text-align:center;line-height:1.35;
-              text-shadow:0 2px 6px rgba(0,0,0,.75);pointer-events:none}
-.buildersHead b{display:block;font-size:15px}
-.buildersHead span{font-size:11px;color:var(--muted)}
-
-/* One row, one line, always. Each button takes an equal share of the width and is allowed to
-   shrink (min-width:0), so the row holds whether the page has five buildings or two — and the
-   prices inside are compacted by fmtShort so the text never decides the layout. */
-.buildersBar{position:absolute;left:10px;right:10px;bottom:14px;
-             display:flex;gap:6px;align-items:stretch}
-.upb{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;
-     background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;border-radius:11px;
-     padding:8px 4px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.28);transition:transform .08s}
-.upb:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-.upb .upbName{font-size:9px;opacity:.85;text-transform:uppercase;letter-spacing:.03em;
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.upb .upbCost{font-size:13px;white-space:nowrap}
-/* Can't afford it: still readable, obviously inert. */
-.upb.cant{background:var(--panel2);color:var(--muted);box-shadow:none;border:1px solid var(--line)}
-.upb.max{background:transparent;border:1px solid var(--line);color:var(--gold);box-shadow:none}
-
-/* Banked episodes, sitting just above the upgrade row. The upgrade row is bottom:14 and about
-   50px tall, so this clears it; both track the same safe-area inset so they stay stacked on a
-   notched phone. var(--safeB, 0px) is 0 outside ?view=mobile, where the inset is not defined. */
+/* Episodes waiting to be watched. It used to live in the builders view; with that gone it is
+   re-anchored onto the board itself, because in ?view=mobile it is the ONLY route back to a
+   banked episode — the side panel's Predict & watch is not on screen there. Its offset used to
+   exist purely to clear the deleted upgrade row. */
 .bingeBtn{position:absolute;right:10px;bottom:calc(74px + var(--safeB, 0px));
           display:none;align-items:center;gap:6px;
           background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
@@ -213,18 +142,13 @@ body.board3d .board{display:none}
 .bingeBtn:active{transform:translateY(2px)}
 .bingeCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px}
 
-/* Library, stacked above the builders button on the board's left edge. Deliberately NOT a
-   .navBtn: css/mobile.css re-anchors every .navBtn:not(.back) to the bottom inset, and that
-   selector out-specifies anything a modifier class here could say. */
-/* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's now. */
+/* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's. */
 .libBtn{position:absolute;left:14px;top:14px;z-index:35;
         width:52px;height:52px;border-radius:16px;
         background:var(--panel2);border:1px solid var(--line);color:#fff;font-size:22px;
         display:none;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.28)}
 .libBtn.on{display:flex}
 .libBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-/* it belongs to the board's layer, so it goes with the rest of it */
-.boardScene.showBuilders .libBtn{display:none}
 
 /* the library list */
 .libList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;padding-right:4px}
@@ -244,29 +168,8 @@ body.board3d .board{display:none}
 .libRow.sealed{border-color:var(--teal);background:#16303a}
 .libRow.sealed .libTag{color:var(--teal);font-weight:800}
 
-/* dice
-   The 3D board throws real dice onto the middle of the board, so the DOM pair would be a
-   second, contradicting set. Kept in the DOM rather than removed: js/ui/fx.js still writes
-   their faces, and it falls back to shaking them whenever die.glb is missing or cfg.dice3d
-   is off.
-
-   HIDDEN BY DEFAULT, shown only by .dice2d. The reverse — visible until JS hides them — meant
-   they flashed on every load, because the class that hid them is applied by renderAll() and
-   the board module that calls it is deferred until after first paint. */
-.dice{display:none;gap:8px}
-body.dice2d .dice{display:flex}
-.die{width:42px;height:42px;border-radius:10px;background:#fff;color:#1b1b2b;
-     display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-     padding:6px;box-shadow:0 5px 12px rgba(0,0,0,.4)}
-/* shake duration driven by cfg.diceRevealMs via applyFxTiming() in ui/render.js */
-.die.roll{animation:shake var(--shakeDur,.5s) ease infinite}
-@keyframes shake{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-6px) rotate(-12deg)}
-                 50%{transform:translateY(2px) rotate(10deg)}75%{transform:translateY(-3px) rotate(-6deg)}}
-.pip{border-radius:50%;background:#1b1b2b;width:7px;height:7px;align-self:center;justify-self:center}
-.pip.off{background:transparent}
-
-/* Clue album, to the right of Roll. Sized like the stake button so the row reads as
-   [stake] [ROLL] [album] with Roll the obvious primary. The dot marks clues banked for the
+/* Clue album, to the right of Pull. Sized like the buy button so the row reads as
+   [buy] [PULL] [album] with Pull the obvious primary. The dot marks clues banked for the
    next prediction — the ones about to be spent. */
 .btn.album{background:var(--panel2);border:1px solid var(--line);color:#fff;
            padding:12px 14px;font-size:17px;min-width:52px;justify-content:center;position:relative}
@@ -274,13 +177,10 @@ body.dice2d .dice{display:flex}
           background:var(--teal);border:2px solid #10142f;display:none}
 .albumDot.on{display:block}
 
-/* Roll stake — one small button that cycles through MULTIPLIERS and wraps. It replaced a row
-   of five, which the 9:16 framing had no room for. Always shows the ACTIVE stake, so it is
-   styled as a live value rather than as an idle control. */
-.btn.mult{background:var(--purple);color:#fff;padding:12px 14px;font-size:15px;
-          min-width:56px;justify-content:center}
-/* locked mid-spin / during auto — keep the stake legible rather than greying it out */
-.btn.mult:disabled{opacity:.75;cursor:not-allowed}
+/* A full ticket row is not a dead end — Pull becomes the way into the prediction, so it says
+   so rather than greying out. This is the game's only stop condition now, and a disabled
+   primary button with no explanation reads as a soft-lock. */
+.btn.roll.needsWatch{background:linear-gradient(180deg,var(--pink),#c74d80);color:#fff}
 
 /* The row under the board — the balancing tool and the view toggle. These are dev/debug
    controls, deliberately NOT on the board with the play controls. */
@@ -295,3 +195,7 @@ body.dice2d .dice{display:flex}
    new box up on its own and re-fits the frustum — no JS resize call needed here. */
 .stage.phone .boardScene{aspect-ratio:9/16;min-height:0;width:min(100%,360px);
                          margin-inline:auto;overflow:hidden}
+
+/* Buy-a-deck while it is unaffordable. Dimmed, but deliberately NOT disabled: tapping it is how
+   the player finds out how short they are. See renderBoardChrome() in js/ui/render.js. */
+.playbar .btn.navb.cant{opacity:.5}
