@@ -48,8 +48,16 @@ const DEFAULTS={
      detail, the mystery box and the token all live there — so they use the inner edge, which
      is the one strip of every tile that is reliably clear.
      The pause is a RANGE because a fixed one makes three figures walk in formation; each step
-     draws its own, so they drift apart instead of syncing up over a lap. */
-  npcs:1, npcHeight:0.75, npcStepMs:900, npcPauseMinMs:400, npcPauseMaxMs:2600,
+     draws its own, so they drift apart instead of syncing up over a lap.
+
+     npcs SHIPS OFF, and off means the models are never fetched — the cast is about a megabyte of
+     GLB and scenery nobody has switched on should not be on the critical path of a first load.
+     NPC3D loads them the first time it ticks with this true, so turning it on in the drawer
+     still works without a reload. Note the usual caveat about changing a default: saveConfig
+     writes the WHOLE cfg, so anyone who has already played has npcs:1 in their save and keeps
+     it — this is the shipped default for a fresh install, not a switch that reaches backwards.
+     Reset config, or the toggle itself, is the way back for an existing player. */
+  npcs:0, npcHeight:0.75, npcStepMs:900, npcPauseMinMs:400, npcPauseMaxMs:2600,
   npcLane:0.3, npcBob:0.05,
   diceRevealMs:500, diceToMoveMs:30,
   /* 3D dice. diceRevealMs doubles as the length of the throw, so the pacing knob that already
@@ -223,7 +231,7 @@ const TUNING=[
  {group:"Player piece",items:[
    ["tokenHeight","Size — height in tiles",0.05,{min:0.2,max:2}]]},
  {group:"NPCs",items:[
-   ["npcs","Walk the board (0/1)",1],
+   ["npcs","People on the board — off ships (0/1)",1],
    /* Capped at cfg.tokenHeight's default rather than at 2 like the piece: past that a figure
       starts hiding the token it walks in front of, which is the one thing this must not do. */
    ["npcHeight","Size — height in tiles",0.05,{min:0.2,max:1.15}],

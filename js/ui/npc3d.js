@@ -57,12 +57,18 @@ export const NPC3D = {
     this._ctx = ctx;
     this._group = new THREE.Group();
     scene.add(this._group);
-    this._load();
+    /* NOT _load(). The cast ships switched off and is about a megabyte of GLB, so fetching it
+       here would put scenery nobody has enabled on the critical path of every first load. tick()
+       loads it the first time it runs with cfg.npcs true, which also means the drawer's toggle
+       works without a reload — the alternative, deciding here, would make the switch look broken
+       for anyone who flipped it on. Deferring also sidesteps a boot-order question: Board3D.init
+       can run before loadConfig(), so cfg.npcs read at this point is not necessarily the player's
+       saved value, where every tick reads the live one. */
   },
 
-  /* One load per character, at init rather than per build(): the group survives a board rebuild
-     the way the dice and the token do. The token learned this the expensive way — re-fetching on
-     every rebuild left a placeholder on screen for the length of the download. */
+  /* One load per character, and once only: the group survives a board rebuild the way the dice
+     and the token do. The token learned that the expensive way — re-fetching on every rebuild
+     left a placeholder on screen for the length of the download. */
   _load() {
     if (this._started) return;
     this._started = true;
@@ -161,9 +167,15 @@ export const NPC3D = {
      background tab does not fast-forward the cast on return. */
   tick(dt) {
     if (!this._group) return;
-    const on = cfg.npcs === undefined ? true : !!cfg.npcs;
+    const on = !!cfg.npcs;
     this._group.visible = on;
-    if (!on || !this._walkers.length) return;
+    if (!on) return;
+    /* First frame with the cast switched on is what pays for it — see init(). _load() latches on
+       _started, so from the second frame this is one boolean test. Switching back OFF keeps the
+       loaded models, hidden: they are already paid for, and re-enabling should be instant rather
+       than a second download. */
+    this._load();
+    if (!this._walkers.length) return;
 
     const step = Math.max(1, +cfg.npcStepMs || 900);
     const bob = Math.max(0, +cfg.npcBob || 0);
