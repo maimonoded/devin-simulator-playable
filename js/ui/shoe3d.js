@@ -72,8 +72,8 @@ const backOut = k => { const c = 1.70158; const p = k - 1; return 1 + (c + 1) * 
    are constants beside ROW/ROW_PHONE rather than cfg keys — cfg is persisted, so a saved config
    would shadow any change to them for anyone who had already played. The phone frame is far more
    zoomed (camZoomPhone 0.5), so the same spread walks the hand off the edge there. */
-const HAND = { gap: 0.42, tilt: 0.13 };
-const HAND_PHONE = { gap: 0.30, tilt: 0.10 };
+const HAND = { gap: 0.58, tilt: 0.16 };
+const HAND_PHONE = { gap: 0.40, tilt: 0.13 };
 /* The ticket row, per view. The 9:16 frame is far more zoomed in (cfg.camZoomPhone), so the
    same numbers walk the row over the board there — it needs to be shorter and tighter. */
 const ROW = { at: 0.45, gap: 0.95, height: 1.70 };

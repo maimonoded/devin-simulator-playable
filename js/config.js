@@ -107,9 +107,13 @@ const DEFAULTS={
      Unlike the joker hold this one IS on the turn's critical path — pull() awaits it, because the
      whole point is that the moment cannot be missed. It costs ~1.9s once per five jokers, and
      auto-play session skips it entirely. handScale multiplies an ordinary card's presented size
-     (PRESENT_SCALE), so 1.1 is a shade bigger than a pulled card, not eleven times. */
-  handRiseMs:380, handFanMs:340, handHoldMs:420, handMergeMs:300, handSettleMs:420,
-  handScale:1.1, slotPopMs:260, slotPopScale:1.16,
+     (PRESENT_SCALE), so 1.75 is well over a pulled joker and the hand fills the middle of the
+     board. It shipped at 1.1 first and that was wrong: five cards at roughly one card's size,
+     splayed a little for a third of a second, is every beat of a celebration performed too small
+     and too fast to register — it was reported as nothing having changed at all. A moment that
+     has to be unmissable is worth a whole second of stillness and half the board. */
+  handRiseMs:520, handFanMs:460, handHoldMs:1100, handMergeMs:380, handSettleMs:460,
+  handScale:1.75, slotPopMs:260, slotPopScale:1.16,
   /* Riffling a bought deck into the one on the table. Long enough to read as two decks becoming
      one; short enough that a player buying several in a row is not held up by it. */
   shuffleMs:900,
