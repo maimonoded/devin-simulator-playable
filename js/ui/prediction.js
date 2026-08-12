@@ -46,8 +46,28 @@ function openPrediction(wantId){
       toast(`▶ Finish <b>${Episodes.titleOf(r.id)}</b> first — its result is still sealed`);
     return resumeReveal(r.id);
   }
-  const id=wantId!=null?wantId:state.epQueue[0];
+  let id=wantId!=null?wantId:Tickets.firstUnwatchedId();
   if(id==null) return;
+  /* THE ORDERING GATE, and the only one. It is a serialised drama, so an episode whose
+     predecessors on the row are unfinished cannot be watched — and with four collections filling
+     at once the player routinely holds several complete-but-unwatchable episodes, so this is
+     walked constantly rather than almost never.
+
+     Enforced HERE rather than at the call sites: the play row, the binge button, the library, the
+     result screen's next-episode link and a tap on a placeholder all arrive through this function,
+     and five copies of the rule is five chances for one of them to drift. Redirects to what CAN
+     be watched instead of refusing, so the button always does something. */
+     A REWATCH IS STILL ALLOWED: watchableAt only asks that the slot is full and the ones before
+     it are watched, both of which are true for anything already seen, so the library keeps
+     working. */
+  const allowed=Tickets.firstUnwatchedId();
+  if(allowed&&id!==allowed){
+    const slot=Tickets.all().findIndex((_,i)=>Tickets.idAt(i)===id);
+    if(slot>=0&&!Tickets.watchableAt(slot)){
+      toast(`▶ Watch <b>${Episodes.titleOf(allowed)}</b> first — the story runs in order`);
+      id=allowed;
+    }
+  }
   const ep=Episodes.get(id);
   if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
   // answers are shuffled every time, so the correct index in the file isn't a tell

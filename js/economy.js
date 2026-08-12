@@ -65,8 +65,8 @@ const ECONOMY_DEFAULT = {
      gate. js/storage.js stamps the saved config with it and drops every OWNED_CFG_KEYS entry from
      the save when it no longer matches, so changing a number here without bumping the version
      leaves anyone who has played before on their old value forever, with nothing thrown and
-     nothing logged. v3.16 is v3.14 with ten jokers added to the pack instead of two. */
-  version: "Economy Model v3.16 - 52 cards + 10 jokers, segmented cost curve, 240 episodes x 5 tickets",
+     nothing logged. v3.17 is v3.14 with twelve jokers added to the pack instead of two. */
+  version: "Economy Model v3.17 - 52 cards + 12 jokers, segmented cost curve, 240 episodes x 5 tickets",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
@@ -75,17 +75,23 @@ const ECONOMY_DEFAULT = {
      nothing else stops a player buying packs back to back. The workbook's dailyAllowance is
      gone rather than renamed — it was imported and never read. */
   /* ticketsPerPack IS THE JOKER COUNT — the jokers are the tickets (js/shoe.js), so there is one
-     number for both and never two that can disagree. Ten rather than the natural two: at two, a
+     number for both and never two that can disagree. Twelve rather than the natural two: at two, a
      five-ticket episode takes two and a half packs, which is a long way to walk to see the ticket
      path work at all.
 
+     AND IT MUST DIVIDE BY THE NUMBER OF LEADS. mintPack deals jokers round-robin over Shoe.JOKERS,
+     so ten across four leads is 3,3,2,2 — a permanent 50% supply advantage to the first two
+     episodes of every row, forever. That was invisible while tickets were interchangeable; type
+     routing (js/tickets.js) turns it into a balance defect compounding over a 240-episode run.
+     Twelve gives three of each. Change the cast and this wants changing with it.
+
      THERE IS NO packSize HERE, deliberately. The 52 numbered cards are fixed and jokers are added
-     on top, so the size is derived (Shoe.packSize(), 62 at ten jokers) and apply() computes it.
+     on top, so the size is derived (Shoe.packSize(), 64 at twelve jokers) and apply() computes it.
      A packSize in this table would be a second number saying the same thing, free to drift from
      the joker count and silently eat ranks off the top of the deck when it did. Note the one
      knock-on: pack size is also the free-card cap, so a bigger pack is a slightly longer leash
-     on the game's clock — 62 cards between top-ups rather than 54. */
-  cards: { ticketsPerPack: 10, regenMin: 3, sessionsPerDay: 2.5, secPerPull: 5 },
+     on the game's clock — 64 cards between top-ups rather than 54. */
+  cards: { ticketsPerPack: 12, regenMin: 3, sessionsPerDay: 2.5, secPerPull: 5 },
 
   structure: { totalEpisodes: 240, ticketsPerEpisode: 5, episodesPerSeries: 60 },
 

@@ -34,15 +34,18 @@ test("a pack is four suits of 1..13 plus the two jokers", () => {
 });
 
 /* WHAT THE GAME ACTUALLY DEALS: the whole numbered deck, plus ten jokers on top of it — 62. */
-test("the shipped pack is the whole numbered deck plus its ten jokers", () => {
+test("the shipped pack is the whole numbered deck plus its twelve jokers", () => {
   freshRun();
-  eq(cfg.ticketsPerPack, 10, "the shipped joker count");
-  eq(cfg.packSize, 62, "52 numbered cards plus ten jokers");
+  eq(cfg.ticketsPerPack, 12, "the shipped joker count");
+  eq(cfg.ticketsPerPack % Shoe.jokerTypes(), 0,
+     "and it divides by the cast, or the first leads get a permanent supply advantage");
+  eq(cfg.packSize, 64, "52 numbered cards plus twelve jokers");
   const pack = Shoe.mintPack();
-  eq(pack.length, 62);
-  eq(pack.filter(c => Shoe.isTicket(c)).length, 10, "ten jokers");
-  eq(pack.filter(c => c === "J1").length, 5, "dealt round-robin, so five of each lead");
-  eq(pack.filter(c => c === "J2").length, 5);
+  eq(pack.length, 64);
+  eq(pack.filter(c => Shoe.isTicket(c)).length, 12, "twelve jokers");
+  /* Round-robin over the whole cast, EVENLY — the reason ticketsPerPack must divide by it. */
+  Shoe.JOKERS.forEach(j => eq(pack.filter(c => c === j).length, 12 / Shoe.jokerTypes(),
+                             `an equal share of ${j}`));
   /* THE RANKS SURVIVE THE JOKER COUNT, and this is the whole reason the size is derived. When
      packSize was set independently, raising the jokers ate 12s and 13s off the top of the deck
      to make room — so a change that reads as "more tickets" also quietly cut the token's longest
@@ -87,12 +90,15 @@ test("the two jokers are distinct cards, and both are tickets", () => {
   ok(Shoe.JOKERS[0] !== Shoe.JOKERS[1], "but they are not the same card");
   eq(Shoe.jokerIndex("J1"), 0);
   eq(Shoe.jokerIndex("J2"), 1);
+  /* -1, NOT 0. It picks the episode a ticket fills now, so clamping an unknown joker to
+     the first lead would silently stuff episode 1. award() treats -1 as a wildcard. */
+  eq(Shoe.jokerIndex("J9"), -1, "an unknown joker is not the first lead");
 });
 
 /* Every path that reads a saved shoe leans on this, so it is asserted rather than assumed. */
 test("illegal cards are recognisable as illegal", () => {
   freshRun();
-  ["s0", "s14", "x3", "7", "", "J3", "s07"].forEach(c =>
+  ["s0", "s14", "x3", "7", "", "J9", "s07"].forEach(c =>
     ok(!Shoe.isLegal(c), `${JSON.stringify(c)} must be refused`));
   ["s1", "h13", "d7", "m12", "J1", "J2"].forEach(c => ok(Shoe.isLegal(c), c));
 });

@@ -250,7 +250,10 @@ export const Shoe3D = {
       const x = -a + off * SQ2, z = -a - off * SQ2;
       const held = Tickets.held(slot), full = Tickets.isFull(slot);
       const watched = full && Tickets.isWatched(slot);
-      const map = this._slotTexture(slot + 1, held, per, full, watched);
+      /* WHICH LEAD THIS PLACEHOLDER COLLECTS — its position on the row, which is the joker's own
+         index. Passed in rather than derived inside the texture, because the row is a window into
+         the series and the slot's series index is not its position on the row. */
+      const map = this._slotTexture(slot + 1, held, per, full, watched, k);
       const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false }));
       /* Height is the fixed dimension and width follows the face's own aspect — the fan grows
          taller with cfg.ticketsPerEpisode, so a hardcoded pair would squash it. */
@@ -287,11 +290,11 @@ export const Shoe3D = {
 
      Empty slots stay as ghost outlines in the same positions, so 3/5 reads without counting.
 
-     WHICH joker is presentation, not state: the game records that a slot holds a ticket, never
-     which of the two it was, so the fan alternates them by position. A pack deals its jokers
-     round-robin, so it holds equal numbers of each however many there are — alternating depicts a
-     typical fill rather than claiming a particular one. */
-  _slotTexture(n, held, per, full, watched) {
+     WHICH joker is now STATE rather than presentation. A placeholder collects one lead — the one
+     at its position on the row — so the fan draws that lead `held` times and is telling the truth
+     about what is in it. `lead` is passed in for that reason; deriving it here would mean this
+     function knowing how the row window maps onto the series. */
+  _slotTexture(n, held, per, full, watched, lead) {
     const CW = 112, CH = 157, STEP = 32;          // card, and how far each one drops
     const W = 170, HEAD = 42, PAD = 12;
     const H = HEAD + CH + STEP * Math.max(0, per - 1) + PAD;
@@ -324,7 +327,12 @@ export const Shoe3D = {
         x.save();
         this._roundRect(x, cx, cy, CW, CH, 9);
         x.clip();
-        const face = (typeof CardArt !== "undefined") && CardArt.face(Shoe.JOKERS[i % Shoe.JOKERS.length]);
+        /* ONE LEAD PER PLACEHOLDER. This used to alternate the jokers by position, because the
+           game recorded only that a slot held a ticket and never which of the two it was — so
+           alternating depicted a typical fill rather than claiming a particular one. A slot now
+           collects exactly one lead, so the fan is five of that lead and the claim is true. */
+        const face = (typeof CardArt !== "undefined")
+          && CardArt.face(Shoe.JOKERS[Math.max(0, lead | 0) % Shoe.JOKERS.length]);
         if (face) {
           /* Crop at the destination's aspect so nothing stretches, taken from the upper body. */
           const sh = face.height * 0.58, sw = sh * (CW / CH);
@@ -562,15 +570,23 @@ export const Shoe3D = {
        table instead would say the wrong thing twice over: it is not the last move, and the
        thing it actually did happened somewhere else on the board.
 
-       The destination slot is read BEFORE the ticket is awarded — pull() awards after this
-       animation is already under way — so it is the lowest unfilled placeholder on the row,
-       which is exactly the one Tickets.award() is about to fill. With the row full the ticket
-       is banked rather than placed, and there is nowhere to fly to, so it falls back to the
-       table. */
+       THE SLOT IS THE CARD'S OWN, and it is read BEFORE the ticket is awarded because pull()
+       awards after this animation is already under way. It used to be "the lowest unfilled
+       placeholder", mirroring award()'s rule; now each lead collects into its own episode, so it
+       is the slot at this joker's index. THE TWO RULES ARE STILL MIRRORED AND STILL UNENFORCED —
+       change one without the other and every joker flies into a placeholder while its ticket
+       lands in a different one, which the board shows and nothing reports.
+
+       Falls back to the table when there is nowhere to fly: an unknown joker (index -1, a
+       wildcard to award()), or a slot already full, in which case the ticket is banked. */
     const ticket = (typeof Shoe !== "undefined") && Shoe.isTicket(card);
-    const slot = ticket && typeof Tickets !== "undefined"
-      ? Tickets.pageSlots().find(i => !Tickets.isFull(i))
-      : undefined;
+    let slot;
+    if (ticket && typeof Tickets !== "undefined") {
+      const k = Shoe.jokerIndex(card);
+      const row = Tickets.pageSlots();
+      const s = (k >= 0 && k < row.length) ? row[k] : undefined;
+      if (s != null && !Tickets.isFull(s)) slot = s;      // slot 0 is legitimate AND falsy
+    }
     const table = this._discardPos();
 
     /* How big it gets, and how hard it lands. A number reads at PRESENT_SCALE and always has;

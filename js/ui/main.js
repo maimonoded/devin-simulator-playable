@@ -55,7 +55,7 @@ async function pull(){
          keyboard and would otherwise spend every one of them building forty divs. */
       if(autoMode!=="session" && typeof confetti==="function") confetti();
       log("🎟","Pulled a <b>ticket</b>");
-      await playEvents(ticketPullEvents());
+      await playEvents(ticketPullEvents(card));
       /* HOLD THE TURN OPEN UNTIL THE CELEBRATION IS OVER — the one place the pull deliberately
          waits on presentation, and the exception that proves the rule above it.
 
@@ -100,11 +100,19 @@ async function pull(){
 /* What a ticket card does: fills a placeholder and drops mystery boxes on the board.
    State first, animation second — dropBoxes() picks the tiles synchronously, so a reload or a
    lost WebGL context mid-throw still leaves the boxes correctly on the board. */
-function ticketPullEvents(){
+function ticketPullEvents(card){
   const ev=[];
-  const award=Tickets.award(1);
+  /* THE CARD DECIDES WHICH EPISODE, not the board's scarcity. Shoe.jokerIndex returns -1 for a
+     joker this build does not know, and award() treats that as a wildcard rather than stuffing
+     episode 1 — see the note on jokerIndex. Shoe3D.pullCard computes the same slot from the same
+     rule so the card flies where the ticket lands; the two are only correct together. */
+  const type=Shoe.jokerIndex(card);
+  const award=Tickets.award(1,type);
+  const lead=(typeof CardArt!=="undefined"&&CardArt.JOKERS[type]) ? CardArt.JOKERS[type].name : null;
   ev.push({float:{text:"+1🎟",color:"var(--pink)"},ticketAward:award,
-           log:{icon:"🎟",msg:`Ticket collected · <b>${Tickets.doneCount()}/${Tickets.count()}</b> episodes`}});
+           log:{icon:"🎟",msg:lead
+             ? `<b>${lead}</b> collected · <b>${Tickets.doneCount()}/${Tickets.count()}</b> episodes`
+             : `Ticket collected · <b>${Tickets.doneCount()}/${Tickets.count()}</b> episodes`}});
   dropBoxes(cfg.boxesPerTicketCard);
   return ev;
 }

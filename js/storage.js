@@ -27,7 +27,7 @@
 const LS_ECON="pmdrama.econ.v3";
 const LS_CFG="pmdrama.cfg.v3";
 const LS_STATE="pmdrama.state.v3";
-const SLOT_V=3;
+const SLOT_V=4;
 
 let storageOK=(function(){
   try{ const k="pmdrama.probe"; localStorage.setItem(k,"1"); localStorage.removeItem(k); return true; }
@@ -115,7 +115,7 @@ function serializeState(){
     /* [tile, contents] pairs — the contents were decided when the box was placed, so they have
        to survive a reload or a gold box would reopen as something else. */
     tickets:[...state.tickets], boxes:[...state.boxes],
-    pendingTickets:state.pendingTickets, pendingBoxes:state.pendingBoxes,
+    ticketBank:{...(state.ticketBank||{})}, pendingBoxes:state.pendingBoxes,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     predWins:state.predWins, predLoss:state.predLoss,
@@ -161,7 +161,12 @@ function loadState(){
     state.shoe=(Array.isArray(d.shoe)?d.shoe:[]).filter(c=>Shoe.isLegal(c));
     state.packTail=(Array.isArray(d.packTail)?d.packTail:[]).filter(c=>Shoe.isLegal(c));
     state.ticketsPriced=Math.max(0,Math.floor(+d.ticketsPriced||0));
-    state.pendingTickets=Math.max(0,Math.floor(+d.pendingTickets||0));
+    /* THE BANK IS AN OBJECT NOW, AND THE OLD SHAPE WAS A NUMBER. Restoring it with the arithmetic
+       the count used — `+d.ticketBank||0` — coerces {wild:2} to NaN and then to 0, deleting a
+       bank that can hold tickets bought with real money, with nothing thrown and nothing logged.
+       So it is handed to Tickets._bank, which reads either shape: a number becomes wildcards. */
+    state.ticketBank=(d.ticketBank!==undefined)?d.ticketBank:d.pendingTickets;
+    state.ticketBank=Tickets._bank();          // reads whatever was put there, returns it clean
     /* Saves from before contents were decided at spawn stored bare tile indices. Accept both:
        a number becomes a box with nothing known about it, and onLand draws for it then — which
        is exactly what the old code did. */

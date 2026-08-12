@@ -16,7 +16,7 @@ const DEFAULTS={
      this list only has to agree (there is a test that says so).
      cardRegenMin is where energy regen went — minutes of game clock per free card, and now the
      game's only pacing gate. */
-  packSize:62, ticketsPerPack:10, cardRegenMin:3, sessionsPerDay:2.5, secPerPull:5, tokenStepMs:135,
+  packSize:64, ticketsPerPack:12, cardRegenMin:3, sessionsPerDay:2.5, secPerPull:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   fallbackSceneMs:1700, longPressMs:350,
@@ -122,9 +122,12 @@ const DEFAULTS={
      because no single formula holds for a whole run. `episodesInSeries` is the current series'
      length, seeded by Economy.apply(); `ticketsPerEpisode` is how many tickets fill one. */
   episodesInSeries:12, ticketsPerEpisode:5, boxesPerTicketCard:1,
-  /* How many episode placeholders the board shows at once. The row only advances once every
-     episode on it is full AND watched, so this is also the size of a "chunk" of the series. */
-  episodeRowSize:5,
+  /* NO episodeRowSize. How many placeholders the board shows is ONE PER LEAD — Tickets.rowSize()
+     reads Shoe.jokerTypes() — because each episode collects one joker type and a second number
+     saying how many episodes are on a row could disagree with the cast. It is deleted rather than
+     kept and ignored: it is not economy-owned, so loadConfig merges it back out of every existing
+     save, and any surviving read would let a stale save pin the row at five while a fresh install
+     got four — the row's length would depend on whether you had played before. */
   /* What a deck costs the player, in real money. A deck is an IAP, not a coin sink — coins buy
      nothing but prediction wagers now. Until the store is wired to a payment provider the
      purchase is free per click; this is the price tag it will carry. */
@@ -319,8 +322,7 @@ const TUNING=[
       The drawer shows it read-only in the Economy panel (js/ui/economy-panel.js). */
    ["deckPriceUsd","Deck price (real money, $)",0.5],
    ["boxesPerTicketCard","Boxes per ticket",1],["boxCoins","Box item 1: coins",10],
-   ["episodesInSeries","Episodes in this series",1],["ticketsPerEpisode","Tickets per episode",1],
-   ["episodeRowSize","Episodes shown per row",1]]},
+   ["episodesInSeries","Episodes in this series",1],["ticketsPerEpisode","Tickets per episode",1]]},
  {group:"Prediction & wager",items:[
    ["minWager","Minimum wager (floor under every tier)",10],
    ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],

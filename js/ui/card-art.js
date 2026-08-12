@@ -43,10 +43,23 @@ const CardArt = {
     diamond: { ink: "#1f9fc4", glow: "#8ce8ff", label: "Diamonds" },
     mask:    { ink: "#7c5cd6", glow: "#c3adff", label: "Masks"    },
   },
-  /* The two leads. Order matches Shoe.JOKERS. */
+  /* THE LEADS, AND THIS ORDER IS LOAD-BEARING — it must match Shoe.JOKERS index for index.
+     Since jokers became type-routed, index k is also the k-th episode placeholder, so a portrait
+     out of step with Shoe.JOKERS does not merely draw the wrong face: it labels the wrong
+     collection. There are as many entries here as there are joker ids, and a test pins that.
+
+     Carl and Victoria's mother are the show's third and fourth billed — see the episode content
+     and assets/npcs/README.md, which reached the same two independently. Carl already exists as a
+     board figure (assets/npcs/models/carl.glb), so his card and the man walking the ring are
+     deliberately the same read: slate navy, sunglasses, phone at his ear.
+
+     `file` is a PAINTED OVERRIDE and a missing one is not an error — _override() falls back to
+     the vector portrait below, so the mechanism ships before the art does. */
   JOKERS: [
     { name: "VICTORIA", ink: "#d82f52", glow: "#ff9ab4", file: "joker-victoria" },
     { name: "SIMON",    ink: "#1f9fc4", glow: "#8ce8ff", file: "joker-simon"    },
+    { name: "CARL",     ink: "#2f9e4f", glow: "#8fe0a6", file: "joker-carl"     },
+    { name: "MAMA",     ink: "#e0872f", glow: "#ffc98a", file: "joker-mama"     },
   ],
 
   _cache: new Map(),

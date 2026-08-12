@@ -86,7 +86,7 @@ function buildTuning(){
     const key=e.target.dataset.key; let v=parseFloat(e.target.value); if(isNaN(v))return;
     /* parseFloat above accepts 2.5 — these keys are counts, and a fractional one flows straight
        into the ticket arithmetic. Round them, then re-shape the run to the new size. */
-    if(["episodesInSeries","ticketsPerEpisode","episodeRowSize"].includes(key)){
+    if(["episodesInSeries","ticketsPerEpisode"].includes(key)){
       v=Math.max(1,Math.round(v)); cfg[key]=v; Tickets.reshape(); }
     else cfg[key]=v;
     const out=body.querySelector(`output[data-out="${key}"]`); if(out) out.textContent=v;

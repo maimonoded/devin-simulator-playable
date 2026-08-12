@@ -1,14 +1,18 @@
 "use strict";
 /* js/tickets.js — the ticket row, and the episode-unlock rules it inherited.
 
-   Most of this is ported word for word from the builders suite it replaces, because the rules
-   are the same rules: the row is derived rather than stored, episodes come off the FRONT of the
-   story whatever order slots filled in, and firstUnwatchedId falls back to the queue. The one
-   genuinely new rule is that a row clears only when its episodes have been WATCHED, not merely
-   filled — that is the pull-stop, and it is now the only stop condition in the game. */
+   Much of this is ported from the builders suite it replaces, because the rules are the same
+   rules: the row is derived rather than stored, and firstUnwatchedId falls back to the queue. Two
+   rules are NOT inherited — a row clears only when its episodes have been WATCHED rather than
+   merely filled (the pull-stop, and the only stop condition in the game), and a placeholder now
+   earns ITS OWN episode rather than the front of the story, because one lead collects into each
+   and out-of-order filling is the normal case. */
 
-/* Fill a placeholder outright, without going through award()'s row rules. */
-function fill(i) { state.tickets[i] = Tickets.perEpisode(); }
+/* Fill a placeholder outright, skipping award()'s routing — but still QUEUEING the episode, the
+   way award() does on the transition into full. Without that this helper builds a state award()
+   cannot produce: a full slot whose episode was never unlocked, which isWatched() then reads as
+   watched (an episode never queued has trivially left the queue) and the row advances over it. */
+function fill(i) { state.tickets[i] = Tickets.perEpisode(); Tickets.completeEpisode(i); }
 /* Mark an episode watched by taking it out of the unwatched queue. */
 function watch(i) {
   const id = Tickets.idAt(i);
@@ -79,17 +83,18 @@ test("award works mid-animation — it must not inherit the old upgrade guard", 
 
 suite("tickets: the row");
 
-test("the row is the first five placeholders and is derived, not stored", () => {
+test("the row is one placeholder per lead, derived from the cast and not stored", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
-  deepEq(Tickets.pageSlots(), [0, 1, 2, 3, 4]);
+  cfg.episodesInSeries = 12; Tickets.reshape();   // row size is Shoe.jokerTypes()
+  eq(Tickets.rowSize(), Shoe.jokerTypes(), "one episode per joker, never a config key");
+  deepEq(Tickets.pageSlots(), Shoe.JOKERS.map((_, k) => k));
   eq(Tickets.page(), 0);
   resetCfg();
 });
 
 test("filling out of order can never skip a row", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
+  cfg.episodesInSeries = 12; Tickets.reshape();   // row size is Shoe.jokerTypes()
   fill(7); fill(9);                       // later rows finished first
   eq(Tickets.page(), 0, "the row with work left is still the one on screen");
   resetCfg();
@@ -98,22 +103,23 @@ test("filling out of order can never skip a row", () => {
 /* The new rule, and the reason the row exists at all. */
 test("a full row does NOT clear until every episode on it has been watched", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
-  for (let i = 0; i < 5; i++) { fill(i); state.epQueue.push(Tickets.idAt(i)); }
+  cfg.episodesInSeries = 12; Tickets.reshape();   // row size is Shoe.jokerTypes()
+  const N = Tickets.rowSize();
+  for (let i = 0; i < N; i++) fill(i);
   ok(Tickets.rowFull(), "full");
   eq(Tickets.page(), 0, "but still the current row");
-  for (let i = 0; i < 4; i++) watch(i);
-  eq(Tickets.page(), 0, "four of five watched is not enough");
-  watch(4);
-  eq(Tickets.page(), 1, "the fifth clears it");
+  for (let i = 0; i < N - 1; i++) watch(i);
+  eq(Tickets.page(), 0, "all but one watched is not enough");
+  watch(N - 1);
+  eq(Tickets.page(), 1, "the last one clears it");
   resetCfg();
 });
 
 /* Ducking out mid-episode must not advance the row, or a sealed bet would be a way past it. */
 test("a sealed but unwatched bet counts as not yet watched", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
-  for (let i = 0; i < 5; i++) fill(i);
+  cfg.episodesInSeries = 12; Tickets.reshape();   // row size is Shoe.jokerTypes()
+  for (let i = 0; i < Tickets.rowSize(); i++) fill(i);
   state.epQueue = [];
   state.pendingReveal = { id: Tickets.idAt(2), wager: 10, odds: 2, won: true, payout: 20 };
   eq(Tickets.page(), 0, "the row is held by the outstanding reveal");
@@ -124,12 +130,13 @@ test("a sealed but unwatched bet counts as not yet watched", () => {
 
 test("rowFull is the pull-stop, and is false one ticket short", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
-  for (let i = 0; i < 4; i++) fill(i);
-  state.tickets[4] = Tickets.perEpisode() - 1;
-  ok(!Tickets.rowFull(), "24 of 25 still allows a pull");
-  Tickets.award(1);
-  ok(Tickets.rowFull(), "25 of 25 stops it");
+  cfg.episodesInSeries = 12; Tickets.reshape();   // row size is Shoe.jokerTypes()
+  const N = Tickets.rowSize(), last = N - 1;
+  for (let i = 0; i < last; i++) fill(i);
+  state.tickets[last] = Tickets.perEpisode() - 1;
+  ok(!Tickets.rowFull(), "one ticket short still allows a pull");
+  Tickets.award(1, last);            // that lead's own joker
+  ok(Tickets.rowFull(), "a full row stops it");
   resetCfg();
 });
 
@@ -137,48 +144,88 @@ test("rowFull is the pull-stop, and is false one ticket short", () => {
    episodes nor be thrown away — a ticket can be bought with real money. */
 test("tickets earned while the row is full are banked, not lost and not spilled", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
-  for (let i = 0; i < 5; i++) { fill(i); state.epQueue.push(Tickets.idAt(i)); }
-  const r = Tickets.award(3);
+  cfg.episodesInSeries = 12; Tickets.reshape();   // row size is Shoe.jokerTypes()
+  const N = Tickets.rowSize();
+  for (let i = 0; i < N; i++) fill(i);
+  const r = Tickets.award(3, 0);                 // three of the FIRST lead, nowhere to go
   eq(r.banked, 3, "banked");
-  eq(Tickets.held(5), 0, "and did not spill into the next row");
-  for (let i = 0; i < 5; i++) watch(i);
+  eq(Tickets.held(N), 0, "and did not spill into the next row");
+  for (let i = 0; i < N; i++) watch(i);
   Tickets._drainPending();
-  eq(Tickets.held(5), 3, "they land once the row advances");
-  eq(state.pendingTickets, 0);
+  /* THE BANK KEEPS THE TYPE. These were lead 0's jokers, so they land on the next row's lead-0
+     placeholder — not wherever happened to be emptiest. A bare count could not have said so. */
+  eq(Tickets.held(N), 3, "they land on their own lead's placeholder once the row advances");
+  eq(Tickets.bankedCount(), 0);
   resetCfg();
 });
 
 /* seriesShape clamps a series to the content that exists, so the last row is genuinely short. */
 test("a short final row returns fewer than rowSize and is not padded", () => {
   freshRun();
-  cfg.episodesInSeries = 12; cfg.episodeRowSize = 5; Tickets.reshape();
-  for (let i = 0; i < 10; i++) { fill(i); state.epQueue.push(Tickets.idAt(i)); }
-  for (let i = 0; i < 10; i++) watch(i);
-  eq(Tickets.page(), 2);
-  deepEq(Tickets.pageSlots(), [10, 11], "two placeholders, not five");
+  /* A series that is NOT a whole number of rows — the last one is genuinely short, and some
+     leads then have no placeholder on it at all. Sized off the cast so it stays short whatever
+     the cast becomes. */
+  const N = Tickets.rowSize();
+  cfg.episodesInSeries = N + 2; Tickets.reshape();
+  for (let i = 0; i < N; i++) fill(i);
+  for (let i = 0; i < N; i++) watch(i);
+  eq(Tickets.page(), 1);
+  eq(Tickets.pageSlots().length, 2, "two placeholders, not a padded row");
+  deepEq(Tickets.pageSlots(), [N, N + 1]);
   resetCfg();
 });
 
-test("a row size larger than the series still yields one row", () => {
+/* There is no cfg.episodeRowSize any more — the row is the cast. What still has to hold is the
+   degenerate shape: a series SHORTER than one row is one short row, not a negative one. */
+test("a series shorter than one row still yields exactly one short row", () => {
   freshRun();
-  cfg.episodeRowSize = 50; Tickets.reshape();
+  cfg.episodesInSeries = Math.max(1, Tickets.rowSize() - 1); Tickets.reshape();
   eq(Tickets.rowCount(), 1);
   eq(Tickets.pageSlots().length, Tickets.count());
-  cfg.episodeRowSize = 0; Tickets.reshape();
-  eq(Tickets.rowSize(), 1, "zero is floored to one rather than dividing by zero");
+  eq(Tickets.page(), 0);
   resetCfg();
 });
 
 suite("tickets: episodes");
 
-/* The rule that makes a serialised drama watchable. Completing the third placeholder first
-   still earns episode 001 — the unlocked set is always a PREFIX of the story. */
-test("episodes come off the front of the story, whatever order placeholders filled", () => {
+/* THE RULE THAT CHANGED. Episodes used to come off the FRONT of the story whatever order slots
+   filled, because slots only ever filled left to right and "front of the story" and "this slot's
+   episode" were the same answer. Type routing makes out-of-order filling normal and the two come
+   apart, so a slot now IS its episode — and the ordering it used to get for free is an explicit
+   gate instead. See watchableAt. */
+test("a placeholder earns ITS OWN episode, not the front of the story", () => {
+  freshRun();
+  fill(2);                                       // queues its episode, the way award() does
+  deepEq(state.epQueue, [Tickets.idAt(2)], "the third placeholder earns the third episode");
+  ok(Tickets.idAt(2) !== Episodes.idForBuilder(0), "and NOT the front of the story");
+  eq(Tickets.completeEpisode(2), null, "queueing it twice is refused, or isWatched would flap");
+});
+
+/* The silent one. isWatched asks whether a slot's episode has left the unwatched queue, and an
+   episode that was never unlocked has trivially left it — so without the isFull guard an EMPTY
+   slot reads as watched and page() walks the row forward over content nobody has seen. */
+test("an unfilled placeholder is never 'watched', however empty the queue is", () => {
+  freshRun();
+  state.epQueue = [];
+  ok(!Tickets.isWatched(0), "nothing collected, nothing watched");
+  ok(!Tickets.isWatched(1));
+  eq(Tickets.page(), 0, "and the row does not advance past unseen episodes");
+});
+
+/* The ordering the old front-of-story rule used to give away for free. */
+test("an episode is not watchable until the ones before it on the row are watched", () => {
   freshRun();
   fill(2);
-  const id = Tickets.completeEpisode();
-  eq(id, Episodes.idForBuilder(0), "the third placeholder still earns the first episode");
+  ok(Tickets.isFull(2), "collected");
+  ok(!Tickets.watchableAt(2), "but episodes 1 and 2 are not done, so it cannot be watched");
+  fill(0); fill(1);
+  ok(Tickets.watchableAt(0), "the first is always watchable once complete");
+  ok(!Tickets.watchableAt(1), "the second waits on the first being WATCHED, not just full");
+  watch(0);
+  ok(Tickets.watchableAt(1));
+  watch(1);
+  ok(Tickets.watchableAt(2), "and now the third");
+  eq(Tickets.nextWatchableId(), Tickets.idAt(2), "which is what firstUnwatchedId offers");
 });
 
 test("each completed placeholder queues the next episode in order", () => {

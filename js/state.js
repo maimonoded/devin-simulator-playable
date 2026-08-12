@@ -26,9 +26,12 @@ function initState(){
        WHICH of the row's episodes have been watched is deliberately NOT stored — it is derived
        from epQueue and pendingReveal (js/tickets.js). Derived state cannot drift. */
     tickets:Tickets.fresh(), boxes:new Map(),
-    /* Tickets earned while the row was already full. Banked rather than spilling into the next
-       row's episodes, and never thrown away — they land when the row advances. */
-    pendingTickets:0,
+    /* Tickets earned while their placeholder was already full. Banked rather than spilling into
+       the next row's episodes, and never thrown away — they land when the row advances.
+       KEYED BY JOKER TYPE (plus a `wild` pot for the box / Plot Twist / store tickets, which have
+       no joker behind them), because a bare count forgets which lead paid for it and a banked J3
+       would come back as a wildcard and land on episode 1. See Tickets._bank. */
+    ticketBank:{wild:0},
     /* Boxes earned but with nowhere to go, because every eligible tile already had one. They
        land on the next drop rather than being silently eaten. */
     pendingBoxes:0,

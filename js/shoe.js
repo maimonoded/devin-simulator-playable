@@ -55,10 +55,21 @@ const RANKS = 13;
 
 const Shoe = {
   SUITS,
-  /* The joker ids, in order. Index 0 is the first-named lead. */
-  JOKERS: ["J1", "J2"],
+  /* THE JOKER IDS, IN ORDER, AND THIS LIST IS NOW THE SHAPE OF THE BOARD.
+     Index k is the k-th lead AND the k-th episode placeholder on the row: a joker fills the slot
+     belonging to its own type, so the row is one episode per joker and Tickets.rowSize() derives
+     its length from here rather than from a config key. Adding a fifth lead adds a fifth episode
+     to every row with no other edit — which is the whole reason the count is read and never
+     written down a second time. See js/tickets.js.
+
+     Order matches CardArt.JOKERS (js/ui/card-art.js), and that pairing is asserted at load: a
+     joker with no portrait renders as the first lead, which under type routing would look like
+     the wrong character collecting into the wrong episode. */
+  JOKERS: ["J1", "J2", "J3", "J4"],
   /* Kept as a name for the ticket concept, but a ticket IS a joker now — see isTicket. */
   TICKET: "J1",
+  /* How many distinct leads there are — the row's length, and the modulus mintPack deals on. */
+  jokerTypes(){ return this.JOKERS.length; },
 
   /* ---------- how big a pack is ----------
 
@@ -100,8 +111,15 @@ const Shoe = {
     if(this.isTicket(card)) return "joker";
     return {s:"star",h:"heart",d:"diamond",m:"mask"}[String(card)[0]] || "star";
   },
-  /* Which joker: 0 or 1. Only meaningful for a joker. */
-  jokerIndex(card){ return Math.max(0,this.JOKERS.indexOf(card)); },
+  /* WHICH LEAD THIS IS — and now also WHICH EPISODE the ticket fills, which is why it returns
+     -1 for anything it does not recognise instead of clamping to 0.
+
+     It used to clamp: `Math.max(0, indexOf(card))`. That was harmless while the answer only chose
+     a portrait — an unknown joker drew as the first lead and nobody could tell. Under type
+     routing the same clamp silently awards the ticket to EPISODE 1, so a stray or future joker id
+     would quietly stuff the first placeholder. Callers must test for -1; award() treats it as a
+     wildcard, the same as a ticket that never came off the shoe at all. */
+  jokerIndex(card){ return this.JOKERS.indexOf(card); },
   /* Is this a card this game knows how to deal with? The storage validator's rule, kept here
      so the shape is defined once. */
   isLegal(card){
