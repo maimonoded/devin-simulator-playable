@@ -999,6 +999,11 @@ const Board3D = {
   /* Where the presented card is, for throwOverlays to launch a joker's boxes from. Null when
      nothing is on the stage, which is the signal to fall from above instead. */
   cardWorldPos() { return Shoe3D.presentedPos(); },
+  /* The completed-collection celebration. Hands over the LIVE camera for the same reason pullCard
+     does: camFollow drifts while the hand is up, and a pose computed once would let it slide. */
+  completeHand(slot, per) {
+    return Shoe3D.completeHand(slot, per, { aim: this._camTarget, camera: this._camera });
+  },
   /* A bought deck being riffled into the one already on the table. Decoration only — the cards
      are in the shoe before this is called. Resolves, never rejects. */
   shuffleDeck() { return Shoe3D.shuffleDeck(); },

@@ -55,7 +55,11 @@ async function pull(){
          keyboard and would otherwise spend every one of them building forty divs. */
       if(autoMode!=="session" && typeof confetti==="function") confetti();
       log("🎟","Pulled a <b>ticket</b>");
-      await playEvents(ticketPullEvents(card));
+      const tev=ticketPullEvents(card);
+      await playEvents(tev);
+      /* The award rides on the event list already (js/tiles/README.md, `ticketAward`), so it is
+         read back off it rather than threaded out through a second return value. */
+      const award=(tev[0]||{}).ticketAward;
       /* HOLD THE TURN OPEN UNTIL THE CELEBRATION IS OVER — the one place the pull deliberately
          waits on presentation, and the exception that proves the rule above it.
 
@@ -70,6 +74,12 @@ async function pull(){
          per ticket is real money across a run of thousands. */
       if(autoMode!=="session" && use3d() && window.Board3D && Board3D.available && Board3D.cardStageClear)
         await Board3D.cardStageClear(cfg.jokerHoldMs + cfg.cardToTableMs + 600);
+      /* AND IF THAT WAS THE FIFTH, the collection takes a bow. Awaited on purpose — this is the
+         one presentation the turn waits for, because a moment the player can miss is the whole
+         complaint it exists to answer. Its promise is timer-backstopped inside Shoe3D, so a
+         backgrounded tab still settles it and pull()'s finally still clears state.animating. */
+      const done=(award&&award.filled||[]).filter(i=>Tickets.isFull(i));
+      if(done.length) await celebrateCollection(done[done.length-1]);
       return;                           // ← see the header. Not a break, not a skip: a return.
     }
 
@@ -115,6 +125,26 @@ function ticketPullEvents(card){
              : `Ticket collected · <b>${Tickets.doneCount()}/${Tickets.count()}</b> episodes`}});
   dropBoxes(cfg.boxesPerTicketCard);
   return ev;
+}
+
+/* THE COLLECTION TAKES A BOW — five of one lead have filled a placeholder and bought an episode.
+   The cards come back out, splay into a hand, hold, merge into the one episode, and drop home.
+
+   The 3D half is Shoe3D.completeHand; this adds the DOM half — the card shower and a banner
+   naming the episode. Deliberately NOT confetti: pull() already threw some when the joker landed
+   and a second burst two seconds later reads as a stutter rather than a bigger moment.
+
+   Skipped for the batch balancing tool, which takes the fast path through every other
+   presentation for the same reason, and degrades to the banner alone when the 3D board is off or
+   failed — so the moment is still announced, just not performed. */
+async function celebrateCollection(slot){
+  if(autoMode==="session") return;
+  const id=Tickets.idAt(slot), title=id?Episodes.titleOf(id):null;
+  if(typeof cardShower==="function") cardShower();
+  if(title&&typeof showEpisodeReady==="function") showEpisodeReady(title);
+  if(!use3d()||!window.Board3D||!Board3D.available||!Board3D.completeHand) return;
+  try{ await Board3D.completeHand(slot,Tickets.perEpisode()); }
+  catch(e){ console.error("collection celebration failed:",e); }
 }
 
 /* Announce what a ticket award did. Called from playEvents (the card and the box) and from the

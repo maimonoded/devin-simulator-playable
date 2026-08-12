@@ -64,6 +64,16 @@ const PRESENT_LIFT = 3.0;        // toward the camera; under an ortho camera thi
    rather than a duration in cfg: it has to stay in proportion however long cfg.pullRevealMs is
    set to, and a millisecond value would drift out of step with the flight the moment one moved. */
 const JOKER_BLOOM_AT = 0.15;
+/* Overshoot-and-settle. Module level because both the joker's bloom and the completed hand's
+   splay use it, and two copies of an easing curve drift. */
+const backOut = k => { const c = 1.70158; const p = k - 1; return 1 + (c + 1) * p * p * p + c * p * p; };
+/* THE COMPLETED HAND, per view. `gap` is how far apart the cards splay as a fraction of a card's
+   presented width, `tilt` how far each is canted from the middle one. Shape, not pacing, so they
+   are constants beside ROW/ROW_PHONE rather than cfg keys — cfg is persisted, so a saved config
+   would shadow any change to them for anyone who had already played. The phone frame is far more
+   zoomed (camZoomPhone 0.5), so the same spread walks the hand off the edge there. */
+const HAND = { gap: 0.42, tilt: 0.13 };
+const HAND_PHONE = { gap: 0.30, tilt: 0.10 };
 /* The ticket row, per view. The 9:16 frame is far more zoomed in (cfg.camZoomPhone), so the
    same numbers walk the row over the board there — it needs to be shorter and tighter. */
 const ROW = { at: 0.45, gap: 0.95, height: 1.70 };
@@ -519,6 +529,9 @@ export const Shoe3D = {
      on its own. Nothing is lost, no reward is skipped, and the fast path costs no time: this is
      what lets a player hammer Pull without the celebration ever queueing up behind itself. */
   _clearStage() {
+    /* A celebration is on the stage in the same sense a card is — put it away first, or the
+       hand goes on floating in front of the card that just interrupted it. */
+    this.cancelHand();
     const prev = this._flying;
     if (!prev) return;
     /* Drop the tweens still driving it first, or they go on writing a pose onto a card that has
@@ -720,7 +733,6 @@ export const Shoe3D = {
          turn. A tumble would be louder and would spend half the flight showing the card's back,
          which is the half the player is trying to read the joker in. */
       const _spin = new THREE.Quaternion(), _axis = new THREE.Vector3(0, 1, 0);
-      const backOut = k => { const c = 1.70158; const p = k - 1; return 1 + (c + 1) * p * p * p + c * p * p; };
       this._anims.push({
         mesh, t: 0, dur: ms,
         step: k => {
@@ -747,6 +759,202 @@ export const Shoe3D = {
       setTimeout(settle, ms);
     });
   },
+  /* ---------------- completing a collection ----------------
+
+     THE HAND YOU COLLECTED. Five jokers fill a placeholder and unlock an episode, and until now
+     that moment showed nothing of its own — the fifth card flew in exactly like the other four
+     and the player could miss the one thing the whole board is for. So the collection comes back
+     out and takes a bow: the cards rise out of the placeholder, splay into a hand, hold, and then
+     merge into the single episode they bought before dropping home.
+
+     IT IS THE CARDS THEMSELVES, not a poster of them. `_makeCard` with the slot's own lead, which
+     is the same expression the placeholder's fan draws — so this is the fan standing up rather
+     than five cards the player never collected. _faceTexture memoises, so all `per` meshes share
+     one face texture and one upload.
+
+     FOUR RULES, and every one is a bug that was reasoned out rather than found:
+
+       · THE PROMISE RESOLVES ON A TIMER. Backstopped by setTimeout, and the resolver goes on
+         this._done so Shoe3D.cancel() — reached from clearOverlayFx on every error path —
+         settles it. pull() awaits this inside playEvents, and its finally is what clears
+         state.animating: a promise that only a frame could settle soft-locks a backgrounded tab.
+       · finish() FORCES THE END STATE and is idempotent. A tab that never ran a frame still ends
+         with the meshes gone, the row redrawn and the sprite back at its own scale.
+       · THE SPRITE PUNCH NEEDS THE PAIRED LIFT. A sprite scales about its centre and the row's
+         sprites are seated at 0.14 + height/2, so scaling one without lifting it by the same
+         proportion grows it DOWN through the board.
+       · THE ROW REBUILDS UNDER IT. syncSlots() replaces sprites whenever its signature changes
+         (a ticket lands, CardArt finishes loading, the view flips), so the sprite and the
+         destination are re-read every frame rather than captured. And slot 0 is a legitimate
+         slot AND falsy — test != null, never truthiness. */
+  completeHand(slot, per, view) {
+    if (this.failed() || slot == null) return Promise.resolve();
+    this.cancelHand();
+    const n = Math.max(1, per | 0);
+    const H = this._phone() ? HAND_PHONE : HAND;
+    const riseMs = Math.max(1, +cfg.handRiseMs || 1), fanMs = Math.max(1, +cfg.handFanMs || 1);
+    const holdMs = Math.max(0, +cfg.handHoldMs || 0), mergeMs = Math.max(1, +cfg.handMergeMs || 1);
+    const homeMs = Math.max(1, +cfg.handSettleMs || 1), popMs = Math.max(1, +cfg.slotPopMs || 1);
+    const total = riseMs + fanMs + holdMs + mergeMs + homeMs + popMs;
+
+    const from = this.slotWorldPos(slot);
+    if (!from) return Promise.resolve();
+    /* The lead this placeholder collects is its POSITION on the row, not its series index. */
+    const k = Math.max(0, Tickets.pageSlots().indexOf(slot));
+    const face = Shoe.JOKERS[k % Shoe.JOKERS.length];
+
+    const cards = [];
+    for (let i = 0; i < n; i++) {
+      const m = this._makeCard(face);
+      m.position.copy(from);
+      m.scale.setScalar(CARD_SIZE * 0.18);     // exactly where and how big the fifth card vanished
+      this._setOverlay(m, true);
+      this._scene.add(m);
+      cards.push(m);
+    }
+    this._hand = cards;
+
+    const grow = CARD_SIZE * PRESENT_SCALE * Math.max(0.2, +cfg.handScale || 1);
+    const mid = (n - 1) / 2;
+    const _p = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion();
+    const _right = new THREE.Vector3(), _spin = new THREE.Quaternion();
+    const _axis = new THREE.Vector3(0, 1, 0);
+    const faceQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    const aimPos = () => {
+      if (!view || !view.aim || !view.camera) return _p.copy(from).setY(from.y + PRESENT_LIFT);
+      _d.copy(view.camera.position).sub(view.aim).normalize();
+      return _p.copy(view.aim).addScaledVector(_d, PRESENT_LIFT);
+    };
+    const aimQuat = () => (view && view.camera)
+      ? _q.copy(view.camera.quaternion).multiply(faceQ)
+      : _q.setFromEuler(new THREE.Euler(0, THREE.MathUtils.degToRad(ENV_CAM.az), 0));
+    /* Spread along the CAMERA's right vector, so the hand is horizontal on screen at any azimuth
+       — a world axis would swing as the camera turns. */
+    const right = () => (view && view.camera)
+      ? _right.setFromMatrixColumn(view.camera.matrixWorld, 0)
+      : _right.set(1, 0, 0);
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      cards.forEach(m => {
+        this._scene.remove(m);
+        (Array.isArray(m.material) ? m.material : [m.material]).forEach(mt => mt && mt.dispose());
+        m.geometry.dispose();                  // per-card geometry; the TEXTURES are shared, never disposed
+      });
+      this._hand = null;
+      this._anims = this._anims.filter(a => !a.hand);
+      this._restoreSlotScale();
+      this.syncSlots();
+      this._done = this._done.filter(r => r !== finish);
+      if (this._handResolve) { const r = this._handResolve; this._handResolve = null; r(); }
+    };
+
+    return new Promise(resolve => {
+      this._handResolve = resolve;
+      this._done.push(finish);
+      const push = (dur, step, end, delay) =>
+        this._anims.push({ hand: true, t: -(delay || 0), dur: Math.max(1, dur), step, end });
+
+      /* 1 · RISE — out of the placeholder and up to the middle of the view, still stacked. */
+      push(riseMs, t => {
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const to = aimPos(), q = aimQuat();
+        cards.forEach(m => {
+          m.position.lerpVectors(from, to, e);
+          m.quaternion.slerpQuaternions(m.quaternion, q, Math.min(1, e));
+          m.scale.setScalar(CARD_SIZE * 0.18 + (grow - CARD_SIZE * 0.18) * e);
+        });
+      }, () => {
+        /* 2 · SPLAY — the stack opens into a hand, overshooting and settling. */
+        push(fanMs, t => {
+          const e = backOut(t), c = aimPos(), q = aimQuat(), r = right();
+          cards.forEach((m, i) => {
+            const off = (i - mid) * H.gap * grow * e;
+            m.position.copy(c).addScaledVector(r, off);
+            m.quaternion.copy(q).multiply(_spin.setFromAxisAngle(_axis, (i - mid) * H.tilt * e));
+            m.scale.setScalar(grow);
+          });
+        }, () => {
+          /* 3 · HOLD — dead still, and the only place the shower fires. No confetti: pull()
+             already threw some when the joker landed, and a second burst reads as a stutter. */
+          push(holdMs || 1, () => {}, () => {
+            /* 4 · MERGE — the outer cards slide behind the middle one and fade out. Five tickets
+               in, one episode out, performed by the cards rather than by a cross-fade. */
+            push(mergeMs, t => {
+              const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              const c = aimPos(), q = aimQuat(), r = right();
+              cards.forEach((m, i) => {
+                const off = (i - mid) * H.gap * grow * (1 - e);
+                m.position.copy(c).addScaledVector(r, off);
+                m.quaternion.copy(q).multiply(_spin.setFromAxisAngle(_axis, (i - mid) * H.tilt * (1 - e)));
+                if (i !== Math.round(mid))
+                  (Array.isArray(m.material) ? m.material : [m.material])
+                    .forEach(mt => { if (mt) mt.opacity = 1 - e; });
+              });
+            }, () => {
+              cards.forEach((m, i) => { if (i !== Math.round(mid)) m.visible = false; });
+              const keep = cards[Math.round(mid)];
+              const p0 = keep.position.clone(), s0 = keep.scale.x;
+              /* 5 · SETTLE — the survivor drops home. Destination re-read every frame: the row
+                 rebuilds on a signature change and a captured sprite goes stale. */
+              push(homeMs, t => {
+                const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+                const dest = this.slotWorldPos(slot) || from;
+                keep.position.lerpVectors(p0, dest, e);
+                keep.scale.setScalar(s0 + (CARD_SIZE * 0.18 - s0) * e);
+              }, () => {
+                keep.visible = false;
+                this.syncSlots();
+                /* 6 · PUNCH — the placeholder itself, which is the button about to be pressed. */
+                const pop = Math.max(1, +cfg.slotPopScale || 1);
+                push(popMs, t => {
+                  const spr = this._slotSprite(slot);
+                  if (!spr) return;
+                  if (spr.userData.baseScale == null) {
+                    spr.userData.baseScale = spr.scale.y;
+                    spr.userData.baseY = spr.position.y;
+                  }
+                  const s = 1 + (pop - 1) * (1 - backOut(t));
+                  const b = spr.userData.baseScale;
+                  spr.scale.set(spr.scale.x / (spr.scale.y / b) * s, b * s, 1);
+                  /* Paired lift, or scaling about the sprite's centre grows it down through
+                     the board — it is seated at 0.14 + height/2, not at its base. */
+                  spr.position.y = spr.userData.baseY + (b * (s - 1)) / 2;
+                }, finish);
+              });
+            });
+          });
+        });
+      });
+      /* Independent of the frame loop, so a backgrounded tab still settles. */
+      setTimeout(finish, total + 400);
+    });
+  },
+  _slotSprite(slot) { return this.slotSprites().find(o => o.userData.slot === slot) || null; },
+  _restoreSlotScale() {
+    this.slotSprites().forEach(spr => {
+      if (spr.userData.baseScale == null) return;
+      const b = spr.userData.baseScale;
+      spr.scale.set(spr.scale.x / (spr.scale.y / b), b, 1);
+      spr.position.y = spr.userData.baseY;
+      spr.userData.baseScale = null;
+    });
+  },
+  /* Put a celebration away — a pull arriving mid-hand, or any error path. */
+  cancelHand() { if (this._hand || this._handResolve) { this._anims = this._anims.filter(a => !a.hand); this._handFinish(); } },
+  _handFinish() {
+    const h = this._hand; this._hand = null;
+    if (h) h.forEach(m => {
+      this._scene.remove(m);
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(mt => mt && mt.dispose());
+      m.geometry.dispose();
+    });
+    this._restoreSlotScale();
+    if (this._handResolve) { const r = this._handResolve; this._handResolve = null; r(); }
+  },
+
   /* Where the card on the stage is, in world space, or null if nothing is presented.
      The mystery boxes a joker earns are thrown FROM here, so the reward visibly comes out of the
      card that paid for it rather than appearing from off-screen. Read at throw time rather than
@@ -842,6 +1050,7 @@ export const Shoe3D = {
      called on the same error paths so a failed pull can never strand an awaited promise. */
   cancel() {
     this._anims.length = 0;
+    this.cancelHand();
     /* A shuffle caught mid-riffle would leave two half-stacks on the board. */
     if (this._shuffling) { this._shuffling = false; this._buildDeck(); }
     /* Only the card in flight is abandoned. The discard stays: it is the last card the player

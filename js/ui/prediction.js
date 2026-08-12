@@ -47,7 +47,19 @@ function openPrediction(wantId){
     return resumeReveal(r.id);
   }
   let id=wantId!=null?wantId:Tickets.firstUnwatchedId();
-  if(id==null) return;
+  /* NOTHING WATCHABLE IS A REAL ANSWER NOW, and it has to be spoken. The gate below can refuse
+     everything queued — complete episode 3 while 1 and 2 are unfinished and there is genuinely
+     nothing to play — and a button that silently does nothing reads as broken, which is exactly
+     how it was reported. Name the collection that is holding things up instead. */
+  if(id==null){
+    const stuck=Tickets.pageSlots().find(i=>!Tickets.isFull(i));
+    const lead=(stuck!=null&&typeof CardArt!=="undefined"
+      &&CardArt.JOKERS[Tickets.pageSlots().indexOf(stuck)]);
+    toast(lead
+      ? `🎟 Finish <b>${lead.name}</b>'s collection first — the story runs in order`
+      : "🎟 Collect a full set of one lead's cards to unlock the next episode");
+    return;
+  }
   /* THE ORDERING GATE, and the only one. It is a serialised drama, so an episode whose
      predecessors on the row are unfinished cannot be watched — and with four collections filling
      at once the player routinely holds several complete-but-unwatchable episodes, so this is
@@ -56,7 +68,8 @@ function openPrediction(wantId){
      Enforced HERE rather than at the call sites: the play row, the binge button, the library, the
      result screen's next-episode link and a tap on a placeholder all arrive through this function,
      and five copies of the rule is five chances for one of them to drift. Redirects to what CAN
-     be watched instead of refusing, so the button always does something. */
+     be watched instead of refusing, so the button always does something.
+
      A REWATCH IS STILL ALLOWED: watchableAt only asks that the slot is full and the ones before
      it are watched, both of which are true for anything already seen, so the library keeps
      working. */

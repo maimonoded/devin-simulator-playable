@@ -248,3 +248,16 @@
 .pack.cant:hover{border-color:var(--line);transform:none}
 .pack.wide{grid-column:1 / -1;flex-direction:row;gap:10px;justify-content:center}
 .pack .pkNote{font-size:11px;color:var(--muted);font-weight:600}
+
+/* A completed collection — the episode it bought, named over the board while the hand of cards
+   performs the unlock behind it. Sits in #centerFx like .spoils, so it inherits the panel's
+   centring and its fade; only the type differs. */
+.centerfx.ready{ text-align:center; pointer-events:none; }
+.centerfx.ready .readyTop{
+  font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--gold,#ffcb5c); opacity:.9; margin-bottom:4px;
+}
+.centerfx.ready .readyName{
+  font-family:var(--serif,Georgia,serif); font-size:26px; line-height:1.15; color:#fff;
+  text-shadow:0 2px 18px rgba(0,0,0,.75); max-width:min(78vw,420px); margin:0 auto;
+}

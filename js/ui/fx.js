@@ -63,6 +63,19 @@ function rainFx(cls, glyph, n, big) {
 }
 function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
 function cardShower(){ rainFx("cardfx", "🃏", 16, true); }
+/* A collection completed — the episode it bought, named, over the board while the hand of cards
+   performs the unlock behind it. Title ONLY: the unlock modal that follows carries the choice, and
+   without that split the game says "watch this now" three times in two seconds (this, the Pull
+   button's "Watch to continue", and the modal). Fades on its own, and only clears the panel if
+   nothing else has taken it over — the same guard showBoxSpoils uses. */
+function showEpisodeReady(title){
+  const el=$("#centerFx"); if(!el) return;
+  el.className="centerfx show ready";
+  el.innerHTML=`<div class="readyTop">Episode unlocked</div><div class="readyName">${title}</div>`;
+  const mine=el.innerHTML;
+  setTimeout(()=>{ if(el.innerHTML===mine) el.className="centerfx"; },
+             Math.max(600,(+cfg.handHoldMs||0)+(+cfg.handMergeMs||0)+(+cfg.handSettleMs||0)+600));
+}
 function ticketShower(){ rainFx("ticketfx", "🎟", 16, true); }
 /* One place that turns a reveal/card event's `shower` string into the right rain. */
 function playShower(kind){

@@ -96,6 +96,39 @@ function throws(fn, msg) {
   if (!threw) fail(msg || "expected function to throw");
 }
 
+/* ---- every js file at least PARSES ----
+
+   APP_FILES below is only the DOM-free layer, so a syntax error anywhere else — js/ui/*.js, or
+   one of the three ES modules — fails no test at all. It fails at RUNTIME, in the browser, by the
+   file quietly defining nothing: every function in it is simply undefined and whatever called one
+   dies. That has now shipped twice, both times as "this button does nothing", and both times from
+   a comment block closed early so the prose after it parsed as code.
+
+   So: parse-check the lot. It catches nothing a browser would not, but it catches it here instead
+   of after a click. Modules get their import/export lines blanked first, since vm cannot parse
+   them standalone — the syntax being checked is everything else. */
+(function parseCheckEverything(){
+  const skip = /^vendor\//;
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(d => {
+    const rel = path.relative(ROOT, path.join(dir, d.name));
+    if (skip.test(rel)) return [];
+    if (d.isDirectory()) return walk(path.join(dir, d.name));
+    return d.name.endsWith(".js") ? [rel] : [];
+  });
+  const bad = [];
+  for (const rel of walk(path.join(ROOT, "js"))) {
+    let src = fs.readFileSync(path.join(ROOT, rel), "utf8");
+    src = src.replace(/^\s*import\s[^;]*;?\s*$/gm, "").replace(/^\s*export\s+/gm, "");
+    try { new vm.Script(src, { filename: rel }); }
+    catch (e) { bad.push(`${rel}: ${e.message}`); }
+  }
+  if (bad.length) {
+    console.error("\n✗ these files do not parse — in a browser they define NOTHING:\n  " +
+                  bad.join("\n  ") + "\n");
+    process.exit(1);
+  }
+})();
+
 /* ---- context ---- */
 const ctx = vm.createContext(makeShims());
 for (const rel of APP_FILES) {

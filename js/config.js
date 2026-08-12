@@ -101,6 +101,15 @@ const DEFAULTS={
      after the reveal has already resolved, so the token is walking through it and the turn is not
      a frame slower. jokerScale below 1 is ignored — see the clamp in js/ui/shoe3d.js. */
   jokerScale:1.5, jokerHoldMs:800,
+  /* COMPLETING A COLLECTION — five of one lead fill a placeholder and unlock an episode. The
+     collected cards come back out, splay into a hand, hold, then merge into the one episode they
+     bought and drop home; the placeholder punches to slotPopScale as they land.
+     Unlike the joker hold this one IS on the turn's critical path — pull() awaits it, because the
+     whole point is that the moment cannot be missed. It costs ~1.9s once per five jokers, and
+     auto-play session skips it entirely. handScale multiplies an ordinary card's presented size
+     (PRESENT_SCALE), so 1.1 is a shade bigger than a pulled card, not eleven times. */
+  handRiseMs:380, handFanMs:340, handHoldMs:420, handMergeMs:300, handSettleMs:420,
+  handScale:1.1, slotPopMs:260, slotPopScale:1.16,
   /* Riffling a bought deck into the one on the table. Long enough to read as two decks becoming
      one; short enough that a player buying several in a row is not held up by it. */
   shuffleMs:900,
