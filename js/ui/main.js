@@ -104,6 +104,9 @@ async function pull(){
     clearOverlayFx();
   }finally{
     state.animating=false; renderAll();
+    /* UNCONDITIONAL: an error path still owes the prompt, and swallowing it would leave an
+       unlocked episode with nothing ever offering it. */
+    flushUnlockOwed();
   }
 }
 
@@ -125,6 +128,17 @@ function ticketPullEvents(card){
              : `Ticket collected · <b>${Tickets.doneCount()}/${Tickets.count()}</b> episodes`}});
   dropBoxes(cfg.boxesPerTicketCard);
   return ev;
+}
+
+/* An unlock popup (or the series finale) owed until the board is still — see announceTickets.
+   Deliberately NOT persisted: the episode is already in state.epQueue, so a reload costs the
+   prompt and nothing else, where persisting it would let a saved run owe a modal for ever. */
+let _unlockOwed=null;
+function flushUnlockOwed(){
+  const owed=_unlockOwed; _unlockOwed=null;
+  if(!owed||autoMode!==null) return;
+  if(owed.finale) seriesComplete();
+  else if(owed.id) openEpisodeUnlock(owed.id);
 }
 
 /* THE COLLECTION TAKES A BOW — five of one lead have filled a placeholder and bought an episode.
@@ -156,14 +170,23 @@ function announceTickets(r){
     log("🎬",`Episode unlocked · <b>${t}</b>`);
   });
   if(r.banked) log("🎟",`<b>${r.banked}</b> ticket${r.banked>1?"s":""} banked — watch this row to spend them`);
-  if(r.seriesDone) seriesComplete();
+  /* DEFERRED, not skipped — see _unlockOwed. */
+  if(r.seriesDone){ _unlockOwed={finale:true}; return; }
   renderAll();
   /* Offer it the moment it unlocks — but only to a human, and only when the finale is not
      already on screen. An auto run must never be stopped by a modal (that is the rule the two
      auto modes are built on), and stacking this over seriesComplete() would bury the finale.
      Either way the id stays queued, so nothing is lost by not asking. */
   const id=r.episodeIds&&r.episodeIds[0];
-  if(id && !r.seriesDone && autoMode===null) openEpisodeUnlock(id);
+  /* OWED, NOT OPENED. This used to fire the moment the ticket landed — which now drops a modal
+     straight on top of the collection celebration, so the one thing the change exists to show is
+     covered by a dialog for the whole of its 1.9 seconds. It was reported as "nothing changed",
+     and the board was in fact doing all of it behind the panel.
+
+     So it is stashed and flushed in pull()'s finally, once the board has stopped moving. Same
+     pattern as _shuffleOwed above: a beat that is owed and paid when it can actually be seen.
+     The id stays in state.epQueue either way, so nothing is lost if the flush never runs. */
+  if(id && !r.seriesDone && autoMode===null) _unlockOwed={id};
 }
 
 function nextSession(){
