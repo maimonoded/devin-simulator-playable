@@ -137,7 +137,7 @@ helpers (`gainCoins`/`gainCards`/`gainTickets`/`gainClues`) and the blocking pre
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
 | Session & time | `js/game.js` `advanceSession()` | A pull costs one card, never coins. "Next session" advances the clock by the greater of a full deal (`cardRegenMin` minutes per card) and one session slot (`1440 / sessionsPerDay` minutes), deals free cards toward the cap and pays a login reward on each day rollover. **This is the game's clock** — see the note under the economy model. |
 | Persistence | `js/storage.js` | Two independent localStorage slots — config and progress — with separate **Reset config** and **Reset user** buttons in the tuning drawer. Everything is guarded, so blocked storage degrades to "don't persist". |
-| Store | `js/ui/store.js` `openStore()` | Button top-right of the board. A **deck** is bought with coins at the curve's price for the next pack (also on the play row, `#buyDeckBtn`). Coins 10k/100k/1M and tickets 5/25/100 are real-money grants — **coins can never buy a ticket**, which is the wall the free player walks up to. |
+| Store | `js/ui/store.js` `openStore()` | Button top-right of the board. A **deck** is bought here and ONLY here — the play row used to carry a duplicate `#buyDeckBtn`, removed because two buttons doing one purchase is two places for it to drift. Coins 10k/100k/1M and tickets 5/25/100 are real-money grants — **coins can never buy a ticket**, which is the wall the free player walks up to. |
 
 ### The economy model vs `cfg`
 

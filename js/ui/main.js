@@ -263,17 +263,6 @@ async function playDeckShuffle(){
   catch(e){ console.error("deck shuffle failed:",e); }
   finally{ state.animating=false; renderAll(); }
 }
-/* Buying a deck is also how you take manual control of an auto-pull: stop the loop, let the
-   in-flight pull finish, then buy. */
-async function onBuyDeck(){
-  stopAuto();
-  while(state.animating) await sleep(50);
-  const r=Shoe.buyPack();
-  toast(`🃏 <b>+${cfg.packSize}</b> cards`);
-  log("🃏",`Bought a deck ($${r.usd.toFixed(2)}) · ${r.size} cards in hand`);
-  renderAll();
-  await playDeckShuffle();          // nothing covering the board here, so play it now
-}
 
 /* ---------------- wiring ---------------- */
 /* ?view=mobile: reparent the HUD and the store button INTO the board scene, so the whole game
@@ -331,7 +320,6 @@ if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE){
   btn.addEventListener("pointercancel",endHold);
 })();
 $("#autoBtn").onclick=autoPlay;
-$("#buyDeckBtn").onclick=onBuyDeck;
 /* Tapping a ticket placeholder on the board.
 
    A completed placeholder draws a play triangle, so it has to actually BE a button — an

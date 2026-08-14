@@ -158,15 +158,6 @@ function renderBoardChrome(){
      rather than the lifetime total, which only ever grows and would leave the dot on forever. */
   const adot=$("#albumDot");
   if(adot) adot.classList.toggle("on",state.cycleClues>0);
-  /* Buy-a-deck. A deck is a real-money product, so there is no affordability state at all —
-     it is live whenever the board is idle. The dot lights when the shoe is running dry, which
-     is the only moment buying one is the obvious thing to do. */
-  const buy=$("#buyDeckBtn"), dot=$("#buyDot");
-  if(buy){
-    buy.title=`Buy a deck — $${Shoe.priceUsd().toFixed(2)}`;
-    buy.disabled=state.animating||autoMode!==null;
-  }
-  if(dot) dot.classList.toggle("on",Shoe.count()<=Math.max(1,Math.round(cfg.packSize*0.2)));
   /* The ticket placeholders live in the 3D scene, not the DOM. */
   if(use3d()&&window.Board3D&&Board3D.available&&Board3D.setTicketSlots) Board3D.setTicketSlots();
 }
