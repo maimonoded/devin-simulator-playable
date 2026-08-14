@@ -97,6 +97,23 @@ function flyCollectionToBinge(from,face){
     el.appendChild(c);
   }
   el.style.left=to.x+"px"; el.style.top=to.y+"px";
+  /* START AT THE SIZE THE 3D CARD ENDED AT, so the handoff is invisible and this reads as the
+     same card continuing rather than a new, smaller one appearing. Falls back to a sane width
+     only when the 3D leg could not measure itself (no WebGL). */
+  /* World units → pixels, measured off the live camera rather than assumed: project two points
+     one unit apart and take the gap. That is what makes the DOM card start at exactly the size
+     the 3D card ended at, so the handoff is invisible and this reads as the SAME card carrying
+     on rather than a new, smaller one appearing somewhere else. */
+  let px=45;
+  if(window.Board3D&&Board3D.worldToViewport){
+    const p0=Board3D.worldToViewport({x:0,y:1,z:0}), p1=Board3D.worldToViewport({x:1,y:1,z:0});
+    if(p0&&p1&&Math.abs(p1.x-p0.x)>1) px=Math.abs(p1.x-p0.x);
+  }
+  const w=Math.max(24,Math.round((from.worldW||1.6)*px)),
+        h=Math.round(w*(from.aspect||1.42));
+  el.style.width=w+"px";
+  el.style.marginLeft=(-w/2)+"px";
+  el.style.marginTop=(-h/2)+"px";
   document.body.appendChild(el);
 
   /* DRIVEN BY THE WEB ANIMATIONS API, not a CSS class. Three reasons, all of them things that

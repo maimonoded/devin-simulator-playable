@@ -1036,11 +1036,8 @@ const Board3D = {
     return { x: (v.x * 0.5 + 0.5) * r.width + r.left, y: (-v.y * 0.5 + 0.5) * r.height + r.top };
   },
 
-  /* Where the placeholder for a row slot is on screen — the launch point for that flight. */
-  slotScreenPos(slot) {
-    const w = Shoe3D.slotWorldPos(slot);
-    return w ? this.worldToScreen(w) : null;
-  },
+  /* The placeholder's WORLD position, for callers that need to project it themselves. */
+  slotWorldPos3(slot) { return Shoe3D.slotWorldPos(slot); },
 
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */
   screenPosOf(i, lift = 0) {

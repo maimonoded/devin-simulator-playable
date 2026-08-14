@@ -266,7 +266,7 @@
    coordinates; the travel is a CSS custom-property translate so the JS only sets numbers.
    pointer-events off — it passes over live controls on its way. */
 .bingeFly{
-  position:fixed; z-index:9999; width:74px; margin:-52px 0 0 -37px;
+  position:fixed; z-index:9999;   /* width and margins are set by fx.js, from the 3D card */
   pointer-events:none; transform-origin:50% 50%;
   filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));
 }

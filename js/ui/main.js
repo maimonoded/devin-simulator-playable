@@ -169,7 +169,17 @@ async function celebrateCollection(slot){
     let handFrom=null;
     if(use3d()&&window.Board3D&&Board3D.available&&Board3D.completeHand)
       handFrom=await Board3D.completeHand(slot,Tickets.perEpisode());
-    const from=handFrom||((window.Board3D&&Board3D.slotScreenPos)?Board3D.slotScreenPos(slot):null);
+    /* THE FALLBACK HAS TO SPEAK THE SAME LANGUAGE. completeHand hands back viewport coordinates
+       AND the card's world width; slotScreenPos returns board-scene coordinates and no size at
+       all, so whenever the 3D leg did not finish — a backgrounded tab, no WebGL — the card flew
+       from the wrong origin at a quarter of its size. Which looked exactly like it not flying.
+       Same frame, same fields, both ways. */
+    let from=handFrom;
+    if(!from&&window.Board3D&&Board3D.worldToViewport&&Board3D.slotWorldPos3){
+      const w=Board3D.slotWorldPos3(slot);
+      const p=w&&Board3D.worldToViewport(w);
+      if(p) from={x:p.x,y:p.y,worldW:0.66*0.95*2.6*Math.max(0.2,+cfg.handScale||1),aspect:0.94/0.66};
+    }
     const face=(typeof CardArt!=="undefined"&&Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)])
       ? CardArt.face(Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)]) : null;
     if(typeof flyCollectionToBinge==="function")

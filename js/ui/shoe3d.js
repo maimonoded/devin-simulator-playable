@@ -872,6 +872,9 @@ export const Shoe3D = {
     const k = Math.max(0, Tickets.pageSlots().indexOf(slot));
     const face = Shoe.JOKERS[k % Shoe.JOKERS.length];
 
+    /* Cleared per run: it is written by a tween's end callback, and a run whose frames never
+       arrived would otherwise hand out the PREVIOUS collection's launch point. */
+    this._handFrom = null;
     const cards = [];
     for (let i = 0; i < n; i++) {
       const m = this._makeCard(face);
@@ -974,8 +977,34 @@ export const Shoe3D = {
                  Dropping it home first was the earlier shape and read wrong: the card returned
                  to the row it had just left, and only then did a second card appear from the
                  same place and set off again. One journey, not two. */
-              this._handFrom = (typeof Board3D !== "undefined" && Board3D.worldToViewport)
-                ? Board3D.worldToViewport(keep.position) : null;
+              /* HAND OVER THE SIZE, NOT JUST THE PLACE. The merged card is ~345px tall on
+                 screen; a DOM card that starts at some fixed width instead is a different object
+                 appearing somewhere else, and the big cards the player is watching simply
+                 vanish. That is what "they do not fly into the button" looked like.
+
+                 Measured, not guessed: project the card's centre and a point half its height
+                 along the CAMERA's up vector, and the pixel gap between them is half its screen
+                 height. Camera up rather than world up because the card is turned to face the
+                 view — world up would measure a foreshortened edge. */
+              /* Hand over WHERE it is and HOW WIDE IT IS IN WORLD UNITS — a plain
+                 multiplication that cannot fail. Converting that to pixels is fx.js's job,
+                 because it is the side that knows what it is drawing into.
+
+                 An earlier version projected an offset point here to measure the card's screen
+                 size directly and kept coming back zero, which silently fell through to a fixed
+                 74px card — a quarter of the size of the one the player was watching, so the big
+                 cards appeared to vanish and a small one appeared elsewhere. That IS what "it
+                 does not fly into the button" looked like. */
+              this._handFrom = null;
+              if (typeof Board3D !== "undefined" && Board3D.worldToViewport) {
+                const a = Board3D.worldToViewport(keep.position);
+                /* From `grow`, not from keep.scale — grow is known before a single frame runs,
+                   where the mesh's live scale is only correct if the tweens actually stepped. A
+                   backgrounded tab reaches here with the scale still at its spawn value, and the
+                   card would fly at a fifth of its size. */
+                if (a) this._handFrom = { x: a.x, y: a.y, worldW: CARD_W * grow,
+                                          aspect: CARD_H / CARD_W };
+              }
               push(1, () => {}, () => {
                 keep.visible = false;
                 this.syncSlots();
