@@ -163,11 +163,13 @@ async function celebrateCollection(slot){
   if(typeof cardShower==="function") cardShower();
   if(title&&typeof showEpisodeReady==="function") showEpisodeReady(title);
   try{
+    /* completeHand resolves WITH the screen position the merged card ended at, so the DOM leg
+       continues from exactly where the 3D one stopped — one journey from the row down into the
+       button, rather than a return to the placeholder and a second card setting off after it. */
+    let handFrom=null;
     if(use3d()&&window.Board3D&&Board3D.available&&Board3D.completeHand)
-      await Board3D.completeHand(slot,Tickets.perEpisode());
-    /* THEN it goes into your list. The card leaves the placeholder it just filled and flies into
-       the episode button; only when it lands does the number move. */
-    const from=(window.Board3D&&Board3D.slotScreenPos)?Board3D.slotScreenPos(slot):null;
+      handFrom=await Board3D.completeHand(slot,Tickets.perEpisode());
+    const from=handFrom||((window.Board3D&&Board3D.slotScreenPos)?Board3D.slotScreenPos(slot):null);
     const face=(typeof CardArt!=="undefined"&&Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)])
       ? CardArt.face(Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)]) : null;
     if(typeof flyCollectionToBinge==="function")

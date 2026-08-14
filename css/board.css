@@ -134,7 +134,8 @@ body.board3d .board{display:none}
    re-anchored onto the board itself, because in ?view=mobile it is the ONLY route back to a
    banked episode — the side panel's Predict & watch is not on screen there. Its offset used to
    exist purely to clear the deleted upgrade row. */
-.bingeBtn{display:flex;align-items:center;gap:6px;flex:0 0 auto;
+.bingeBtn{position:absolute;left:10px;bottom:calc(74px + var(--safeB, 0px));
+          display:flex;align-items:center;gap:6px;z-index:6;
           background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
           border-radius:999px;padding:8px 14px;font-size:15px;font-weight:800;
           box-shadow:0 4px 14px rgba(255,111,165,.35)}

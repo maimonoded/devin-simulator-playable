@@ -917,7 +917,8 @@ export const Shoe3D = {
       this._restoreSlotScale();
       this.syncSlots();
       this._done = this._done.filter(r => r !== finish);
-      if (this._handResolve) { const r = this._handResolve; this._handResolve = null; r(); }
+      /* Resolves WITH where the card ended up on screen — the launch point for the DOM leg. */
+      if (this._handResolve) { const r = this._handResolve; this._handResolve = null; r(this._handFrom || null); }
     };
 
     return new Promise(resolve => {
@@ -965,15 +966,17 @@ export const Shoe3D = {
             }, () => {
               cards.forEach((m, i) => { if (i !== Math.round(mid)) m.visible = false; });
               const keep = cards[Math.round(mid)];
-              const p0 = keep.position.clone(), s0 = keep.scale.x;
-              /* 5 · SETTLE — the survivor drops home. Destination re-read every frame: the row
-                 rebuilds on a signature change and a captured sprite goes stale. */
-              push(homeMs, t => {
-                const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-                const dest = this.slotWorldPos(slot) || from;
-                keep.position.lerpVectors(p0, dest, e);
-                keep.scale.setScalar(s0 + (CARD_SIZE * 0.18 - s0) * e);
-              }, () => {
+              /* 5 · HAND OFF. The survivor does NOT go back to the placeholder — it is being
+                 COLLECTED, and the thing collecting it is the episode button, which is DOM. So
+                 this is where the 3D half ends: its screen position is handed out and main.js
+                 flies a DOM card from exactly there down into the button.
+
+                 Dropping it home first was the earlier shape and read wrong: the card returned
+                 to the row it had just left, and only then did a second card appear from the
+                 same place and set off again. One journey, not two. */
+              this._handFrom = (typeof Board3D !== "undefined" && Board3D.worldToScreen)
+                ? Board3D.worldToScreen(keep.position) : null;
+              push(1, () => {}, () => {
                 keep.visible = false;
                 this.syncSlots();
                 /* 6 · PUNCH — the placeholder itself, which is the button about to be pressed. */
@@ -1021,7 +1024,7 @@ export const Shoe3D = {
       m.geometry.dispose();
     });
     this._restoreSlotScale();
-    if (this._handResolve) { const r = this._handResolve; this._handResolve = null; r(); }
+    if (this._handResolve) { const r = this._handResolve; this._handResolve = null; r(this._handFrom || null); }
   },
 
   /* Where the card on the stage is, in world space, or null if nothing is presented.

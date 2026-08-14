@@ -79,12 +79,6 @@
            scene reads as a game screen rather than a viewport with a toolbar under it. -->
       <!-- One row, evenly spaced: buy · PULL · album. -->
       <div class="playbar">
-        <!-- Episodes waiting to be watched, and the thing a collection is filled TOWARD — so it
-             sits on the play row with the other actions rather than up among the balances.
-             ALWAYS shown, dimmed at zero: it has to exist before there is anything in it, both so
-             the player knows what they are collecting for and so the completed-collection flight
-             has a target to fly at. -->
-        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
         <!-- Pull is also the auto-pull control: hold it to hand the loop over, tap again to stop. -->
         <button class="btn roll" id="rollBtn" title="Tap to pull · hold to auto-pull">🃏 Pull</button>
         <!-- Clue album. Badged while there are clues banked for the next prediction, since
@@ -94,6 +88,13 @@
       <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
            until something has actually been unlocked. -->
       <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
+      <!-- Episodes waiting to be watched, and what a collection is filled TOWARD. On the LEFT
+           edge rather than in the centred play group: the completed collection flies down into
+           it, and a target sitting next to Pull put that flight across the controls the player is
+           about to press. ALWAYS shown, dimmed at zero — it has to exist before there is anything
+           in it, both to say what the collecting is for and to give the flight something to aim
+           at. -->
+      <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">
