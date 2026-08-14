@@ -9,30 +9,14 @@ function closeEpisodeUi(){
   $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null;
 }
 
-/* A placeholder just filled, so an episode came with it. Ask rather than launch: banking several
-   and watching them back to back is how the show is actually consumed, and interrupting a roll
-   streak to sit through a video is not a choice the game should make for the player.
+/* THERE IS NO UNLOCK DIALOG ANY MORE. Completing a collection used to end in a Watch now /
+   Binge later modal. The choice it offered no longer needs asking: the episode flies into the
+   play row's button in front of the player, and that button is how you watch it — so the modal
+   interrupted the run to ask a question the screen had just answered. Nothing replaced it; the
+   id is in state.epQueue and the button carries the count.
 
-   Declining costs nothing — the id stays in state.epQueue, and the board grows a 🎬 button
-   for whatever is waiting there. */
-function openEpisodeUnlock(id){
-  const ep=Episodes.get(id);
-  if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
-  const queued=state.epQueue.length;
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode unlocked</div><h2>${ep.title}</h2></div>
-    <div class="mbody">
-      <div class="hint">Call what happens next, then watch it.${
-        queued>1?` You have <b style="color:var(--pink)">${queued}</b> waiting.`:""}</div>
-      <div class="foot" style="margin-top:14px">
-        <button class="btn ghost" id="bingeLater" style="flex:1">Binge later</button>
-        <button class="btn pink" id="watchNow" style="flex:2">Watch now</button>
-      </div></div></div>`;
-  $("#scrim").classList.add("show");
-  /* Straight into the prediction — openPrediction replaces this modal's contents, so the two
-     screens read as one flow rather than a dialog that spawns another dialog. */
-  $("#watchNow").onclick=()=>openPrediction();
-  $("#bingeLater").onclick=()=>{ closeEpisodeUi(); renderAll(); };
-}
+   The SERIES finale still gets a screen (js/ui/finale.js) — a finished series is a full stop,
+   where a finished episode is not. */
 
 /* `wantId` lets the library start a prediction for a SPECIFIC unwatched episode instead of
    whatever is at the front of the queue. Omitted, it behaves as it always did. */

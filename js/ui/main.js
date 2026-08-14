@@ -130,15 +130,16 @@ function ticketPullEvents(card){
   return ev;
 }
 
-/* An unlock popup (or the series finale) owed until the board is still — see announceTickets.
-   Deliberately NOT persisted: the episode is already in state.epQueue, so a reload costs the
-   prompt and nothing else, where persisting it would let a saved run owe a modal for ever. */
+/* The series finale, owed until the board is still — see announceTickets. It is the one thing
+   still deferred this way: a completed SERIES is a full-stop and does want a screen, where a
+   completed episode does not (the play row's button already has it).
+   Deliberately NOT persisted: a reload costs the celebration and nothing else, where persisting
+   it would let a saved run owe a modal for ever. */
 let _unlockOwed=null;
 function flushUnlockOwed(){
   const owed=_unlockOwed; _unlockOwed=null;
   if(!owed||autoMode!==null) return;
   if(owed.finale) seriesComplete();
-  else if(owed.id) openEpisodeUnlock(owed.id);
 }
 
 /* THE COLLECTION TAKES A BOW — five of one lead have filled a placeholder and bought an episode.
@@ -234,15 +235,12 @@ function announceTickets(r){
      auto modes are built on), and stacking this over seriesComplete() would bury the finale.
      Either way the id stays queued, so nothing is lost by not asking. */
   const id=r.episodeIds&&r.episodeIds[0];
-  /* OWED, NOT OPENED. This used to fire the moment the ticket landed — which now drops a modal
-     straight on top of the collection celebration, so the one thing the change exists to show is
-     covered by a dialog for the whole of its 1.9 seconds. It was reported as "nothing changed",
-     and the board was in fact doing all of it behind the panel.
-
-     So it is stashed and flushed in pull()'s finally, once the board has stopped moving. Same
-     pattern as _shuffleOwed above: a beat that is owed and paid when it can actually be seen.
-     The id stays in state.epQueue either way, so nothing is lost if the flush never runs. */
-  if(id && !r.seriesDone && autoMode===null) _unlockOwed={id};
+  /* NO POPUP. Unlocking an episode used to end in a Watch now / Binge later dialog. It was
+     first fired immediately (covering the celebration), then deferred until the board settled —
+     and neither is right, because the choice it offers no longer needs asking: the episode goes
+     into the play row's button, the card is SEEN flying into it, and the button is how you watch.
+     A modal after all that interrupts the run to ask a question the screen has just answered.
+     The id is in state.epQueue and the button is on screen, so nothing is lost by not asking. */
 }
 
 function nextSession(){
