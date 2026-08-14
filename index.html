@@ -84,17 +84,19 @@
         <!-- Clue album. Badged while there are clues banked for the next prediction, since
              those are the ones about to be spent. -->
         <button class="btn album" id="albumBtn" title="Clue album">🔍<i class="albumDot" id="albumDot"></i></button>
+        <!-- Episodes waiting to be watched, and what a collection is filled TOWARD. Pinned to the
+             LEFT of the play row rather than sitting in the centred group: the completed
+             collection flies down into it, and a target beside Pull put that flight across the
+             controls the player is about to press. It is a CHILD of this row on purpose — the
+             row's own height is what centres it, so it stays aligned with Pull whatever that
+             height becomes. An absolute offset from the scene's bottom did not, which is how it
+             ended up floating above the row. ALWAYS shown, dimmed at zero. -->
+        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
       </div>
       <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
            until something has actually been unlocked. -->
       <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
-      <!-- Episodes waiting to be watched, and what a collection is filled TOWARD. On the LEFT
-           edge rather than in the centred play group: the completed collection flies down into
-           it, and a target sitting next to Pull put that flight across the controls the player is
-           about to press. ALWAYS shown, dimmed at zero — it has to exist before there is anything
-           in it, both to say what the collecting is for and to give the flight something to aim
-           at. -->
-      <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
+
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">

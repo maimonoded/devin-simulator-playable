@@ -134,12 +134,12 @@ body.board3d .board{display:none}
    re-anchored onto the board itself, because in ?view=mobile it is the ONLY route back to a
    banked episode — the side panel's Predict & watch is not on screen there. Its offset used to
    exist purely to clear the deleted upgrade row. */
-.bingeBtn{position:absolute;left:10px;bottom:calc(74px + var(--safeB, 0px));
+.bingeBtn{position:absolute;left:10px;top:50%;transform:translateY(-50%);
           display:flex;align-items:center;gap:6px;z-index:6;
           background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
           border-radius:999px;padding:8px 14px;font-size:15px;font-weight:800;
           box-shadow:0 4px 14px rgba(255,111,165,.35)}
-.bingeBtn:active{transform:translateY(2px)}
+.bingeBtn:active{transform:translateY(-50%) scale(.96)}
 .bingeCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px}
 
 /* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's. */
@@ -184,7 +184,9 @@ body.board3d .board{display:none}
 
 /* The row under the board — the balancing tool and the view toggle. These are dev/debug
    controls, deliberately NOT on the board with the play controls. */
-.controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
+/* position:relative so .bingeBtn can pin to this row's left edge and be centred by
+   its height — see .bingeBtn. */
+.controls{position:relative;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
 .controls.viewrow{margin-top:14px}
 .controls.viewrow .btn.on{background:var(--purple);color:#fff}
 
