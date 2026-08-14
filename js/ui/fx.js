@@ -63,6 +63,36 @@ function rainFx(cls, glyph, n, big) {
 }
 function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
 function cardShower(){ rainFx("cardfx", "🃏", 16, true); }
+/* THE BADGE TAKES DELIVERY. The card has just been carried into this button, so the count does
+   not simply change — the button swells, the number turns over at the top of the swell, and it
+   settles back. The number changing at the PEAK is the point: it reads as the button absorbing
+   the card rather than as a counter that happened to tick.
+
+   Composed onto translateY(-50%), never replacing it: the button is centred on the play row by
+   that transform, so animating a bare scale would drop it half its own height mid-pop.
+
+   Driven by el.animate() rather than a CSS class — the same reason the flight is: a shorthand
+   that silently resolves to 0s and a malformed @keyframes both look exactly like "nothing
+   happened", and neither is visible from JS. Always resolves; onPeak always fires. */
+function popBingeBadge(onPeak){
+  const btn=$("#bingeBtn");
+  const ms=Math.max(1,+cfg.bingePopMs||1);
+  const big=Math.max(1,+cfg.bingePopScale||1);
+  const peak=()=>{ if(onPeak){ const f=onPeak; onPeak=null; f(); } };
+  if(!btn||!btn.animate){ peak(); return sleep(ms); }
+  let a=null;
+  try{
+    a=btn.animate([
+      {transform:"translateY(-50%) scale(1)",      offset:0},
+      {transform:`translateY(-50%) scale(${big})`, offset:0.42},
+      {transform:"translateY(-50%) scale(1)",      offset:1},
+    ],{duration:ms, easing:"cubic-bezier(.34,1.4,.64,1)"});
+  }catch(e){}
+  setTimeout(peak, Math.round(ms*0.42));
+  return Promise.race([a?a.finished.catch(()=>{}):sleep(ms), sleep(ms+300)])
+    .then(()=>{ peak(); });          // belt and braces: the number turns over even if the pop did not
+}
+
 /* There is no DOM card flight any more. The completed collection is carried into the episode
    button by the 3D card itself, inside the scene — see completeHand in js/ui/shoe3d.js. Four
    silent failures lived in the DOM version and all of them read the same way on screen (the

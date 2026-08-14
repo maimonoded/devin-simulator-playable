@@ -171,6 +171,10 @@ async function celebrateCollection(slot){
        looked identical: the cards simply vanished. */
     if(use3d()&&window.Board3D&&Board3D.available&&Board3D.completeHand)
       await Board3D.completeHand(slot,Tickets.perEpisode());
+    /* Delivered. The badge swells, the number turns over at the top of the swell, and it settles
+       back — which is why releasing the pin is the PEAK callback rather than something that
+       happens before or after the pop. */
+    await popBingeBadge(()=>{ releaseBingeCount(); renderAll(); });
   }catch(e){ console.error("collection celebration failed:",e); }
   finally{
     /* ALWAYS released. A pinned badge that never came back would under-report the queue for the

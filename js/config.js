@@ -115,6 +115,9 @@ const DEFAULTS={
   /* The last beat: the completed collection flying from its placeholder into the episode-list
      button. The button's count is pinned until it lands — see holdBingeCount. */
   bingeFlyMs:620,
+  /* The button taking delivery: it swells to bingePopScale, the number turns over at the top of
+     the swell, and it settles back. */
+  bingePopMs:460, bingePopScale:1.45,
   handRiseMs:520, handFanMs:460, handHoldMs:1100, handMergeMs:380, handSettleMs:460,
   handScale:1.75, slotPopMs:260, slotPopScale:1.16,
   /* Riffling a bought deck into the one on the table. Long enough to read as two decks becoming
