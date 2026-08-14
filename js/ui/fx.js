@@ -77,20 +77,51 @@ function cardShower(){ rainFx("cardfx", "🃏", 16, true); }
    Resolves on a TIMER, and always: main.js awaits this before releasing the count, so a promise
    that never settled would leave the badge pinned at its old value for the rest of the run. */
 function flyCollectionToBinge(from,face){
-  const btn=$("#bingeBtn"), host=document.querySelector(".wrap");
+  const btn=$("#bingeBtn");
   const ms=Math.max(1,+cfg.bingeFlyMs||1);
-  if(!btn||!host||!from) return sleep(ms);
-  const b=btn.getBoundingClientRect(), h=host.getBoundingClientRect();
-  const to={x:b.left-h.left+b.width/2, y:b.top-h.top+b.height/2};
+  if(!btn||!from) return sleep(ms);
+  /* VIEWPORT coordinates throughout, and position:fixed on <body>. `from` comes from
+     Board3D.worldToViewport and the destination from getBoundingClientRect, so both are in the
+     same frame. An earlier version mixed board-scene coords with .wrap's box and put the card
+     hundreds of pixels off screen. */
+  const b=btn.getBoundingClientRect();
+  const to={x:b.left+b.width/2, y:b.top+b.height/2};
   const el=document.createElement("div");
   el.className="bingeFly";
-  if(face) el.appendChild(face);
-  el.style.left=from.x+"px"; el.style.top=from.y+"px";
-  el.style.setProperty("--dx",(to.x-from.x)+"px");
-  el.style.setProperty("--dy",(to.y-from.y)+"px");
-  el.style.animationDuration=ms+"ms";
-  host.appendChild(el);
-  return sleep(ms).then(()=>{ el.remove(); });
+  /* A CANVAS IS COPIED BY DRAWING IT, never by cloneNode: that clones the element and leaves the
+     bitmap behind, so the card flew as an empty transparent box. */
+  if(face&&face.width){
+    const c=document.createElement("canvas");
+    c.width=face.width; c.height=face.height;
+    c.getContext("2d").drawImage(face,0,0);
+    el.appendChild(c);
+  }
+  el.style.left=to.x+"px"; el.style.top=to.y+"px";
+  document.body.appendChild(el);
+
+  /* DRIVEN BY THE WEB ANIMATIONS API, not a CSS class. Three reasons, all of them things that
+     already went wrong here: a CSS `animation` shorthand with no duration silently resolves to
+     0s and the card just sits there; a malformed @keyframes block fails quietly and does the
+     same; and neither state is visible from JS, so both look exactly like "the animation never
+     ran". anim.finished is a real promise, and the keyframes are right here next to the numbers
+     that feed them.
+
+     Backstopped by a timer regardless: main.js awaits this before releasing the badge, and a
+     promise that never settled would pin the count for the rest of the run. */
+  const dx=from.x-to.x, dy=from.y-to.y;
+  let anim=null;
+  try{
+    anim=el.animate([
+      {transform:`translate(${dx}px,${dy}px) scale(1) rotate(0deg)`, opacity:1, offset:0},
+      {opacity:1, offset:0.75},
+      {transform:"translate(0,0) scale(.14) rotate(-14deg)", opacity:.2, offset:1},
+    ],{duration:ms, easing:"cubic-bezier(.4,0,.25,1)", fill:"forwards"});
+  }catch(e){ /* no WAAPI — the card still appears and is cleared by the timer below */ }
+  const done=()=>{ el.remove(); };
+  return Promise.race([
+    anim ? anim.finished.catch(()=>{}) : sleep(ms),
+    sleep(ms+400),
+  ]).then(done);
 }
 
 /* A collection completed — the episode it bought, named, over the board while the hand of cards

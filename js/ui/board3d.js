@@ -1024,6 +1024,18 @@ const Board3D = {
       y: (-v.y * 0.5 + 0.5) * rect.height + (rect.top - host.top),
     };
   },
+  /* Same projection, in VIEWPORT coordinates. worldToScreen is relative to the board-scene host,
+     which is right for a DOM overlay parented INTO that host and wrong for anything parented
+     anywhere else — mixing the two silently puts the element hundreds of pixels off, with nothing
+     to show for it but an animation nobody can find. Anything flying to a target outside the
+     scene (the episode button lives on the play row) wants these. */
+  worldToViewport(p) {
+    if (!this.available) return null;
+    const v = new THREE.Vector3(p.x, p.y, p.z).project(this._camera);
+    const r = this._renderer.domElement.getBoundingClientRect();
+    return { x: (v.x * 0.5 + 0.5) * r.width + r.left, y: (-v.y * 0.5 + 0.5) * r.height + r.top };
+  },
+
   /* Where the placeholder for a row slot is on screen — the launch point for that flight. */
   slotScreenPos(slot) {
     const w = Shoe3D.slotWorldPos(slot);

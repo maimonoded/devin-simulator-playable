@@ -266,17 +266,13 @@
    coordinates; the travel is a CSS custom-property translate so the JS only sets numbers.
    pointer-events off — it passes over live controls on its way. */
 .bingeFly{
-  position:absolute; z-index:95; width:52px; margin:-36px 0 0 -26px;
+  position:fixed; z-index:9999; width:74px; margin:-52px 0 0 -37px;
   pointer-events:none; transform-origin:50% 50%;
-  animation:bingeFly cubic-bezier(.45,.02,.35,1) forwards;
-  filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));
+  filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));
 }
-.bingeFly canvas{ width:100%; height:auto; display:block; border-radius:5px }
-@keyframes bingeFly{
-  0%   { transform:translate(0,0) scale(1) rotate(0deg); opacity:1 }
-  70%  { opacity:1 }
-  100% { transform:translate(var(--dx),var(--dy)) scale(.18) rotate(-12deg); opacity:.15 }
-}
+.bingeFly canvas{ width:100%; height:auto; display:block; border-radius:6px }
+/* No @keyframes: the flight is driven by el.animate() in fx.js, so the travel and the numbers
+   that produce it live in one place. */}
 
 /* Debug menu — development only, hung under its HUD button. The HUD needs to be a positioning
    ancestor or `top:100%` resolves against .wrap and the menu lands nowhere near the button. */

@@ -974,8 +974,8 @@ export const Shoe3D = {
                  Dropping it home first was the earlier shape and read wrong: the card returned
                  to the row it had just left, and only then did a second card appear from the
                  same place and set off again. One journey, not two. */
-              this._handFrom = (typeof Board3D !== "undefined" && Board3D.worldToScreen)
-                ? Board3D.worldToScreen(keep.position) : null;
+              this._handFrom = (typeof Board3D !== "undefined" && Board3D.worldToViewport)
+                ? Board3D.worldToViewport(keep.position) : null;
               push(1, () => {}, () => {
                 keep.visible = false;
                 this.syncSlots();
