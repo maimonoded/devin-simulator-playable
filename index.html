@@ -43,7 +43,16 @@
       <div class="pill cardswrap"><span class="ic">🃏</span><div style="flex:1">
         <div class="v"><span id="hCards">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hCardCap">50</span></span></div>
         <div class="ebar"><div class="efill" id="hCfill"></div></div></div></div>
+      <!-- Episodes waiting to be watched. Last in the BALANCES row, not up with the brand: it is
+           a count of something you are holding, like the coins and cards beside it. It used to
+           float over the bottom-right of the board, aligned with nothing. Hidden when empty. -->
+      <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
     </div>
+    <!-- Development only: fires presentation beats that normally need a whole collection to see.
+         Sits next to the player button and is the obvious place to add go-to-jail, land-on-bonus
+         and the rest as they are needed. -->
+    <button class="avatarBtn debugBtn" id="debugBtn" title="Debug — fire an animation">🐞</button>
+    <div class="debugMenu" id="debugMenu"></div>
     <!-- Player. Not changeable yet — it is the handle for the profile panel, which for now
          holds only the progress reset. Pushed to the far right so the balances read left. -->
     <button class="avatarBtn" id="avatarBtn" title="Player">💃</button>
@@ -86,10 +95,6 @@
       <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
            until something has actually been unlocked. -->
       <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
-      <!-- Episodes banked by "Binge later". Re-homed onto the board when the builders view was
-           deleted: in ?view=mobile the side panel is hidden, so this is the ONLY route back to
-           a waiting episode. Hidden when the queue is empty. -->
-      <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">

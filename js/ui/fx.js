@@ -63,6 +63,36 @@ function rainFx(cls, glyph, n, big) {
 }
 function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
 function cardShower(){ rainFx("cardfx", "🃏", 16, true); }
+/* THE COLLECTION GOES INTO YOUR EPISODE LIST — the last beat of a completed collection.
+
+   A card flies from the placeholder it just filled into #bingeBtn, and the button's count only
+   moves when it lands. That ordering is the whole point: the card is what DELIVERS the episode,
+   so a number that ticked at award time would announce the arrival before it happened.
+
+   DOM rather than three.js, deliberately. The destination is a DOM button whose position depends
+   on the HUD's layout — projecting it back into the scene would mean guessing at a world point
+   that happens to land on it, and re-guessing on every resize. Flying a DOM card to a DOM rect is
+   exact by construction.
+
+   Resolves on a TIMER, and always: main.js awaits this before releasing the count, so a promise
+   that never settled would leave the badge pinned at its old value for the rest of the run. */
+function flyCollectionToBinge(from,face){
+  const btn=$("#bingeBtn"), host=document.querySelector(".wrap");
+  const ms=Math.max(1,+cfg.bingeFlyMs||1);
+  if(!btn||!host||!from) return sleep(ms);
+  const b=btn.getBoundingClientRect(), h=host.getBoundingClientRect();
+  const to={x:b.left-h.left+b.width/2, y:b.top-h.top+b.height/2};
+  const el=document.createElement("div");
+  el.className="bingeFly";
+  if(face) el.appendChild(face);
+  el.style.left=from.x+"px"; el.style.top=from.y+"px";
+  el.style.setProperty("--dx",(to.x-from.x)+"px");
+  el.style.setProperty("--dy",(to.y-from.y)+"px");
+  el.style.animationDuration=ms+"ms";
+  host.appendChild(el);
+  return sleep(ms).then(()=>{ el.remove(); });
+}
+
 /* A collection completed — the episode it bought, named, over the board while the hand of cards
    performs the unlock behind it. Title ONLY: the unlock modal that follows carries the choice, and
    without that split the game says "watch this now" three times in two seconds (this, the Pull

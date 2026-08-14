@@ -154,11 +154,67 @@ function flushUnlockOwed(){
 async function celebrateCollection(slot){
   if(autoMode==="session") return;
   const id=Tickets.idAt(slot), title=id?Episodes.titleOf(id):null;
+  /* PIN THE COUNT for the whole beat. The episode went into state.epQueue when the ticket
+     landed, so without this the button would already read its new number while the card that
+     delivers it is still on the board — announcing the arrival before it happens. */
+  holdBingeCount(Math.max(0,state.epQueue.length-1));
+  renderAll();
   if(typeof cardShower==="function") cardShower();
   if(title&&typeof showEpisodeReady==="function") showEpisodeReady(title);
-  if(!use3d()||!window.Board3D||!Board3D.available||!Board3D.completeHand) return;
-  try{ await Board3D.completeHand(slot,Tickets.perEpisode()); }
-  catch(e){ console.error("collection celebration failed:",e); }
+  try{
+    if(use3d()&&window.Board3D&&Board3D.available&&Board3D.completeHand)
+      await Board3D.completeHand(slot,Tickets.perEpisode());
+    /* THEN it goes into your list. The card leaves the placeholder it just filled and flies into
+       the episode button; only when it lands does the number move. */
+    const from=(window.Board3D&&Board3D.slotScreenPos)?Board3D.slotScreenPos(slot):null;
+    const face=(typeof CardArt!=="undefined"&&Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)])
+      ? CardArt.face(Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)]) : null;
+    if(typeof flyCollectionToBinge==="function")
+      await flyCollectionToBinge(from,face?face.cloneNode?face.cloneNode(true):null:null);
+  }catch(e){ console.error("collection celebration failed:",e); }
+  finally{
+    /* ALWAYS released. A pinned badge that never came back would under-report the queue for the
+       rest of the run, and the player would think episodes were being eaten. */
+    releaseBingeCount(); renderAll();
+  }
+}
+
+/* ---------------- debug ----------------
+   Development only. Presentation beats normally need a whole collection (or a particular
+   landing) to see even once, which makes them nearly impossible to tune. This fires them on
+   demand. Add entries as they are needed — go-to-jail, land-on-bonus, pass-start. */
+const DEBUG_ACTIONS=[
+  { label:"🎬 Collection complete", run:async()=>{
+      /* The first not-yet-full placeholder, topped up to one short so the beat has a real slot
+         to complete into — the animation reads the row, so faking it would not exercise it. */
+      const slot=Tickets.pageSlots().find(i=>!Tickets.isFull(i));
+      if(slot==null){ toast("🐞 Every episode on the row is already complete"); return; }
+      const per=Tickets.perEpisode();
+      state.tickets[slot]=Math.max(0,per-1);
+      const k=Tickets.pageSlots().indexOf(slot);
+      await pullJoker(Shoe.JOKERS[k%Shoe.JOKERS.length]);
+    } },
+];
+/* Put a specific card on the front of the shoe and pull it, so a debug beat goes through the
+   REAL path — same award, same animation, same ordering — rather than a parallel one that can
+   drift from it. */
+async function pullJoker(card){
+  if(state.animating) return;
+  state.shoe.unshift(card);
+  await pull();
+}
+function openDebugMenu(){
+  const el=$("#debugMenu");
+  if(!el) return;
+  const open=el.classList.toggle("show");
+  if(!open) return;
+  el.innerHTML="";
+  DEBUG_ACTIONS.forEach(a=>{
+    const b=document.createElement("button");
+    b.className="debugItem"; b.textContent=a.label;
+    b.onclick=async()=>{ el.classList.remove("show"); try{ await a.run(); }catch(e){ console.error("debug action failed:",e); } };
+    el.appendChild(b);
+  });
 }
 
 /* Announce what a ticket award did. Called from playEvents (the card and the box) and from the
@@ -383,6 +439,7 @@ $("#bingeBtn").onclick=()=>openPrediction(Tickets.firstUnwatchedId());
 $("#libraryBtn").onclick=()=>openLibrary();
 $("#albumBtn").onclick=()=>openAlbum();
 $("#avatarBtn").onclick=()=>openProfile();
+$("#debugBtn").onclick=openDebugMenu;
 $("#watchBtn").onclick=openPrediction;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;

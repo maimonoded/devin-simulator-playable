@@ -112,6 +112,9 @@ const DEFAULTS={
      splayed a little for a third of a second, is every beat of a celebration performed too small
      and too fast to register — it was reported as nothing having changed at all. A moment that
      has to be unmissable is worth a whole second of stillness and half the board. */
+  /* The last beat: the completed collection flying from its placeholder into the episode-list
+     button. The button's count is pinned until it lands — see holdBingeCount. */
+  bingeFlyMs:620,
   handRiseMs:520, handFanMs:460, handHoldMs:1100, handMergeMs:380, handSettleMs:460,
   handScale:1.75, slotPopMs:260, slotPopScale:1.16,
   /* Riffling a bought deck into the one on the table. Long enough to read as two decks becoming

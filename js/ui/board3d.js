@@ -1011,6 +1011,25 @@ const Board3D = {
      this, so that distinction is what stops the flat card flashing on every page load. */
   shoeFailed() { return Shoe3D.failed(); },
 
+  /* Where a WORLD point lands on screen, in the host's coordinates. Split out of screenPosOf so
+     anything in the scene can hand a position to a DOM element — the collected hand flying into
+     the episode button needs it, and it is not a tile. */
+  worldToScreen(p) {
+    if (!this.available) return null;
+    const v = new THREE.Vector3(p.x, p.y, p.z).project(this._camera);
+    const rect = this._renderer.domElement.getBoundingClientRect();
+    const host = this._host.getBoundingClientRect();
+    return {
+      x: (v.x * 0.5 + 0.5) * rect.width + (rect.left - host.left),
+      y: (-v.y * 0.5 + 0.5) * rect.height + (rect.top - host.top),
+    };
+  },
+  /* Where the placeholder for a row slot is on screen — the launch point for that flight. */
+  slotScreenPos(slot) {
+    const w = Shoe3D.slotWorldPos(slot);
+    return w ? this.worldToScreen(w) : null;
+  },
+
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */
   screenPosOf(i, lift = 0) {
     if (!this.available) return null;

@@ -1,4 +1,8 @@
 "use strict";
+/* Pins #bingeCount while a completed collection flies into it — see renderStory. */
+let _bingeHold=null;
+function holdBingeCount(n){ _bingeHold=n; }
+function releaseBingeCount(){ _bingeHold=null; }
 /* All read-only rendering of state → DOM. No state mutation here — the play controls delegate
    to js/ui/main.js. */
 /* Push timing configs into CSS custom properties so the animations match the sim's pacing.
@@ -148,8 +152,14 @@ function renderBoardChrome(){
   const queued=state.epQueue.length+(state.pendingReveal?1:0);
   const binge=$("#bingeBtn");
   if(binge){
-    binge.style.display=queued?"flex":"none";
-    $("#bingeCount").textContent=queued;
+    /* THE COUNT CAN BE PINNED. When a completed collection is flying into this button the number
+       must not have moved yet — the point of the flight is that the card is what delivers it, so
+       a badge that ticked at award time would announce the arrival before it happened. holdBinge
+       pins it at the pre-award value and the flight releases it on landing.
+       The BUTTON is shown live regardless: it has to be on screen to be flown at. */
+    const shown=(_bingeHold!=null)?_bingeHold:queued;
+    binge.style.display=(queued||_bingeHold!=null)?"flex":"none";
+    $("#bingeCount").textContent=shown;
   }
   /* The library button only exists once there is something in the library. */
   const lib=$("#libraryBtn");
