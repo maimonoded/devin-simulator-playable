@@ -265,14 +265,7 @@
 /* A completed collection flying into the episode-list button. Positioned by fx.js in .wrap's
    coordinates; the travel is a CSS custom-property translate so the JS only sets numbers.
    pointer-events off — it passes over live controls on its way. */
-.bingeFly{
-  position:fixed; z-index:9999;   /* width and margins are set by fx.js, from the 3D card */
-  pointer-events:none; transform-origin:50% 50%;
-  filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));
-}
-.bingeFly canvas{ width:100%; height:auto; display:block; border-radius:6px }
-/* No @keyframes: the flight is driven by el.animate() in fx.js, so the travel and the numbers
-   that produce it live in one place. */}
+/* (the collection flight is 3D now — see completeHand in js/ui/shoe3d.js) */}
 
 /* Debug menu — development only, hung under its HUD button. The HUD needs to be a positioning
    ancestor or `top:100%` resolves against .wrap and the menu lands nowhere near the button. */

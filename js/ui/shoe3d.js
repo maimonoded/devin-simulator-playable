@@ -863,8 +863,15 @@ export const Shoe3D = {
     const H = this._phone() ? HAND_PHONE : HAND;
     const riseMs = Math.max(1, +cfg.handRiseMs || 1), fanMs = Math.max(1, +cfg.handFanMs || 1);
     const holdMs = Math.max(0, +cfg.handHoldMs || 0), mergeMs = Math.max(1, +cfg.handMergeMs || 1);
-    const homeMs = Math.max(1, +cfg.handSettleMs || 1), popMs = Math.max(1, +cfg.slotPopMs || 1);
-    const total = riseMs + fanMs + holdMs + mergeMs + homeMs + popMs;
+    const popMs = Math.max(1, +cfg.slotPopMs || 1);
+    /* THE BACKSTOP HAS TO COVER EVERY BEAT, and it did not. The last beat used to be the card
+       settling home for cfg.handSettleMs; it is now the flight into the button for
+       cfg.bingeFlyMs, and `total` was never updated — so setTimeout(finish, total + 400) could
+       fire WHILE the card was still travelling and delete it mid-air. Which looks precisely like
+       the cards vanishing instead of flying, and is timing-dependent, so it survives one machine
+       and not another. Anything added after this must be added here too. */
+    const flyMs = Math.max(1, +cfg.bingeFlyMs || 1);
+    const total = riseMs + fanMs + holdMs + mergeMs + flyMs + popMs;
 
     const from = this.slotWorldPos(slot);
     if (!from) return Promise.resolve();
@@ -986,26 +993,30 @@ export const Shoe3D = {
                  along the CAMERA's up vector, and the pixel gap between them is half its screen
                  height. Camera up rather than world up because the card is turned to face the
                  view — world up would measure a foreshortened edge. */
-              /* Hand over WHERE it is and HOW WIDE IT IS IN WORLD UNITS — a plain
-                 multiplication that cannot fail. Converting that to pixels is fx.js's job,
-                 because it is the side that knows what it is drawing into.
+              /* 5 · INTO THE BUTTON — and it never leaves the scene to get there.
 
-                 An earlier version projected an offset point here to measure the card's screen
-                 size directly and kept coming back zero, which silently fell through to a fixed
-                 74px card — a quarter of the size of the one the player was watching, so the big
-                 cards appeared to vanish and a small one appeared elsewhere. That IS what "it
-                 does not fly into the button" looked like. */
-              this._handFrom = null;
-              if (typeof Board3D !== "undefined" && Board3D.worldToViewport) {
-                const a = Board3D.worldToViewport(keep.position);
-                /* From `grow`, not from keep.scale — grow is known before a single frame runs,
-                   where the mesh's live scale is only correct if the tweens actually stepped. A
-                   backgrounded tab reaches here with the scale still at its spawn value, and the
-                   card would fly at a fifth of its size. */
-                if (a) this._handFrom = { x: a.x, y: a.y, worldW: CARD_W * grow,
-                                          aspect: CARD_H / CARD_W };
-              }
-              push(1, () => {}, () => {
+                 This used to hand a screen position to a DOM card that flew the rest of the way.
+                 It never once worked in a real browser: wrong coordinate frame, a cloned canvas
+                 with no pixels, an animation with no duration, a fallback path with neither the
+                 right origin nor the right size — four separate silent failures, every one of
+                 which looks exactly like "the cards just vanish", which is what it did.
+
+                 So there is no handoff any more. Board3D.elementWorldPos unprojects the button's
+                 own rect into a world point that projects back onto it, and the card that is
+                 already in the scene — already animating, already visibly working — simply flies
+                 there and shrinks. One medium, one tween, and it is driven by the same frame loop
+                 that just splayed the hand, so if the hand renders this does too. */
+              const target = (typeof Board3D !== "undefined" && Board3D.elementWorldPos)
+                ? Board3D.elementWorldPos("#bingeBtn") : null;
+              const p0 = keep.position.clone(), s0 = keep.scale.x;
+              push(target ? flyMs : 1, t => {
+                if (!target) return;
+                const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+                keep.position.lerpVectors(p0, target, e);
+                /* Down to a tenth: it has to read as being swallowed by a small button, not as
+                   a full-size card parked on top of one. */
+                keep.scale.setScalar(s0 + (s0 * 0.10 - s0) * e);
+              }, () => {
                 keep.visible = false;
                 this.syncSlots();
                 /* 6 · PUNCH — the placeholder itself, which is the button about to be pressed. */

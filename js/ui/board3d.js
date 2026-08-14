@@ -1036,6 +1036,25 @@ const Board3D = {
     return { x: (v.x * 0.5 + 0.5) * r.width + r.left, y: (-v.y * 0.5 + 0.5) * r.height + r.top };
   },
 
+  /* A point on screen → a WORLD point that projects back onto it. The inverse of
+     worldToViewport, and what lets a 3D object fly to a DOM element's position without ever
+     leaving the scene: no second medium, no coordinate frames to line up, no CSS. */
+  viewportToWorld(x, y) {
+    if (!this.available) return null;
+    const r = this._renderer.domElement.getBoundingClientRect();
+    const ndcX = ((x - r.left) / r.width) * 2 - 1;
+    const ndcY = -(((y - r.top) / r.height) * 2 - 1);
+    return new THREE.Vector3(ndcX, ndcY, 0).unproject(this._camera);
+  },
+  /* Where an element's centre is, as a world point the scene can fly to. */
+  elementWorldPos(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    if (!b.width && !b.height) return null;
+    return this.viewportToWorld(b.left + b.width / 2, b.top + b.height / 2);
+  },
+
   /* The placeholder's WORLD position, for callers that need to project it themselves. */
   slotWorldPos3(slot) { return Shoe3D.slotWorldPos(slot); },
 

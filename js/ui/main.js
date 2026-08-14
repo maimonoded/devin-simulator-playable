@@ -163,27 +163,14 @@ async function celebrateCollection(slot){
   if(typeof cardShower==="function") cardShower();
   if(title&&typeof showEpisodeReady==="function") showEpisodeReady(title);
   try{
-    /* completeHand resolves WITH the screen position the merged card ended at, so the DOM leg
-       continues from exactly where the 3D one stopped — one journey from the row down into the
-       button, rather than a return to the placeholder and a second card setting off after it. */
-    let handFrom=null;
+    /* THE CARD FLIES ITSELF. completeHand's last beat now carries the merged card into the
+       episode button inside the 3D scene (Board3D.elementWorldPos unprojects the button's rect),
+       so there is no DOM leg and nothing to hand off. Four separate silent failures lived in that
+       handoff — wrong coordinate frame, an empty cloned canvas, an animation with no duration,
+       and a fallback with neither the right origin nor the right size — and every one of them
+       looked identical: the cards simply vanished. */
     if(use3d()&&window.Board3D&&Board3D.available&&Board3D.completeHand)
-      handFrom=await Board3D.completeHand(slot,Tickets.perEpisode());
-    /* THE FALLBACK HAS TO SPEAK THE SAME LANGUAGE. completeHand hands back viewport coordinates
-       AND the card's world width; slotScreenPos returns board-scene coordinates and no size at
-       all, so whenever the 3D leg did not finish — a backgrounded tab, no WebGL — the card flew
-       from the wrong origin at a quarter of its size. Which looked exactly like it not flying.
-       Same frame, same fields, both ways. */
-    let from=handFrom;
-    if(!from&&window.Board3D&&Board3D.worldToViewport&&Board3D.slotWorldPos3){
-      const w=Board3D.slotWorldPos3(slot);
-      const p=w&&Board3D.worldToViewport(w);
-      if(p) from={x:p.x,y:p.y,worldW:0.66*0.95*2.6*Math.max(0.2,+cfg.handScale||1),aspect:0.94/0.66};
-    }
-    const face=(typeof CardArt!=="undefined"&&Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)])
-      ? CardArt.face(Shoe.JOKERS[Tickets.pageSlots().indexOf(slot)]) : null;
-    if(typeof flyCollectionToBinge==="function")
-      await flyCollectionToBinge(from,face?face.cloneNode?face.cloneNode(true):null:null);
+      await Board3D.completeHand(slot,Tickets.perEpisode());
   }catch(e){ console.error("collection celebration failed:",e); }
   finally{
     /* ALWAYS released. A pinned badge that never came back would under-report the queue for the

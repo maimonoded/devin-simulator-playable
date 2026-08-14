@@ -63,83 +63,10 @@ function rainFx(cls, glyph, n, big) {
 }
 function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
 function cardShower(){ rainFx("cardfx", "🃏", 16, true); }
-/* THE COLLECTION GOES INTO YOUR EPISODE LIST — the last beat of a completed collection.
-
-   A card flies from the placeholder it just filled into #bingeBtn, and the button's count only
-   moves when it lands. That ordering is the whole point: the card is what DELIVERS the episode,
-   so a number that ticked at award time would announce the arrival before it happened.
-
-   DOM rather than three.js, deliberately. The destination is a DOM button whose position depends
-   on the HUD's layout — projecting it back into the scene would mean guessing at a world point
-   that happens to land on it, and re-guessing on every resize. Flying a DOM card to a DOM rect is
-   exact by construction.
-
-   Resolves on a TIMER, and always: main.js awaits this before releasing the count, so a promise
-   that never settled would leave the badge pinned at its old value for the rest of the run. */
-function flyCollectionToBinge(from,face){
-  const btn=$("#bingeBtn");
-  const ms=Math.max(1,+cfg.bingeFlyMs||1);
-  if(!btn||!from) return sleep(ms);
-  /* VIEWPORT coordinates throughout, and position:fixed on <body>. `from` comes from
-     Board3D.worldToViewport and the destination from getBoundingClientRect, so both are in the
-     same frame. An earlier version mixed board-scene coords with .wrap's box and put the card
-     hundreds of pixels off screen. */
-  const b=btn.getBoundingClientRect();
-  const to={x:b.left+b.width/2, y:b.top+b.height/2};
-  const el=document.createElement("div");
-  el.className="bingeFly";
-  /* A CANVAS IS COPIED BY DRAWING IT, never by cloneNode: that clones the element and leaves the
-     bitmap behind, so the card flew as an empty transparent box. */
-  if(face&&face.width){
-    const c=document.createElement("canvas");
-    c.width=face.width; c.height=face.height;
-    c.getContext("2d").drawImage(face,0,0);
-    el.appendChild(c);
-  }
-  el.style.left=to.x+"px"; el.style.top=to.y+"px";
-  /* START AT THE SIZE THE 3D CARD ENDED AT, so the handoff is invisible and this reads as the
-     same card continuing rather than a new, smaller one appearing. Falls back to a sane width
-     only when the 3D leg could not measure itself (no WebGL). */
-  /* World units → pixels, measured off the live camera rather than assumed: project two points
-     one unit apart and take the gap. That is what makes the DOM card start at exactly the size
-     the 3D card ended at, so the handoff is invisible and this reads as the SAME card carrying
-     on rather than a new, smaller one appearing somewhere else. */
-  let px=45;
-  if(window.Board3D&&Board3D.worldToViewport){
-    const p0=Board3D.worldToViewport({x:0,y:1,z:0}), p1=Board3D.worldToViewport({x:1,y:1,z:0});
-    if(p0&&p1&&Math.abs(p1.x-p0.x)>1) px=Math.abs(p1.x-p0.x);
-  }
-  const w=Math.max(24,Math.round((from.worldW||1.6)*px)),
-        h=Math.round(w*(from.aspect||1.42));
-  el.style.width=w+"px";
-  el.style.marginLeft=(-w/2)+"px";
-  el.style.marginTop=(-h/2)+"px";
-  document.body.appendChild(el);
-
-  /* DRIVEN BY THE WEB ANIMATIONS API, not a CSS class. Three reasons, all of them things that
-     already went wrong here: a CSS `animation` shorthand with no duration silently resolves to
-     0s and the card just sits there; a malformed @keyframes block fails quietly and does the
-     same; and neither state is visible from JS, so both look exactly like "the animation never
-     ran". anim.finished is a real promise, and the keyframes are right here next to the numbers
-     that feed them.
-
-     Backstopped by a timer regardless: main.js awaits this before releasing the badge, and a
-     promise that never settled would pin the count for the rest of the run. */
-  const dx=from.x-to.x, dy=from.y-to.y;
-  let anim=null;
-  try{
-    anim=el.animate([
-      {transform:`translate(${dx}px,${dy}px) scale(1) rotate(0deg)`, opacity:1, offset:0},
-      {opacity:1, offset:0.75},
-      {transform:"translate(0,0) scale(.14) rotate(-14deg)", opacity:.2, offset:1},
-    ],{duration:ms, easing:"cubic-bezier(.4,0,.25,1)", fill:"forwards"});
-  }catch(e){ /* no WAAPI — the card still appears and is cleared by the timer below */ }
-  const done=()=>{ el.remove(); };
-  return Promise.race([
-    anim ? anim.finished.catch(()=>{}) : sleep(ms),
-    sleep(ms+400),
-  ]).then(done);
-}
+/* There is no DOM card flight any more. The completed collection is carried into the episode
+   button by the 3D card itself, inside the scene — see completeHand in js/ui/shoe3d.js. Four
+   silent failures lived in the DOM version and all of them read the same way on screen (the
+   cards vanish), which is the argument against crossing mediums for a single object. */
 
 /* A collection completed — the episode it bought, named, over the board while the hand of cards
    performs the unlock behind it. Title ONLY: the unlock modal that follows carries the choice, and
