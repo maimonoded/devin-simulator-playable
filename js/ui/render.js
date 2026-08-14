@@ -158,7 +158,12 @@ function renderBoardChrome(){
        pins it at the pre-award value and the flight releases it on landing.
        The BUTTON is shown live regardless: it has to be on screen to be flown at. */
     const shown=(_bingeHold!=null)?_bingeHold:queued;
-    binge.style.display=(queued||_bingeHold!=null)?"flex":"none";
+    /* ALWAYS ON SCREEN, including at zero. It used to hide when the queue was empty, which meant
+       the one control telling you what you are collecting toward only existed once you had
+       already collected it — and it left the completed-collection flight aiming at a button that
+       was not there. An empty state says "nothing waiting yet"; absence says nothing at all. */
+    binge.style.display="flex";
+    binge.classList.toggle("empty",shown<=0);
     $("#bingeCount").textContent=shown;
   }
   /* The library button only exists once there is something in the library. */

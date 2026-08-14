@@ -221,10 +221,10 @@ function openDebugMenu(){
    store, so all three paths say the same thing in the same order. */
 function announceTickets(r){
   if(!r) return;
-  r.titles.filter(Boolean).forEach(t=>{
-    toast(`🎬 Episode unlocked — <b>${t}</b>`);
-    log("🎬",`Episode unlocked · <b>${t}</b>`);
-  });
+  /* LOGGED, NOT TOASTED. The celebration already names the episode on the board — the banner in
+     showEpisodeReady — so a toast saying the same sentence puts it on screen twice, over the top
+     of the animation that was the point. The log keeps the record. */
+  r.titles.filter(Boolean).forEach(t=>log("🎬",`Episode unlocked · <b>${t}</b>`));
   if(r.banked) log("🎟",`<b>${r.banked}</b> ticket${r.banked>1?"s":""} banked — watch this row to spend them`);
   /* DEFERRED, not skipped — see _unlockOwed. */
   if(r.seriesDone){ _unlockOwed={finale:true}; return; }

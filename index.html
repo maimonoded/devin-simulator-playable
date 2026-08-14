@@ -43,10 +43,6 @@
       <div class="pill cardswrap"><span class="ic">🃏</span><div style="flex:1">
         <div class="v"><span id="hCards">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hCardCap">50</span></span></div>
         <div class="ebar"><div class="efill" id="hCfill"></div></div></div></div>
-      <!-- Episodes waiting to be watched. Last in the BALANCES row, not up with the brand: it is
-           a count of something you are holding, like the coins and cards beside it. It used to
-           float over the bottom-right of the board, aligned with nothing. Hidden when empty. -->
-      <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
     </div>
     <!-- Development only: fires presentation beats that normally need a whole collection to see.
          Sits next to the player button and is the obvious place to add go-to-jail, land-on-bonus
@@ -83,9 +79,12 @@
            scene reads as a game screen rather than a viewport with a toolbar under it. -->
       <!-- One row, evenly spaced: buy · PULL · album. -->
       <div class="playbar">
-        <!-- Buy a pack of cards. The deck is the game's clock, so when it runs dry this is the
-             one thing left to do — which is why it sits on the play row rather than only in
-             the store. Shows the curve's price for the next pack. -->
+        <!-- Episodes waiting to be watched, and the thing a collection is filled TOWARD — so it
+             sits on the play row with the other actions rather than up among the balances.
+             ALWAYS shown, dimmed at zero: it has to exist before there is anything in it, both so
+             the player knows what they are collecting for and so the completed-collection flight
+             has a target to fly at. -->
+        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
         <!-- Pull is also the auto-pull control: hold it to hand the loop over, tap again to stop. -->
         <button class="btn roll" id="rollBtn" title="Tap to pull · hold to auto-pull">🃏 Pull</button>
         <!-- Clue album. Badged while there are clues banked for the next prediction, since

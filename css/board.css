@@ -134,7 +134,7 @@ body.board3d .board{display:none}
    re-anchored onto the board itself, because in ?view=mobile it is the ONLY route back to a
    banked episode — the side panel's Predict & watch is not on screen there. Its offset used to
    exist purely to clear the deleted upgrade row. */
-.bingeBtn{display:none;align-items:center;gap:6px;flex:0 0 auto;
+.bingeBtn{display:flex;align-items:center;gap:6px;flex:0 0 auto;
           background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
           border-radius:999px;padding:8px 14px;font-size:15px;font-weight:800;
           box-shadow:0 4px 14px rgba(255,111,165,.35)}
@@ -198,3 +198,9 @@ body.board3d .board{display:none}
 /* Buy-a-deck while it is unaffordable. Dimmed, but deliberately NOT disabled: tapping it is how
    the player finds out how short they are. See renderBoardChrome() in js/ui/render.js. */
 .playbar .btn.navb.cant{opacity:.5}
+
+/* Nothing waiting yet. Still a button and still tappable — it explains what to do — but it must
+   not read as an alert when there is nothing to answer. */
+.bingeBtn.empty{ background:rgba(255,255,255,.07); color:var(--muted);
+                 box-shadow:none; border:1px solid rgba(255,255,255,.10) }
+.bingeBtn.empty .bingeCount{ background:rgba(0,0,0,.22) }
