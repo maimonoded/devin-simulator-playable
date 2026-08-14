@@ -46,9 +46,22 @@ import * as THREE from "three";
    Distances are in tiles, measured along the Start↔VIP diagonal from the board's centre:
    positive is UP-screen (toward VIP), negative is DOWN-screen (toward Start), and the deck is
    the one thing that sits below. Get that sign wrong and the row lands on top of the deck. */
-const DECK_AT = 1.75;            // the deck, below centre, nearest the player
+/* THE DECK AND THE PULLED CARD STAND SIDE BY SIDE, as a pair.
+
+   DECK_AT is the pair's DEPTH — how far down-screen from the board's centre both of them sit —
+   and PAIR_GAP is how far apart they are along the screen's horizontal. The deck takes the left
+   half of that gap and the discard the right, so the two straddle the same centre line the deck
+   used to sit on alone and the pair reads as centred rather than as one thing pushed aside.
+
+   Both anchors therefore share one depth: x + z = 2 * DECK_AT. That is what puts them level on
+   screen. Moving apart uses (1,−1)/√2, the axis the 45° camera renders as horizontal — the same
+   axis the episode row is laid out along. Increase (x − z) to go right.
+
+   The pulled card used to rest at the board's dead centre, and that is what freed the middle of
+   the board for the episode row to come down into. */
+const DECK_AT = 1.75;            // depth of the deck+card pair, below centre, nearest the player
+const PAIR_GAP = 1.15;           // deck ↔ pulled card, measured across the screen
 const DECK_SCALE = 1.15;
-const DISCARD_AT = 0;            // the pulled card rests dead centre — see _discardPos()
 /* HOW HIGH "ON THE TABLE" IS, and it is not zero. The board's surface is ENV_Y.deck = 0, and a
    card seated exactly there is swallowed by it — the floor wins, and a single card lying flat
    simply does not render. The discard has always known this and sat at 0.04; the DECK did not,
@@ -76,8 +89,13 @@ const HAND = { gap: 0.58, tilt: 0.16 };
 const HAND_PHONE = { gap: 0.40, tilt: 0.13 };
 /* The ticket row, per view. The 9:16 frame is far more zoomed in (cfg.camZoomPhone), so the
    same numbers walk the row over the board there — it needs to be shorter and tighter. */
-const ROW = { at: 0.45, gap: 0.95, height: 1.70 };
-const ROW_PHONE = { at: 1.05, gap: 0.78, height: 1.15 };
+/* Lowered and enlarged once the pulled card moved off the board's centre and in beside the deck:
+   the middle is free, so the collections can come down into it and be read properly. `at` is
+   measured UP-screen, so a smaller number sits lower. Four slots rather than five also bought
+   room to grow — the width of a slot is its height times the face's own aspect (about 0.50), so
+   `gap` has to stay ahead of `height * 0.50` or neighbours overlap. */
+const ROW = { at: -0.45, gap: 1.38, height: 2.55 };
+const ROW_PHONE = { at: 0.25, gap: 1.10, height: 1.90 };
 
 /* ---------------------------------------------------------------------------
    HOW TALL THE DECK LOOKS — the one thing in this file that is a READOUT rather than layout.
@@ -127,6 +145,7 @@ export const Shoe3D = {
       scene.add(this._deck);
       scene.add(this._slots);
       this._buildDeck();
+      this._buildGhost();
       /* The painted card art arrives after this runs. A texture built from a CardArt canvas can
          just be re-uploaded, but the PLACEHOLDER faces DRAW the joker into a canvas of their
          own, so they have to be rebuilt outright — invalidating the signature is what forces
@@ -157,7 +176,12 @@ export const Shoe3D = {
   failed() { return this._failed || !this._scene; },
 
   /* ---------------- the deck ---------------- */
-  _anchorPos() { return new THREE.Vector3(DECK_AT, TABLE_Y, DECK_AT); },
+  /* Half the gap, stepped along the screen-horizontal axis. Negative is left. */
+  _pairPos(side) {
+    const h = (PAIR_GAP / 2) * side * SQ2;
+    return new THREE.Vector3(DECK_AT + h, TABLE_Y, DECK_AT - h);
+  },
+  _anchorPos() { return this._pairPos(-1); },        // the deck, on the left
 
   /* How many cards are in the shoe, right now. Guarded because Board3D.init() — and therefore
      the first _buildDeck() — runs BEFORE boot() calls initState(), so there is no state.shoe to
@@ -474,7 +498,51 @@ export const Shoe3D = {
      The board's centre is the safest fixed point in the frame, and not by accident — it is
      exactly what cfg.camBias pulls the aim toward, so the more the camera follows the token the
      closer the centre sits to the middle of the view. */
-  _discardPos() { return new THREE.Vector3(DISCARD_AT, TABLE_Y, DISCARD_AT); },
+  _discardPos() { return this._pairPos(1); },        // the pulled card, on the right
+
+  /* THE EMPTY SLOT THE PULLED CARD LANDS IN.
+
+     A ghost outline, shown only while there is no card on it. Without it the pair is lopsided
+     before the first pull of a run — a deck sitting off to the left of nothing, which reads as a
+     mistake rather than as a deck waiting to deal. It is also what makes the card's arrival land
+     somewhere the eye already knows, instead of somewhere it has to find.
+
+     Drawn rather than modelled: a dashed rounded rect on a canvas, the same language the episode
+     placeholders use for a slot that has not been filled yet. */
+  _buildGhost() {
+    if (this._ghost || !this._scene) return;
+    const c = document.createElement("canvas");
+    c.width = 132; c.height = 188;
+    const x = c.getContext("2d");
+    this._roundRect(x, 6, 6, c.width - 12, c.height - 12, 14);
+    x.fillStyle = "rgba(12,16,40,.42)"; x.fill();
+    x.setLineDash([10, 8]); x.lineWidth = 6;
+    x.strokeStyle = "rgba(255,235,190,.72)"; x.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(CARD_W * CARD_SIZE, CARD_H * CARD_SIZE),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2;                       // lie flat on the table
+    m.position.copy(this._discardPos());
+    /* ABOVE the table height, not below it. Slipping it under a card so the card would cover it
+       put a zero-thickness plane at y≈0.034, and the board's own ground wins there — the same
+       swallowing that TABLE_Y exists to escape, and worse for a plane with no thickness at all.
+       It never fights a real card because the two are never visible at the same time. */
+    m.position.y += 0.010;
+    /* Yaw applied after the flat rotation, so it squares to the camera like the card that will
+       land on it. Order matters — rotation.set would undo the tilt. */
+    m.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(ENV_CAM.az));
+    this._scene.add(m);
+    this._ghost = m;
+  },
+  /* Visible exactly when the slot is empty. Called wherever _discard changes. */
+  _syncGhost() {
+    if (!this._ghost) return;
+    this._ghost.position.copy(this._discardPos());
+    this._ghost.position.y += 0.010;
+    this._ghost.visible = !this._discard;
+  },
 
   /* Pull a card, in TWO BEATS.
 
@@ -669,6 +737,7 @@ export const Shoe3D = {
          still what the player can see there. */
       if (this._discard && this._discard !== mesh) this._scene.remove(this._discard);
       this._discard = mesh;
+      this._syncGhost();
       this._stageCleared();
     };
     /* How a LATER pull puts this card away without waiting for it — see _clearStage(). */
@@ -967,6 +1036,7 @@ export const Shoe3D = {
   clearCard() {
     if (this._flying) { this._scene.remove(this._flying); this._flying = null; }
     if (this._discard) { this._scene.remove(this._discard); this._discard = null; }
+    this._syncGhost();
     this._stageCleared();
   },
   /* Draw-over-everything, or ordinary depth.
