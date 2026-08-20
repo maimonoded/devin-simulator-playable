@@ -23,6 +23,10 @@ declared in [`js/board-model.js`](../board-model.js):
 `tileType(i)` (in board-model.js) maps an index to its type name; `TILE_TYPES[name]` (registry in
 [tile.js](tile.js)) maps the name to its singleton tile object.
 
+The table above is the rule; **[../../TILES.md](../../TILES.md) is the roster** — all 40 indices
+one per row, with the art filename, the name the player sees, the coin value each standard tile
+prints, and which tiles still carry the placeholder model.
+
 **`deck` is a name collision, and a deliberate one.** The `deck` *tile type* is the Plot Twist
 card — six board squares with their own weighted table. The *deck* everywhere else in the game is
 the 50-card pack the player pulls from ([`js/shoe.js`](../shoe.js)). The two are unrelated. The
@@ -37,10 +41,10 @@ tuning-drawer values each type reads are noted per type.
 | Type | File | Icon | Behavior on landing | Tuning values used |
 |---|---|---|---|---|
 | **standard** | [standard-tile.js](standard-tile.js) | — | Pays the tile's printed coin value: `stdBase × stdWeights[i]`. Weights rise around the board (mean 1), so late tiles pay more. Also renders the printed value via `valueLabel(i)`. No interruption — just a floating number. | `stdBase` |
-| **train** | [train-tile.js](train-tile.js) | 🚗 | The board's **two-bonus** tile. Pays one of exactly two outcomes from the economy model — the small bonus, or the large one at `trainLargeChance` — and opens **that bonus's own mini-game** ([minigames/](../../minigames/README.md)). The coins are banked before the game opens; the game only presents them. The large bonus's three-rung ladder and its winning rung are also picked here (`Economy.trainLadder`) — the game reveals that result, it never rolls it. Falls back to the **Collect popup** when `bonusGames` is off or a game is missing. | `trainSmall`, `trainLarge`, `trainLargeChance`, `bonusGames`, `bonusLoadMs`, `bonusMaxMs`, `collectMinSec`, `collectMaxSec` |
+| **train** | [train-tile.js](train-tile.js) | ✈️ | The board's **two-bonus** tile. Pays one of exactly two outcomes from the economy model — the small bonus, or the large one at `trainLargeChance` — and opens **that bonus's own mini-game** ([minigames/](../../minigames/README.md)). The coins are banked before the game opens; the game only presents them. The large bonus's three-rung ladder and its winning rung are also picked here (`Economy.trainLadder`) — the game reveals that result, it never rolls it. Falls back to the **Collect popup** when `bonusGames` is off or a game is missing. | `trainSmall`, `trainLarge`, `trainLargeChance`, `bonusGames`, `bonusLoadMs`, `bonusMaxMs`, `collectMinSec`, `collectMaxSec` |
 | **deck** | [deck-tile.js](deck-tile.js) | 🃏 | The **Plot Twist** card (not the pull deck — see above). Draws a weighted card from the `twistDeck` table (editable in tuning) and **shows the card** for `deckCardMs`: coins (can be a negative fine), a ticket (the Backstage pass), clues, VIP-pool seed, or **Advance to Start** (walks the token to Start and pays the full Start landing bonus). A ticket card rains tickets over the card face. | the Plot Twist table, `deckCardMs`, `startPass`, `startLand`, `vipSeed`, `tokenStepMs` |
-| **spa** | [spa-tile.js](spa-tile.js) | 💆 | Deals `spaCards` free cards into the shoe, topped up toward `packSize`, and reveals it with the **card shower**. The grant is 1, and that is not `spaEnergy` renamed: energy was spent up to ten per roll so five was a small top-up, whereas a pull costs exactly one card and this corner comes round about every six pulls — a five-card grant would hand back most of the pull cost forever and the deck would stop being a budget. | `spaCards`, `packSize`, `revealMs` |
-| **vip** | [vip-tile.js](vip-tile.js) | 🌟 | Collects the entire VIP pool as coins — or shows the sad "Empty" reveal if the pool is dry. The pool is seeded by laps past Start, Start landings, and the Fine/Paparazzi card. | `vipRevealMs` |
+| **spa** | [spa-tile.js](spa-tile.js) | 💆 | **The grant is the card that landed on it** — its rank, 1..13 — which is why `card` is on the landing context at all. A joker has no rank (it moves nothing) so it pays `spaJokerCards`; a landing with no card pays `spaCards`, the old flat grant, kept because it is economy-owned. Deals through **`Shoe.dealExtra`**, uncapped: `dealFree` tops up only toward `packSize` and so paid **nothing** to a shoe already at the cap — the ordinary state right after buying a pack — while still announcing a card. Reveals with the **card shower**, and every number shown comes from `ev.dealt`, never from what was asked for. | `spaJokerCards`, `spaCards`, `revealMs` |
+| **vip** | [vip-tile.js](vip-tile.js) | 🌟 | Collects the entire VIP pool as coins — or shows the sad "Empty" reveal if the pool is dry. The pool is seeded by laps past Start, Start landings, and the Fine/Paparazzi card. A pay-out also **opens the treasure chest** behind this corner (the `chest` event), which is the only thing that ever opens it. | `vipRevealMs`, `chestOpenMs` |
 | **premiere** | [premiere-tile.js](premiere-tile.js) | 🎭 | Sweeps the token to Start at `premiereStepMs` per tile and pays the full Start landing bonus. | `premiereStepMs`, `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
 | **start** | [start-tile.js](start-tile.js) | ⭐ | Landing here pays `startPass + startLand`, seeds the VIP pool with `vipSeed`, and dwells `startRevealMs`. (Merely *passing* Start pays only `startPass` — that lap logic is in `applyPassStart()` in [`js/game.js`](../game.js), because it isn't a landing.) | `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
 
@@ -82,6 +86,7 @@ played in this fixed order by `playEvents()`:
 | `card: {name, big, positive, shower}` | **blocking** drawn Plot Twist card, flipped onto the board centre and held `cfg.deckCardMs` (default 2000) |
 | `reveal: {big, sub, positive, shower, ms}` | **blocking** center-of-board reveal, held `ms` or `cfg.revealMs` (default 1500). `positive` → confetti + pop animation; otherwise the 😢 sad droop |
 | `collect: {big, sub}` | **blocking** popup with a Collect button; waits for the click, or auto-closes after a random `cfg.collectMinSec`–`cfg.collectMaxSec` (default 10–20s). Clicking the backdrop also collects |
+| `chest: {ms}` | opens the VIP treasure chest standing behind the VIP corner for `ms`, lighting the coins inside. **Not blocking and not awaited** — it plays under the popup announcing the same coins. Emitted only by [vip-tile.js](vip-tile.js), and only when the pool actually paid: the open model is heaped with gold, so opening it on a dry pool would show coins that were never handed over. Ignored on the legacy DOM board |
 | `clue: {names, count}` | **blocking** clue sheet, naming what was found. Mounted inside the board scene rather than over the page, and auto-closes after `cfg.clueCollectMs`. The mystery box is its only source today |
 | `minigame: {game, amount, outcome, label, big, sub}` | **blocking** full-frame bonus game, opened over the board in an iframe and resolved when the player collects. `amount` is coins **already paid** — the game presents it and never decides it. Degrades to `collect` when `cfg.bonusGames` is 0 or `game` is unregistered. → [minigames/README.md](../../minigames/README.md) |
 | `pause: ms` | wait before the next event |
@@ -144,7 +149,7 @@ Shared helpers subclasses should call instead of reimplementing:
 | Helper | Does |
 |---|---|
 | `gainCoins(amount, text?, color?)` | adds coins, returns the float event |
-| `gainCards(n, text?)` | deals `n` free cards into the shoe via `Shoe.dealFree`, returns the float event. Tops up **toward** `cfg.packSize` and never reduces a shoe already above it — a bought pack merges onto whatever was left, so being over the cap is the ordinary state of affairs and a plain `Math.min` clamp would delete purchases. The float reports what was actually dealt, which can be fewer than asked for |
+| `gainCards(n, text?, opts?)` | deals `n` free cards into the shoe via `Shoe.dealFree`, returns the float event **with the count actually dealt on `ev.dealt`** — report that, never `n`, or a full shoe gets told about cards it did not receive. `opts.uncapped` routes to `Shoe.dealExtra` instead, for a grant that must always pay (the Spa). Tops up **toward** `cfg.packSize` and never reduces a shoe already above it — a bought pack merges onto whatever was left, so being over the cap is the ordinary state of affairs and a plain `Math.min` clamp would delete purchases. The float reports what was actually dealt, which can be fewer than asked for |
 | `gainTickets(n, text?)` | awards tickets through `Tickets.award`, returns the float event **with `ticketAward` attached**. Always go through this: the Plot Twist card, the mystery box and the store all fill placeholders by exactly one rule, and three paths that priced their own would eventually disagree about when an episode unlocks |
 | `gainClues(n, text?)` | adds clues to both counters — the lifetime album total and the per-prediction flow that buys accuracy — and returns the float event |
 | `reveal(big, sub, opts)` | builds the blocking center-reveal event. `opts = {positive, shower, ms}` |
@@ -210,10 +215,12 @@ Sizes and what changes when art is present are documented in
 ## Note on persistence
 
 Tuning values and player progress are saved to `localStorage` by
-[`js/storage.js`](../storage.js) (slots `pmdrama.cfg.v2` / `pmdrama.state.v2`), so a tile type's
-tuning changes survive a reload. Each slot also refuses a payload whose own `v` isn't 2 — a new
-slot name alone is not enough, because `loadState`'s copy loop would happily half-restore an older
-save's overlapping fields and throw nothing while doing it. If you add a tile type that needs
+[`js/storage.js`](../storage.js), which keeps three independent slots — `pmdrama.econ.v3` (the
+imported economy model), `pmdrama.cfg.v3` (tuning) and `pmdrama.state.v3` (run progress) — so a
+tile type's tuning changes survive a reload. Each slot also refuses a payload whose own `v` isn't
+`SLOT_V` (currently 4, and deliberately not tied to the number in the slot name) — a new slot name
+alone is not enough, because `loadState`'s copy loop would happily half-restore an older save's
+overlapping fields and throw nothing while doing it. If you add a tile type that needs
 **new tuning values**, add them to `DEFAULTS` in [`js/config.js`](../config.js) — `loadConfig()`
 merges saved values onto `DEFAULTS`, so existing saves pick up the new key's default automatically
 instead of breaking. If a tile needs to persist **new player state**, add the field to

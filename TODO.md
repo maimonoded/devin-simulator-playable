@@ -300,6 +300,6 @@ Until then the built-in model and the importable model are deliberately differen
 them from `ECONOMY_DEFAULT`.
 
 ### No server — the browser is the database
-An imported model lives only in `localStorage` (`pmdrama.econ.v2`), so it is per-browser and
+An imported model lives only in `localStorage` (`pmdrama.econ.v3`), so it is per-browser and
 per-machine, and clearing site data loses it. The slot keeps the version string and the source
 filename so at least it is identifiable. Revisit when there is a backend.

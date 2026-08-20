@@ -178,6 +178,28 @@ const Shoe = {
     return take;
   },
 
+  /* n cards with NO CAP — the Spa's grant, and the only other thing besides buyPack() that may
+     take the shoe past cfg.packSize.
+
+     dealFree() tops up TOWARD the cap, which means it deals NOTHING to a shoe already at it —
+     the ordinary state right after a purchase, since a bought pack merges onto the leftovers.
+     That is right for a regen tick (the cap is the free allowance) and wrong for a reward the
+     player just landed on: a corner that silently pays nothing two thirds of the time is a
+     corner that lies. So the two are separate methods rather than a flag, and the cap rule is
+     stated at each one.
+
+     Still dealt off state.packTail, exactly like dealFree — the tickets-per-pack invariant is
+     the one thing that must not care where a card came from. Nothing here mints loose cards. */
+  dealExtra(n){
+    const want=Math.max(0,Math.floor(n||0));
+    for(let k=0;k<want;k++){
+      if(!state.packTail.length) state.packTail=this.mintPack();
+      state.shoe.push(state.packTail.shift());
+    }
+    if(want) state.shoe=shuffle(state.shoe);
+    return want;
+  },
+
   /* Buy one pack. MERGES onto whatever is left and reshuffles the whole shoe — never assigns,
      never clamps. A ticket still sitting in the remainder is therefore never destroyed by
      buying, which is the whole reason this merges rather than replaces.

@@ -53,6 +53,64 @@ const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neigh
    restores it, so it follows on its own — but only because all three agree. */
 const BOX_Y = TILE_H;
 
+/* ---- the VIP treasure chest ----
+   The VIP Lounge is the board's only POOL, and until now the only place you could see it was
+   the HUD. This is that number, standing in the world.
+
+   IT IS NOT ON THE TILE. It sits OUTSIDE the ring, past the VIP corner on the outward diagonal,
+   where it neither shares tile 20's square with the token nor competes with that tile's own art
+   — and where, in the shipped texas-town world, it stands among the trees.
+
+   That position is also why it is allowed to be BIG. envMaxTop() in js/env-model.js caps a
+   piece by how much board it could hide, and tile 20 is the diamond's FAR vertex: there is no
+   board behind it at all, so the only ceiling is the frame's (ENV_Y.deck + 3.0). Every other
+   piece of art on this board is fighting a 0.2-tile budget; this one is not.
+
+   Board-relative rather than an entry in assets/env/scene.js, for one reason: env pieces are
+   static scenery that Env3D places and forgets, and this one has to follow state.vip. Added to
+   the scene root so it survives a world switch. NOTE the consequence — in the harbour world
+   that spot is open water and the chest will stand on it. cfg.chest turns it off. */
+const CHEST_MODEL = "assets/props/models/treasure-chest.glb";
+const CHEST_MODEL_OPEN = "assets/props/models/treasure-chest-open.glb";
+/* Tile units, largest dimension. Measured on the board rather than chosen. It went 1.8 → 2.5 to
+   read past the storefronts, and then to 0.83 — a third of that — once it was seen at the size
+   it actually renders: 2.5 made a chest taller than the buildings behind it, which reads as a
+   set piece rather than as the Lounge's takings. A third of a tile is a prop again. */
+const CHEST_SIZE = 0.83;
+/* World (x,z), on the outward diagonal past tile 20 (which sits at (-5,-5), the ring's edge
+   being -5.5).
+
+   6.05 IS MEASURED, NOT ROUNDED. It has to clear the plinth (±6.0) so the chest is not standing
+   on the board's own lip, and it has to stay INSIDE the town — at 6.6 the chest sat behind the
+   texas-town storefronts and was invisible from the camera, which is the whole failure this
+   position exists to avoid. Just outside the plinth is the one band that is both off the board
+   and in front of the buildings.
+
+   Framing: envVisible() guarantees |x+z| <= 11·cfg.envMargin, which is 12.1 against 18.7 at the
+   shipped margin of 1.7. Note this corner is only ON SCREEN when the camera is near it — the
+   camera follows the token, so with the token at Start the far vertex (tile 20 included) is
+   above the top of the frame. The chest is a landmark you arrive at, not a permanent fixture.
+
+   ON THE DIAGONAL, AND THAT WAS RE-LEARNED THE HARD WAY. Moving it along the ring to get it out
+   of the token's screen column (-7.0,-5.1) put it straight behind the town's woodwork — the
+   corner diagonal is the ONE clear lane between the board's lip and the buildings, which is why
+   the distance above is so tight. It shares a screen column with the token but sits ABOVE it,
+   not behind it: chest base at y 76, token at y 108, so they stack rather than overlap. */
+const CHEST_AT = [-6.05, -6.05];
+/* Turned to face the camera, not the +Z the tile loader assumes: a chest read from behind is a
+   brown box, and this one's lid is a barrel, so the two ends read as blank arches.
+
+   THE TWO MODELS NEED DIFFERENT YAWS, AND THAT IS NOT A MISTAKE. normalize_tile.py squares each
+   model's floor to the axes, and squaring is modulo 90° — which quadrant a given model lands in
+   is arbitrary. These two were squared by 60.5° and 55.5°, and came out a quarter-turn apart:
+   the shut chest shows its clasp at 90°, the open one shows its coins at 0. Measured by
+   rendering four clones of each at 0/90/180/270 and looking, which is the only way to know.
+   Re-generate either model and this has to be re-measured. */
+const CHEST_YAW = { _chestShut: Math.PI / 2, _chestOpen: 0 };
+/* Its base sits on the deck — ENV_Y.deck, the underside of the tiles and the top of the island,
+   which is 0. Written as a name rather than a bare 0 so it moves if the datum ever does. */
+const CHEST_Y = 0;
+
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
   standard: 0x232a63,
@@ -375,6 +433,7 @@ const Board3D = {
 
     this._buildToken();
     this._loadBoxModel();
+    this._loadChest();
     this.setTokenTile(state.pos, true);
   },
 
@@ -753,6 +812,110 @@ const Board3D = {
     });
   },
 
+  /* ---------------- the VIP treasure chest ----------------
+
+     TWO MODELS, NOT AN ANIMATION. Image-to-3D returns one fused mesh with no separate lid node,
+     so a generated chest physically cannot hinge — the shut one and the open one are two files
+     and opening is a swap. That is the same idiom the mystery box already uses for its plum and
+     gold variants: the file IS the state. The swap is covered by the light coming up inside it,
+     which is what the eye actually follows.
+
+     Optional like every other prop: no file, no chest, and nothing else changes. */
+  _loadChest() {
+    if (!cfg.chest) return;
+    this._loadOneChest(CHEST_MODEL, "_chestShut");
+    this._loadOneChest(CHEST_MODEL_OPEN, "_chestOpen");
+  },
+  _loadOneChest(url, slot) {
+    if (this[slot]) return;
+    if (!this._gltf) this._gltf = new GLTFLoader();
+    this._gltf.load(url, (gltf) => {
+      const model = gltf.scene;
+      /* Real vertices, not cached per-geometry boxes — the same trap the tile and box loaders
+         document: the box OF a rotated box reads high and renders the prop small. */
+      const size = new THREE.Box3().setFromObject(model, true).getSize(new THREE.Vector3());
+      model.scale.setScalar(CHEST_SIZE / (Math.max(size.x, size.y, size.z) || 1));
+      /* Stamped so the open-pop can MULTIPLY it rather than assign an absolute scale — the same
+         rule the thrown mystery box lives under, and for the same reason: an absolute scale
+         silently re-sizes the model and a pop killed mid-flight strands it at the wrong size. */
+      model.userData.restScale = model.scale.x;
+      model.position.set(CHEST_AT[0], CHEST_Y, CHEST_AT[1]);
+      model.rotation.y = CHEST_YAW[slot] || 0;
+      /* The open one waits in the scene rather than being added on demand: a GLTF that first
+         appears mid-flourish would pop in a frame late, and the whole beat is under a second. */
+      model.visible = (slot === "_chestShut");
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = !!cfg.envShadows;
+        if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
+      });
+      this[slot] = model;
+      this._scene.add(model);
+    }, undefined, (e) => {
+      console.warn(`Board3D: treasure chest ${url} failed to load`, e);
+    });
+  },
+
+  /* Open the chest for ms. Called from playEvents when the VIP Lounge pays out — see
+     js/tiles/vip-tile.js, which is the only caller and explains why it is the only one.
+
+     PUSHED, NOT POLLED, and that is the fix for a real failure: this used to watch state.vip and
+     open on any change, so it fired about ten times a pack — nine of them while the token, and
+     therefore the camera, was somewhere else entirely and the far corner was off the top of the
+     frame. It played correctly and nobody ever saw it. Now it plays once, at the one moment the
+     player is standing at this corner looking at it.
+
+     Never blocking: the caller does not await it, and nothing in the pull loop waits. */
+  openChest(ms) {
+    this._chestFrom = performance.now();
+    this._chestUntil = this._chestFrom + Math.max(120, +ms || 0);
+  },
+
+  /* One frame of the chest. Renders whatever openChest() last asked for and OWNS NO STATE — it
+     never reads or writes the pool. A prop that moved coins from outside the event list is the
+     one thing that could desync the economy from what the player was shown (the rule NPC3D
+     lives under too). */
+  _tickChest(t) {
+    const shut = this._chestShut, open = this._chestOpen;
+    if (!shut || !open) return;
+    const isOpen = t < (this._chestUntil || 0);
+    shut.visible = !isOpen;
+    open.visible = isOpen;
+    if (!isOpen) {
+      if (this._chestLight) this._chestLight.intensity = 0;
+      /* Put the size back, always — a pop interrupted by a reload or a second payout must not
+         strand the chest swollen for the rest of the run. */
+      const rest = +open.userData.restScale || open.scale.x;
+      if (open.scale.x !== rest) open.scale.setScalar(rest);
+      return;
+    }
+    /* The coins lighting up. A point light just inside the mouth rather than an emissive on the
+       mesh, because the coins are not a separate material to brighten — the model is one baked
+       texture, so the light is the only handle on "the gold, specifically". */
+    if (!this._chestLight) {
+      /* Radius in WORLD units, not tile-size-derived: the chest is a third of a tile, and a
+         light with a 1.8-unit reach around it lit almost nothing. This one has to spill onto
+         the ground so the corner itself brightens — that spill is most of what is visible at
+         this size. */
+      this._chestLight = new THREE.PointLight(0xffc257, 0, 6, 2);
+      this._chestLight.position.set(CHEST_AT[0], CHEST_Y + CHEST_SIZE * 0.6, CHEST_AT[1]);
+      this._scene.add(this._chestLight);
+    }
+    /* Up fast, down slow, so it reads as catching the light rather than blinking. */
+    const span = Math.max(120, this._chestUntil - (this._chestFrom || 0));
+    const k = Math.min(1, Math.max(0, (t - (this._chestFrom || 0)) / span));
+    const ease = Math.sin(k * Math.PI) ** 0.6;
+    this._chestLight.intensity = Math.max(0, +cfg.chestGlow || 0) * ease;
+    /* AND IT SWELLS. This is the part that makes the beat legible at all: measured on the real
+       board, the chest renders 35px tall, so a lid tilting back is a ~10px change at the top
+       edge of the frame — correct, and invisible. Motion is what the eye catches (the same
+       finding as the gold box's turn-and-bob), so the open model grows on the way in and
+       settles back. A MULTIPLIER on restScale, never an absolute — see the stamp in
+       _loadOneChest. */
+    const rest = +open.userData.restScale || open.scale.x;
+    open.scale.setScalar(rest * (1 + (Math.max(1, +cfg.chestOpenScale || 1) - 1) * ease));
+  },
+
   /* ---------------- the box throw ----------------
      Pull the camera out, rain the boxes onto their tiles, put the camera back. Returns a promise
      that resolves when the whole thing is done, so the caller can await it before handing the
@@ -1091,6 +1254,7 @@ const Board3D = {
        in the same frame it was asked for rather than one late. */
     this._stepAnims(1000 / 60);
     this._tickBoxes(performance.now());
+    this._tickChest(performance.now());
     /* The cast keeps walking through a box throw, unlike the boxes' own idle tick: nothing here
        shares an object with the board's tweens, and a world that freezes whenever something else
        is happening reads worse than one that carries on. */

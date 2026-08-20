@@ -20,6 +20,10 @@ async function playEvents(events){
        box), so the announcement rides along with it rather than being fired by a button. */
     if(ev.ticketAward){ renderHUD(); announceTickets(ev.ticketAward); }
     if(ev.card){ renderHUD(); await showCard(ev.card); }
+    /* Before the reveal, and NOT awaited: the chest opening plays under the popup rather than
+       queueing behind it. It is scenery out on the board, so a turn must never wait for it. */
+    if(ev.chest && use3d() && window.Board3D && Board3D.available && Board3D.openChest)
+      Board3D.openChest(ev.chest.ms);
     if(ev.reveal){ renderHUD(); await showReveal(ev.reveal); }
     if(ev.collect){ renderHUD(); await showCollect(ev.collect); }
     if(ev.clue){ renderHUD(); await showClue(ev.clue); }
@@ -55,6 +59,12 @@ async function pull(){
          keyboard and would otherwise spend every one of them building forty divs. */
       if(autoMode!=="session" && typeof confetti==="function") confetti();
       log("🎟","Pulled a <b>ticket</b>");
+      /* PIN THE BADGE BEFORE THE AWARD, not after it. ticketPullEvents() fills the placeholder
+         AND calls renderAll() by way of dropBoxes(), so by the time the celebration got around
+         to pinning, the button had already flashed its new number — announcing the arrival a
+         second before the card that is supposed to deliver it even sets off. Released in the
+         finally below, so a ticket that completes nothing unpins on its way out. */
+      holdBingeCount(bingeCount());
       const tev=ticketPullEvents(card);
       await playEvents(tev);
       /* The award rides on the event list already (js/tiles/README.md, `ticketAward`), so it is
@@ -97,12 +107,17 @@ async function pull(){
       const pass=applyPassStart(1);
       floatToken("+"+fmt(pass),"var(--gold)"); log("⭐",`Passed Start · +<b>${fmt(pass)}</b> coins`);
     }
-    await playEvents(resolveLandingEvents(1));
+    await playEvents(resolveLandingEvents(1,card));
   }catch(e){
     console.error("pull failed:",e);
     log("⚠️","<b>Something went wrong mid-pull</b> — board recovered.");
     clearOverlayFx();
   }finally{
+    /* BEFORE the render below, or the turn ends on the pinned number. A ticket that filled a
+       placeholder without completing it never reaches celebrateCollection, so this is the only
+       thing that unpins it — and a badge stuck at its old value would under-report the library
+       for the rest of the run. Harmless when nothing was pinned. */
+    releaseBingeCount();
     state.animating=false; renderAll();
     /* UNCONDITIONAL: an error path still owes the prompt, and swallowing it would leave an
        unlocked episode with nothing ever offering it. */
@@ -155,10 +170,11 @@ function flushUnlockOwed(){
 async function celebrateCollection(slot){
   if(autoMode==="session") return;
   const id=Tickets.idAt(slot), title=id?Episodes.titleOf(id):null;
-  /* PIN THE COUNT for the whole beat. The episode went into state.epQueue when the ticket
-     landed, so without this the button would already read its new number while the card that
-     delivers it is still on the board — announcing the arrival before it happens. */
-  holdBingeCount(Math.max(0,state.epQueue.length-1));
+  /* THE PIN IS NORMALLY ALREADY IN PLACE — pull() sets it before the award, which is the only
+     point early enough to stop the badge flashing its new number. This is the fallback for any
+     other caller: the placeholder is full by now, so the pre-award value is one less, and one
+     completed collection unlocks exactly one episode. */
+  if(bingeHeld()==null) holdBingeCount(Math.max(0,bingeCount()-1));
   renderAll();
   if(typeof cardShower==="function") cardShower();
   if(title&&typeof showEpisodeReady==="function") showEpisodeReady(title);
@@ -198,7 +214,43 @@ const DEBUG_ACTIONS=[
       const k=Tickets.pageSlots().indexOf(slot);
       await pullJoker(Shoe.JOKERS[k%Shoe.JOKERS.length]);
     } },
+  /* Hands the intro back and runs it, without touching anything else in the save — the way to
+     iterate on it that does not cost a reload or a Reset user. */
+  { label:"🎓 Replay intro (FTUE)", run:()=>Ftue.replay() },
+  /* ---- go to a corner ----
+     Walking tools, not landing tools: they move the token and stop. THEY DELIBERATELY DO NOT
+     RESOLVE THE LANDING, which is the opposite of every other entry in this menu and is the
+     whole reason they are useful.
+
+     The camera follows the token, so a corner is only in frame once the token is near it — the
+     far half of the board, tile 20 included, sits above the top of the frame while you stand on
+     Start. These exist to go and LOOK at a corner: its art, and the treasure chest standing
+     behind the VIP Lounge.
+
+     Resolving the landing would defeat exactly that. Landing on the VIP Lounge empties the pool
+     you went to look at; the Spa deals cards and changes the shoe; and the Premiere sweeps the
+     token straight back to Start, so "go to the Premiere" would end up somewhere else. Pull is
+     how you land on things. */
+  ...[["🏁 Go to Start",0,"Start"],["💆 Go to the Spa",10,"Spa Day"],
+      ["🌟 Go to the VIP Lounge",20,"the VIP Lounge"],["🎭 Go to the Premiere",30,"the Premiere"]]
+    .map(([label,to,name])=>({ label, run:()=>walkTo(to,name) })),
 ];
+/* Walk the token to a tile, clockwise, at the normal step pace — the same one-tile-at-a-time
+   loop pull() uses, so it looks like a move rather than a teleport. Mutates state.pos as it
+   goes (a jump that left state.pos behind would strand the token on the next render) and pays
+   nothing on the way: no pass-Start bonus, because nothing was pulled. Already there = a lap. */
+async function walkTo(to,name){
+  if(state.animating) return;
+  state.animating=true; renderAll();
+  try{
+    const path=[]; const dist=(to-state.pos+40)%40||40;
+    for(let s=0;s<dist;s++) path.push((state.pos+1+s)%40);
+    for(const p of path){ state.pos=p; positionToken(); await sleep(cfg.tokenStepMs); }
+    /* The name is passed in rather than read off the tile: a tile HAS no name, only a type
+       (see TILES.md), and reaching for the class name gets you "Vip". */
+    log("🐞",`Walked to <b>${name}</b> · tile ${to} — nothing resolved`);
+  } finally { state.animating=false; renderAll(); }
+}
 /* Put a specific card on the front of the shoe and pull it, so a debug beat goes through the
    REAL path — same award, same animation, same ordering — rather than a parallel one that can
    drift from it. */
@@ -434,10 +486,14 @@ function dropBoxes(n){
     OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))),spawned,
     Board3D.cardWorldPos&&Board3D.cardWorldPos());
 }
-/* Straight into the prediction for the earliest unwatched episode — same ordering rule the
-   library enforces, so the two entry points can never disagree about what plays next. */
-$("#bingeBtn").onclick=()=>openPrediction(Tickets.firstUnwatchedId());
-$("#libraryBtn").onclick=()=>openLibrary();
+/* THE ONE DOOR TO THE EPISODES. It opens the LIBRARY rather than going straight into the
+   prediction: the library is the whole list — what is unlocked, what is waiting, what can be
+   rewatched — and it carries a Watch button that starts the same flow this button used to start
+   directly. The top-left library button is gone; two controls onto one list is two places for
+   the rules about what plays next to drift apart, and this is also the button the completed
+   collection flies into, so it is the one the player already associates with episodes. */
+$("#bingeBtn").onclick=()=>openLibrary();
+$("#ftueSkip").onclick=()=>Ftue.skip();
 $("#albumBtn").onclick=()=>openAlbum();
 $("#avatarBtn").onclick=()=>openProfile();
 $("#debugBtn").onclick=openDebugMenu;
@@ -496,6 +552,13 @@ function boot(){
   if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.pulls} pulls so far.`);
   else log("✨","Welcome to <b>Harbour Heights</b>. Pull to move, collect tickets, predict to win.");
   if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
+  /* LAST, and after renderAll(): the intro is scripted against a board that already exists, and
+     the first thing it does is point at controls that have to be on screen to be pointed at.
+     It decides for itself whether to run — see Ftue.wanted() and the ?ftue switch. */
+  /* typeof, not window.Ftue: js/ui/ftue.js declares it with const, and a top-level const is a
+     lexical global that never becomes a property of window. The window check read as false and
+     the intro silently never ran. */
+  if(typeof Ftue!=="undefined") Ftue.maybeStart();
 }
 window.boot=boot;
 /* Safety net: if the module never runs (blocked, 404, or opened from file://), boot anyway

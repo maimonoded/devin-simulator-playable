@@ -29,6 +29,15 @@ const DEFAULTS={
   /* How long Pull has to be held before it hands the loop to auto-pull. Long enough that a
      slow tap never trips it, short enough not to feel stuck. */
   autoRollHoldMs:1000,
+  /* The first-time flow (js/ui/ftue.js). ftueSplashMs is the only beat that advances on a timer
+     — every other screen waits for a tap, because an intro that moves on by itself is an intro
+     the player is reading behind. ftueWinCoins is the scripted first win, and it is deliberately
+     NOT priced off the wager model: there is no wager in the intro, the number is a gift, and
+     tying it to odds would make the one guaranteed win in the game drift with a balance change. */
+  ftueSplashMs:1800, ftueFadeMs:280, ftueWinCoins:500,
+  /* Zara's bubble over an episode gets out of the way once it has been read — it is a line of
+     setup, not a caption, and the whole point of the screen behind it is the episode. */
+  ftueBubbleMs:5000,
   tileArtScale:1.41, tileArtLift:20,
   board3d:1,                 /* 1 = WebGL board (js/ui/board3d.js), 0 = the old CSS-3D board */
   /* Environment (js/ui/env3d.js). envMargin is how much wider than the ring the camera
@@ -131,11 +140,18 @@ const DEFAULTS={
      Nothing pays a player from it — it is the number the economy model is checked against,
      which is why it is not in the drawer. */
   stdBase:40, trainSmall:60, trainLarge:315, trainLargeChance:0.35, trainEV:149.25,
-  /* spaCards is re-derived, NOT the old spaEnergy:5 renamed. Energy was spent at up to 10 per
-     roll, so 5 was a small top-up; a pull costs exactly one card and the Spa corner comes round
-     roughly every six pulls, so granting 5 would return most of the pull cost forever and the
-     deck would stop being a budget at all. */
-  startPass:100, startLand:100, spaCards:1, vipSeed:60,
+  /* THE SPA'S GRANT IS THE CARD THAT LANDED ON IT — its rank, 1..13 (js/tiles/spa-tile.js).
+     These two are the cases a rank cannot cover:
+       spaJokerCards — a joker has no rank (it moves nothing, so Shoe.rank is 0), and a corner
+                       that grants zero is not a corner.
+       spaCards      — the fallback when the landing carries no card at all. This is the old
+                       flat grant, kept at its old value and its old meaning: it is
+                       economy-owned (Economy.OWNED_CFG_KEYS) and imported from the workbook,
+                       so redefining it would silently change what an imported model means.
+     Note the corner pays ~1 landing in 40, not "every six pulls" — that was the rate the token
+     PASSES it, and the old comment here reasoned from the wrong one. At rank-sized grants a
+     pack is worth about 75 pulls instead of 64; cfg.cardRegenMin is the knob that answers it. */
+  startPass:100, startLand:100, spaCards:1, spaJokerCards:15, vipSeed:60,
   boardScale:1,
   /* Episode shape. The COST CURVE is not here — it is segmented and lives in js/economy.js,
      because no single formula holds for a whole run. `episodesInSeries` is the current series'
@@ -190,6 +206,15 @@ const DEFAULTS={
      bigger, self-lit, wrapped in a glow, and — the part that actually catches the eye — moving.
      boxGoldGlow 0 turns the halo off, boxGoldSpinMs is one full turn. */
   boxGoldScale:1.22, boxGoldGlow:0.7, boxGoldEmissive:0.45, boxGoldSpinMs:4200, boxGoldBob:0.09,
+  /* The VIP treasure chest standing outside the ring past the VIP corner (js/ui/board3d.js).
+     It opens, lights the coins inside and shuts again when the VIP Lounge PAYS OUT, and at no
+     other time — the pool is also seeded about ten times a pack, but always with the token (and
+     so the camera) elsewhere, so those openings played to nobody. chestOpenMs runs a little
+     past cfg.vipRevealMs on purpose: the chest is behind the popup that announces the same
+     coins, so it has to still be open when the popup clears. Non-blocking; nothing waits for
+     it. chest:0 removes it, which is also the switch for the harbour world, where that spot is
+     open water. */
+  chest:1, chestOpenMs:2200, chestGlow:2.6, chestOpenScale:2.2,
   /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
      gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
      this long if the player doesn't tap Collect. */
@@ -264,6 +289,11 @@ const TUNING=[
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
    ["startRevealMs","Start: dwell on tile (ms)",50]]},
+ {group:"First-time flow (FTUE)",items:[
+   ["ftueSplashMs","Splash: hold before the host (ms)",100],
+   ["ftueFadeMs","Screen cross-fade (ms)",20],
+   ["ftueWinCoins","Scripted first win (coins)",50],
+   ["ftueBubbleMs","Host bubble over video: hide after (ms)",250]]},
  {group:"Tile values (base coins)",items:[
    ["stdBase","Standard base coins (avg)",1],
    /* The train's two outcomes, straight from the model. cfg.trainEV is derived from them
@@ -271,7 +301,8 @@ const TUNING=[
    ["trainSmall","Train: small bonus",5],["trainLarge","Train: large bonus",5],
    ["trainLargeChance","Train: chance of the large bonus",0.05],
    ["startPass","Start pass bonus",10],["startLand","Start landing extra",10],
-   ["spaCards","Spa Day card grant",1],["vipSeed","VIP seed per lap",5],
+   ["spaCards","Spa Day grant (no card)",1],["spaJokerCards","Spa Day grant on a joker",1],
+   ["vipSeed","VIP seed per lap",5],
    ["boardScale","Board scale",0.1],
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],
@@ -290,6 +321,11 @@ const TUNING=[
    ["boxOpenScale","Size it reaches (x board size)",0.25],
    ["boxSpoilsMs","3 · Winnings held on screen (ms)",50],
    ["boxCluePopupMs","4 · Clue sheet, after the winnings (ms)",50]]},
+ {group:"VIP treasure chest",items:[
+   ["chest","Show the chest (0/1)",1],
+   ["chestOpenMs","Open + glow + shut (ms)",100],
+   ["chestGlow","Coin glow brightness",0.1],
+   ["chestOpenScale","Swell while open (x rest size)",0.1]]},
  {group:"Gold (clue) box",items:[
    ["boxGoldScale","Size vs a plain box (x)",0.02],
    ["boxGoldEmissive","Self-lit glow on the model",0.05],

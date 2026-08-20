@@ -113,6 +113,5 @@ html.viewMobile {
 }
 html.viewMobile .playbar { bottom: calc(14px + var(--safeB)); }
 /* .bingeBtn is a HUD chip now — it rides along with the HUD into the board scene,
-   so it no longer needs a bottom offset of its own here. */
-/* Library clears the HUD strip, level with Back and the Store button. */
-html.viewMobile .libBtn { top: calc(74px + var(--safeT)); width: 44px; height: 44px; font-size: 19px; }
+   so it no longer needs a bottom offset of its own here. It is also the only route into the
+   library now, which is why it is never hidden — see renderBoardChrome(). */

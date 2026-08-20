@@ -106,6 +106,24 @@ const Tickets={
       if(this.watchableAt(i)&&!this.isWatched(i)) return this.idAt(i);
     return null;
   },
+  /* HOW MANY COULD BE WATCHED BACK TO BACK, starting now. Deliberately NOT the 🎬 badge's number,
+     which counts everything waiting: with four collections filling in parallel the player
+     routinely holds a complete episode 3 while 2 is still being collected, and 3 cannot be
+     started — offering to binge it would be a promise the ordering gate then breaks.
+
+     So: walk the row and stop at the first placeholder that is not full, because nothing past it
+     is reachable however complete it looks. The watched ones on the way are simply not counted.
+     This is watchableAt()'s rule read forwards rather than a second copy of it — a slot is
+     watchable exactly when every slot before it is full and watched, so the run of full slots IS
+     the run that will become watchable one after another as they are watched. */
+  bingeableCount(){
+    let n=0;
+    for(const i of this.pageSlots()){
+      if(!this.isFull(i)) break;
+      if(!this.isWatched(i)) n++;
+    }
+    return n;
+  },
 
   /* ---------- price ----------
      Owned by js/economy.js: the same segmented curve that used to price builder levels now

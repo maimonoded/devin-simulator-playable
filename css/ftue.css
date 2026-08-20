@@ -1,0 +1,237 @@
+/* The first-time flow. Chrome that exists only while the intro is running — see js/ui/ftue.js.
+
+   Loaded before css/mobile.css so the mobile overrides still win on order.
+
+   ---- THE SHAPE OF A HOST SCREEN ----
+
+   Two bands, and the split is load-bearing:
+
+     .ftueScene   Zara stands here, lit and bottom-anchored, with her SPEECH BUBBLE beside her
+                  head and a tail pointing back at her. It takes all the room left over, so she
+                  is as big as the screen allows and shrinks on the busy screens by herself.
+     .ftuePanel   what the player reads and touches. Never her voice.
+
+   Her line used to sit in the same column as the answer buttons, at the same width, in the same
+   box — and it read as a fourth option you could tap. So: speech is light-on-dark with a tail
+   and never full width; things you press are dark chips and a filled CTA, down in the panel.
+   Nothing in the panel may be styled like the bubble.
+
+   ---- and why it is dark ----
+
+   This is the game, not the storyboard. The wireframe's white screens are a lo-fi drawing
+   convention; the app is a lit, deep-navy stage and the intro is the first thing a player ever
+   sees of it. Zara's art is cut out (transparent PNG), so she composites onto that stage — see
+   assets/host/README.md. The two video screens go black, because a full-bleed episode fills them. */
+
+.ftueStage{position:fixed;inset:0;z-index:200;display:none;
+           align-items:center;justify-content:center;
+           background:#07091c;color:var(--text)}
+.ftueStage.show{display:flex}
+
+/* The phone column. Not a drawn phone frame — the wireframe's bezel is a storyboard device for
+   showing nine screens side by side on one page, and drawing it around the real thing would put
+   a picture of a phone inside a phone.
+
+   The top padding is the strip the Skip button sits in: at phone width the title is nearly
+   full-width and Skip is pinned top-right, so without a reserved strip the two overlap. */
+.ftuePhone{position:relative;width:min(430px,100vw);height:100%;max-height:100vh;overflow:hidden;
+           display:flex;flex-direction:column;
+           padding:calc(52px + env(safe-area-inset-top,0px)) 18px
+                   calc(18px + env(safe-area-inset-bottom,0px));
+           background:
+             radial-gradient(150% 70% at 50% 108%, #2a1c52 0%, transparent 62%),
+             radial-gradient(120% 60% at 82% -8%, #1b3a63 0%, transparent 58%),
+             linear-gradient(180deg,#131a3f 0%,#0a0d24 58%,#07091c 100%)}
+/* Video wants the whole column, in black, with no padding fighting the frame. */
+.ftuePhone.bare{padding:0;background:#07080f}
+
+/* ---- 1 · splash ---- */
+.ftueSplash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px}
+.ftueLogo{width:112px;height:112px;border-radius:30px;display:flex;align-items:center;justify-content:center;
+          font-size:50px;background:linear-gradient(160deg,#3b3f8e,#1d2050);
+          border:1px solid rgba(255,255,255,.14);
+          box-shadow:0 22px 50px rgba(0,0,0,.6),0 0 60px rgba(139,109,255,.35)}
+.ftueBrand{font-size:26px;font-weight:800;letter-spacing:3px;margin-top:20px;
+           background:linear-gradient(180deg,#fff,#b9bdf5);-webkit-background-clip:text;
+           background-clip:text;color:transparent}
+.ftueTag{font-size:9.5px;letter-spacing:4px;color:var(--muted)}
+.ftueLoad{width:172px;height:5px;border-radius:99px;background:rgba(255,255,255,.10);
+          overflow:hidden;margin-top:34px}
+/* Indeterminate on purpose: it is a brand beat on a fixed timer, and a bar claiming to track a
+   real download would be lying about work that is not happening. */
+.ftueLoad i{display:block;width:38%;height:100%;border-radius:99px;
+            background:linear-gradient(90deg,var(--purple),var(--pink));
+            animation:ftueLoad 1.15s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes ftueLoad{0%{transform:translateX(-100%)}100%{transform:translateX(360%)}}
+.ftueLoadTxt{font-size:10.5px;color:var(--muted);letter-spacing:.4px}
+
+/* ---- the scene ---- */
+.ftueScene{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+/* Her key light. Behind her and low, so she reads as standing IN the screen rather than pasted
+   on it — the single cheapest thing that stops a cut-out looking like a sticker. */
+.ftueSpot{position:absolute;right:-14%;bottom:-16%;width:112%;height:88%;pointer-events:none;
+          background:radial-gradient(closest-side,rgba(255,203,92,.20),rgba(255,111,165,.10) 45%,transparent 72%)}
+/* SIZED BY WIDTH, not height, and pushed off the right edge. Height-sized she grew to whatever
+   the screen was tall — on a phone that filled it, put her head behind the title and left the
+   bubble sitting across her face. A width fraction frames her the same way at every height, and
+   max-height only kicks in on the short screens (the guess screen's panel is tall, so the scene
+   it leaves is short). Off-centre to the right is what leaves the left column free for her
+   speech: the bubble and her head must not want the same pixels. */
+.ftueHost{position:absolute;right:-10%;bottom:0;height:80%;
+          display:flex;align-items:flex-end}
+/* .ftueZara is the WRAPPER, not the image — see Ftue.hostImg for why. It is sized by HER, so the
+   bubble hung off it lands where she actually is. */
+.ftueZara{display:inline-flex;height:100%;align-items:flex-end}
+.ftueZara img{height:100%;width:auto;max-width:none;display:block;
+              filter:drop-shadow(0 24px 34px rgba(0,0,0,.6))}
+/* No art for this pose — see assets/host/README.md. */
+.ftueZara.missing{width:170px;height:min(300px,40vh);border-radius:85px 85px 24px 24px;
+                  background:linear-gradient(180deg,#3a3c78,#25264f);border:1px solid var(--line)}
+
+.ftueTitle{position:relative;z-index:3;font-size:27px;font-weight:800;line-height:1.12;
+           letter-spacing:-.2px;max-width:70%;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+
+/* ---- her speech ----
+   ANCHORED TO HER, not to the screen: it is a child of .ftueHost, so `top` is a percentage of
+   HER height and the bubble lands beside her head whatever size she has been given. Pinned to
+   the screen instead, it floated near the top with the tail aimed at empty space while she stood
+   half a screen below it.
+
+   Never full width — that, plus light-on-dark and the tail, is what stops it reading as a fourth
+   thing you can tap. `right:46%` puts its right edge just short of her face, so the two never
+   want the same pixels. */
+/* IN THE SCENE'S FLOW, top-left, above her — not hung off her block. Anchoring it to her put its
+   left edge wherever she happened to start, and since she is deliberately pushed off the right
+   edge the bubble inherited that offset and ran off the screen with her lines cut in half. In
+   flow it is measured against the column, so it always fits.
+
+   Above her rather than beside her because the art is a full-length figure at 0.70 aspect: tall
+   enough to fill the scene means wide enough to fill the column, so there is no beside. */
+.ftueSay{position:relative;z-index:3;align-self:flex-start;margin-top:10px;
+         width:max-content;max-width:82%;
+         background:linear-gradient(180deg,#ffffff,#eef0ff);color:#191c3d;
+         border-radius:18px 18px 18px 5px;padding:12px 15px;
+         font-size:15px;line-height:1.38;font-weight:600;
+         box-shadow:0 14px 34px rgba(0,0,0,.45);
+         animation:ftueSayIn .34s cubic-bezier(.22,1,.36,1) both}
+/* The tail drops from the underside and leans right, toward her — she stands to the right of it. */
+.ftueSay::after{content:"";position:absolute;right:16%;bottom:-10px;width:20px;height:13px;
+                background:#eef0ff;clip-path:polygon(0 0,100% 0,72% 100%)}
+@keyframes ftueSayIn{from{opacity:0;transform:translateY(-8px) scale(.96)}to{opacity:1;transform:none}}
+
+/* ---- the panel — everything the player reads or presses ---- */
+.ftuePanel{position:relative;z-index:4;flex-shrink:0;display:flex;flex-direction:column;gap:9px;
+           padding-top:14px}
+
+/* The episode's own question. Big enough to actually read — it was 12.5px and got lost under the
+   bubble it is not part of. The eyebrow says whose turn it is. */
+.ftueAsk{font-size:17px;line-height:1.35;font-weight:700;color:var(--text);
+         text-shadow:0 2px 14px rgba(0,0,0,.7)}
+.ftueAsk b{display:block;font-size:9.5px;letter-spacing:2.6px;text-transform:uppercase;
+           color:var(--gold);margin-bottom:6px;font-weight:800}
+
+/* ---- 5 · the options ----
+   Dark chips with a light rule down the left edge: unmistakably a control, and unmistakably not
+   the bubble. */
+.ftueOpts{display:flex;flex-direction:column;gap:8px}
+.ftueOpt{position:relative;width:100%;text-align:left;overflow:hidden;
+         background:linear-gradient(180deg,rgba(43,50,110,.92),rgba(28,33,78,.92));
+         border:1px solid var(--line);color:var(--text);border-radius:13px;
+         padding:13px 14px 13px 20px;font-size:14.5px;font-weight:700;line-height:1.35;
+         backdrop-filter:blur(6px);box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.ftueOpt::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--purple)}
+.ftueOpt:active{transform:translateY(1px)}
+/* Tapped and wrong. Struck through and out of the running — but still ON SCREEN, because the
+   point of 5a is that nothing failed, it was just not that one. */
+.ftueOpt.dead{color:#6f76a6;background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.07);
+              text-decoration:line-through;pointer-events:none;box-shadow:none}
+.ftueOpt.dead::before{background:#39406f}
+/* The one Zara has just pointed at. */
+.ftueOpt.lit{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,203,92,.18),0 8px 20px rgba(0,0,0,.35)}
+.ftueOpt.lit::before{background:var(--gold)}
+.ftueOpt.lit span{color:#fff}
+
+.ftueCta{flex-shrink:0;margin-top:2px}
+
+/* ---- 7 · the win ----
+   The scene, dressed for a win: she is IN it, celebrating, rather than a thumbnail in a bubble. */
+.ftueBurst{position:absolute;inset:-20% -30% auto;height:120%;pointer-events:none;
+           background:radial-gradient(closest-side,rgba(255,203,92,.30),transparent 70%);
+           animation:ftueBurst 2.6s ease-in-out infinite}
+@keyframes ftueBurst{0%,100%{opacity:.72;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.ftueWinHead{position:relative;z-index:3;max-width:72%}
+.ftueWinTitle{font-size:38px;font-weight:800;line-height:.98;letter-spacing:-.5px;
+              background:linear-gradient(180deg,#fff 30%,var(--gold));-webkit-background-clip:text;
+              background-clip:text;color:transparent;
+              filter:drop-shadow(0 4px 18px rgba(0,0,0,.55))}
+.ftueWinPay{display:flex;align-items:center;gap:10px;margin-top:12px}
+.ftueCoin{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+          font-size:26px;background:radial-gradient(circle at 34% 30%,#ffe08a,#d79b26);
+          box-shadow:0 10px 24px rgba(215,155,38,.45)}
+.ftueWinAmt{font-size:30px;font-weight:800;color:var(--gold);text-shadow:0 3px 16px rgba(0,0,0,.5)}
+
+/* ---- 3 / 6 · the episode player ----
+   The REAL player (playerMarkup / playVideo), not a copy: it owns the controls, the progress bar,
+   the seek block and the resolve-on-close. This only makes it full-bleed and lays Zara's line
+   over it — the storyboard's picture, a vertical episode filling the screen. */
+.ftueVideo{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.ftueVideo .vwrap{margin:0;border-radius:0;max-width:100%}
+.ftueVideo .epVideo{height:100vh;max-height:100vh;width:auto;max-width:100vw}
+
+/* THE TOP EDGE OF THE VIDEO SCREEN, laid out once so nothing lands on anything else. At phone
+   width the video is full-bleed, so the player's ✕ (normally top-right) would sit under the Skip
+   button; it moves left, and the chips drop below it.
+
+     left    ✕ close          centre   2× speed          right   Skip (dev chrome)
+     left, second row         the episode label, then the locked guess */
+.ftueVideo .vclose{left:12px;right:auto;top:calc(12px + env(safe-area-inset-top,0px))}
+.ftueChip{position:absolute;left:12px;z-index:6;font-size:10px;font-weight:700;letter-spacing:.4px;
+          border-radius:999px;padding:5px 10px;backdrop-filter:blur(4px);
+          max-width:min(60%,300px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ftueChip.epChip{top:calc(52px + env(safe-area-inset-top,0px));
+                 background:rgba(6,8,24,.66);color:#dfe1ff;border:1px solid rgba(255,255,255,.14)}
+/* The locked guess rides along all the way to the reveal — it IS the suspense, so it is opaque
+   and light where the episode label is a quiet chip. */
+.ftueChip.guessChip{top:calc(80px + env(safe-area-inset-top,0px));
+                    background:var(--gold);color:#231a03;border:1px solid rgba(255,255,255,.5)}
+
+/* Her line over the video: her avatar and the bubble, clear of the progress bar at the bottom
+   edge. Same speech language as .ftueSay — light, dark text, tail — so she sounds like herself
+   on both kinds of screen. */
+.ftueBubble{position:absolute;left:12px;right:12px;z-index:6;
+            bottom:calc(20px + env(safe-area-inset-bottom,0px));
+            max-width:420px;margin-inline:auto;display:flex;gap:10px;align-items:flex-end;
+            background:linear-gradient(180deg,#ffffff,#eef0ff);color:#191c3d;
+            border-radius:18px 18px 18px 5px;padding:11px 13px;
+            font-size:14px;line-height:1.38;font-weight:600;
+            box-shadow:0 14px 34px rgba(0,0,0,.6);
+            transition:opacity .45s ease,transform .45s ease}
+/* Read, and out of the way — cfg.ftueBubbleMs. It leaves downward, the way it would if she had
+   stepped back off the bottom of the screen. */
+.ftueBubble.gone{opacity:0;transform:translateY(16px);pointer-events:none}
+.ftueAv{width:40px;height:40px;border-radius:50%;overflow:hidden;flex:none;
+        background:#232a63;box-shadow:0 0 0 2px rgba(25,28,61,.15)}
+.ftueAv .ftueZara{width:100%;height:100%}
+.ftueAv .ftueZara img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;filter:none}
+.ftueAv .ftueZara.missing{width:100%;height:100%;border-radius:0;border:0}
+
+/* The latching 2× button. Kept — 30-to-60MB episodes make it genuinely useful — but moved to the
+   top edge between the chips and the ✕, so the intro's bottom half stays Zara's. */
+.ftueVideo .vctrl{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:50%;
+                  transform:translateX(-50%);z-index:6;margin:0}
+.ftueVideo .vctrl .btn{padding:6px 12px;font-size:11px}
+
+/* ---- skip ----
+   A DEV control for now — it is how you get past a flow you are in the middle of writing — so it
+   is quiet chrome rather than part of the game. Shown for the whole run rather than only while a
+   tap is pending: a step sitting on a 90-second video still has to be escapable. */
+.ftueSkip{position:fixed;right:16px;top:calc(16px + env(safe-area-inset-top,0px));z-index:210;display:none;
+          background:rgba(10,13,36,.72);border:1px solid rgba(255,255,255,.16);color:#aab0e0;
+          border-radius:999px;padding:7px 13px;font-size:11.5px;font-weight:800;
+          backdrop-filter:blur(8px)}
+.ftueSkip.show{display:block}
+.ftueSkip:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+.ftueSkip:active{transform:translateY(1px)}
+
+/* Nothing behind a full-screen takeover should be reachable. */
+html.ftueOn .drawerBtn{display:none}

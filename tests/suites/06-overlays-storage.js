@@ -268,6 +268,19 @@ test("save then load restores a run", () => {
   eq(state.lastCoins, state.coins, "tween baseline starts where we left off");
 });
 
+/* The intro must not come back for someone who has already been through it — and it must come
+   back for a player who resets, which is why the flag is progress rather than config. */
+test("having seen the intro survives a reload", () => {
+  freshRun();
+  eq(state.ftueDone, false, "a fresh run has not seen it");
+  state.ftueDone = true;
+  saveState();
+  freshRun();
+  eq(state.ftueDone, false, "wiped in memory");
+  ok(loadState());
+  eq(state.ftueDone, true, "and restored from the save");
+});
+
 test("boxes bought but not yet thrown survive a reload", () => {
   freshRun();
   state.pendingBoxes = 3;

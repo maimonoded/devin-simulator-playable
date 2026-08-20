@@ -21,12 +21,19 @@ function applyPassStart(mult){
 
 /* Resolve whatever the token landed on. Mutates state fully; returns events for the UI to play.
    Overlays (js/overlays/) resolve first since they sit on top of the tile; per-type landing
-   behavior lives in js/tiles/. Nothing tile-specific belongs in this function. */
-function resolveLandingEvents(mult=1){
+   behavior lives in js/tiles/. Nothing tile-specific belongs in this function.
+
+   `card` is the card that produced this landing, passed straight through to the tile. It is on
+   the context rather than looked up because there is nowhere to look it up FROM: the shoe has
+   already shifted it off and state keeps no "last card". The Spa is the first tile to read it
+   (its grant is the card's rank) and it stays a general field rather than a Spa argument —
+   any tile that wants to know how it was reached needs exactly this. Null is legitimate and
+   means "resolved without a pull", which every tile that reads it must handle. */
+function resolveLandingEvents(mult=1,card=null){
   const ev=[]; const i=state.pos;
   // an overlay may pay out more than once, so it may hand back an array (see js/overlays/overlay.js)
   OVERLAYS.forEach(o=>{ if(o.has(i)){ const e=o.consume(i); if(e) ev.push(...[].concat(e)); } });
-  ev.push(...TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale}));
+  ev.push(...TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale,card}));
   return ev;
 }
 

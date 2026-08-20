@@ -142,15 +142,15 @@ body.board3d .board{display:none}
 .bingeBtn:active{transform:translateY(-50%) scale(.96)}
 .bingeCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px}
 
-/* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's. */
-.libBtn{position:absolute;left:14px;top:14px;z-index:35;
-        width:52px;height:52px;border-radius:16px;
-        background:var(--panel2);border:1px solid var(--line);color:#fff;font-size:22px;
-        display:none;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.28)}
-.libBtn.on{display:flex}
-.libBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
+/* The library's Watch button: what plays next, and how many will play back to back after it.
+   The title is the part that gives — a long episode name ellipsises rather than pushing the
+   count off the button, since the count is the smaller half and the one that would be missed. */
+.libWatchLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.libWatchCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px;flex-shrink:0}
 
-/* the library list */
+/* the library list. There is no library BUTTON any more — .bingeBtn above is the only way in,
+   because two controls opening the same list is two things to keep in sync and one of them
+   was invisible until something had been unlocked. */
 .libList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;padding-right:4px}
 .libList::-webkit-scrollbar{width:6px}.libList::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
 .libRow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;

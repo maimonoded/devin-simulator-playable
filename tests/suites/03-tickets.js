@@ -228,6 +228,22 @@ test("an episode is not watchable until the ones before it on the row are watche
   eq(Tickets.nextWatchableId(), Tickets.idAt(2), "which is what firstUnwatchedId offers");
 });
 
+/* The number the library's Watch button carries. It is NOT the queue length, which is what the
+   🎬 badge shows: an episode whose predecessor on the row is still being collected is waiting,
+   not available, and counting it promises a binge the ordering gate then refuses. */
+test("bingeableCount stops at the first placeholder that is not full", () => {
+  freshRun();
+  eq(Tickets.bingeableCount(), 0, "nothing collected, nothing to watch");
+  fill(2);
+  eq(Tickets.bingeableCount(), 0, "complete, but nothing before it is — so it cannot start");
+  fill(0);
+  eq(Tickets.bingeableCount(), 1, "only the first: the second is still a gap in the run");
+  fill(1);
+  eq(Tickets.bingeableCount(), 3, "the gap closes and all three play back to back");
+  watch(0);
+  eq(Tickets.bingeableCount(), 2, "a watched one stops counting without stopping the walk");
+});
+
 test("each completed placeholder queues the next episode in order", () => {
   freshRun();
   const per = Tickets.perEpisode();

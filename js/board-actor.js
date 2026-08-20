@@ -14,10 +14,16 @@ class BoardActor {
   /* Cards for the shoe. Tops up TOWARD cfg.packSize and never reduces a shoe already above it —
      a bought pack merges onto whatever was left, so being over the cap is the ordinary state of
      affairs, not an edge case. Shoe.dealFree applies the same rule and deals from the current
-     pack's tail, so free cards still carry their share of the tickets. */
-  gainCards(n,text){
-    const got=Shoe.dealFree(n);
-    return {float:{text:text??"+"+got+"🃏",color:"var(--teal)"}};
+     pack's tail, so free cards still carry their share of the tickets.
+
+     opts.uncapped routes to Shoe.dealExtra instead, for a grant that must always pay (the Spa).
+     The count actually dealt comes back on the event as `dealt` — an inert field playEvents
+     ignores — because callers overriding `text` used to build their log line and their reveal
+     from what they ASKED for, and on a full shoe the board then announced cards it had not
+     given. Report ev.dealt, never n. */
+  gainCards(n,text,opts){
+    const got=(opts&&opts.uncapped)?Shoe.dealExtra(n):Shoe.dealFree(n);
+    return {dealt:got,float:{text:text??"+"+got+"🃏",color:"var(--teal)"}};
   }
   /* Tickets have no cap. Awarding goes through Tickets.award so the ticket card, the mystery
      box and the store all fill placeholders by exactly the same rule — three paths that could

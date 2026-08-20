@@ -1,12 +1,48 @@
 # Board props
 
-Small 3D objects that sit **on** a tile rather than being one. Today there is one: the mystery
-box ([js/overlays/mystery-box.js](../../js/overlays/mystery-box.js)).
+Small 3D objects placed by the board rather than being part of it — the mystery box
+([js/overlays/mystery-box.js](../../js/overlays/mystery-box.js)) sitting on a tile, and the VIP
+treasure chest standing outside the ring.
 
 ```
 assets/props/models/mystery-box.glb        plum — coins or energy inside
 assets/props/models/mystery-box-gold.glb   gold — clues inside
+assets/props/models/treasure-chest.glb     the VIP pool, shut
+assets/props/models/treasure-chest-open.glb  the VIP pool, open, gold inside
 ```
+
+## The treasure chest is two files because a generated mesh cannot hinge
+
+Image-to-3D returns **one fused mesh with no separate lid node**, so a chest made this way
+physically cannot open. The shut one and the open one are therefore two models and "opening" is a
+swap — the same idiom as the box's plum/gold pair, where *the file is the state*. The swap is
+covered by a point light coming up inside the chest, which is what the eye follows; splitting a
+lid by hand in Blender would buy a real hinge at the cost of a manual step on every regeneration.
+
+It opens when the **VIP Lounge pays out**, and at no other time. `Board3D.openChest(ms)` is
+pushed from `playEvents` on the `chest` event that [vip-tile.js](../../js/tiles/vip-tile.js)
+emits; `_tickChest` only renders whatever was last asked for and owns no state.
+
+**It used to poll `state.vip` and open on any change, and that was a real bug even though the
+animation worked.** The pool is seeded about ten times a pack — every lap past Start, every
+arrival, every fine — and all of those happen with the token, and therefore the camera,
+somewhere else, with this corner off the top of the frame. Nine openings in ten played to an
+empty room and the tenth was over before the player looked up. The pay-out is the one moment
+the player is standing here. Still never blocking: nothing in the pull loop waits for it.
+
+**The two chests need different yaws, and that is not a bug.** `normalize_tile.py` squares a
+model's floor to the axes, and squaring is modulo 90° — which quadrant a model ends up in is
+arbitrary. These two were squared by 60.5° and 55.5° and came out a quarter-turn apart: the shut
+one shows its clasp at 90°, the open one shows its coins at 0. `CHEST_YAW` is therefore a map
+keyed by model, measured by rendering four clones of each at 0/90/180/270 and looking at them.
+**Re-generate either model and the yaw has to be re-measured.** The lid is a barrel, so the two
+wrong answers are not subtle — they present a blank arched end.
+
+Placement is `CHEST_AT`, on the outward diagonal past the VIP corner, and the distance is
+**measured rather than chosen**: it has to clear the plinth so the chest is not standing on the
+board's lip, and stay inside the town, because further out it disappears *behind* the texas-town
+storefronts. `cfg.chest` removes it — which is also the answer for the harbour world, where that
+spot is open water.
 
 Two boxes, because a box's contents are decided when it is **placed** rather than when it is
 landed on, so the board can say which one is worth crossing to. See

@@ -1,8 +1,19 @@
 "use strict";
-/* Pins #bingeCount while a completed collection flies into it — see renderStory. */
+/* WHAT THE 🎬 BADGE COUNTS: episodes you OWN, not episodes still waiting to be watched.
+
+   It used to be the unwatched queue, which made sense while the button jumped straight into the
+   next prediction. It opens the LIBRARY now — the whole list, rewatchable — so the number on it
+   has to be the size of that list, or the intro hands you two free episodes and leaves the button
+   reading 0 and dimmed, which is exactly how it was reported.
+
+   Derived from the ticket row rather than stored, the same way the library itself is
+   (Tickets.unlockedEpisodeIds), so the two can never disagree about how many there are. */
+function bingeCount(){ return Tickets.unlockedEpisodeIds().length; }
+/* Pins #bingeCount while a completed collection flies into it — see celebrateCollection. */
 let _bingeHold=null;
 function holdBingeCount(n){ _bingeHold=n; }
 function releaseBingeCount(){ _bingeHold=null; }
+function bingeHeld(){ return _bingeHold; }
 /* All read-only rendering of state → DOM. No state mutation here — the play controls delegate
    to js/ui/main.js. */
 /* Push timing configs into CSS custom properties so the animations match the sim's pacing.
@@ -145,11 +156,6 @@ function renderOverlays(){
    one named function rather than scattering them into renderAll() is what stops the next
    person wondering why the binge button is rendered from three different places. */
 function renderBoardChrome(){
-  /* Episodes banked by "Binge later" — the only way back to them in the mobile layout, since
-     the side panel's Predict & watch button is not on screen there.
-     A sealed reveal counts as something waiting: the bet is placed and the result is owed, so
-     the button has to stay reachable even when the queue itself is empty. */
-  const queued=state.epQueue.length+(state.pendingReveal?1:0);
   const binge=$("#bingeBtn");
   if(binge){
     /* THE COUNT CAN BE PINNED. When a completed collection is flying into this button the number
@@ -157,18 +163,15 @@ function renderBoardChrome(){
        a badge that ticked at award time would announce the arrival before it happened. holdBinge
        pins it at the pre-award value and the flight releases it on landing.
        The BUTTON is shown live regardless: it has to be on screen to be flown at. */
-    const shown=(_bingeHold!=null)?_bingeHold:queued;
-    /* ALWAYS ON SCREEN, including at zero. It used to hide when the queue was empty, which meant
-       the one control telling you what you are collecting toward only existed once you had
+    const shown=(_bingeHold!=null)?_bingeHold:bingeCount();
+    /* ALWAYS ON SCREEN, including at zero. It used to hide when there was nothing there, which
+       meant the one control telling you what you are collecting toward only existed once you had
        already collected it — and it left the completed-collection flight aiming at a button that
-       was not there. An empty state says "nothing waiting yet"; absence says nothing at all. */
+       was not there. An empty state says "nothing yet"; absence says nothing at all. */
     binge.style.display="flex";
     binge.classList.toggle("empty",shown<=0);
     $("#bingeCount").textContent=shown;
   }
-  /* The library button only exists once there is something in the library. */
-  const lib=$("#libraryBtn");
-  if(lib) lib.classList.toggle("on",Tickets.unlockedEpisodeIds().length>0);
   /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
      rather than the lifetime total, which only ever grows and would leave the dot on forever. */
   const adot=$("#albumDot");

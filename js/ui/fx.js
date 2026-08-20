@@ -298,7 +298,7 @@ function showCollect(c){
       ? Math.max(0.05,cfg.autoCollectMs/1000)
       : rand(Math.min(cfg.collectMinSec,cfg.collectMaxSec),Math.max(cfg.collectMinSec,cfg.collectMaxSec));
     $("#scrim").innerHTML=`<div class="modal collectModal"><div class="top">
-        <div class="eyebrow">Train bonus</div><h2>${c.sub||"You won"}</h2></div>
+        <div class="eyebrow">Flight bonus</div><h2>${c.sub||"You won"}</h2></div>
       <div class="mbody"><div class="collectAmt">🪙 ${c.big}</div>
         <button class="btn roll wide" id="collectBtn" style="margin-top:16px">Collect</button>
         <div class="hint" style="text-align:center;margin-top:8px">${auto

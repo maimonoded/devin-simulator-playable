@@ -202,11 +202,46 @@ test("the mini-game scales with the multiplier and never invents a payout", () =
 test("spa deals cards and flags the card shower", () => {
   freshRun();
   state.shoe = [];
-  const ev = TILE_TYPES.spa.onLand({});
-  eq(Shoe.count(), cfg.spaCards);
+  const ev = TILE_TYPES.spa.onLand({ card: "s7" });
+  eq(Shoe.count(), 7);
   const r = ev.find(e => e.reveal).reveal;
   eq(r.positive, true);
   eq(r.shower, "cards", "a card grant rains cards");
+});
+
+/* The grant IS the card that landed on it — the whole point of threading `card` through the
+   landing context. A joker has no rank, so it takes its own number. */
+test("spa grants the rank of the card that landed on it", () => {
+  freshRun();
+  [["s1", 1], ["h7", 7], ["d13", 13], ["m4", 4]].forEach(([card, want]) => {
+    state.shoe = [];
+    TILE_TYPES.spa.onLand({ card });
+    eq(Shoe.count(), want, card + " grants " + want);
+  });
+});
+
+test("spa grants spaJokerCards on a joker, and spaCards when there is no card", () => {
+  freshRun();
+  state.shoe = [];
+  TILE_TYPES.spa.onLand({ card: "J1" });
+  eq(Shoe.count(), cfg.spaJokerCards, "a joker has no rank, so it takes its own grant");
+  state.shoe = [];
+  TILE_TYPES.spa.onLand({});
+  eq(Shoe.count(), cfg.spaCards, "no card at all falls back to the flat grant");
+});
+
+/* The reason this corner deals through Shoe.dealExtra: dealFree tops up only TOWARD the cap,
+   so on a full shoe — the ordinary state right after buying a pack — the old Spa dealt nothing
+   while still announcing a card. Always paying is the rule; the cap is not this corner's. */
+test("spa pays a shoe that is already over the cap, and says what it really dealt", () => {
+  freshRun();
+  state.shoe = new Array(cfg.packSize + 5).fill("s2");
+  const before = Shoe.count();
+  const ev = TILE_TYPES.spa.onLand({ card: "h9" });
+  eq(Shoe.count(), before + 9, "a full shoe still gets the whole grant");
+  const f = ev.find(e => e.float).float;
+  eq(f.text, "💆 +9🃏");
+  eq(ev.find(e => e.log).log.msg.includes("<b>9</b>"), true, "the log reports what was dealt");
 });
 
 /* Spa cards come off the pack tail like every other free card. If it minted loose cards the
@@ -215,9 +250,24 @@ test("spa cards are dealt off the pack, not minted loose", () => {
   freshRun();
   state.shoe = []; state.packTail = [];
   const priced = state.ticketsPriced;
-  TILE_TYPES.spa.onLand({});
+  TILE_TYPES.spa.onLand({ card: "s3" });
   eq(state.ticketsPriced, priced + cfg.ticketsPerPack, "one pack minted, not one loose card");
-  eq(state.packTail.length, cfg.packSize - cfg.spaCards, "the rest of that pack is kept for next time");
+  eq(state.packTail.length, cfg.packSize - 3, "the rest of that pack is kept for next time");
+});
+
+/* The chest is opened by the PAY-OUT and nothing else. It used to watch state.vip and open on
+   every change, which fired ~10x a pack with the camera on the other side of the board. */
+test("vip opens the chest when it pays, and not when the pool is dry", () => {
+  freshRun();
+  state.vip = 400;
+  const paid = TILE_TYPES.vip.onLand({});
+  const chest = paid.find(e => e.chest);
+  eq(!!chest, true, "a pay-out opens the chest");
+  eq(chest.chest.ms, cfg.chestOpenMs);
+  eq(!!chest.reveal, true, "it rides on the reveal, so the two play together");
+  state.vip = 0;
+  eq(TILE_TYPES.vip.onLand({}).some(e => e.chest), false,
+     "an empty pool must not open a chest heaped with coins it did not pay");
 });
 
 test("vip collects the whole pool, then leaves it empty", () => {

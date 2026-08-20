@@ -47,6 +47,12 @@ function initState(){
     predWins:0, predLoss:0, streak:0, bestStreak:0, pulls:0, predsMade:0,
     lastCoins:0, lastClues:0,
     animating:false, seriesDone:false,
+    /* The scripted opening has been seen (or dismissed). PERSISTED, and false by default, so a
+       fresh run gets the intro and a returning one never does. It is progress rather than
+       tuning: "Reset user" should hand the intro back, and "Reset config" should not touch it.
+       Note what does NOT set it — the ?ftue=false bypass, which is a developer skipping past the
+       intro this once, not a player dismissing it. See js/ui/ftue.js. */
+    ftueDone:false,
   };
   state.shoe=Shoe.mintPack();   // after the assignment above — see the note there
 }

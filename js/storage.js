@@ -121,6 +121,10 @@ function serializeState(){
     predWins:state.predWins, predLoss:state.predLoss,
     streak:state.streak, bestStreak:state.bestStreak, pulls:state.pulls, predsMade:state.predsMade,
     seriesDone:state.seriesDone,
+    /* Whether the scripted opening has been seen. In the PROGRESS slot, not the config one:
+       it is something the player did, so Reset user hands the intro back and Reset config
+       leaves it alone. */
+    ftueDone:!!state.ftueDone,
   };
 }
 function saveState(){

@@ -23,6 +23,7 @@
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/drawer.css">
 <link rel="stylesheet" href="css/overlay.css">
+<link rel="stylesheet" href="css/ftue.css">
 <!-- last, so its overrides win the cascade without needing specificity tricks -->
 <link rel="stylesheet" href="css/mobile.css">
 </head>
@@ -90,13 +91,11 @@
              controls the player is about to press. It is a CHILD of this row on purpose — the
              row's own height is what centres it, so it stays aligned with Pull whatever that
              height becomes. An absolute offset from the scene's bottom did not, which is how it
-             ended up floating above the row. ALWAYS shown, dimmed at zero. -->
-        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
+             ended up floating above the row. ALWAYS shown, dimmed at zero.
+             It opens the LIBRARY, which is the one door to every episode — the top-left library
+             button it replaced was a second door onto the same list. -->
+        <button class="bingeBtn" id="bingeBtn" title="Episodes">🎬<span class="bingeCount" id="bingeCount">0</span></button>
       </div>
-      <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
-           until something has actually been unlocked. -->
-      <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
-
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
     <div class="controls viewrow">
@@ -155,6 +154,11 @@
 
 <div class="scrim" id="scrim"></div>
 <div class="toasts" id="toasts"></div>
+<!-- The first-time flow's chrome. Both are hidden until the intro is actually running, and both
+     sit outside .wrap so the 9:16 view reshapes the game without reshaping them. The stage is
+     drawn whole by each step — see js/ui/ftue.js screen(). -->
+<div class="ftueStage" id="ftueStage"></div>
+<button class="ftueSkip" id="ftueSkip" title="Skip the intro (dismisses it for good)">Skip intro ✕</button>
 
 <!-- Load order matters: each file only uses globals defined in files above it. -->
 <script src="js/util.js"></script>
@@ -225,6 +229,8 @@
 <script src="js/ui/finale.js"></script>
 <script src="js/ui/economy-panel.js"></script>
 <script src="js/ui/drawer.js"></script>
+<!-- the scripted opening; boot() starts it, so it must be above main.js -->
+<script src="js/ui/ftue.js"></script>
 <script src="js/ui/main.js"></script>
 <!-- three.js addons import the bare specifier "three"; this maps it to the vendored build -->
 <script type="importmap">
