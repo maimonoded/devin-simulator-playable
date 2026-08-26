@@ -67,7 +67,7 @@ test("serializeState captures progress and omits transient fields", () => {
 
 test("save then load restores a run", () => {
   freshRun();
-  state.coins = 4321; state.clues = 6; state.vip = 99; state.day = 4;
+  state.coins = 4321; state.clues = { "001": ["c2", "c5"] }; state.clueDay = { "001": 2 }; state.vip = 99; state.day = 4;
   state.energy = 17; state.pos = 23; state.mult = 5; state.rolls = 12;
   const held = Collection.pool()[0];
   Collection.add(held, 2);
@@ -78,7 +78,8 @@ test("save then load restores a run", () => {
   eq(state.coins, 0);
   ok(loadState(), "loadState should report success");
   eq(state.coins, 4321);
-  eq(state.clues, 6);
+  deepEq(state.clues, { "001": ["c2", "c5"] }, "the evidence comes back clue by clue");
+  deepEq(state.clueDay, { "001": 2 }, "and so does the clock the catch-up valve measures from");
   eq(state.vip, 99);
   eq(state.day, 4);
   eq(state.pos, 23);
@@ -94,6 +95,8 @@ test("save then load restores a run", () => {
 test("a finished board and the one after it both come back", () => {
   freshRun();
   Collection.pool(1).forEach(id => Collection.add(id, 1));
+  /* Cards no longer finish a set: its episodes have to be unlocked by clues AND watched. */
+  Collection.pages(1).forEach(p => watchEpisode(unlockEpisode(p.ep)));
   Collection.advanceBoard();
   Collection.add(Collection.pool()[0], 1);
   const unlocked = Collection.unlockedEpisodeIds().slice();
@@ -163,7 +166,7 @@ test("restore keeps energy bought above the cap", () => {
 
 test("loadState drops queue entries that aren't known episode ids", () => {
   freshRun();
-  state.epQueue = ["001"];
+  unlockEpisode("002");
   saveState();
   // hand-edit the saved slot into the legacy format, which stored titles
   const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
@@ -173,6 +176,20 @@ test("loadState drops queue entries that aren't known episode ids", () => {
   freshRun();
   loadState();
   deepEq(state.epQueue, ["002"], "unknown titles dropped, real ids kept");
+});
+
+test("…and drops one whose episode is no longer unlocked", () => {
+  freshRun();
+  unlockEpisode("001");
+  saveState();
+  /* A save from when episodes were unlocked by CARDS has a queue and no evidence. Offering
+     "Predict & watch" for an episode the player has not bought would be worse than resetting. */
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  raw.clues = {};
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  freshRun();
+  loadState();
+  deepEq(state.epQueue, [], "the queue can only ever hold what is currently unlocked");
 });
 
 /* The library is not persisted at all — it is derived from the albums

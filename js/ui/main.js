@@ -329,7 +329,8 @@ function boot(){
      Say so in the log rather than only in the tests. */
   [["Set "+Collection.num(),Collection.validate()],
    ["The board",validateBoard()],
-   ["The pools",Pools.validate()]].forEach(([what,bad])=>{
+   ["The pools",Pools.validate()],
+   ["The clues",Clues.validate()]].forEach(([what,bad])=>{
     if(!bad.length) return;
     console.warn(what+":",bad);
     log("⚠️",`<b>${what} does not add up</b> — ${bad.length} problem${bad.length>1?"s":""}, see the console.`);

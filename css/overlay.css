@@ -231,3 +231,19 @@
        border-radius:12px;padding:10px 18px;font-weight:700;font-size:14px;box-shadow:var(--shadow);
        animation:toastin .3s ease}
 @keyframes toastin{0%{transform:translateY(-14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+
+/* ---- Review the evidence (js/ui/prediction.js, GDD §7.2) ----
+   Collapsed by default: the clues are the reason to open it, and a wall of text above the
+   answers would bury the question the player is actually being asked. */
+.evidence{margin:8px 0 2px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.evHead{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+  background:rgba(45,212,191,.07);border:0;color:var(--text);font:inherit;font-size:13px;
+  padding:9px 12px;cursor:pointer;text-align:left}
+.evHead:hover{background:rgba(45,212,191,.13)}
+.evHead::after{content:"▾";color:var(--muted);transition:transform .18s ease}
+.evHead.open::after{transform:rotate(180deg)}
+.evCount{color:var(--teal);font-weight:700;margin-left:auto}
+.evBody{padding:10px 12px;border-top:1px solid var(--line)}
+.evList{margin:0;padding-left:18px;font-size:13px;color:var(--text);line-height:1.55}
+.evList li{margin:0 0 5px}
+.evList li:last-child{margin:0}

@@ -214,7 +214,9 @@ function renderNav(){
   /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
      rather than the lifetime total, which only ever grows and would leave the dot on forever. */
   const adot=$("#albumDot");
-  if(adot) adot.classList.toggle("on",state.cycleClues>0);
+  /* Lit while there is evidence to read for the episode that is next up. */
+  const nextEp=Collection.firstUnwatchedId();
+  if(adot) adot.classList.toggle("on",!!nextEp&&Clues.countFor(nextEp)>0);
   /* Episodes: unwatched ones waiting, plus a sealed reveal, which is owed even with an empty
      queue. The badge is the count; the button hides when there is nothing at all. */
   const queued=state.epQueue.length+(state.pendingReveal?1:0);
@@ -235,18 +237,20 @@ function renderStory(){
   /* Unlocked is not the same as watchable: the drama is serialised, so the button is only live
      when the next episode of the STORY is the one that has been collected. */
   $("#watchBtn").disabled=!playable||state.animating;
-  const [got,need]=(()=>{
-    const p=blocked?Collection.pageFor(blocked):
-      (Collection.pages().find(x=>!Collection.pageReady(x))||Collection.pages()[0]);
-    return p?Collection.pageProgress(p):[0,0];
-  })();
+  /* GDD §12's third non-negotiable: a progress bar to the next unlock, visible at all times.
+     Whatever is holding the story up — the blocked episode, or simply the next one — this says
+     how many clues it still wants, so the narrative track is never a black box. */
+  const waiting=blocked||Clues.currentId();
+  const [got,need]=waiting?Clues.progressFor(waiting):[0,0];
+  const short=Math.max(0,need-got);
   $("#storyHint").innerHTML= playable
     ? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} ready — place your prediction before watching.`
     : blocked
       ? `<b style="color:var(--gold)">${Episodes.titleOf(blocked)}</b> comes next and needs
-         <b>${need-got}</b> more card${need-got>1?"s":""} — episodes are watched in order.`
-      : need
-        ? `Next episode needs <b style="color:var(--pink)">${need-got}</b> more card${need-got>1?"s":""} — land on a 🎁 tile.`
+         <b>${short}</b> more clue${short===1?"":"s"} — episodes are watched in order.`
+      : waiting
+        ? `<b style="color:var(--gold)">${Episodes.titleOf(waiting)}</b> needs
+           <b style="color:var(--pink)">${short}</b> more clue${short===1?"":"s"} — talk to the cast.`
         : "Every episode in this set has been watched.";
 }
 /* Reflect state.mult on the stake button (needed after a restore or user reset). */

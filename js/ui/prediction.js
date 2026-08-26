@@ -62,7 +62,10 @@ function openPrediction(wantId){
   const next=Collection.firstUnwatchedId();
   if(next==null){
     const blocked=Collection.blockedBy();
-    if(blocked) toast(`🔒 <b>${Episodes.titleOf(blocked)}</b> comes first — collect its cards`);
+    if(blocked){
+      const [have,need]=Clues.progressFor(blocked);
+      toast(`🔒 <b>${Episodes.titleOf(blocked)}</b> comes first — <b>${have}/${need}</b> clues`);
+    }
     return;
   }
   if(wantId!=null&&wantId!==next)
@@ -101,15 +104,28 @@ function openPrediction(wantId){
   const footHtml=`<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
        <button class="btn ghost" id="skipPred" style="flex:1">Skip &amp; watch</button>${
          canBet?`<button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button>`:""}`;
-  /* Clues banked since the last prediction are spent on this one. They set the accuracy the
-     economy model uses, so say what they bought — otherwise the only clue feedback a player
-     ever gets is a number going up in the HUD. */
-  const clueHtml=state.cycleClues>0
-    ? `<div class="hint" style="margin:6px 0 2px">
-         <b style="color:var(--teal)">${state.cycleClues}🔍</b> clue card${state.cycleClues>1?"s":""} banked since your last prediction —
-         they lift the modelled accuracy to <b>${Math.round(Economy.accuracyFor(state.cycleClues)*100)}%</b>, and are spent here.</div>`
-    : `<div class="hint" style="margin:6px 0 2px">No clue cards banked — modelled accuracy sits at its floor of
-         <b>${Math.round(Economy.accuracyFor(0)*100)}%</b>. Clue cards come out of boxes, and each new one counts once.</div>`;
+  /* REVIEW THE EVIDENCE (GDD §7.2). The clues that unlocked this episode are the clues you are
+     reasoning from, and they are shown here in full — not as a count. That is the whole payoff
+     of making the gate and the edge one object: the thing you spent four draws collecting is
+     the thing you now read before betting.
+
+     Two players arrive here holding different evidence, because four are needed out of eight.
+     So this list is genuinely personal, and a count in the HUD could never have been. */
+  const evidence=Clues.evidenceFor(id);
+  const clueHtml=`<div class="evidence">
+      <button class="evHead" id="evToggle" aria-expanded="false">
+        <span>🔍 Review the evidence</span>
+        <span class="evCount">${evidence.length} clue${evidence.length===1?"":"s"}</span>
+      </button>
+      <div class="evBody" id="evBody" hidden>
+        ${evidence.length
+          ? `<ul class="evList">${evidence.map(c=>`<li>${c.text}</li>`).join("")}</ul>`
+          : `<p class="hint" style="margin:0">Nothing on file for this one.</p>`}
+        <p class="hint" style="margin:8px 0 0">Modelled accuracy with this much to go on:
+          <b style="color:var(--teal)">${Math.round(Economy.accuracyFor(evidence.length)*100)}%</b>
+          (the floor is ${Math.round(Economy.accuracyFor(0)*100)}%).</p>
+      </div>
+    </div>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
     ${clueHtml}
@@ -117,6 +133,12 @@ function openPrediction(wantId){
     ${wagerHtml}
     <div class="foot">${footHtml}</div></div></div>`;
   $("#scrim").classList.add("show");
+  const evT=$("#evToggle"), evB=$("#evBody");
+  if(evT) evT.onclick=()=>{
+    const open=evB.hidden;
+    evB.hidden=!open; evT.setAttribute("aria-expanded",String(open));
+    evT.classList.toggle("open",open);
+  };
   $("#scrim").querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
     $("#scrim").querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
     b.classList.add("sel"); pending.sel=+b.dataset.idx;

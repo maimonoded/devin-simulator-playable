@@ -39,6 +39,8 @@ const APP_FILES = [
   "js/xlsx.js",
   "js/economy.js",
   "js/economy-import.js",
+  /* what unlocks an episode: the clues, read off the episode files above */
+  "js/clues.js",
   /* board-actor.js owns grantEnergy(), which js/boxes.js calls */
   "js/board-actor.js",
   "js/collection.js",
@@ -140,6 +142,27 @@ vm.runInContext(`
     const saved = t.table.map(r => r.weight);
     t.table.forEach(r => { r.weight = match(r) ? 100 : 0; });
     try { return fn(); } finally { t.table.forEach((r, i) => { r.weight = saved[i]; }); }
+  }
+  /* Put an episode's evidence on file directly. Unlocking is derived from the clues held, so a
+     test that needs an unlocked episode has to hold clues for it — granting them through the
+     draw would mean rolling until the RNG cooperated. */
+  function unlockEpisode(id){
+    if(!state.clues) state.clues={};
+    if(!state.clueDay) state.clueDay={};
+    const before=Collection.unlockSnapshot();
+    state.clues[id]=Clues.authoredFor(id).slice(0,Clues.requiredFor(id)).map(c=>c.id);
+    state.clueDay[id]=state.day;
+    /* A real snapshot, not an empty list: claimUnlocked treats everything missing from it as
+       fresh, so an empty one would re-queue an episode that has already been watched. */
+    Collection.claimUnlocked(before);
+    return id;
+  }
+  /* …and mark one watched, which is simply no longer waiting in the queue. */
+  function watchEpisode(id){
+    const k=state.epQueue.indexOf(id);
+    if(k>=0) state.epQueue.splice(k,1);
+    state.epsWatched++;
+    return id;
   }
   /* The same trick for a POOL: force one row to be the only drawable one, always restored.
      Every landing is a weighted draw now, so a test that wants "a clue off an NPC tile" has to

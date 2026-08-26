@@ -87,10 +87,19 @@ class PoolTile extends Tile {
 
   drawCard(row,ctx){ return drawCardEvents(row.name,this.icon); }
 
+  /* A clue lands on the episode currently being worked on, and a duplicate pays coins — both
+     rules live in Clues.grant(), because every future source of clues (a milestone cache, an
+     Insider pack) owes exactly the same behaviour. */
   drawClue(row,ctx){
-    const ev=this.gainClues(1);
-    ev.log={icon:"🔍",msg:`${row.name} · a <b>clue</b>`};
-    return [ev];
+    const got=Clues.grant();
+    if(!got) return [{float:{text:"🔍 —",color:"var(--muted)"},
+                      log:{icon:"🔍",msg:`${row.name} · nothing left to work out`}}];
+    if(!got.isNew)
+      return [{float:{text:"+"+fmt(got.coins),color:"var(--gold)"},
+               log:{icon:"🔍",msg:`${row.name} · you knew that one · +<b>${fmt(got.coins)}</b> coins`}}];
+    const [have,need]=Clues.progressFor(got.id);
+    return [{float:{text:"+1🔍",color:"var(--teal)"},
+             log:{icon:"🔍",msg:`${row.name} · <i>${got.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(got.id)}`}}];
   }
 
   drawEnergy(row,ctx){

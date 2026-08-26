@@ -160,22 +160,17 @@ const Collection = {
   countOf(id, n) { return Math.max(0, this.albumOf(n)[id] | 0); },
   has(id, n) { return this.countOf(id, n) > 0; },
   /* Bank a card on the CURRENT board. Returns what the presentation needs to say about it:
-     whether it was new, and how many are now held. Clue counters are fed here rather than by
-     the caller, so every future source of cards gets them right for free. */
+     whether it was new, and how many are now held.
+
+     Cards no longer gate anything. An episode is unlocked by its CLUES (js/clues.js, GDD 6.1),
+     which is why nothing is counted here beyond the album itself — a card is a collectible, and
+     what it buys is Status. */
   add(id, n) {
     const many = Math.max(1, Math.round(n || 1));
     const album = this.albumOf(this.num());
     const before = Math.max(0, album[id] | 0);
     album[id] = before + many;
-    const isNew = before === 0;
-    const p = this.parse(id);
-    if (isNew && p && p.kind === "clue") {
-      /* A clue card still buys prediction accuracy, exactly as the mystery box's clues did:
-         state.clues is the lifetime album total, state.cycleClues the flow spent on the next
-         wager (Economy.accuracyFor). Only a NEW clue pays — a duplicate is coins, not insight. */
-      state.clues++; state.cycleClues++;
-    }
-    return { isNew, count: album[id], id };
+    return { isNew: before === 0, count: album[id], id };
   },
   /* Distinct pool cards owned on a board — the album's headline number. */
   collected(n) {
@@ -183,25 +178,33 @@ const Collection = {
     return this.pool(num).filter(id => this.has(id, num)).length;
   },
 
-  /* ---------------- progress ---------------- */
-  /* [owned, needed] for one page. */
+  /* ---------------- progress ----------------
+
+     WHAT UNLOCKS AN EPISODE IS ITS CLUES, not its cards (GDD 6.1). These three read through to
+     js/clues.js rather than counting the album, and they stay here because every surface that
+     draws a page — the album, the case board, the library — asks the page, not the episode.
+
+     The cards still have their page. It is a display now: what this set contains and how much
+     of it you have, which is exactly what a collection is when it has stopped being a gate. */
+  /* [clues held, clues needed] for one page's episode. */
   pageProgress(page, n) {
-    const num = n || this.num();
-    const got = page.needs.filter(id => this.has(id, num)).length;
-    return [got, page.needs.length];
+    return Clues.progressFor(page.ep);
   },
   pageReady(page, n) {
-    const [got, need] = this.pageProgress(page, n);
-    return need > 0 && got === need;
+    return Clues.isUnlocked(page.ep);
   },
-  /* Which cards a page is still missing — what the album shows as empty slots. */
+  /* Which of this page's CARDS are still missing — the album's empty slots. */
   pageMissing(page, n) {
     const num = n || this.num();
     return page.needs.filter(id => !this.has(id, num));
   },
+  /* [cards owned, cards on the page] — the collection side, which gates nothing. */
+  pageCards(page, n) {
+    const num = n || this.num();
+    return [page.needs.filter(id => this.has(id, num)).length, page.needs.length];
+  },
   episodeReady(ep, n) {
-    const p = this.pageFor(ep, n);
-    return !!p && this.pageReady(p, n);
+    return Clues.isUnlocked(ep);
   },
   /* Every board page complete. An empty board (content exhausted) is NOT complete — otherwise
      running out of episodes would read as a finished board and advance forever. */
@@ -235,17 +238,10 @@ const Collection = {
   },
 
   /* ---------------- the library ----------------
-     Derived from every album, oldest board first, so the unlocked set is always a prefix-ish
-     list in story order and past boards keep their episodes after the album moves on. */
-  unlockedEpisodeIds() {
-    const out = [];
-    for (let n = 1; n <= this.num(); n++) {
-      this.pages(n).forEach(p => {
-        if (this.pageReady(p, n) && Episodes.has(p.ep) && !out.includes(p.ep)) out.push(p.ep);
-      });
-    }
-    return out;
-  },
+     One line, because "unlocked" has exactly one definition and it lives in js/clues.js. This
+     stays as a method because every caller in the UI already speaks to Collection about the
+     library, and moving them all would be churn for no gain. */
+  unlockedEpisodeIds() { return Clues.unlockedIds(); },
   unlockedCount() { return this.unlockedEpisodeIds().length; },
 
   /* ---------------- watching, in order ----------------

@@ -207,21 +207,23 @@ test("accuracy rises per clue and stops at the cap", () => {
   near(Economy.accuracyFor(-5), 0.55, 1e-9, "a negative count cannot lower it");
 });
 
-test("a prediction spends the cycle's clues and resets the flow, leaving the album alone", () => {
+test("a prediction is priced on THIS episode's evidence, and does not delete it", () => {
   freshRun();
   state.coins = 1e6;
-  state.clues = 9; state.cycleClues = 3;
+  /* Three clues on the episode being bet, and a fourth on a different one — which must not
+     count. The edge is what you know about THIS story beat, not a running balance. */
+  state.clues = { "001": ["c1", "c2", "c3"], "002": ["c1"] };
   state.epQueue.push("001");
-  const r = resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
-  eq(r.cluesSpent, 3);
+  const r = resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false, id: "001" });
+  eq(r.cluesSpent, 3, "another episode's clues are not evidence for this one");
   near(r.accuracy, 0.67, 1e-9, "the outcome was modelled at the clued accuracy");
-  eq(state.cycleClues, 0, "the flow resets for the next prediction");
-  eq(state.clues, 9, "the album is cosmetic and untouched");
+  deepEq(state.clues["001"], ["c1", "c2", "c3"],
+         "the evidence survives — Review Evidence would be empty otherwise");
 });
 
 test("clues only decide the outcome in auto runs — a manual pick still wins on its merits", () => {
   freshRun();
-  state.coins = 1e6; state.cycleClues = 0;   // accuracy floor, 0.55
+  state.coins = 1e6;                         // no evidence: the 0.55 accuracy floor
   state.epQueue.push("001");
   eq(resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false }).won, true,
      "the right answer wins regardless of the modelled accuracy");

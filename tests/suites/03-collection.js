@@ -66,24 +66,14 @@ test("adding a card reports whether it was new, and counts duplicates", () => {
   eq(Collection.collected(), 1, "distinct cards, not copies");
 });
 
-test("a NEW clue card feeds both clue counters; a duplicate feeds neither", () => {
+test("banking a card touches no clue and gates nothing", () => {
   freshRun();
-  const clue = Collection.poolOf("clue", null)[0];
-  state.clues = 0; state.cycleClues = 0;
-  Collection.add(clue, 1);
-  eq(state.clues, 1, "the lifetime album total");
-  eq(state.cycleClues, 1, "and the flow the next wager spends");
-  Collection.add(clue, 1);
-  eq(state.clues, 1, "a duplicate is coins, not insight");
-  eq(state.cycleClues, 1);
-});
-
-test("a character card never touches the clue counters", () => {
-  freshRun();
-  state.clues = 0; state.cycleClues = 0;
-  Collection.add(Collection.poolOf("char", null)[0], 1);
-  eq(state.clues, 0);
-  eq(state.cycleClues, 0);
+  /* Cards stopped being the gate (GDD 6.1). Every card in the set can be in the album and not
+     one episode is unlocked by it — which is the whole point of the split. */
+  Collection.pool().forEach(id => Collection.add(id, 1));
+  deepEq(state.clues, {}, "a card is not evidence");
+  deepEq(Collection.unlockedEpisodeIds(), [], "and it unlocks nothing");
+  eq(Collection.collected(), Collection.poolSize(), "the album still fills");
 });
 
 test("albums are per board — the same id on another board is a different card", () => {
@@ -96,29 +86,29 @@ test("albums are per board — the same id on another board is a different card"
 
 suite("collection: unlocking episodes");
 
-test("an episode unlocks exactly when its page is complete", () => {
+test("a page reports its CLUE progress, and unlocks on the last one", () => {
   freshRun();
   const page = Collection.pages()[0];
-  page.needs.slice(0, -1).forEach(id => Collection.add(id, 1));
-  eq(Collection.pageReady(page), false, "four of five is not a set");
-  deepEq(Collection.pageProgress(page), [page.needs.length - 1, page.needs.length]);
-  Collection.add(page.needs[page.needs.length - 1], 1);
-  ok(Collection.pageReady(page), "the fifth card is the unlock");
+  const need = Clues.requiredFor(page.ep);
+  const cs = Clues.authoredFor(page.ep);
+  state.clues[page.ep] = cs.slice(0, need - 1).map(c => c.id);
+  eq(Collection.pageReady(page), false, `${need - 1} of ${need} is not an unlock`);
+  deepEq(Collection.pageProgress(page), [need - 1, need]);
+  state.clues[page.ep].push(cs[need - 1].id);
+  ok(Collection.pageReady(page), "the last clue is the unlock");
   ok(Collection.unlockedEpisodeIds().includes(page.ep));
 });
 
 test("claimUnlocked queues only what is newly unlocked", () => {
   freshRun();
   const pages = Collection.pages();
-  const before = Collection.unlockSnapshot();
-  pages[0].needs.forEach(id => Collection.add(id, 1));
-  const fresh = Collection.claimUnlocked(before);
-  deepEq(fresh, [pages[0].ep]);
+  unlockEpisode(pages[0].ep);
   deepEq(state.epQueue, [pages[0].ep]);
-  /* Watched, so off the queue — and it must not come back as "fresh" on the next box. */
+  /* Watched, so off the queue — and it must not come back as "fresh" on the next unlock. */
   state.epQueue = [];
   const after = Collection.unlockSnapshot();
-  pages[1].needs.forEach(id => Collection.add(id, 1));
+  state.clues[pages[1].ep] = Clues.authoredFor(pages[1].ep)
+    .slice(0, Clues.requiredFor(pages[1].ep)).map(c => c.id);
   deepEq(Collection.claimUnlocked(after), [pages[1].ep], "only the new one");
   deepEq(state.epQueue, [pages[1].ep], "an already-watched episode is not re-queued");
 });
@@ -134,11 +124,10 @@ test("pageMissing names exactly what is still needed", () => {
 test("firstUnwatchedId walks the album in order, not the queue's push order", () => {
   freshRun();
   const pages = Collection.pages();
-  pages[2].needs.forEach(id => Collection.add(id, 1));
-  pages[0].needs.forEach(id => Collection.add(id, 1));
-  Collection.claimUnlocked([]);
+  unlockEpisode(pages[2].ep);
+  unlockEpisode(pages[0].ep);
   eq(Collection.firstUnwatchedId(), pages[0].ep,
-     "collecting set 3 first still plays episode 1 first");
+     "unlocking episode 3 first still plays episode 1 first");
 });
 
 suite("collection: turning the board over");
@@ -146,16 +135,15 @@ suite("collection: turning the board over");
 test("a board is complete only when every page is", () => {
   freshRun();
   eq(Collection.boardComplete(), false);
-  Collection.pages().forEach(p => p.needs.forEach(id => Collection.add(id, 1)));
+  Collection.pages().forEach(p => unlockEpisode(p.ep));
   ok(Collection.boardComplete());
   deepEq(Collection.boardProgress(), [cfg.episodesPerBoard, cfg.episodesPerBoard]);
 });
 
 test("a set is finished only when its episodes have been watched, not merely collected", () => {
   freshRun();
-  Collection.pool().forEach(id => Collection.add(id, 1));
-  Collection.claimUnlocked([]);
-  ok(Collection.boardComplete(), "every card is in");
+  Collection.pages().forEach(p => unlockEpisode(p.ep));
+  ok(Collection.boardComplete(), "every episode unlocked");
   eq(Collection.boardFinished(), false, "but five episodes are still waiting");
   deepEq(Collection.boardWatched(), [0, cfg.episodesPerBoard]);
   state.epQueue = [];                            // …watched
@@ -165,7 +153,7 @@ test("a set is finished only when its episodes have been watched, not merely col
 
 test("a sealed reveal is not a watched episode", () => {
   freshRun();
-  Collection.pool().forEach(id => Collection.add(id, 1));
+  Collection.pages().forEach(p => unlockEpisode(p.ep));
   state.epQueue = [];
   state.pendingReveal = { id: "001", wager: 10, odds: 2, won: true, payout: 20 };
   eq(Collection.boardFinished(), false, "the bet is placed but the answer is still owed");
@@ -176,23 +164,23 @@ test("a sealed reveal is not a watched episode", () => {
 test("advanceBoard refuses until the set is finished, then moves on", () => {
   freshRun();
   eq(Collection.advanceBoard(), null, "an incomplete board does not turn over");
-  Collection.pool().forEach(id => Collection.add(id, 1));
-  Collection.claimUnlocked([]);
-  eq(Collection.advanceBoard(), null, "and neither does a collected-but-unwatched one");
+  Collection.pages().forEach(p => unlockEpisode(p.ep));
+  eq(Collection.advanceBoard(), null, "and neither does an unlocked-but-unwatched one");
   state.epQueue = [];
   const next = Collection.advanceBoard();
   ok(next, "a complete board with content behind it advances");
   eq(state.boardNum, 2);
   eq(state.boardsDone, 1);
-  eq(Collection.collected(), 0, "the new set starts empty");
+  eq(Collection.collected(), 0, "the new set's album starts empty");
   eq(Collection.poolSize(), cfg.episodesPerBoard * cfg.collectiblesPerEpisode);
 });
 
 test("a finished board keeps its episodes forever", () => {
   freshRun();
-  Collection.pool(1).forEach(id => Collection.add(id, 1));
+  Collection.pages(1).forEach(p => unlockEpisode(p.ep));
   state.epQueue = [];
   const wasUnlocked = Collection.unlockedEpisodeIds().slice();
+  ok(wasUnlocked.length, "the set has to actually be unlocked for this to mean anything");
   Collection.advanceBoard();
   const now = Collection.unlockedEpisodeIds();
   wasUnlocked.forEach(id => ok(now.includes(id), `${id} must survive the board change`));
@@ -295,33 +283,20 @@ test("openBoxEvents pays a box and says nothing more when nothing completed", ()
   });
 });
 
-test("openBoxEvents reports the unlock the moment a page fills", () => {
+test("a box unlocks nothing — cards and the story are separate tracks now", () => {
   freshRun();
-  const page = Collection.pages()[0];
-  const clues = page.needs.filter(id => Collection.parse(id).kind === "clue");
-  /* Everything but the clues, then every clue in the pool except this page's — so a clue draw
-     has nowhere to land but the cards that finish the page. */
-  page.needs.filter(id => !clues.includes(id)).forEach(id => Collection.add(id, 1));
-  Collection.poolOf("clue", null).filter(id => !clues.includes(id))
-    .forEach(id => Collection.add(id, 1));
-  let unlocked = null;
-  forceBox("silver", r => r.kind === "clue", () => {
-    for (let k = 0; k < 200 && !unlocked; k++) {
-      const ev = openBoxEvents("silver");
-      const u = ev.find(e => e.unlock);
-      if (u) unlocked = u.unlock.ids;
-    }
-  });
-  deepEq(unlocked, [page.ep], "the page that filled is the episode announced");
-  ok(state.epQueue.includes(page.ep), "and it is queued to watch");
+  for (let k = 0; k < 40; k++) {
+    eq(openBoxEvents("silver").filter(e => e.unlock).length, 0,
+       "an episode is bought with clues, and a box does not contain any");
+  }
+  eq(Collection.unlockedEpisodeIds().length, 0);
 });
 
-test("openBoxEvents does not end a set — collecting the last card is not watching it", () => {
+test("openBoxEvents does not end a set — unlocking an episode is not watching it", () => {
   freshRun();
-  Collection.pages().forEach(p => p.needs.forEach(id => Collection.add(id, 1)));
-  Collection.claimUnlocked([]);                  // all five unlocked, none watched
-  ok(Collection.boardComplete(), "collected");
-  eq(Collection.boardFinished(), false, "but not finished");
+  Collection.pages().forEach(p => unlockEpisode(p.ep));
+  ok(Collection.boardComplete(), "every episode unlocked");
+  eq(Collection.boardFinished(), false, "but not one of them watched");
   forceBox("silver", r => r.kind === "coins", () => {
     eq(openBoxEvents("silver").filter(e => e.boardDone).length, 0,
        "the set holds until the episodes have been seen");
@@ -338,26 +313,22 @@ test("landing on the Premiere hands over a box and nothing else", () => {
 
 test("a card drawn off a tile goes through the same banking as one out of a box", () => {
   freshRun();
-  const before = Collection.unlockSnapshot();
   const ev = drawCardEvents("test", "🃏");
   eq(Collection.collected(), 1, "banked before a single event is returned");
-  deepEq(Collection.claimUnlocked(before), [], "one card cannot complete a page of five");
   eq(ev.filter(e => e.pack).length, 0, "and it is NOT the box ceremony");
+  eq(ev.filter(e => e.card).length, 1, "a card you did not have holds the screen");
 });
 
-test("a card that completes a page unlocks its episode, wherever it came from", () => {
+test("a duplicate off a tile pays coins and never blocks", () => {
   freshRun();
-  const page = Collection.pages()[0];
-  page.needs.slice(0, page.needs.length - 1).forEach(id => Collection.add(id, 1));
-  const last = page.needs[page.needs.length - 1];
-  /* Force the pool down to the one card still missing, then draw it off a tile. */
   const real = Collection.poolOf;
-  Collection.poolOf = () => [last];
+  Collection.poolOf = () => [Collection.pool()[0]];
   try {
+    drawCardEvents("test", "🃏");
+    state.coins = 0;
     const ev = drawCardEvents("test", "🃏");
-    const un = ev.find(e => e.unlock);
-    ok(un, "the page filled, so the episode has to unlock");
-    deepEq(un.unlock.ids, [page.ep]);
+    ok(state.coins > 0, "a duplicate always converts to something");
+    eq(ev.filter(e => e.card).length, 0, "and it does not stop the roll");
   } finally { Collection.poolOf = real; }
 });
 
@@ -438,8 +409,7 @@ suite("collection: watching in order");
 test("watched is derived — unlocked, and no longer waiting", () => {
   freshRun();
   const pages = Collection.pages();
-  pages[0].needs.forEach(id => Collection.add(id, 1));
-  Collection.claimUnlocked([]);
+  unlockEpisode(pages[0].ep);
   deepEq(Collection.watchedIds(), [], "unlocked but queued is not watched");
   state.epQueue = [];
   deepEq(Collection.watchedIds(), [pages[0].ep]);
@@ -448,10 +418,9 @@ test("watched is derived — unlocked, and no longer waiting", () => {
 test("the next episode is the next of the STORY, however the cards fell", () => {
   freshRun();
   const pages = Collection.pages();
-  pages[1].needs.forEach(id => Collection.add(id, 1));   // page 2 fills first
-  Collection.claimUnlocked([]);
+  unlockEpisode(pages[1].ep);                            // episode 2 unlocks first
   eq(Collection.nextStoryId(), pages[0].ep, "episode 1 is still what is owed next");
-  eq(Collection.firstUnwatchedId(), null, "and it cannot be watched — it is not collected");
+  eq(Collection.firstUnwatchedId(), null, "and it cannot be watched — it is not unlocked");
   eq(Collection.blockedBy(), pages[0].ep, "so the UI can say which one is holding things up");
   eq(Collection.canWatch(pages[1].ep), false, "episode 2 does not jump the queue");
 });
@@ -459,9 +428,8 @@ test("the next episode is the next of the STORY, however the cards fell", () => 
 test("collecting the earlier episode unblocks it, and only it", () => {
   freshRun();
   const pages = Collection.pages();
-  pages[1].needs.forEach(id => Collection.add(id, 1));
-  pages[0].needs.forEach(id => Collection.add(id, 1));
-  Collection.claimUnlocked([]);
+  unlockEpisode(pages[1].ep);
+  unlockEpisode(pages[0].ep);
   eq(Collection.firstUnwatchedId(), pages[0].ep);
   eq(Collection.blockedBy(), null);
   ok(Collection.canWatch(pages[0].ep));
@@ -472,7 +440,7 @@ test("collecting the earlier episode unblocks it, and only it", () => {
 
 test("the order runs across sets, not just within one", () => {
   freshRun();
-  Collection.pool(1).forEach(id => Collection.add(id, 1));
+  Collection.pages(1).forEach(p => unlockEpisode(p.ep));
   state.epQueue = [];
   Collection.advanceBoard();
   const pages = Collection.pages();

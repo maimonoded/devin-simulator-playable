@@ -44,13 +44,17 @@ function resolveLandingEvents(mult){
 function resolvePrediction({wager,odds,sel,correct,auto,id}){
   if(wager>0) state.coins-=wager;
   state.predsMade++;
-  /* Clue CARDS banked since the last prediction buy accuracy, then are spent — the economy
-     model treats them as a per-cycle flow, not a balance. Only a new clue card counts (a
-     duplicate pays coins), and they only decide the outcome in auto runs; a human's pick still
-     decides a manual one. See TODO.md. */
-  const accuracy=Economy.accuracyFor(state.cycleClues);
-  const cluesSpent=state.cycleClues;
-  state.cycleClues=0;
+  /* The evidence held for THIS episode buys the accuracy — not a running balance, and not
+     whatever happened to be banked since the last bet. That is the whole reason the gate and the
+     edge are one object (GDD 6.1): the clues that unlocked this episode are the clues you are
+     reasoning from, so two players who unlocked it holding different evidence are genuinely
+     making different bets.
+
+     It only decides the outcome in AUTO runs; a human's pick still decides a manual one. The
+     clues are not cleared — see js/clues.js on why "consumed" does not mean deleted. */
+  const held=id!=null?Clues.countFor(id):0;
+  const accuracy=Economy.accuracyFor(held);
+  const cluesSpent=held;
   const won=auto?chance(accuracy):sel===correct;
   state.epsWatched++;
   /* Remove THIS episode, not whichever happens to be at the front. The library can start a

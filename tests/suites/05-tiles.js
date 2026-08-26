@@ -39,11 +39,9 @@ test("gainEnergy never reduces a balance already above the cap", () => {
   eq(state.energy, 500, "an over-cap balance must not be clamped down");
 });
 
-test("gainClues adds clues", () => {
-  freshRun();
-  state.clues = 2;
-  TILE_TYPES.std.gainClues(3);
-  eq(state.clues, 5);
+test("a tile has no clue helper of its own — Clues.grant() is the only way in", () => {
+  ok(typeof TILE_TYPES.std.gainClues === "undefined",
+     "a clue is per-episode evidence now; a bare counter must not come back");
 });
 
 test("presentation builders produce well-formed events", () => {
@@ -122,13 +120,13 @@ test("a landing draws from ITS pool, not from any other", () => {
      one of each: the tile must reach the table its type points at. */
   forcePool("clue", r => r.kind === "clue", () =>
     forcePool("money", r => r.kind === "money", () => {
-      state.clues = 0; state.coins = 0;
+      state.coins = 0;
       landOn("npc");
-      eq(state.clues, 1, "an NPC tile draws the clue pool");
+      eq(Clues.total(), 1, "an NPC tile draws the clue pool");
       eq(state.coins, 0);
       landOn("std");
       ok(state.coins > 0, "a standard tile draws the money pool");
-      eq(state.clues, 1);
+      eq(Clues.total(), 1);
     }));
 });
 
@@ -190,10 +188,10 @@ test("energy tops up and an event row pays nothing at all", () => {
     ok(state.energy > 0);
   });
   forcePool("money", r => r.kind === "event", () => {
-    state.coins = 0; state.clues = 0; state.energy = 5;
+    state.coins = 0; state.energy = 5;
     const before = Collection.collected();
     const ev = landOn("std");
-    eq(state.coins, 0); eq(state.clues, 0); eq(state.energy, 5);
+    eq(state.coins, 0); eq(Clues.total(), 0); eq(state.energy, 5);
     eq(Collection.collected(), before, "an event row is flavour, and flavour is free");
     eq(evField(ev, "log").length, 1, "it still earns its line in the log");
   });
@@ -297,10 +295,10 @@ test("The Scoop teleports to an NPC tile and triggers it", () => {
   const npcs = tilesOfType("npc");
   forcePool("clue", r => r.kind === "clue", () => {
     for (let k = 0; k < 40; k++) {
-      state.pos = 30; state.clues = 0; state.coins = 0;
+      state.pos = 30; state.clues = {}; state.coins = 0;
       const ev = TILE_TYPES.scoop.onLand({ pos: 30, mult: 1, bs: 1 });
       ok(npcs.includes(state.pos), `landed on ${state.pos}, which is not an NPC tile`);
-      eq(state.clues, 1, "and the tile it lands on actually fires");
+      eq(Clues.total(), 1, "and the tile it lands on actually fires");
       const move = ev.find(e => e.move).move;
       eq(move.path.length, 1, "a teleport is one step — walking it would pay a lap bonus");
       eq(move.path[0], state.pos);

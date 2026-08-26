@@ -76,7 +76,8 @@ js/
   storage.js        localStorage persistence for config and progress
   episodes.js       episode registry
   board-actor.js    shared base: reward helpers, grantEnergy, presentation event builders
-  collection.js     THE PROGRESSION ENGINE: the pool, the albums, what unlocks an episode
+  clues.js          WHAT UNLOCKS AN EPISODE: per-episode evidence, and the edge it buys
+  collection.js     the card album: the pool, the per-set pages, duplicates
   status.js         the status track: points, ranks, buying, milestone sweep
   boxes.js          the three box tiers, the drop tables, and openBoxEvents()
   tiles/            ONE class for the four pooled types, plus the four corners → js/tiles/README.md
@@ -184,7 +185,8 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 | Dice | `js/dice-model.js` `js/ui/dice3d.js` | Thrown in from the bottom-left of the view and landing wherever the camera is aimed — the middle of the board is off-screen much of the time with `camFollow` on. `cfg.diceRevealMs` is the throw's length and the promise resolves at exactly that mark, `cfg.diceToMoveMs` still gates the token. Falls back to the DOM pair in `js/ui/fx.js` when `cfg.dice3d` is off or `die.glb` never loaded. |
 | Bonus mini-games | `minigames/` `js/ui/minigame.js` | A **pool row may name a game** — the two that do sit in the `bonus` table the arrivals draw from, so a mini-game is a property of the outcome rather than of the ground you are standing on. Each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
-| **The collection** | `js/collection.js` `assets/cards/` | The progression. A **set** is `cfg.episodesPerBoard` episodes, each unlocked by `cfg.collectiblesPerEpisode` named cards — 5 × 5, so 25 distinct cards a set. Three things are derived rather than stored: the **pool** (the union of the episodes' requirements, so a card that can drop but is never wanted is a validation error), **which episodes are unlocked** (read off the albums, which are kept per set forever), and **which set an episode belongs to** (its position in `Episodes.ids()`). → [README](assets/cards/README.md) |
+| **Clues** | `js/clues.js` `episodes/NNN.js` | **What unlocks an episode**, and the evidence you bet on — one object doing both jobs (GDD §6.1). Each episode authors eight; `cfg.cluesPerEpisode` of them unlocks it, so two players arrive at the same wager holding different evidence. A duplicate pays coins. The catch-up valve eases the requirement by one a day after `cfg.clueStuckDays`. |
+| **The collection** | `js/collection.js` `assets/cards/` | The card album. A **set** is `cfg.episodesPerBoard` episodes, each unlocked by `cfg.collectiblesPerEpisode` named cards — 5 × 5, so 25 distinct cards a set. Three things are derived rather than stored: the **pool** (the union of the episodes' requirements, so a card that can drop but is never wanted is a validation error), **which episodes are unlocked** (read off the albums, which are kept per set forever), and **which set an episode belongs to** (its position in `Episodes.ids()`). → [README](assets/cards/README.md) |
 | **Boxes** | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | The only way anything is collected. Three tiers, each `items` draws against its own weighted table. Opened the moment they are won — and **not in a dialog**: the box is the same GLB the board used to stand on a tile, it arrives over the middle of the board, and you tap the mesh. It bursts where it stood and the cards fly out and hang in the air. The only DOM is a caption and the countdown bar (`js/ui/pack.js`), which also holds the modal fallback for when there is no WebGL. Every empty case falls forward, so a box always pays. → [README](assets/boxes/README.md) |
 | **The case board** | `js/ui/case3d.js` | The current set, standing **inside the ring**: five panels, one per episode, each holding that episode's five card slots with the collected cards' own art in them. Each panel is a canvas painted once and used as the texture of an **upright plane standing on the board** — see "Nothing on the board fades or hides" below. Tapping a panel opens the album there (`Board3D.caseAt()` raycasts them; the tap/pan split lives in `_initDrag`). |
 | **Status** | `js/status.js` `js/ui/profile.js` `js/ui/statusup.js` `assets/status/` | The player's standing. Points come from owned items **plus** episodes watched **plus** cards collected, so play alone climbs and buying alone does not finish. Every one of the ten items has both a coin price and a play milestone. Rank shows beside the avatar in the HUD, and earning an item plays a beat that shows the track actually moving. A status item wears a **gold frame** everywhere it appears — see below. → [README](assets/status/README.md) |
@@ -200,11 +202,13 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 ```
 roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
                      →  money · a CARD · a clue · energy · a move · flavour
+      →  a clue      →  filed against the episode being worked on  (js/clues.js)
       →  a card      →  banked, and held on screen if it is new  (js/boxes.js drawCardEvents)
       →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
                         (the Premiere's free pack, and the store)
-   five cards on one page  →  that EPISODE unlocks  →  predict & watch, IN STORY ORDER
-   all five WATCHED        →  the SET is done       →  a fresh 25 on the next five episodes
+   four of an episode's eight clues  →  it UNLOCKS  →  predict & watch, IN STORY ORDER
+   the same clues are the EVIDENCE you read before betting
+   all five WATCHED  →  the SET is done  →  a fresh 25 on the next five episodes
 ```
 
 **Unlocking and watching are two different gates.** Which cards fall is luck, so pages fill in
@@ -347,22 +351,41 @@ one. `Guide!B2` is the model's identity, and re-importing a version already impo
 There is no server yet, so the browser is the database: an imported model lives in
 `localStorage` under `pmdrama.econ.v1`, with its source filename kept for reference.
 
-### Clues are two different things
+### A clue is the gate AND the evidence
 
-A clue is a **card** now (`clue:sign`, one of the ten in a set), but it still does the two
-unrelated jobs it always did.
+That is the design, not a coincidence, and it is GDD §6.1's whole argument: progress and
+information are the same currency, so there is never a moment where you are grinding one and
+ignoring the other.
 
-`state.clues` is the **lifetime total**, never spent — shown in the album's footer against
-`cfg.clueAlbumSize`, which the economy model still owns. `state.cycleClues` is the **flow** —
-banked since the last prediction, it raises the modelled accuracy (`Economy.accuracyFor`:
-0.55 + 0.04/clue, capped at 0.70) and is spent and reset by `resolvePrediction`.
+`state.clues` is `{ "005": ["c3","c7"] }` — **which** clues, for **which** episode. Not a count.
+The requirement (`cfg.cluesPerEpisode`, four) sits well below the pool each episode authors
+(eight), so two players reach the same prediction holding *different* evidence. A counter could
+not express that, and without it "Review the evidence" would show everyone the same screen.
 
-Both are fed by `Collection.add()`, and **only by a new card**: a duplicate clue pays coins, not
-insight. Feeding them there rather than at the call site is what makes every future source of
-cards get it right for free.
+Four consequences worth knowing before changing any of it:
 
-Accuracy only decides the outcome in **auto** runs — a manual pick still wins on its merits.
-That gap is open design, tracked in [TODO.md](TODO.md).
+1. **A draw can repeat.** It picks uniformly from the episode's eight, so four distinct ones take
+   about five draws (`Clues.expectedDraws()`), and an unlucky run takes many more. That is what
+   makes the pool-of-eight meaningful — and a duplicate still pays coins, because GDD §12's first
+   rule about variance is that a duplicate must always convert to something.
+2. **The catch-up valve** (§6.7): once an episode has been the current one for `cfg.clueStuckDays`,
+   the requirement decays by one a day, never below one. It is invisible to anyone progressing
+   normally — the clock only starts when a clue has actually landed for that episode, because a
+   player who has just arrived has not been unlucky.
+3. **A clue always goes to the first episode not yet unlocked**, so it can never arrive for
+   something already bought and the story always moves forward.
+4. **They are never cleared.** §6.4 calls them consumed at unlock, which they are in the sense
+   that they buy that episode and nothing else — but the record has to survive or the evidence
+   screen would be empty the moment it became reachable.
+
+**The accuracy edge is per-episode now.** `resolvePrediction` prices the bet on
+`Clues.countFor(id)` — what you know about *this* story beat — not on a running balance. Another
+episode's clues are not evidence for this one. It still only decides the outcome in **auto** runs;
+a human's pick wins on its merits.
+
+**Cards gate nothing.** They are collectibles, and what they buy is Status. `Collection.pageReady`
+and friends read through to `Clues`, so the album, the case board and the library all show the
+clue gate; the cards still have their page, as a display of what the set contains.
 
 ### Energy may exceed the cap
 
@@ -473,6 +496,10 @@ so `valueLabel()` returns `""` for every type and the position weights were dele
 two mini-games moved into the `bonus` pool as rows carrying a `game` key, and their money is the
 row's `amount` rather than the model's number. `Economy.trainLadder()` is still what builds the
 three-rung reveal, so the ladder is live and the two payout scalars are not.
+
+**`clueAlbumSize` is dead.** It was the cosmetic target for a lifetime clue count that no
+longer exists — clues are per-episode now and `Clues.total()` derives the total. The key is
+still imported from the workbook and still projected onto `cfg`, so it round-trips.
 
 `secPerRoll` is in the tuning drawer but read by nothing. It is still used by the economy
 spreadsheet (seconds-per-roll derives its "active minutes per session"), so wiring it up is

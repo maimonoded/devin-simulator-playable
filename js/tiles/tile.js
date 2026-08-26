@@ -11,7 +11,7 @@
    The point of that is not tidiness. A new tile type, a seasonal board or a live-ops variant is
    a row in assets/pools/pools.js and an entry in assets/board/board.js — content, not code.
 
-   Rewards and presentation builders (gainCoins/gainEnergy/gainClues, reveal/collect/card) are
+   Rewards and presentation builders (gainCoins/gainEnergy, reveal/collect/card) are
    inherited from BoardActor in js/board-actor.js.
 
    onLand(ctx) contract: ctx={pos,mult,bs}. Mutates state synchronously and returns an ordered

@@ -26,7 +26,12 @@ Episodes.add({
     { "text": "His family forced him out and seized everything he owned", "odds": 2.22 }
   ],
   "correct": 0,                      // 0-based index into answers
-  "difficulty": 4                    // optional, 1–10 (default 1)
+  "difficulty": 4,                   // optional, 1–10 (default 1)
+  "clues": [                         // 8+ — what unlocks this episode, and the evidence for it
+    { "id": "c1", "text": "A city-centre lock-up in his name is still paid up, in cash." },
+    { "id": "c2", "text": "He turns down casual work that would need identification." }
+    // …six more
+  ]
 });
 ```
 
@@ -38,6 +43,8 @@ Episodes.add({
 | `answers[].text` | Option label. |
 | `answers[].odds` | Payout multiplier if that option is picked **and** it's right — a wager of 500 at ×2.4 returns 1,200. Longer odds should go on less likely answers. |
 | `correct` | Index of the true answer **as listed in this file**. Decides win/loss in manual play. The game reshuffles the answer order on every showing, so the correct answer doesn't sit in a predictable position — you don't need to vary it across files. |
+| `clues[].id` | Unique within this episode. `state.clues` stores these ids, so **do not renumber them** in a shipped episode — a player's evidence is a list of them. |
+| `clues[].text` | One short, concrete, in-world observation. It is printed verbatim on the wager screen under "Review the evidence", so write it to be *read*, not counted. |
 | `difficulty` | **Optional.** How hard the call is, `1`–`10` (10 = hardest). **Defaults to `1`** when absent. Values outside the range are clamped. Informational for now — nothing in the game reads it yet; available as `Episodes.difficultyOf(id)`. |
 
 The payload is plain JSON wrapped in one `Episodes.add(...)` call. That wrapper is what lets the
@@ -52,11 +59,35 @@ JSON-valid, so these can be converted to real `.json` files if the project ever 
    other episode scripts.
 3. Drop `episodes/013.mp4` alongside it when the video exists.
 
+## Writing the clues
+
+`cfg.cluesPerEpisode` of them unlocks the episode — four of the eight each file authors. That
+slack is the point (GDD §6.1): two players arrive at the same prediction holding **different**
+evidence, which is why the clues are the wager screen's content and not a number in the HUD.
+
+So write eight that could each stand alone:
+
+- **Concrete and observed.** "There is a dictaphone in his coat, and the tapes are labelled by
+  surname" — not "he seems to be investigating something".
+- **Partial.** Each one narrows the answer without settling it. Any four together should make the
+  correct answer feel earned; no single one should give it away.
+- **True.** A clue that misleads is not a clue, it is a lie, and the player is betting money on
+  it. Ambiguity is fine; falsehood is not.
+- **Short.** One sentence. Eight of them are shown at once.
+
+`Clues.validate()` refuses an episode with fewer clues than the requirement, a duplicate id or a
+clue with no text, and prints the lot in the tuning drawer — an episode that can never unlock is
+invisible in play, because it looks exactly like a long run of bad luck.
+
 A **set** is `cfg.episodesPerBoard` consecutive episodes: set 1 is 001–005, set 2 is 006–010,
 and so on straight down `Episodes.ids()`. So adding files extends the run by a set every five,
 and running out of them is what ends it — `Collection.hasNextBoard()` is false, and the last set
 completed is the finale. Only board 1's cards are authored; later sets reuse its requirements
 over their own episodes until someone authors them.
+
+**`013.js`–`018.js` are written but not loaded.** They have no `<script>` tag in `index.html`, so
+the run is twelve episodes today. Adding the six tags extends it by a set and a bit; they carry
+their clues already.
 
 ## Watch now, or binge later
 

@@ -135,6 +135,14 @@ const DEFAULTS={
      being the one the economy model's projections assume (Economy.wagerTiers). minWager is
      the floor underneath all three. clueAlbumSize is the cosmetic album target. */
   wagerSafe:0.05, wagerConfident:0.10, wagerMax:0.20, clueAlbumSize:300,
+  /* ---- clues (js/clues.js) ----
+     cluesPerEpisode is how many of an episode's authored eight it takes to unlock it —
+     GDD 6.2 wants that FIXED within a Season and stepped between them, which is
+     clueSeasonStep. clueStuckDays is the catch-up valve (6.7): after this many days on
+     the same episode the requirement decays by one a day, so an unlucky run of duplicate
+     clues cannot wall a player out of the story. dupClueCoins is what a duplicate pays,
+     because a draw that pays nothing reads as the game misfiring. */
+  cluesPerEpisode:4, clueSeasonStep:0, clueStuckDays:3, dupClueCoins:150,
 };
 let cfg=Object.assign({},DEFAULTS);
 /* Roll stakes in cycle order. One button steps through these and wraps, so the order here IS
@@ -343,5 +351,9 @@ const TUNING=[
    ["accuracyPerClue","Accuracy gained per clue",0.01,{min:0,max:0.2}],
    ["accuracyMax","Accuracy cap",0.01,{min:0,max:1}],
    ["clueAlbumSize","Clue album size (cosmetic target)",10,{min:1}],
+   ["cluesPerEpisode","Clues needed to unlock an episode",1,{min:1}],
+   ["clueSeasonStep","…and how many more each Season",1,{min:0}],
+   ["clueStuckDays","Catch-up valve: days before it eases",1,{min:0}],
+   ["dupClueCoins","Duplicate clue: coins",10,{min:0}],
    ["avgOdds","Avg odds (reference)",0.1]]},
 ];

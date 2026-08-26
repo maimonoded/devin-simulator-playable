@@ -26,11 +26,6 @@ class BoardActor {
     grantEnergy(n);
     return {float:{text:text??"+"+n+"⚡",color:"var(--teal)"}};
   }
-  /* Feeds both counters: the album total and the per-prediction flow that buys accuracy. */
-  gainClues(n,text){
-    state.clues+=n; state.cycleClues+=n;
-    return {float:{text:text??"+"+n+"🔍",color:"var(--teal)"}};
-  }
 
   /* ---- presentation event builders (all block the roll loop) ---- */
   /* Center-of-board reveal. opts: {positive, energy, ms}

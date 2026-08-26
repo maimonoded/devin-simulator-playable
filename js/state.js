@@ -4,14 +4,16 @@ let state={};
 function initState(){
   state={
     day:1, clock:9*60, sessionsToday:1,
-    /* Two clue counters. A clue is a CARD now (js/collection.js), but it still does the two
-       unrelated jobs it always did:
-         clues      — the lifetime total, never spent. Shown in the album's footer.
-         cycleClues — the flow. Banked since the last prediction, spent on the next one
-                      (it buys accuracy, see Economy.accuracyFor) and reset to zero.
-       Both are fed by Collection.add() when a NEW clue card lands — a duplicate pays coins,
-       not insight. */
-    energy:cfg.energyCap, coins:0, clues:0, cycleClues:0, vip:0,
+    energy:cfg.energyCap, coins:0, vip:0,
+    /* THE EVIDENCE. Episode id → the clue ids held for it: {"005": ["c3","c7"]}. Which clues,
+       for which episode — not how many in total. The requirement (cfg.cluesPerEpisode) sits
+       well below the eight each episode authors, so two players reach the same prediction
+       holding DIFFERENT evidence; a counter could not express that. Whether an episode is
+       unlocked is DERIVED from this and nothing else (js/clues.js). */
+    clues:{},
+    /* Episode id → the day its first clue landed. All the catch-up valve needs to measure
+       from; see Clues.daysOn(). */
+    clueDay:{},
     pos:0, mult:1, series:0,
     /* Which Season's board is being played — an INDEX into BOARD_SEASONS (assets/board/board.js),
        so 0 is Season 1. The board's size, shape and every tile's type come from there, which is

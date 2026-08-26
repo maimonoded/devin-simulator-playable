@@ -87,7 +87,7 @@ function buildTuning(){
      forty tiles is a 10% clue rate per roll, and it is the second number anyone tuning pacing
      needs (GDD 6.6). */
   const pwrap=document.createElement("div"); pwrap.className="tgroup";
-  const pbad=validateBoard().concat(Pools.validate());
+  const pbad=validateBoard().concat(Pools.validate()).concat(Clues.validate());
   const rolls=40, per=k=>(Pools.boardShareOf(k)*rolls).toFixed(1);
   pwrap.innerHTML=`<h4>Board · ${boardSeason().name}</h4>
     <p class="hint" style="margin:0 0 8px">
@@ -96,7 +96,9 @@ function buildTuning(){
       4 corners</p>
     <p class="hint" style="margin:0 0 8px">Per 40 rolls: <b>${per("card")}</b> cards ·
       <b>${per("clue")}</b> clues · <b>${(Pools.boardShareOf("money")*100).toFixed(0)}%</b> of
-      landings pay money.</p>
+      landings pay money. An episode costs <b>${Clues.baseRequired()}</b> of the
+      ${Clues.authoredFor(Episodes.ids()[0]).length} clues it authors, so roughly
+      <b>${(Clues.expectedDraws()).toFixed(1)}</b> clue draws.</p>
     ${pbad.length
       ? `<p class="hint" style="color:var(--pink);margin:0"><b>${pbad.length} problem${pbad.length>1?"s":""}:</b></p>
          <ul style="margin:6px 0 0 16px;padding:0;font-size:12px;color:var(--muted)">

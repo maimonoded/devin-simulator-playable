@@ -91,7 +91,7 @@ function clearConfig(){ if(!storageOK) return; try{ localStorage.removeItem(LS_C
 function serializeState(){
   return {v:2,
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
-    energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
+    energy:state.energy, coins:state.coins, clues:state.clues, clueDay:state.clueDay, vip:state.vip,
     pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series, season:state.season,
     /* The collection and the shelf. Both are plain objects keyed by id, so they serialise as
        they stand — no Map to spread, and a card or item the content no longer defines simply
@@ -139,6 +139,26 @@ function loadState(){
       Object.keys(src).forEach(id=>{ const c=Math.floor(+src[id]||0); if(c>0) out[id]=c; });
       state.albums[String(n)]=out;
     });
+    /* THE EVIDENCE. Sanitised the same way and for the same reason as the albums: the episode
+       keys are checked but the CLUE IDS are not, because an episode's clue list is authored
+       content that can be rewritten, and dropping a clue this build has not heard of would
+       silently re-lock an episode the player had already bought.
+
+       A save from before clues were per-episode has a NUMBER here. There is no honest way to
+       spread a total across episodes, so it is dropped — better an obvious reset than an
+       invented set of holdings that unlocks the wrong thing. */
+    state.clues={}; state.clueDay={};
+    const rawClues=(d.clues&&typeof d.clues==="object")?d.clues:{};
+    Object.keys(rawClues).forEach(id=>{
+      const held=Array.isArray(rawClues[id])?rawClues[id]:[];
+      const out=[]; held.forEach(c=>{ if(typeof c==="string"&&c&&!out.includes(c)) out.push(c); });
+      if(out.length) state.clues[id]=out;
+    });
+    const rawDay=(d.clueDay&&typeof d.clueDay==="object")?d.clueDay:{};
+    Object.keys(state.clues).forEach(id=>{
+      const day=Math.floor(+rawDay[id]);
+      state.clueDay[id]=day>=1?day:1;
+    });
     /* Clamped to a Season that actually exists: a save from a build with more Seasons than
        this one would otherwise leave the board empty and every tile undefined. */
     state.season=Math.min(Math.max(0,Math.floor(+d.season||0)),BOARD_SEASONS.length-1);
@@ -156,7 +176,13 @@ function loadState(){
     });
     // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
     const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
-    state.epQueue=rawQueue.filter(x=>Episodes.has(x));
+    /* The queue is what is UNLOCKED AND UNWATCHED, so it can only ever hold episodes that are
+       currently unlocked — an invariant worth enforcing here rather than trusting, because two
+       things can break it between saves: raising cfg.cluesPerEpisode in the drawer, and a save
+       written when episodes were unlocked by cards. Leaving a stale id in would offer a
+       "Predict & watch" for an episode the player has not actually bought. */
+    const unlocked=Clues.unlockedIds();
+    state.epQueue=rawQueue.filter(x=>Episodes.has(x)&&unlocked.includes(x));
     /* A sealed reveal is only worth restoring if its episode still exists and it still carries
        a decided outcome — anything else would leave the player stuck being told to finish an
        episode that cannot play. */

@@ -64,7 +64,7 @@ function renderAlbum(){
       <div class="albumBar"><div class="albumFill" style="width:${pct}%"></div></div>
       <div class="hint" style="margin:6px 0 10px">
         <b style="color:var(--pink)">${eps}</b>/${epTotal} episodes unlocked ·
-        ${state.clues?`<b style="color:var(--teal)">${fmt(state.clues)}</b> clue cards filed`
+        ${Clues.total()?`<b style="color:var(--teal)">${fmt(Clues.total())}</b> clues filed`
                      :`clue cards lift your next prediction`}</div>
       ${body}
       <div class="albNav">
