@@ -98,6 +98,7 @@ function serializeState(){
        defines simply sits there harmlessly until it is defined again. */
     cards:state.cards, setsDone:state.setsDone, status:state.status,
     seasonFrom:state.seasonFrom, seasonsDone:state.seasonsDone, statusMilestones:state.statusMilestones,
+    trophies:state.trophies, insiderBought:state.insiderBought,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
@@ -175,6 +176,11 @@ function loadState(){
       if(STATUS_MILESTONES.some(m=>String(m.level)===String(k)))
         state.statusMilestones[String(k)]=Math.max(1,Math.floor(+rawMs[k]||1));
     });
+    /* THE TROPHIES. Only episodes this build has files for — unlike a card, a trophy for an
+       episode that does not exist is a Showcase row with no title to print on it. */
+    state.trophies={};
+    const rawT=(d.trophies&&typeof d.trophies==="object")?d.trophies:{};
+    Object.keys(rawT).forEach(id=>{ if(Episodes.has(id)) state.trophies[id]=Math.max(1,Math.floor(+rawT[id]||1)); });
     /* THE SHELF. Only items this build defines — unlike a card, a status item that no longer
        exists is worth points nothing can explain, and the profile has nowhere to draw it. */
     state.status={};
@@ -199,7 +205,11 @@ function loadState(){
        episode that cannot play. */
     const pr=d.pendingReveal;
     state.pendingReveal=(pr&&typeof pr==="object"&&Episodes.has(pr.id)&&typeof pr.won==="boolean")
-      ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0}
+      ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0,
+         /* The reward was banked when the bet was locked, so it rides along and is announced
+            when the reveal finally plays — a trophy arriving with no explanation is worse than
+            one arriving late. */
+         cardId:typeof pr.cardId==="string"?pr.cardId:null, trophy:!!pr.trophy}
       : null;
     /* Nothing to restore for the library: Collection.unlockedEpisodeIds() derives it from the
        evidence restored above. That is what makes an OLD save work — a run with four episodes

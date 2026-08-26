@@ -141,6 +141,10 @@ const Collection = {
     const had = before || [];
     const fresh = this.unlockedEpisodeIds().filter(id => !had.includes(id));
     fresh.forEach(id => { if (!state.epQueue.includes(id)) state.epQueue.push(id); });
+    /* An unlock resets the Insider Pack's price (GDD 6.5). It lives here rather than in
+       js/boxes.js because "an episode unlocked" happens exactly once, right here, and a counter
+       reset hung off anything else would fire twice or not at all. */
+    if (fresh.length) state.insiderBought = 0;
     return fresh;
   },
 

@@ -199,13 +199,17 @@ test("…and drops one whose episode is no longer unlocked", () => {
 
 test("a sealed reveal survives a reload — closing the tab cannot duck the bet", () => {
   freshRun();
-  state.pendingReveal = { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 };
+  /* The reward rides along: it was banked when the bet was locked, so it has to still be
+     announceable when the player comes back to finish the episode. */
+  const sealed = { id: "001", wager: 500, odds: 2.4, won: true, payout: 900,
+                   cardId: Cards.all()[0].id, trophy: true };
+  state.pendingReveal = { ...sealed };
   saveState();
   freshRun();
   eq(state.pendingReveal, null, "gone in memory");
   loadState();
-  deepEq(state.pendingReveal, { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 },
-         "restored, so the losing bet is still owed a reveal");
+  deepEq(state.pendingReveal, sealed,
+         "restored, so the bet is still owed its reveal — and its spoils are still nameable");
 });
 
 test("a sealed reveal for a missing or malformed episode is dropped", () => {

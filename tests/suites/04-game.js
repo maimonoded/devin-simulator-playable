@@ -54,15 +54,68 @@ function setupPrediction(coins = 10000) {
   return state;
 }
 
-test("a correct pick wins and pays wager x odds", () => {
+test("a correct pick wins and pays the FLAT multiplier, whatever was passed", () => {
   setupPrediction();
   const before = state.coins;
-  const r = resolvePrediction({ wager: 1000, odds: 2.2, sel: 0, correct: 0, auto: false });
+  const flat = Economy.flatMultiplier();
+  /* `odds` is passed here on purpose: it used to come off the answer, and the point of GDD 7.3
+     is that it no longer can. An answer that could set its own multiplier would leak which one
+     the writers think is true. */
+  const r = resolvePrediction({ wager: 1000, odds: 2.2, sel: 0, correct: 0, auto: false, id: "001" });
   eq(r.won, true);
-  near(r.payout, 2200, 1e-9);
-  near(state.coins, before - 1000 + 2200, 1e-9, "stake out, payout in");
+  eq(r.odds, flat, "the multiplier is the model's, not the answer's");
+  eq(r.payout, Math.round(1000 * flat));
+  eq(state.coins, before - 1000 + r.payout, "stake out, payout in");
   eq(state.predWins, 1);
   eq(state.streak, 1);
+});
+
+test("every answer pays the same, so the screen cannot leak the truth", () => {
+  const ep = Episodes.get("001");
+  const seen = new Set();
+  ep.answers.forEach((_, i) => {
+    setupPrediction();
+    seen.add(resolvePrediction({ wager: 500, sel: i, correct: 0, auto: false, id: "001" }).odds);
+  });
+  eq(seen.size, 1, "two answers with two multipliers is a tell");
+});
+
+test("GDD 7.4: every prediction pays a Collectible, won, lost or skipped", () => {
+  ["won", "lost", "skipped"].forEach(kind => {
+    setupPrediction();
+    const before = Cards.owned();
+    const r = resolvePrediction({ wager: kind === "skipped" ? 0 : 500,
+                                  sel: kind === "skipped" ? null : (kind === "won" ? 0 : 1),
+                                  correct: 0, auto: false, id: "001" });
+    ok(r.reward.card, `${kind}: a round must never give nothing`);
+    eq(Cards.owned() > before || Cards.count(r.reward.card.id) > 1, true, `${kind}: and it is banked`);
+  });
+});
+
+test("a correct call pays a better card and a trophy; a wrong one pays neither", () => {
+  setupPrediction();
+  const win = resolvePrediction({ wager: 500, sel: 0, correct: 0, auto: false, id: "001" });
+  ok(win.reward.trophy, "the only thing in the game a box cannot contain");
+  eq(win.reward.trophy.ep, "001");
+  ok(Cards.rarity(win.reward.card.card.rarity).rank >= Cards.rarity(cfg.predRewardFloor).rank,
+     "a correct call clears the reward floor");
+  setupPrediction();
+  const lose = resolvePrediction({ wager: 500, sel: 1, correct: 0, auto: false, id: "001" });
+  eq(lose.reward.trophy, null);
+  ok(lose.reward.card, "…but the card still lands");
+});
+
+test("a trophy is unique to its episode and can only be won once", () => {
+  setupPrediction();
+  eq(Status.hasTrophy("001"), false);
+  resolvePrediction({ wager: 0, sel: 0, correct: 0, auto: false, id: "001" });
+  ok(Status.hasTrophy("001"));
+  const pts = Status.points();
+  state.epQueue.push("001");
+  eq(resolvePrediction({ wager: 0, sel: 0, correct: 0, auto: false, id: "001" }).reward.trophy, null,
+     "already won");
+  eq(Status.points(), pts + cfg.statusPerEpisode + cfg.statusPerPrediction,
+     "the trophy is not paid twice");
 });
 
 test("a wrong pick loses the stake and resets the streak", () => {

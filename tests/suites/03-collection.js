@@ -151,20 +151,72 @@ test("the loop stops when the library runs out rather than looping forever", () 
 
 suite("boxes: drawing");
 
-test("every tier draws its stated number of items, and always pays", () => {
+test("every pack draws its stated number, plus the Insider's guaranteed clue", () => {
   freshRun();
   Boxes.tiers().forEach(t => {
     const res = Boxes.open(t.key);
-    eq(res.drops.length, t.items, `${t.key} pays ${t.items}`);
+    /* GDD 6.5's guarantee sits ON TOP of the draws, not instead of one: the Insider is the pack
+       you buy when the story has stalled, and paying for it with a card slot would make it a
+       worse card pack rather than a story one. */
+    const extra = t.clue === "fresh" ? 1 : 0;
+    eq(res.drops.length, t.items + extra, `${t.key} pays ${t.items}${extra ? " + a clue" : ""}`);
     res.drops.forEach(d => ok(d && d.kind, `${t.key} produced an empty drop`));
+    if (extra) eq(res.drops[0].kind, "clue", "and it comes off the top");
   });
+});
+
+test("the Insider's clue is one you do not already hold", () => {
+  freshRun();
+  const ep = Clues.currentId(), all = Clues.authoredFor(ep);
+  /* One short of the requirement, so the episode is still the current one — hold any more and
+     it unlocks and the draw moves to the next episode. A uniform draw over the eight would
+     repeat three times in eight; this must never. */
+  const held = all.slice(0, Clues.requiredFor(ep) - 1).map(c => c.id);
+  for (let k = 0; k < 40; k++) {
+    state.clues[ep] = held.slice();
+    state.clueDay[ep] = state.day;
+    const d = Boxes.open("insider").drops[0];
+    eq(d.kind, "clue");
+    eq(held.includes(d.clue.id), false, "the dearest pack must never be a dud");
+    eq(d.isNew, true);
+  }
+});
+
+test("the Insider's price climbs with every one bought, and an unlock resets it", () => {
+  freshRun();
+  const base = Boxes.priceOf("insider");
+  eq(Boxes.priceOf("standard"), Math.round(Boxes.tier("standard").coins * cfg.boardScale),
+     "a flat pack does not escalate");
+  state.coins = 1e9;
+  Boxes.buyEvents("insider");
+  const second = Boxes.priceOf("insider");
+  ok(second > base, "GDD 6.5 — sprint speed is capped by price, not by a cooldown");
+  Boxes.buyEvents("insider");
+  ok(Boxes.priceOf("insider") > second, "…and it keeps climbing");
+  /* An episode unlocking is what resets it. */
+  const beforeSnap = Collection.unlockSnapshot();
+  unlockEpisode(Episodes.ids()[0]);
+  eq(state.insiderBought, 0);
+  eq(Boxes.priceOf("insider"), base, "back to base the moment the story moves");
+});
+
+test("buyEvents spends exactly once and refuses when it cannot pay", () => {
+  freshRun();
+  state.coins = Boxes.priceOf("standard") - 1;
+  eq(Boxes.buyEvents("standard"), null, "one coin short is short");
+  eq(state.coins, Boxes.priceOf("standard") - 1, "and nothing was taken");
+  state.coins = Boxes.priceOf("standard");
+  const ev = Boxes.buyEvents("standard");
+  ok(ev && ev.some(e => e.pack));
+  ok(state.coins >= 0, "the price came out, and whatever the pack paid went back in");
 });
 
 test("a card drop honours the table's rarity FLOOR, which is a guarantee and not a target", () => {
   freshRun();
-  forceBox("diamond", r => r.kind === "card" && r.floor === "epic", () => {
+  forceBox("insider", r => r.kind === "card" && r.floor === "epic", () => {
     for (let k = 0; k < 60; k++) {
-      const d = Boxes.open("diamond").drops[0];
+      /* Past the guaranteed clue, which is not a table draw. */
+      const d = Boxes.open("insider").drops[1];
       eq(d.kind, "card");
       ok(Cards.rarity(d.card.rarity).rank >= Cards.rarity("epic").rank,
          `${d.card.name} is ${d.card.rarity} — a floor must never be undershot`);
@@ -174,9 +226,9 @@ test("a card drop honours the table's rarity FLOOR, which is a guarantee and not
 
 test("a clue can come out of a box, and it unlocks like any other clue", () => {
   freshRun();
-  forceBox("silver", r => r.kind === "clue", () => {
+  forceBox("standard", r => r.kind === "clue", () => {
     const before = Clues.total();
-    const d = Boxes.open("silver").drops[0];
+    const d = Boxes.open("standard").drops[0];
     eq(d.kind, "clue");
     ok(Episodes.has(d.ep));
     eq(Clues.total(), before + (d.isNew ? 1 : 0));
@@ -185,34 +237,34 @@ test("a clue can come out of a box, and it unlocks like any other clue", () => {
 
 test("coins and energy drops are banked, and energy never drains an overflow", () => {
   freshRun();
-  forceBox("silver", r => r.kind === "coins", () => {
+  forceBox("standard", r => r.kind === "coins", () => {
     state.coins = 0;
-    const d = Boxes.open("silver").drops[0];
+    const d = Boxes.open("standard").drops[0];
     eq(d.kind, "coins");
     eq(state.coins, d.amount);
   });
-  forceBox("silver", r => r.kind === "energy", () => {
+  forceBox("standard", r => r.kind === "energy", () => {
     state.energy = 900;                        // bought, far over the cap
-    Boxes.open("silver");
+    Boxes.open("standard");
     eq(state.energy, 900, "a box must never clamp a purchased balance downward");
   });
 });
 
 test("a status drop shelves an item, and falls back to coins once the shelf is full", () => {
   freshRun();
-  forceBox("diamond", r => r.kind === "status", () => {
-    const d = Boxes.open("diamond").drops[0];
+  forceBox("insider", r => r.kind === "status", () => {
+    const d = Boxes.open("insider").drops[1];
     eq(d.kind, "status");
     ok(Status.owns(d.item.id), "it is on the shelf, not merely announced");
     STATUS_ITEMS.forEach(i => Status.grant(i.id, "found"));   // fill it
-    eq(Boxes.open("diamond").drops[0].kind, "coins", "a box always pays");
+    eq(Boxes.open("insider").drops[1].kind, "coins", "a box always pays");
   });
 });
 
 test("openBoxEvents pays a box and says nothing more when nothing completed", () => {
   freshRun();
-  forceBox("silver", r => r.kind === "coins", () => {
-    const ev = openBoxEvents("silver");
+  forceBox("standard", r => r.kind === "coins", () => {
+    const ev = openBoxEvents("standard");
     eq(ev.filter(e => e.pack).length, 1, "one box");
     eq(ev.filter(e => e.unlock).length, 0, "a coin drop unlocks nothing");
     eq(ev.filter(e => e.boardDone).length, 0);
@@ -222,8 +274,8 @@ test("openBoxEvents pays a box and says nothing more when nothing completed", ()
 
 test("a box's CARDS unlock nothing — only the clue in it can", () => {
   freshRun();
-  forceBox("silver", r => r.kind === "card", () => {
-    for (let k = 0; k < 60; k++) eq(openBoxEvents("silver").filter(e => e.unlock).length, 0);
+  forceBox("standard", r => r.kind === "card", () => {
+    for (let k = 0; k < 60; k++) eq(openBoxEvents("standard").filter(e => e.unlock).length, 0);
     eq(Collection.unlockedEpisodeIds().length, 0, "the collection is not the gate");
     ok(Cards.owned() > 0, "…though the collection did fill");
   });
@@ -234,8 +286,8 @@ test("openBoxEvents does not end a set — unlocking an episode is not watching 
   Collection.pages().forEach(p => unlockEpisode(p.ep));
   ok(Collection.boardComplete(), "every episode unlocked");
   eq(Collection.boardFinished(), false, "but not one of them watched");
-  forceBox("silver", r => r.kind === "coins", () => {
-    eq(openBoxEvents("silver").filter(e => e.boardDone).length, 0,
+  forceBox("standard", r => r.kind === "coins", () => {
+    eq(openBoxEvents("standard").filter(e => e.boardDone).length, 0,
        "the set holds until the episodes have been seen");
   });
 });

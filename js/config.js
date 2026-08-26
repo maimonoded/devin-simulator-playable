@@ -7,10 +7,11 @@ const DEFAULTS={
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
   scoopStepMs:260,
-  /* The two corners that hand something over. galaTier is the floor on the Gala's
-     guaranteed card — GDD 3.4's "Rare or better" in the tier vocabulary the collection
-     speaks today; premiereBox is the free pack for landing on Start. */
-  galaTier:"gold", premiereBox:"silver",
+  /* The two corners that hand something over. galaTier is the rarity FLOOR on the Gala's
+     guaranteed card — GDD 3.4's "Rare or better", set one better than that because a corner
+     reached once a lap should out-pay a tile; premiereBox is the free pack for landing on the
+     Premiere. */
+  galaTier:"epic", premiereBox:"standard",
   fallbackSceneMs:1700, longPressMs:350,
   /* Bonus mini-games — the full-frame games the train tile opens (minigames/, js/ui/minigame.js).
      bonusGames 0 falls back to the plain Collect popup, which is also what happens on its own if
@@ -97,6 +98,10 @@ const DEFAULTS={
      setBonus* is 4.4's set-completion reward. A set is a collection TARGET and never a gate,
      so this is generous and nothing anywhere depends on it having been earned. */
   cardCopiesToConvert:3, dupCoins:40, setBonusCoins:5000, setBonusStatus:250,
+  /* GDD 6.5: every Insider Pack bought since the last episode unlocked costs this much more
+     again, and the count resets when one lands. That is what caps sprint speed BY DESIGN —
+     a player can always buy the next clue, and never buy ten of them cheaply. */
+  insiderStep:0.6,
   /* ---- status (js/status.js, GDD 5) ----
      Status is a LEVEL, 1 to statusLevels, and it resets every Season. The two inflows priced
      here are the two the collection cannot pay for you: an episode WATCHED and a prediction
@@ -147,7 +152,17 @@ const DEFAULTS={
   setDoneMs:2600,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
+  /* GDD 7.3: FLAT ODDS. Every answer pays the same multiplier, because per-answer odds leak the
+     answer — a 1.5 against a 3.2 tells you which one the writers think is true before you have
+     read either — and they make the screen read as a betting market rather than a guess. avgOdds
+     is that multiplier: it was already the model's own average, and it was already what the
+     auto-play session priced its payouts at. */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
+  /* GDD 7.4: every prediction pays a Collectible, win or lose or skip, so a bet is never a
+     round that gave you nothing. A CORRECT call also pays a trophy unique to that episode —
+     predRewardFloor is the rarity floor on the card a correct call earns, and trophyStatus is
+     what the trophy is worth on the Status track. */
+  predRewardFloor:"rare", trophyStatus:120,
   /* Wagers are a share of the player's balance, not a flat amount — three tiers, Confident
      being the one the economy model's projections assume (Economy.wagerTiers). minWager is
      the floor underneath all three. clueAlbumSize is the cosmetic album target. */
@@ -187,27 +202,32 @@ let boxTable=[
   {name:"Clues",weight:33,amount:2,kind:"clues"},
 ];
 
-/* ---- the boxes ----
-   Three tiers, and a tier is TWO things at once: how many draws it makes (`items`) and how the
-   table those draws come from is weighted. A Diamond Box is not a Silver Box with better odds —
-   it is three draws against a table weighted at the rare end, which is what makes the tiers feel
+/* ---- the packs (GDD 4.5) ----
+   Three of them, and a pack is TWO things at once: how many cards it draws (`items`) and how the
+   table those draws come from is weighted. Premium is not Standard with better odds — it is more
+   draws against a table with a rarity floor on some of them, which is what makes the tiers feel
    different rather than merely priced differently.
+
+   NO DOLLAR PRICES HERE. GDD 8.4 is a standing constraint: real money buys Money, and only Money
+   buys packs. A paid loot box sitting beside a wagering mechanic draws regulatory attention well
+   beyond either alone, and the separation costs the design nothing — the store still sells coins
+   for dollars, and coins still buy everything.
 
    `kind` in a row is resolved by js/boxes.js:
      card    one card from the Season catalogue (js/cards.js). `floor` is a rarity GUARANTEE —
-             the draw comes out at that rarity or better — so the tiers differ in what they can
-             produce and not merely in how often
+             the draw comes out at that rarity or better
      clue    one clue for the episode being worked on (js/clues.js)
      status  a status item nobody owns yet, by its own `box` weight (assets/status/status.js)
      coins   `amount`, scaled by cfg.boardScale
      energy  `amount`, topped up toward the cap, never reducing a purchased overflow
 
-   `coins` and `usd` are the two prices in the store — the coin price is what play buys, the
-   dollar price is what the simulated storefront charges. A tier with no `coins` cannot be
-   bought with coins at all; today all three can. */
+   `clue: "fresh"` on the tier itself is the Insider's guarantee (6.5): one clue you do not
+   already hold, on top of its draws. `escalates` makes its price climb with every Insider bought
+   since the last unlock and reset when one lands — which is what caps sprint speed by design
+   rather than by a cooldown. */
 let boxTiers=[
-  { key:"silver", name:"Silver Box", icon:"\ud83c\udf81", rank:1, items:1,
-    art:"assets/boxes/silver.webp", coins:2500, usd:1.99,
+  { key:"standard", name:"Standard Pack", icon:"\ud83c\udf81", rank:1, items:1,
+    art:"assets/boxes/silver.webp", coins:2500,
     table:[
       {name:"A card",       kind:"card",                 weight:52},
       {name:"Rare or up",   kind:"card",  floor:"rare",  weight:6},
@@ -216,8 +236,8 @@ let boxTiers=[
       {name:"Coins",        kind:"coins",  amount:120,   weight:12},
       {name:"Energy",       kind:"energy", amount:3,     weight:8},
     ]},
-  { key:"gold", name:"Gold Box", icon:"\ud83c\udf81", rank:2, items:2,
-    art:"assets/boxes/gold.webp", coins:12000, usd:7.99,
+  { key:"premium", name:"Premium Pack", icon:"\ud83c\udf81", rank:2, items:3,
+    art:"assets/boxes/gold.webp", coins:12000,
     table:[
       {name:"A card",       kind:"card",                  weight:30},
       {name:"Rare or up",   kind:"card",  floor:"rare",   weight:24},
@@ -227,25 +247,25 @@ let boxTiers=[
       {name:"Coins",        kind:"coins",  amount:400,    weight:10},
       {name:"Energy",       kind:"energy", amount:6,      weight:6},
     ]},
-  { key:"diamond", name:"Diamond Box", icon:"\ud83c\udf81", rank:3, items:3,
-    art:"assets/boxes/diamond.webp", coins:45000, usd:24.99,
+  { key:"insider", name:"Insider Pack", icon:"\ud83d\uddc2", rank:3, items:3,
+    art:"assets/boxes/insider.webp", coins:20000, clue:"fresh", escalates:true,
     table:[
       {name:"A card",       kind:"card",                     weight:8},
-      {name:"Rare or up",   kind:"card",  floor:"rare",      weight:30},
-      {name:"Epic or up",   kind:"card",  floor:"epic",      weight:18},
+      {name:"Rare or up",   kind:"card",  floor:"rare",      weight:34},
+      {name:"Epic or up",   kind:"card",  floor:"epic",      weight:20},
       {name:"Legendary",    kind:"card",  floor:"legendary", weight:2},
-      {name:"A clue",       kind:"clue",                     weight:20},
+      {name:"A clue",       kind:"clue",                     weight:14},
       {name:"Status item",  kind:"status",                   weight:12},
       {name:"Coins",        kind:"coins",  amount:1500,      weight:6},
       {name:"Energy",       kind:"energy", amount:12,        weight:4},
     ]},
 ];
-/* Which box a deck tile hands over. Mostly Silver, so a Gold off a tile is a good turn and a
-   Diamond is a story — the paid tiers stay worth paying for. */
+/* Which pack the Premiere corner hands over. Mostly Standard, so a Premium off the board is a
+   good turn and an Insider is a story — the bought tiers stay worth buying. */
 let deckBoxes=[
-  { key:"silver",  weight:80 },
-  { key:"gold",    weight:17 },
-  { key:"diamond", weight:3 },
+  { key:"standard", weight:80 },
+  { key:"premium",  weight:17 },
+  { key:"insider",  weight:3 },
 ];
 
 const defDeck=JSON.parse(JSON.stringify(deck));
@@ -379,5 +399,6 @@ const TUNING=[
    ["clueSeasonStep","…and how many more each Season",1,{min:0}],
    ["clueStuckDays","Catch-up valve: days before it eases",1,{min:0}],
    ["dupClueCoins","Duplicate clue: coins",10,{min:0}],
-   ["avgOdds","Avg odds (reference)",0.1]]},
+   ["avgOdds","Payout multiplier (flat)",0.1],
+   ["trophyStatus","Called-It trophy: status",10,{min:0}]]},
 ];

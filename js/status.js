@@ -71,6 +71,31 @@ const Status = {
     return item;
   },
 
+  /* ---------------- trophies (GDD 7.4) ----------------
+     A "Called It" — one per episode, unique, and only ever earned by calling that episode right.
+     They are Showcase pieces rather than catalogue cards: a card can be pulled from a box and
+     this cannot, which is the whole point of it. Derived from the episode list, so a trophy needs
+     no content of its own beyond the episode already having a title. */
+  trophyBag() {
+    if (!state.trophies || typeof state.trophies !== "object") state.trophies = {};
+    return state.trophies;
+  },
+  hasTrophy(id) { return !!this.trophyBag()[id]; },
+  trophyIds() { return Episodes.ids().filter(id => this.hasTrophy(id)); },
+  trophyOf(id) {
+    return { id, name: `Called it · ${Episodes.titleOf(id)}`, ep: id,
+             points: Math.max(0, Math.round(+cfg.trophyStatus || 0)),
+             art: "assets/status/called-it.webp" };
+  },
+  /* Returns the trophy, or null if it was already won — so a caller can announce without first
+     asking whether it landed, exactly like grant(). */
+  grantTrophy(id) {
+    if (id == null || !Episodes.has(id) || this.hasTrophy(id)) return null;
+    this.trophyBag()[id] = state.day | 0;
+    return this.trophyOf(id);
+  },
+  trophyPoints() { return this.trophyIds().length * Math.max(0, Math.round(+cfg.trophyStatus || 0)); },
+
   /* ---------------- the four inflows ---------------- */
   itemPoints() { return this.ownedIds().reduce((a, id) => a + (this.item(id).points || 0), 0); },
   /* Everything ever earned, across every Season. The Showcase's number, and what the Season
@@ -78,7 +103,7 @@ const Status = {
   lifetime() {
     return Math.round(
       Cards.statusPoints() +
-      this.itemPoints() +
+      this.itemPoints() + this.trophyPoints() +
       (+cfg.statusPerEpisode || 0) * Math.max(0, state.epsWatched | 0) +
       (+cfg.statusPerPrediction || 0) * Math.max(0, state.predWins | 0));
   },
@@ -95,7 +120,7 @@ const Status = {
     const wins = (+cfg.statusPerPrediction || 0) * Math.max(0, state.predWins | 0);
     return [
       { key: "cards",   name: "Collectibles",   points: Math.round(Cards.statusPoints()) },
-      { key: "items",   name: "The Showcase",   points: this.itemPoints() },
+      { key: "items",   name: "The Showcase",   points: this.itemPoints() + this.trophyPoints() },
       { key: "watched", name: "Episodes watched", points: Math.round(eps) },
       { key: "called",  name: "Predictions called", points: Math.round(wins) },
     ];

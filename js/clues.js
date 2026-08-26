@@ -99,11 +99,20 @@ const Clues = {
      Returns {id, clue, isNew, coins} — or null when there is nothing left to unlock, which is
      a real state (the collection has caught up with the content) and not an error. The caller
      turns that into events; nothing here touches the DOM. */
-  grant() {
+  grant(opts) {
     const id = this.currentId();
     if (id == null) return null;
-    const pool = this.authoredFor(id);
-    if (!pool.length) return null;
+    const all = this.authoredFor(id);
+    if (!all.length) return null;
+    /* `fresh` is the Insider pack's guarantee (GDD 6.5): one clue you do not already hold, so
+       the pack that costs the most is the one that can never be a dud. Everything else draws
+       from the whole eight and may repeat — which is what makes holding four of eight a
+       different hand from anyone else's. */
+    let pool = all;
+    if (opts && opts.fresh) {
+      const missing = all.filter(c => !this.has(id, c.id));
+      if (missing.length) pool = missing;
+    }
     const clue = pool[Math.floor(rand(0, pool.length))];
     if (this.has(id, clue.id)) {
       /* A duplicate always converts to something (§12). It is the same rule a duplicate card

@@ -84,7 +84,10 @@ function openPrediction(wantId){
   pending={id,ep,order,sel:null,tier:startTier,
            wager:canBet?Economy.wagerTier(startTier,state.coins).amount:0};
   const optHtml=order.map((src,idx)=>{ const a=ep.answers[src];
-    return `<button class="opt" data-idx="${idx}"><span>${a.text}</span><span class="odds">×${a.odds.toFixed(1)}</span></button>`;
+    /* No per-answer odds (GDD 7.3): they leaked the answer, and they made a guess about a story
+       read as a betting market. Every option pays the same, so the only thing to weigh is what
+       you think happens next. */
+    return `<button class="opt" data-idx="${idx}"><span>${a.text}</span></button>`;
   }).join("");
   /* Every tier reads the same while the balance is small enough that minWager is doing the
      clamping. Say so rather than showing three identical buttons with no explanation. */
@@ -168,11 +171,15 @@ function openPrediction(wantId){
    closing the tab mid-episode is not a way to duck a losing bet or to re-bet a won one. */
 async function playEpisode(){
   const p=pending, ep=p.ep;
-  const answerIdx=p.order[p.sel];        // displayed position → index in the episode file
-  const odds=ep.answers[answerIdx].odds;
-  const {won,payout}=resolvePrediction({wager:p.wager,odds,sel:answerIdx,correct:ep.correct,id:p.id,
-                                        auto:typeof autoMode!=="undefined"&&autoMode!==null});
-  state.pendingReveal={id:p.id,wager:p.wager,odds,won,payout};
+  const answerIdx=p.sel==null?null:p.order[p.sel];   // displayed position → index in the file
+  const res=resolvePrediction({wager:p.wager,sel:answerIdx,correct:ep.correct,id:p.id,
+                               auto:typeof autoMode!=="undefined"&&autoMode!==null});
+  /* The reward rides on the sealed reveal, because the reveal can outlive the tab: a correct
+     call that was banked has to still be announced when the player comes back to finish the
+     episode, or the trophy would arrive with no explanation. */
+  state.pendingReveal={id:p.id,wager:p.wager,odds:res.odds,won:res.won,payout:res.payout,
+                       cardId:res.reward.card?res.reward.card.id:null,
+                       trophy:!!res.reward.trophy};
   scheduleSaveState();
   await runReveal(state.pendingReveal);
 }
@@ -192,7 +199,7 @@ async function runReveal(r){
   const ep=Episodes.get(r.id);
   if(!ep){ state.pendingReveal=null; closeEpisodeUi(); renderAll(); return; }
   const wagerLine=r.wager>0
-    ? `You wagered <b style="color:var(--gold)">${fmt(r.wager)}</b> at \u00d7${r.odds.toFixed(1)}`
+    ? `You wagered <b style="color:var(--gold)">${fmt(r.wager)}</b> at \u00d7${(+r.odds||Economy.flatMultiplier()).toFixed(1)}`
     : "Watching with no wager";
   const showPlayer=()=>{
     $("#scrim").innerHTML=`<div class="modal videoModal"><div class="top"><div class="eyebrow">Now playing</div><h2>${ep.title}</h2></div>
@@ -245,7 +252,19 @@ function showEpisodeResult(ep,r){
   }else{
     resultHtml=`<div class="result"><div class="big" style="color:var(--teal)">${won?"You'd have been right \u2713":"You'd have been wrong \u2717"}</div><div style="margin-top:6px;color:var(--muted)">No wager placed</div>${truthHtml}</div>`;
   }
-  log(won?"\u2705":"\u274c",`${ep.title} \u00b7 ${wager>0?(won?`won +${fmt(payout)}`:`lost ${fmt(wager)}`):"watched (no wager)"}`);
+  /* GDD 7.4: THE COLLECTIBLE IS THE HEADLINE, not the coin number. Every prediction pays one —
+     won, lost or skipped — so a round is never one that gave you nothing, and a correct call
+     also pays the trophy, which is the only thing in the game a box cannot contain. */
+  const card=r.cardId?Cards.get(r.cardId):null;
+  const trophy=r.trophy?Status.trophyOf(r.id):null;
+  const rewardHtml=(card||trophy)?`<div class="predSpoils">
+      ${trophy?`<div class="psItem">${dropFace({kind:"status",item:trophy},{size:"sm"})}
+                  <span class="psTag">Called it</span></div>`:""}
+      ${card?`<div class="psItem">${cardFace(card,{owned:true,count:Cards.count(card.id),size:"sm"})}
+                  <span class="psTag">${won?"Your reward":"Yours anyway"}</span></div>`:""}
+    </div>`:"";
+  log(won?"\u2705":"\u274c",`${ep.title} \u00b7 ${wager>0?(won?`won +${fmt(payout)}`:`lost ${fmt(wager)}`):"watched (no wager)"}${
+    card?` \u00b7 ${card.name}`:""}${trophy?" \u00b7 <b>trophy</b>":""}`);
   /* The episode left the queue when the bet was locked, so what is left is what is still
      waiting. Offer the next one straight from here: a binge should not mean closing back to
      the board and hunting for the button again between every episode. */
@@ -264,7 +283,7 @@ function showEpisodeResult(ep,r){
        <button class="btn ghost wide" id="closeEp" style="margin-top:8px">Back to the board</button>`
     : `<button class="btn purple wide" id="closeEp" style="margin-top:16px">Back to the board</button>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${ep.title}</h2></div>
-    <div class="mbody">${resultHtml}${ctaHtml}</div></div>`;
+    <div class="mbody">${resultHtml}${rewardHtml}${ctaHtml}</div></div>`;
   if($("#closeEp")) $("#closeEp").onclick=()=>{ closeEpisodeUi(); renderAll(); };
   if(setDone) $("#finishSet").onclick=()=>{ closeEpisodeUi(); renderAll(); showBoardComplete(); };
   else if(more) $("#nextEp").onclick=()=>openPrediction();

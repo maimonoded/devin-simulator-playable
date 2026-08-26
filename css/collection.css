@@ -395,3 +395,15 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .sdRow{display:flex;gap:5px}
 .sdChip{width:44px}
 .sdPaid{font-size:13px;font-weight:800;color:var(--gold)}
+
+/* ---------- what a prediction paid (GDD §7.4) ----------
+   The collectible is the headline, not the coin number — so it is shown as the thing it is,
+   beside the result rather than folded into a sentence under it. */
+.predSpoils{display:flex;gap:12px;justify-content:center;margin:14px 0 4px}
+.psItem{display:flex;flex-direction:column;align-items:center;gap:5px;width:78px}
+.psTag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800}
+
+/* The Insider pack says WHY it costs what it costs — a price that climbs without explaining
+   itself reads as a bug, one that says "because you have bought two" reads as a rule. */
+.boxNote{font-size:10px;line-height:1.3;color:var(--teal);margin:2px 0 6px;text-align:center}
+.pack.cant{opacity:.45;cursor:not-allowed}

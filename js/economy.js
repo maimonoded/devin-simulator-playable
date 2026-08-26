@@ -345,6 +345,13 @@ const Economy = {
 
   /* ---------------- prediction ---------------- */
 
+  /* THE FLAT PAYOUT MULTIPLIER (GDD 7.3). Every answer pays this, whichever one is picked.
+     Per-answer odds leaked the answer — a 1.5 beside a 3.2 tells you which one the writers think
+     is true before you have read either — and made the screen read as a betting market rather
+     than a guess about a story. This number was already the model's own average, and already
+     what the auto-play session priced its payouts at, so nothing in the spreadsheet moves. */
+  flatMultiplier() { return Math.max(1, +cfg.avgOdds || 1); },
+
   /* The workbook's clue edge: every clue banked this cycle buys accuracy, up to a cap.
      Reads cfg rather than the model so the drawer can sweep it live; apply() seeds those
      three keys from the model. */

@@ -41,7 +41,7 @@ function resolveLandingEvents(mult){
    Manual play is a real prediction: you win only if sel matches the episode's correct
    answer. Auto runs can't meaningfully "pick", so they fall back to the modelled
    cfg.accuracy — that keeps batch economy runs independent of what a script clicks. */
-function resolvePrediction({wager,odds,sel,correct,auto,id}){
+function resolvePrediction({wager,sel,correct,auto,id}){
   if(wager>0) state.coins-=wager;
   state.predsMade++;
   /* The evidence held for THIS episode buys the accuracy — not a running balance, and not
@@ -62,8 +62,11 @@ function resolvePrediction({wager,odds,sel,correct,auto,id}){
      and leave the played one queued forever. No id given → the old front-of-queue behaviour. */
   if(id!=null){ const k=state.epQueue.indexOf(id); if(k>=0) state.epQueue.splice(k,1); }
   else state.epQueue.shift();
+  /* FLAT ODDS (GDD 7.3): the multiplier is the same whichever answer was picked, so it comes
+     from the model rather than from the answer. */
+  const odds=Economy.flatMultiplier();
   let payout=0;
-  if(wager>0&&won){ payout=wager*odds; state.coins+=payout; }
+  if(wager>0&&won){ payout=Math.round(wager*odds); state.coins+=payout; }
   /* THE RECORD COUNTS A CALL, NOT A STAKE. A correct prediction pays Status (GDD 5.1) and goes
      on the lifetime record whether or not there was money on it — "Skip & watch" is always
      offered (see CLAUDE.md on `participation`), and a player who takes it and calls it right
@@ -74,7 +77,16 @@ function resolvePrediction({wager,odds,sel,correct,auto,id}){
     if(won){ state.predWins++; state.streak++; state.bestStreak=Math.max(state.bestStreak,state.streak); }
     else { state.predLoss++; state.streak=0; }
   }
-  return {won,payout,accuracy,cluesSpent,called};
+  /* GDD 7.4. EVERY prediction pays a Collectible — won, lost or skipped — so a bet is never a
+     round that gave you nothing, and the collectible rather than the coin number is the headline.
+     A CORRECT call pays a better one and a trophy unique to that episode, which is the only thing
+     in the game that cannot come out of a box. */
+  const reward={card:null,trophy:null};
+  if(id!=null){
+    reward.card=Cards.drawAndAdd(won?(cfg.predRewardFloor||null):null);
+    if(won) reward.trophy=Status.grantTrophy(id);
+  }
+  return {won,payout,odds,accuracy,cluesSpent,called,reward};
 }
 
 /* ---------- time ---------- */

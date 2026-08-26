@@ -31,6 +31,9 @@ function initState(){
        setsDone is the ONE thing about a set that has to be stored: "was this bonus already
        paid" is not derivable from a collection that only ever grows. Set key → the day. */
     cards:{}, setsDone:{},
+    /* Insider Packs bought since the last episode unlocked — what its price escalates on
+       (GDD 6.5). Reset by Collection.claimUnlocked(). */
+    insiderBought:0,
     /* THE SHELF. Status item id → {day, how} — how being "bought" | "earned" | "found".
        js/status.js. Collectibles granted whole, and the seed of the Showcase (GDD 5.2). */
     status:{},
@@ -39,6 +42,10 @@ function initState(){
        reset takes Status to zero while the collection, the Showcase and the prediction record
        all persist — nothing is deleted, the line just moves. */
     seasonFrom:0, seasonsDone:0,
+    /* THE TROPHIES (GDD 7.4). Episode id → the day it was called right. One per episode, unique,
+       and the only thing in the game that cannot come out of a box — which is exactly why it is
+       worth having. Showcase pieces, not catalogue cards. */
+    trophies:{},
     /* Milestone level → the day it was paid. Stored because "was this given" is not derivable
        from a level that only goes up. */
     statusMilestones:{},

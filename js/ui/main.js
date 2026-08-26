@@ -177,14 +177,18 @@ async function runAuto(mode){
    player: it converts every spare coin into progress, boxes first because those are what move
    the collection, then the status shelf.
 
-   Boxes go through openBoxEvents() like every other box, so the batch run draws against exactly
-   the same tables a human does — and showPack() takes its fast path in this mode, so nothing is
-   watched. Cheapest first, mirroring the builder loop this replaced. */
+   Packs go through Boxes.buyEvents() like every other purchase, so the batch run pays exactly
+   what a human pays and draws against exactly the same tables — and showPack() takes its fast
+   path in this mode, so nothing is watched. Cheapest first, mirroring the builder loop this
+   replaced. */
 async function autoSpend(){
   let t=Boxes.cheapest();
   while(t && !state.seriesDone && autoMode==="session"){
-    state.coins-=t.coins;
-    await playEvents(openBoxEvents(t.key));
+    /* Boxes.buyEvents spends AND opens, so the batch run pays exactly what a human pays — the
+       Insider's escalation included, which is the whole point of modelling it. */
+    const ev=Boxes.buyEvents(t.key);
+    if(!ev) break;
+    await playEvents(ev);
     t=Boxes.cheapest();
   }
   let item=Status.cheapestBuyable();

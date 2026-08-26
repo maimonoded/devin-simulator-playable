@@ -34,20 +34,48 @@ const Boxes = {
   /* ---------------- tiers ---------------- */
   tiers() { return boxTiers; },
   tier(key) { return boxTiers.find(t => t.key === key) || null; },
-  /* Which box a deck tile hands over — weighted, so a Diamond Box off a tile is an event. */
+  /* ---------------- what a pack costs ----------------
+     Flat for Standard and Premium; ESCALATING for the Insider (GDD 6.5), by insiderStep for
+     every one bought since the last episode unlocked. That is what caps sprint speed by design:
+     a player can always buy the next clue, and can never buy ten of them cheaply. The count
+     resets the moment an episode unlocks (Collection.claimUnlocked). */
+  priceOf(key) {
+    const t = this.tier(key);
+    if (!t || !(t.coins > 0)) return 0;
+    const base = t.coins * (+cfg.boardScale || 1);
+    if (!t.escalates) return Math.round(base);
+    const n = Math.max(0, state.insiderBought | 0);
+    return Math.round(base * Math.pow(1 + Math.max(0, +cfg.insiderStep || 0), n));
+  },
+  affordable(key) { const p = this.priceOf(key); return p > 0 && state.coins >= p; },
+  /* Spend and open. One place, so the store, a milestone and any future source cannot disagree
+     about what a pack costs or about the Insider's counter. Returns the events, or null when it
+     could not be paid for. */
+  buyEvents(key) {
+    const price = this.priceOf(key);
+    if (!(price > 0) || state.coins < price) return null;
+    state.coins -= price;
+    const t = this.tier(key);
+    if (t && t.escalates) state.insiderBought = Math.max(0, state.insiderBought | 0) + 1;
+    return openBoxEvents(key);
+  },
+
+  /* Which pack a corner hands over — weighted, so an Insider off the board is an event. */
   drawTier() {
     const pick = weighted(deckBoxes);
     return (pick && pick.key) || (boxTiers[0] && boxTiers[0].key) || "silver";
   },
 
-  /* The cheapest tier the balance can cover, or null. Cheapest rather than best: a Silver Box
-     is the most DRAWS per coin (2,500 a card against Diamond's 15,000), and draws are what move
-     a collection. Used by the auto-play session, which is the batch balancing tool. */
+  /* The cheapest pack the balance can cover, or null. Cheapest rather than best: a Standard is
+     the most DRAWS per coin, and draws are what move a collection. Used by the auto-play
+     session, which is the batch balancing tool. Reads priceOf, so the Insider's escalation is
+     respected rather than undercut by its base price. */
   cheapest() {
-    let best = null;
+    let best = null, bestPrice = Infinity;
     boxTiers.forEach(t => {
-      if (!(t.coins > 0) || state.coins < t.coins) return;
-      if (!best || t.coins < best.coins) best = t;
+      const p = this.priceOf(t.key);
+      if (!(p > 0) || state.coins < p) return;
+      if (p < bestPrice) { best = t; bestPrice = p; }
     });
     return best;
   },
@@ -59,6 +87,15 @@ const Boxes = {
     const t = this.tier(key) || boxTiers[0];
     const n = Math.max(1, Math.round(t.items || 1));
     const drops = [];
+    /* THE INSIDER'S GUARANTEE, first and off the top (GDD 6.5): one clue you do not already
+       hold. It is what makes the dearest pack the one that can never be a dud, and it is why
+       the Insider is the pack you buy when the story has stalled rather than when you want
+       cards. Falls through silently once every episode is unlocked — there is nothing left to
+       learn, and the pack is still three draws. */
+    if (t.clue === "fresh") {
+      const got = Clues.grant({ fresh: true });
+      if (got) drops.push({ kind: "clue", ep: got.id, clue: got.clue, isNew: got.isNew, coins: got.coins });
+    }
     for (let k = 0; k < n; k++) drops.push(this.drawDrop(t));
     return { tier: t, drops };
   },

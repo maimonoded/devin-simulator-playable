@@ -77,10 +77,10 @@ const STATUS_RANKS = [
 const STATUS_MILESTONES = [
   { level:  5, kind: "clues",  amount: 2,          blurb: "Two clues, on the house." },
   { level: 10, kind: "energy", amount: 20,         blurb: "A full tank and then some." },
-  { level: 15, kind: "pack",   tier: "gold",       blurb: "A Gold Box." },
+  { level: 15, kind: "pack",   tier: "premium",    blurb: "A Premium Pack." },
   { level: 20, kind: "clues",  amount: 4,          blurb: "Four clues — the story owes you." },
   { level: 25, kind: "energy", amount: 50,         blurb: "Enough to finish the week." },
-  { level: 30, kind: "pack",   tier: "diamond",    blurb: "A Diamond Box, and the Season is yours." },
+  { level: 30, kind: "pack",   tier: "insider",    blurb: "An Insider Pack, and the Season is yours." },
 ];
 
 const STATUS_ITEMS = [
