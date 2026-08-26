@@ -9,6 +9,9 @@ function applyFxTiming(){
   s.setProperty("--stepDur",Math.min(130,cfg.tokenStepMs*0.96)+"ms");
   s.setProperty("--hopDur",Math.min(140,cfg.tokenStepMs)+"ms");
   s.setProperty("--shakeDur",Math.max(120,cfg.diceRevealMs)+"ms");
+  /* The card flip is one beat of the box popup's pacing, so it comes from the same knob the
+     popup schedules by rather than being a number in the stylesheet that drifts from it. */
+  s.setProperty("--flipMs",Math.max(60,cfg.packFlipMs||420)+"ms");
   // tile-art fit: tunable because the board's perspective makes the tile diamond's aspect
   // vary by position, so no one value suits every piece of art
   s.setProperty("--artScale",cfg.tileArtScale);
@@ -120,7 +123,7 @@ function buildBoard(){
   applyFxTiming();
   document.body.classList.toggle("board3d",!!use3d());   // hides the legacy DOM board
   syncDiceMode();
-  if(use3d()){ Board3D.build(); buildBoardLabels(); return; }
+  if(use3d()){ Board3D.build(); buildBoardLabels(); renderCaseBoard(); return; }
   const board=$("#board");
   board.querySelectorAll(".tile").forEach(t=>t.remove());
   for(let i=0;i<40;i++){
@@ -145,131 +148,110 @@ function positionToken(instant){
   tok.style.left=left+"%"; tok.style.top=top+"%";
   if(instant) requestAnimationFrame(()=>{tok.style.transition="";});
 }
-/* Draw every registered overlay's markers (mystery boxes today) on their tiles. */
-function renderOverlays(){
-  /* classAt/isGold rather than the flat cssClass: one overlay can look different tile to tile,
-     which is how a box holding clues shows up gold before you land on it. */
-  if(use3d()){
-    Board3D.setOverlays(OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))));
-    return;
-  }
-  document.querySelectorAll(".tile .ovl").forEach(b=>b.remove());
-  OVERLAYS.forEach(o=>o.all().forEach(i=>{
-    const el=document.querySelector(`.tile[data-i="${i}"]`);
-    if(el){ const b=document.createElement("div"); b.className="ovl "+o.classAt(i); b.textContent=o.icon; el.appendChild(b); }
-  }));
+/* The case board — the current set, standing inside the ring. It is geometry in the board's own
+   scene (js/ui/case3d.js), not a DOM layer, so there is nothing to position here: this only asks
+   it to redraw, and it decides for itself whether anything actually changed.
+
+   The legacy CSS board has no scene to put it in and so has no case board; the album button is
+   the route to the same information there. */
+function renderCaseBoard(){
+  if(use3d()&&window.Board3D&&Board3D.available&&Board3D.syncCase) Board3D.syncCase();
 }
-/* Mystery boxes bought but not yet thrown onto the board.
-
-   The pop is driven by comparing against the last number SHOWN rather than being fired from the
-   upgrade handler, so every path that banks a box gets the same acknowledgement — including a
-   reload that restores a pending count. It only fires on an increase: the drop to zero after a
-   throw is the boxes leaving, and celebrating that would be backwards. */
-let _boxShown = null;
-function renderBoxCounter(){
-  const el=$("#boxCounter"); if(!el) return;
-  const n=Math.max(0,state.pendingBoxes|0);
-  el.classList.toggle("on",n>0);
-  $("#boxCount").textContent=n;
-  if(_boxShown!==null&&n>_boxShown){
-    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
-  }
-  _boxShown=n;
+/* Tapping a panel opens the album at that page — called from js/ui/board3d.js, which is the only
+   place that knows a press was a tap rather than a pan. */
+function onCasePanelTap(page){
+  if(state.animating) return;
+  albumBoard=Collection.num();
+  albumPage=page;
+  renderAlbum();
 }
-/* The builders view's 2D layer: the page header, and one upgrade button per building on the
-   page. The buildings themselves are 3D and live in js/ui/builders3d.js — this is only the
-   part you press.
 
-   Every button on the row is the same width and shows a COMPACT price (fmtShort), because the
-   row has to fit cfg.builderPageSize of them across a phone whatever the economy charges:
-   "2.5k" costs four characters where "2,500" costs five and "1,240,000" costs nine. */
-function renderBuilders(){
-  const page=Builders.pageBuilders();
-  // clickable while auto-roll is running (buying stops it), but not during a manual roll
-  const live=!state.animating||autoMode==="roll";
-  const bar=$("#buildersBar"); bar.innerHTML="";
-  page.forEach(i=>{
-    const done=Builders.isMaxed(i);
-    const afford=Builders.canAfford(i);
-    const b=document.createElement("button");
-    b.className="upb"+(done?" max":afford?"":" cant");
-    b.disabled=done||!afford||!live;
-    b.dataset.b=i;
-    b.innerHTML=done
-      ? `<span class="upbName">#${i+1}</span><span class="upbCost">MAX</span>`
-      : `<span class="upbName">#${i+1} · Lv${Builders.tier(i)+1}</span>
-         <span class="upbCost">🪙 ${fmtShort(Builders.nextCost(i))}</span>`;
-    bar.appendChild(b);
-  });
-  bar.querySelectorAll("button[data-b]").forEach(bt=>bt.onclick=()=>onUpgradeClick(+bt.dataset.b));
-
-  const s=Builders.series(), many=Economy.playableSeries().length>1;
-  const range=page.length?`${page[0]+1}–${page[page.length-1]+1}`:"—";
-  $("#buildersHead").innerHTML=
-    `<b>${many&&s?`${s.name} · `:""}Buildings ${range}</b>
-     <span>${Builders.doneCount()}/${Builders.count()} complete · set ${Builders.page()+1} of ${Builders.pageCount()}</span>`;
-
-  /* Episodes banked by "Binge later" — the only way back to them in the mobile layout, since
-     the side panel's Predict & watch button is not on screen there. */
-  /* A sealed reveal counts as something waiting: the bet is placed and the result is owed, so
-     the button has to stay reachable even when the queue itself is empty. */
-  const queued=state.epQueue.length+(state.pendingReveal?1:0);
-  const binge=$("#bingeBtn");
-  if(binge){
-    binge.style.display=queued?"flex":"none";
-    $("#bingeCount").textContent=queued;
-  }
-  /* The library button only exists once there is something in the library. */
-  const lib=$("#libraryBtn");
-  if(lib) lib.classList.toggle("on",Builders.unlockedEpisodeIds().length>0);
-  /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
-     rather than the lifetime total, which only ever grows and would leave the dot on forever. */
-  const adot=$("#albumDot");
-  if(adot) adot.classList.toggle("on",state.cycleClues>0);
-
-  /* The board shows nothing about builders any more, so the only hint that there is something
-     to spend on is a dot on the button that takes you there. */
-  const any=Builders.all().some((_,i)=>Builders.canAfford(i));
-  $("#buildersDot").classList.toggle("on",any);
-  if(use3d()&&window.Board3D&&Board3D.available&&Board3D.setBuilders) Board3D.setBuilders();
-}
 function renderHUD(){
   $("#hDay").textContent="Day "+state.day;
   const tod=((state.clock%1440)+1440)%1440; let h=Math.floor(tod/60),m=Math.floor(tod%60);
   const ap=h<12?"AM":"PM"; let h12=h%12; if(h12===0)h12=12;
   $("#hClock").textContent=`${h12}:${String(m).padStart(2,"0")} ${ap}`;
   tweenNumber($("#hCoins"),state.lastCoins,state.coins,v=>fmt(v)); state.lastCoins=state.coins;
-  /* The album is a lifetime total with a target the model names (clueAlbumSize), so show it as
-     progress toward that rather than as a bare number climbing forever. Past the target it
-     stops reading as a fraction — the collection is simply complete. */
-  tweenNumber($("#hClues"),state.lastClues,state.clues,
-              v=>state.clues>=cfg.clueAlbumSize?fmt(v):`${fmt(v)}/${fmt(cfg.clueAlbumSize)}`);
-  state.lastClues=state.clues;
+  /* The card counter is progress through THIS SET, not a lifetime total. The set is what the
+     player is working on — "18/25" is a sentence about what to do next, where a number that
+     only ever climbs is a sentence about the past. */
+  const cards=Collection.collected(), pool=Collection.poolSize();
+  tweenNumber($("#hCards"),state.lastCards,cards,v=>`${Math.round(v)}/${pool}`);
+  state.lastCards=cards;
   $("#hVip").textContent=fmt(state.vip);
   $("#hEnergy").textContent=Math.floor(state.energy);
   $("#hEnergyCap").textContent=cfg.energyCap;
   $("#hEfill").style.width=Math.max(0,Math.min(100,(state.energy/cfg.energyCap)*100))+"%";
+  renderStatusChip();
+}
+/* The status track, beside the avatar. Rank name, and how far through it — the profile is one
+   tap away for the detail, so what belongs here is only "where am I and am I moving". */
+function renderStatusChip(){
+  const el=$("#hStatus"); if(!el) return;
+  const pts=Status.points(), rank=Status.rank(pts);
+  $("#hRank").textContent=rank.name;
+  $("#hRankIco").textContent=rank.icon;
+  $("#hRankFill").style.width=Math.round(Status.rankProgress(pts)*100)+"%";
+  /* Pop when the number moves, since the chip is small and easy to miss. */
+  if(state.lastStatus!==pts){
+    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+    state.lastStatus=pts;
+  }
+  el.title=`${fmt(pts)} status · ${Status.toNext(pts)?`${fmt(Status.toNext(pts))} to ${Status.nextRank(pts).name}`:"top rank"}`;
 }
 function renderStats(){
   $("#sEps").textContent=state.epsWatched;
   const tot=state.predWins+state.predLoss;
   $("#sAcc").textContent=tot? Math.round(state.predWins/tot*100)+"%":"—";
   $("#sStreak").textContent=state.streak;
-  $("#sBoards").textContent=Builders.doneCount()+"/"+Builders.count();
+  const [eps,epTotal]=Collection.boardProgress();
+  $("#sSet").textContent=eps+"/"+epTotal;
   $("#sRolls").textContent=state.rolls;
   $("#sSessions").textContent=state.sessionsToday;
 }
+/* The board's two buttons that carry state: the album, and the way into an episode. */
+function renderNav(){
+  /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
+     rather than the lifetime total, which only ever grows and would leave the dot on forever. */
+  const adot=$("#albumDot");
+  if(adot) adot.classList.toggle("on",state.cycleClues>0);
+  /* Episodes: unwatched ones waiting, plus a sealed reveal, which is owed even with an empty
+     queue. The badge is the count; the button hides when there is nothing at all. */
+  const queued=state.epQueue.length+(state.pendingReveal?1:0);
+  const epsBtn=$("#episodesBtn");
+  if(epsBtn){
+    epsBtn.classList.toggle("on",queued>0);
+    $("#episodesDot").textContent=queued;
+    $("#episodesDot").style.display=queued?"flex":"none";
+    epsBtn.disabled=!(queued>0||Collection.unlockedEpisodeIds().length>0);
+  }
+}
 function renderStory(){
   const n=state.epQueue.length;
+  const playable=Collection.firstUnwatchedId();
+  const blocked=Collection.blockedBy();
   $("#epBadge").style.display=n?"inline-block":"none";
   $("#epBadge").textContent=n+" ready";
-  $("#watchBtn").disabled=!n||state.animating;
-  $("#storyHint").innerHTML= n? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} unlocked — place your prediction before watching.`
-                              : "Fully upgrade a builder to unlock the next episode.";
+  /* Unlocked is not the same as watchable: the drama is serialised, so the button is only live
+     when the next episode of the STORY is the one that has been collected. */
+  $("#watchBtn").disabled=!playable||state.animating;
+  const [got,need]=(()=>{
+    const p=blocked?Collection.pageFor(blocked):
+      (Collection.pages().find(x=>!Collection.pageReady(x))||Collection.pages()[0]);
+    return p?Collection.pageProgress(p):[0,0];
+  })();
+  $("#storyHint").innerHTML= playable
+    ? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} ready — place your prediction before watching.`
+    : blocked
+      ? `<b style="color:var(--gold)">${Episodes.titleOf(blocked)}</b> comes next and needs
+         <b>${need-got}</b> more card${need-got>1?"s":""} — episodes are watched in order.`
+      : need
+        ? `Next episode needs <b style="color:var(--pink)">${need-got}</b> more card${need-got>1?"s":""} — land on a 🎁 tile.`
+        : "Every episode in this set has been watched.";
 }
 /* Reflect state.mult on the stake button (needed after a restore or user reset). */
 function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
-function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderBoxCounter();renderStats();renderStory();
+function renderAll(){ renderHUD();renderNav();renderStats();renderStory();renderCaseBoard();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
   const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;

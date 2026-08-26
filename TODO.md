@@ -7,6 +7,11 @@ Most of these came out of mapping `economy model v3.xlsx` onto the code. Where t
 and the game disagree about the SHAPE of a mechanic (not just a number), the disagreement is
 recorded here rather than silently resolved.
 
+**This is the `collectible_version` branch**, where builders are gone and the coin sink is boxes
+and the status shelf. Items written against the builder loop are marked *(builder loop)* and are
+about `main`, not about this branch — they are kept because the two branches are alternatives and
+whichever wins inherits this list.
+
 ---
 
 ## Prediction
@@ -50,21 +55,24 @@ is the right call for a game and leaves the model's accuracy curve half-used.
 Options: accuracy only ever models auto runs (today); clues buy a hint or narrow the options;
 clues grant a re-roll on a loss. This is a design decision, not a config change.
 
-### Prediction is unreachable from the balancing tool
-`openPrediction()` has exactly one caller — the Predict & watch button. An auto-play run
-executes zero predictions, so the model's prediction EV (80.23 per prediction, 324 coins/day
-engaged) can never be observed in the tool built to validate it.
+### ~~Prediction is unreachable from the balancing tool~~ — MOSTLY DONE
+An auto-play run used to execute zero predictions, so the model's prediction EV (80.23 per
+prediction, 324 coins/day engaged) could never be observed in the tool built to validate it.
 
-Deliberately left as-is for now. **Done when:** auto-play runs predictions under a stated policy
-for wager tier, participation and clue spend.
+It now runs them. `autoWatch()` in `js/ui/main.js` settles every playable episode with no modal
+and no video: the stake is `Economy.DEFAULT_TIER` (Confident, the one the workbook assumes), the
+outcome is `resolvePrediction`'s auto path (`Economy.accuracyFor(state.cycleClues)`, which the
+clue cards raise), and the payout is priced at `cfg.avgOdds` — the model's own average, and that
+knob's first honest call site.
 
-Two of those three now exist to be pointed at: `Economy.wagerTiers(balance)` gives the policy a
-tier to name (Confident is `Economy.DEFAULT_TIER`, the one the workbook assumes), and the clue
-spend is already `Economy.accuracyFor(state.cycleClues)`. What is still undecided is
-participation — `prediction.participation` is 0.95 in the model and is deliberately not
-projected onto `cfg`, because for a human it is an outcome rather than an input. An auto policy
-is the one place where it *would* be an input, so wiring it belongs to this item, not to the
-wager work.
+It had to happen: on this branch a set is finished when its episodes have been **watched**, so a
+batch run that never watched would fill set 1 and then roll forever.
+
+**Still undecided: participation.** `prediction.participation` is 0.95 in the model and is
+deliberately not projected onto `cfg`, because for a human it is an outcome rather than an input.
+An auto policy is the one place where it *would* be an input — today `autoWatch` stakes on 100%
+of predictions it can afford, where the model expects 95%. **Done when:** the auto policy skips
+the stake on `1 - participation` of them.
 
 ---
 
@@ -104,6 +112,10 @@ the ladder comes out of the game.
 Imported from `Inputs!C9`, in the drawer, read by nothing. In-game time only moves in
 `advanceSession()`, so there is no quantity to compare it against. The model uses it to derive
 "active minutes per session" (3.01) against a 3–7 minute Dashboard target band.
+
+It is now the *only* dead knob: `avgOdds` was the other one, and `autoWatch()` gave it an honest
+call site — the auto-play session prices its payouts at the model's average, which is exactly
+what an average is for when nobody has picked an answer.
 
 ---
 
@@ -145,9 +157,11 @@ real cells for the three rungs and their odds, and `EconomyImport` learns to rea
 
 ### Advance-to-Start pays double what the model prices
 `Tile.advanceToStart` pays `startPass + startLand` (200) and re-seeds the VIP pool. The workbook
-says the Advance card "collects the pass bonus" and prices the Premiere row at 100. Both the
-Premiere corner and the deck's Advance card share that one helper, so the decision moves two
-board rows together.
+says the Advance card "collects the pass bonus" and prices the Premiere row at 100.
+
+On this branch it moves **one** row, not two: the deck's Advance card went with the plot-twist
+deck, so the Premiere corner is the only caller left. That makes it a smaller decision here than
+on `main`, where the two shared the helper.
 
 ### Board composition is not configurable
 `Inputs!C20–C24` (40 tiles: 26 standard / 4 train / 6 deck / 4 corner) matches the code exactly,
@@ -167,6 +181,59 @@ completely different variance, and the model has no pool balance at all.
 
 ---
 
+## The collection *(this branch)*
+
+### The drop tables are not in the economy model
+`boxTiers` and `deckBoxes` live in `js/config.js` and are hand-tuned. Nothing in
+`economy model v3.xlsx` describes them, so `Economy.apply()` does not own them and
+`loadConfig()` treats them like camera settings — they survive a model change rather than being
+replaced by it (see "Known dead config" in CLAUDE.md).
+
+That means the one thing this loop's pacing actually depends on — how often a card drops, and at
+which tier — is the one thing the workbook cannot say. Days-to-finish a set is
+`25 / (cards per roll)`, and cards per roll is a deck-tile landing (6 of 40) times the box's card
+weight, with duplicates making the tail much longer than the mean suggests.
+
+**Done when:** the workbook grows a Box tab with per-tier item counts and drop weights, the
+importer reads it, and `Economy.OWNED_CFG_KEYS` grows `boxTiers`/`deckBoxes` — at which point the
+guard in `loadConfig()` that refuses a wrong-shaped stored tier list can be dropped, because the
+model would be the source of truth again.
+
+### The duplicate rate is unmodelled, and it is most of the run
+A pool of 25 drawn uniformly needs ~95 draws to complete by the coupon-collector expectation,
+not 25. So roughly three quarters of every set is duplicates paying `cfg.dupCoins × tier.dup`.
+That is a large, deliberate coin faucet that no cell in the workbook accounts for.
+
+**Done when:** the model prices a set in draws rather than in cards, and the duplicate refund is
+a line in it. Until then `dupCoins` is a feel number, not a modelled one.
+
+### Only board 1 is authored
+`Collection.boardFor(n)` past the last authored board re-points board 1's requirements at board
+n's episodes, so the loop never dead-ends — but sets 2 and 3 are set 1's cast and clues wearing
+different episode numbers. Fine for a simulator, wrong for a game.
+
+**Done when:** `assets/cards/cards.js` has a real entry per set, with its own cast and its own
+clue lines. It is content, not code: nothing in `js/collection.js` changes.
+
+### Status points and the shelf are not in the model either
+`statusPerEpisode`, `statusPerCard`, `statusPerBoard`, the ten items' prices and their points are
+all hand-set. The shelf is now the main coin sink that is not a box, so its prices are what decide
+whether coins have anywhere to go late in a run — exactly the question the cost curve used to
+answer for builders.
+
+**Done when:** the workbook has a Status tab and `Economy.apply()` projects it, the same way the
+cost curve is projected today.
+
+### The store's dollar prices buy nothing
+The three box tiers and the coin/energy packs carry `$` labels, and tapping one grants the goods
+without charging anything — it is a simulator, and there is no payment path. But the labels are
+also not derived from anything: they are not in the model, so ARPU cannot be read off a run.
+
+**Done when:** the model carries a price list and a conversion assumption, and the store reports
+what a run would have cost.
+
+---
+
 ## Economy plumbing
 
 ### The five relative knobs are stored but only one is wired
@@ -179,7 +246,13 @@ together, so it is a pure currency redenomination with no pacing effect.
 **Done when:** each knob has a decided call site, and it is stated whether `boardScale` survives
 alongside them.
 
-### Box income is delayed here, guaranteed in the model — but it is NOT capped
+### ~~Box income is delayed here~~ — GONE ON THIS BRANCH *(builder loop)*
+Nothing sits on a tile any more, so there is no placement to saturate and no delay between
+earning a box and collecting it: a box is handed over and opened on the spot. The analysis below
+is kept because it is about `main`'s loop, and because the simulation in it is the sort of thing
+that is annoying to re-derive.
+
+### Box income is delayed here, guaranteed in the model — but it is NOT capped *(builder loop)*
 The model's Builder-net column credits 889.6 coins/builder (5 boxes × 80 coins + 1 energy, the
 energy valued at `coinsPerRoll / (1 - energyPerRoll)` = 97.9). In the code a box is a marker on
 a **free standard tile** — 26 slots, no stacking (`state.boxes` is a Set), and `spawn` silently

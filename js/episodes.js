@@ -3,8 +3,10 @@
    Each of those files calls Episodes.add({...}) with a plain JSON-shaped object, so the
    content is data, not code (see episodes/README.md for the schema).
 
-   The id is the whole identity: "003" is builder 3's episode and its video is
-   episodes/003.mp4. Nothing else in the object repeats that. */
+   The id is the whole identity: "003" is the third episode of the story and its video is
+   episodes/003.mp4. Nothing else in the object repeats that. It is also what decides which SET
+   an episode belongs to — js/collection.js slices Episodes.ids() by cfg.episodesPerBoard — so
+   the order of these files IS the order of the drama. */
 const Episodes={
   _byId:{},
   _ids:[],
@@ -25,16 +27,16 @@ const Episodes={
   has(id){ return !!this._byId[id]; },
   ids(){ return this._ids.slice().sort(); },
   count(){ return this._ids.length; },
-  /* "003" → 3 (its builder number, 1-based) */
-  builderOf(id){ return parseInt(id,10); },
+  /* "003" → 3 (its 1-based place in the story). */
+  numberOf(id){ return parseInt(id,10); },
   /* Video path for an episode — always the id with an .mp4 extension. */
   videoFor(id){ return `episodes/${id}.mp4`; },
-  /* Episode for a 0-based builder index. Builders beyond the available files
-     cycle through them so a raised cfg.buildings still gets content. */
-  idForBuilder(bIdx){
+  /* Episode for a 0-based position in the story. A position past the available files cycles
+     back through them, so nothing that counts episodes can run off the end. */
+  idForIndex(i){
     const ids=this.ids(); if(!ids.length) return null;
-    const want=String(bIdx+1).padStart(3,"0");
-    return this.has(want)?want:ids[bIdx%ids.length];
+    const want=String(i+1).padStart(3,"0");
+    return this.has(want)?want:ids[i%ids.length];
   },
   titleOf(id){ const e=this.get(id); return e?e.title:id; },
 };

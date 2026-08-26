@@ -39,18 +39,6 @@
 /* What a mystery box held, centred where it popped. Wider than the plain reveal because it can
    carry three rows, and it pops in per row so the numbers arrive with the confetti rather than
    all at once after it. */
-.centerfx.spoils{width:auto}
-.spoilTop{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);
-          opacity:.9;margin-bottom:4px;text-shadow:0 2px 8px rgba(0,0,0,.8)}
-.spoilRow{display:flex;align-items:center;justify-content:center;gap:9px;line-height:1.15;
-          animation:revealPop .42s cubic-bezier(.2,1.5,.4,1) both}
-.spoilRow:nth-child(3){animation-delay:.10s}
-.spoilRow:nth-child(4){animation-delay:.20s}
-.spoilIco{font-size:30px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))}
-.spoilAmt{font-family:Georgia,serif;font-weight:800;font-size:36px;color:var(--gold);
-          text-shadow:0 3px 12px rgba(0,0,0,.75)}
-.spoilAmt.teal{color:var(--teal)}
-
 /* drawn deck card */
 .centerfx.card{width:auto}
 .playcard{width:158px;margin:0 auto;padding:12px 12px 14px;border-radius:14px;
@@ -71,14 +59,30 @@
 .scrim{position:fixed;inset:0;background:rgba(6,8,24,.72);backdrop-filter:blur(3px);z-index:80;
        display:none;align-items:center;justify-content:center;padding:20px}
 .scrim.show{display:flex}
-.modal{width:min(480px,100%);background:linear-gradient(180deg,var(--panel),#12163a);
+/* A modal is never taller than the window, and its BODY is what scrolls — the header keeps the
+   title and the close affordance on screen, and the footer buttons stay reachable. Without this
+   a tall one (the store, the library with a long list) simply grew past the viewport and lost
+   both ends of itself with nothing to scroll.
+
+   The height cap lives here rather than on each modal because every one of them can grow: the
+   store gained three box tiers, the library grows an episode per set, and the prediction grows
+   an answer per question. */
+.modal{width:min(480px,100%);max-height:100%;display:flex;flex-direction:column;
+       background:linear-gradient(180deg,var(--panel),#12163a);
        border:1px solid var(--purple);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.6);
        overflow:hidden;animation:pop .3s cubic-bezier(.2,1.3,.4,1)}
 @keyframes pop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
-.modal .top{padding:18px 22px;background:linear-gradient(180deg,rgba(139,109,255,.22),transparent)}
+.modal .top{flex:0 0 auto;padding:18px 22px;
+            background:linear-gradient(180deg,rgba(139,109,255,.22),transparent)}
 .modal .eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--pink)}
 .modal h2{margin:6px 0 0;font-size:22px;font-family:Georgia,serif;line-height:1.2}
-.modal .mbody{padding:8px 22px 22px}
+/* min-height:0 is what actually lets a flex child shrink below its content and scroll — without
+   it the body keeps its natural height and pushes the modal past the cap above. */
+.modal .mbody{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+              padding:8px 22px 22px}
+.modal .mbody::-webkit-scrollbar{width:8px}
+.modal .mbody::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.modal .mbody::-webkit-scrollbar-track{background:transparent}
 .opt{width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
      padding:13px 15px;margin-top:9px;display:flex;justify-content:space-between;align-items:center;transition:.15s}
 .opt:hover{border-color:var(--purple);transform:translateX(3px)}
@@ -128,10 +132,6 @@
 
 /* ---------- clue found ---------- */
 .clueModal{width:min(400px,100%)}
-.clueFound{display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;
-           background:#1b2150;border:1px solid var(--teal);border-radius:10px;
-           padding:9px 11px;margin-top:8px;line-height:1.35}
-
 /* ---------- clue album ---------- */
 .modal.albumModal{width:min(520px,100%)}
 .albumBar{height:8px;background:#10143a;border-radius:5px;overflow:hidden;border:1px solid var(--line)}

@@ -58,11 +58,11 @@ function diceConfetti(){
     document.body.appendChild(d); setTimeout(()=>d.remove(),3200);
   }
 }
-/* Coins and energy raining down, for the moment a mystery box pops.
+/* Coins and energy raining down, for the moment a box pops (js/ui/pack.js).
 
    Separate from diceConfetti on purpose: the shower should be made of the thing you just won.
-   The dice shower stays what an energy win looks like everywhere else (spa, deck) — this pair is
-   for the box, where the whole point of the beat is showing WHAT was inside. */
+   The dice shower stays what an energy win looks like everywhere else (spa) — this pair is for
+   the box, where the whole point of the beat is showing WHAT was inside. */
 function rainFx(cls, glyph, n, big) {
   for (let i = 0; i < n; i++) {
     const d = document.createElement("div"); d.className = cls; d.textContent = glyph;
@@ -75,58 +75,6 @@ function rainFx(cls, glyph, n, big) {
 }
 function coinShower(big){ rainFx("coinfx", "🪙", big ? 26 : 18, big); }
 function energyShower(){ rainFx("energyfx", "⚡", 16, true); }
-
-/* Opening a mystery box: it floats to the middle of the screen, swells and pops, and what was
-   inside rains down. Blocks the roll loop until the box is gone and the clue sheet (if there was
-   one) has been dismissed.
-
-   The clue sheet is on its own timer measured from the START of the whole beat, so it can be
-   tuned to slide in while the confetti is still falling rather than queueing politely after it.
-   That is why this owns the sheet rather than leaving it to the payout event's ev.clue.
-
-   Resolves — never rejects — on every path, including no WebGL and auto-play. */
-async function showBoxOpen(b){
-  const auto=typeof autoMode!=="undefined"&&autoMode==="session";
-  /* The batch balancing tool takes the reward without the ceremony, like everything else. */
-  if(auto) return b.clue?showClue(b.clue):undefined;
-
-  /* 1-2 · fly to the middle and pop */
-  await ((use3d()&&window.Board3D&&Board3D.available)
-    ? Board3D.openBox(b.tile)
-    : sleep(Math.max(0,cfg.boxRiseMs||0)+Math.max(0,cfg.boxSwellMs||0)));
-
-  confetti();
-  if(b.coins) coinShower(b.coins>=(cfg.boxCoins||0)*2);     // a bigger haul rains harder
-  if(b.energy) energyShower();
-
-  /* 3 · the winnings, where the box just was. A float over the token is too small and too far
-     from where the player is looking after a burst in the middle of the board. */
-  const clueMs=Math.max(0,cfg.boxCluePopupMs||0);
-  const hold=b.clue?Math.max(cfg.boxSpoilsMs||0,clueMs):Math.max(0,cfg.boxSpoilsMs||0);
-  showBoxSpoils(b,hold);
-
-  /* 4 · then, and only then, the clue sheet — counted from the moment the numbers appeared. */
-  if(b.clue){ await sleep(clueMs); await showClue(b.clue); }
-  else await sleep(hold);
-}
-
-/* What the box held, centred where it popped. Not a blocking modal — it fades on its own while
-   the caller waits, so the clue sheet can arrive over it rather than after an empty pause. */
-function showBoxSpoils(b,ms){
-  const el=$("#centerFx");
-  const rows=[];
-  if(b.coins) rows.push(`<div class="spoilRow"><span class="spoilIco">🪙</span><span class="spoilAmt">+${fmt(b.coins)}</span></div>`);
-  if(b.energy) rows.push(`<div class="spoilRow"><span class="spoilIco">⚡</span><span class="spoilAmt teal">+${b.energy}</span></div>`);
-  if(b.clue&&b.clue.count) rows.push(`<div class="spoilRow"><span class="spoilIco">🔍</span><span class="spoilAmt teal">+${b.clue.count}</span></div>`);
-  if(!rows.length) return;
-  el.className="centerfx show spoils";
-  el.innerHTML=`<div class="spoilTop">Mystery Box</div>${rows.join("")}`;
-  setTimeout(()=>{
-    /* Only clear if nothing else has taken the panel over in the meantime — a reveal from the
-       tile underneath can land while this is still up. */
-    if(el.classList.contains("spoils")){ el.className="centerfx"; el.innerHTML=""; }
-  },Math.max(200,ms));
-}
 
 /* Show the roll for cfg.diceRevealMs, then land on the real numbers. Awaited by roll(), so
    it paces the whole turn either way.
@@ -176,39 +124,6 @@ function showReveal(r){
   if(r.energy) diceConfetti();   // energy wins get a dice shower on top
   return sleep(r.ms??cfg.revealMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
-/* Clue found. Blocking, like the train's Collect popup, because a clue is the only collectible
-   in the game and the album is the only place it ever shows up again — a float would scroll
-   past before the player read what they got.
-
-   Mounted in #sheetHost, INSIDE the board scene, so it is framed by the game window rather than
-   by the browser. Auto-closes after cfg.clueCollectMs; an auto-play session uses the same fast
-   path the train popup does, so a batch run is never held up. */
-function showClue(c){
-  return new Promise(resolve=>{
-    const auto=typeof autoMode!=="undefined"&&autoMode==="session";
-    const ms=auto?Math.max(50,cfg.autoCollectMs):Math.max(0,cfg.clueCollectMs);
-    const host=$("#sheetHost");
-    const names=(c.names&&c.names.length?c.names:[]).map(n=>`<div class="clueFound">🔍 ${n}</div>`).join("");
-    host.innerHTML=`<div class="modal clueModal"><div class="top">
-        <div class="eyebrow">Clue found</div><h2>${c.count>1?`${c.count} new clues`:"A new clue"}</h2></div>
-      <div class="mbody">
-        ${names||`<div class="clueFound">🔍 +${c.count} for the album</div>`}
-        <div class="hint" style="margin-top:8px">Filed in your album · raises your next prediction's accuracy</div>
-        <button class="btn teal wide" id="clueBtn" style="margin-top:14px">Collect</button>
-      </div></div>`;
-    host.classList.add("show");
-    let done=false;
-    const finish=()=>{
-      if(done) return; done=true;
-      clearTimeout(t); host.classList.remove("show"); host.innerHTML=""; host.onclick=null;
-      resolve();
-    };
-    const t=setTimeout(finish,ms);
-    $("#clueBtn").onclick=finish;
-    host.onclick=(e)=>{ if(e.target===host) finish(); };   // tapping outside dismisses it too
-  });
-}
-
 /* Tear down any blocking overlay/popup — used to recover from a mid-roll error.
    A bonus mini-game has to be closed through its own handle rather than by emptying its host:
    dropping the iframe alone would leave the promise the roll loop is awaiting unresolved, and
@@ -216,12 +131,17 @@ function showClue(c){
 function clearOverlayFx(){
   const el=$("#centerFx"); el.className="centerfx"; el.innerHTML="";
   const sc=$("#scrim"); sc.onclick=null; sc.classList.remove("show"); sc.innerHTML="";
-  // the in-scene sheet (clue popup, album) blocks the roll loop the same way, so it clears too
+  /* The in-scene sheet is the box popup and the album, and the box popup blocks the roll loop
+     the same way the Collect popup does — so it clears here too. Its promise is settled by the
+     timers it set, which are cleared when the host is emptied and the popup's own auto-close
+     resolve() short-circuits on the `done` flag. */
   const sh=$("#sheetHost"); if(sh){ sh.onclick=null; sh.classList.remove("show"); sh.innerHTML=""; }
   if(bonusOpen) bonusOpen.finish();
-  /* A box caught mid-flight has to be cleaned up too — and more importantly its promise settled,
+  /* A box caught mid-open has to be cleaned up too — and more importantly its promise settled,
      since roll()'s finally is what clears state.animating. */
-  if(typeof use3d==="function"&&use3d()&&window.Board3D&&Board3D.available) Board3D.cancelBoxFx();
+  if(typeof packHudHide==="function") packHudHide();
+  if(typeof use3d==="function"&&use3d()&&window.Board3D&&Board3D.available&&Board3D.cancelPack)
+    Board3D.cancelPack();
 }
 /* Drawn deck card, flipped onto the board centre and held for cfg.deckCardMs. */
 function showCard(c){

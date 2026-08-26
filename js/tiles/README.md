@@ -32,7 +32,7 @@ The tuning-drawer values each type reads are noted per type.
 |---|---|---|---|---|
 | **standard** | [standard-tile.js](standard-tile.js) | — | Pays the tile's printed coin value: `stdBase × stdWeights[i]`. Weights rise around the board (mean 1), so late tiles pay more. Also renders the printed value via `valueLabel(i)`. No interruption — just a floating number. | `stdBase` |
 | **train** | [train-tile.js](train-tile.js) | 🚗 | The board's **two-bonus** tile. Pays one of exactly two outcomes from the economy model — the small bonus, or the large one at `trainLargeChance` — and opens **that bonus's own mini-game** ([minigames/](../../minigames/README.md)). The coins are banked before the game opens; the game only presents them. Falls back to the **Collect popup** when `bonusGames` is off or a game is missing. | `trainSmall`, `trainLarge`, `trainLargeChance`, `bonusGames`, `bonusLoadMs`, `bonusMaxMs`, `collectMinSec`, `collectMaxSec` |
-| **deck** | [deck-tile.js](deck-tile.js) | 🃏 | Draws a weighted card from the merged `deck` table (editable in tuning) and **shows the card** for `deckCardMs`: coins (can be a negative fine), energy, clues, VIP-pool seed, or **Advance to Start** (walks the token to Start and pays the full Start landing bonus). | deck table, `deckCardMs`, `startPass`, `startLand`, `vipSeed` |
+| **deck** | [deck-tile.js](deck-tile.js) | 🎁 | Hands over a **box**, opened on the spot. Which tier is a weighted draw from `deckBoxes` — mostly Silver, so a Gold off a tile is a good turn and a Diamond is a story. The tile decides nothing about what is inside: `openBoxEvents()` opens it, banks it and returns the events. → [assets/boxes/README.md](../../assets/boxes/README.md) | `boxTiers`, `deckBoxes`, the pack timings |
 | **spa** | [spa-tile.js](spa-tile.js) | 💆 | Grants `spaEnergy` energy, topped up to `energyCap`. Energy win → confetti **plus the dice shower**. | `spaEnergy`, `energyCap`, `revealMs` |
 | **vip** | [vip-tile.js](vip-tile.js) | 🌟 | Collects the entire VIP pool as coins — or shows the sad "Empty" reveal if the pool is dry. The pool is seeded by laps past Start, Start landings, and the Fine/Paparazzi card. | `vipRevealMs` |
 | **premiere** | [premiere-tile.js](premiere-tile.js) | 🎭 | Sweeps the token to Start at `premiereStepMs` per tile and pays the full Start landing bonus. | `premiereStepMs`, `startPass`, `startLand`, `vipSeed`, `startRevealMs` |
@@ -41,15 +41,15 @@ The tuning-drawer values each type reads are noted per type.
 The four single-index types (`start`, `spa`, `vip`, `premiere`) are **corner tiles**
 (`get corner(){ return true; }`) and get the highlighted corner styling.
 
-**Mystery boxes** are not a tile type — they're an **overlay** that sits on top of a tile. Overlays
-live in [`js/overlays/`](../overlays/README.md) and resolve before the tile's own `onLand()`.
+There is no overlay layer: **a board index has exactly one thing on it**. Mystery boxes used to
+sit on a tile and resolve before it; a box is now handed over and opened immediately, wherever it
+came from.
 
 ## How a landing flows
 
 ```
 ui/main.js roll()                  animates the dice + token walk
   └─ game.js resolveLandingEvents(mult)
-       ├─ OVERLAYS — resolves any overlay on the tile first (js/overlays/)
        └─ TILE_TYPES[tileType(pos)].onLand({pos, mult, bs})
             └─ mutates state synchronously, returns an event list
   └─ ui/main.js playEvents(events)  plays the list back with animation
@@ -68,15 +68,17 @@ played in this fixed order by `playEvents()`:
 | `dice: true` | fire the tumbling-dice shower (used for energy wins) |
 | `reveal: {big, sub, positive, energy, ms}` | **blocking** center-of-board reveal, held `ms` or `cfg.revealMs` (default 1500). `positive` → confetti + pop animation; otherwise the 😢 sad droop. `energy` → adds the dice shower |
 | `collect: {big, sub}` | **blocking** popup with a Collect button; waits for the click, or auto-closes after a random `cfg.collectMinSec`–`cfg.collectMaxSec` (default 10–20s). Clicking the backdrop also collects |
-| `card: {name, big, positive, energy}` | **blocking** drawn deck card, flipped onto the board centre and held `cfg.deckCardMs` (default 2000) |
+| `card: {name, big, positive, energy}` | **blocking** card flipped onto the board centre and held `cfg.deckCardMs` (default 2000). Nothing ships that uses it since the deck tile became a box; kept because it is the cheapest way to put a named beat on screen |
 | `minigame: {game, amount, outcome, label, big, sub}` | **blocking** full-frame bonus game, opened over the board in an iframe and resolved when the player collects. `amount` is coins **already paid** — the game presents it and never decides it. Degrades to `collect` when `cfg.bonusGames` is 0 or `game` is unregistered. → [minigames/README.md](../../minigames/README.md) |
-| `boxOpen: {tile, coins, energy, clue}` | **blocking** mystery-box opening: the box flies to the centre of the view, swells and pops, then confetti and a shower of whatever was inside. Carries what to *show* — the rewards were already banked. → [js/overlays/README.md](../overlays/README.md) |
+| `pack: {tier, drops}` | **blocking** box opening: the closed box, which the player may tap and which opens itself after `cfg.packAutoOpenMs`, then its cards one at a time. Carries what to *show* — everything in it was banked before the event was built. → [assets/boxes/README.md](../../assets/boxes/README.md) |
+| `unlock: {ids}` | **blocking** for a human, and a toast for an auto run: the episodes the cards just completed. The ids are already on `state.epQueue`, so declining costs nothing |
+| `boardDone: {board}` | **blocking** set-complete celebration, and the tap that opens the next set. An auto-play session advances silently instead |
 | `pause: ms` | wait before the next event |
 
-`reveal`, `collect`, `card` and `minigame` block the roll loop, so **auto-play waits for them
-too** — that's why every timing is tunable rather than hardcoded. Presentation convention:
-standard tiles show only a float (no interruption), train tiles use `minigame`, deck tiles use
-`card`, and the remaining non-standard tiles use `reveal`.
+`reveal`, `collect`, `card`, `pack`, `unlock`, `boardDone` and `minigame` block the roll loop, so
+**auto-play waits for them too** — that's why every timing is tunable rather than hardcoded.
+Presentation convention: standard tiles show only a float (no interruption), train tiles use
+`minigame`, deck tiles use `pack`, and the remaining non-standard tiles use `reveal`.
 
 A blocking event's promise **must always resolve**. `roll()`'s `finally` is the only thing that
 clears `state.animating`, so one that never settles leaves the board soft-locked with Roll
@@ -100,9 +102,11 @@ so it resolves exactly once, and an unconditional timer so it resolves even if n
 
 ## The base class contract (tile.js)
 
-`Tile` extends **`BoardActor`** ([../board-actor.js](../board-actor.js)) — the shared base that
-also backs overlays. Reward helpers and presentation builders live there; tile-specific board
-movement (`startLandingBonus`, `advanceToStart`) lives on `Tile`.
+`Tile` extends **`BoardActor`** ([../board-actor.js](../board-actor.js)). Reward helpers and
+presentation builders live there; tile-specific board movement (`startLandingBonus`,
+`advanceToStart`) lives on `Tile`. That file also defines the free function `grantEnergy()`,
+which is the one place the never-clamp-a-purchased-overflow rule is written down —
+`js/boxes.js` and `advanceSession()` both call it.
 
 Subclasses may override:
 
@@ -119,7 +123,7 @@ Shared helpers subclasses should call instead of reimplementing:
 |---|---|
 | `gainCoins(amount, text?, color?)` | adds coins, returns the float event |
 | `gainEnergy(n, text?)` | tops up toward `energyCap`, returns the float event. Never *reduces* a balance already above the cap — store purchases are allowed to overflow it, so don't reintroduce a plain `Math.min` clamp |
-| `gainClues(n, text?)` | adds clues, returns the float event |
+| `gainClues(n, text?)` | adds to both clue counters, returns the float event. Nothing ships that calls it: a clue is a card now, and `Collection.add()` feeds the counters when a **new** clue card lands |
 | `reveal(big, sub, positive, energy)` | builds the blocking center-reveal event |
 | `collect(big, sub)` | builds the blocking Collect-popup event |
 | `minigame(game, amount, opts)` | builds the blocking bonus-game event. Call it **after** `gainCoins` — `amount` is what was paid, not what might be |

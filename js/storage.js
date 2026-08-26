@@ -2,7 +2,7 @@
 /* Persistence — the economy model, tuning config and player progress are saved to localStorage
    so all three survive a reload. Three independent slots:
      pmdrama.econ.v1   → the imported economy model   (Reset economy / re-import)
-     pmdrama.cfg.v1    → cfg + deck + boxTable        (Reset config)
+     pmdrama.cfg.v1    → cfg + the box tables         (Reset config)
      pmdrama.state.v1  → run progress                 (Reset user)
    There is no server yet, so the browser IS the database: an imported workbook lives only
    here, which is why the slot keeps the version string and the filename it came from.
@@ -47,7 +47,7 @@ function clearEconomy(){ if(!storageOK) return; try{ localStorage.removeItem(LS_
 /* Stamped with the economy version the values were edited against — see loadConfig. */
 function saveConfig(){
   if(!storageOK) return;
-  try{ localStorage.setItem(LS_CFG,JSON.stringify({v:1,econVersion:Economy.version(),cfg,deck,boxTable})); }catch(e){ storageOK=false; }
+  try{ localStorage.setItem(LS_CFG,JSON.stringify({v:2,econVersion:Economy.version(),cfg,deck,boxTable,boxTiers,deckBoxes})); }catch(e){ storageOK=false; }
 }
 /* Overlay the saved tuning onto whatever the economy model just projected.
    The version stamp decides how much of it survives: tuning edited against the model that is
@@ -74,6 +74,13 @@ function loadConfig(){
       if(Array.isArray(d.deck)&&d.deck.length) deck=d.deck;
       if(Array.isArray(d.boxTable)&&d.boxTable.length) boxTable=d.boxTable;
     }
+    /* The box tables are NOT economy-owned — no workbook describes them yet — so they survive
+       a model change the way the camera settings do. Guarded on shape rather than trusted: a
+       tier list from an older build that is missing a tier would leave the store with a button
+       that opens nothing. */
+    if(Array.isArray(d.boxTiers)&&d.boxTiers.length===boxTiers.length
+       && d.boxTiers.every(t=>t&&Array.isArray(t.table)&&t.table.length)) boxTiers=d.boxTiers;
+    if(Array.isArray(d.deckBoxes)&&d.deckBoxes.length===deckBoxes.length) deckBoxes=d.deckBoxes;
     return true;
   }catch(e){ return false; }
 }
@@ -82,13 +89,14 @@ function clearConfig(){ if(!storageOK) return; try{ localStorage.removeItem(LS_C
 /* ---------------- player slot ---------------- */
 /* Explicit field list: transient bits (animating, tween baselines) are never persisted. */
 function serializeState(){
-  return {v:1,
+  return {v:2,
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
     energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
     pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
-    /* [tile, contents] pairs — the contents were decided when the box was placed, so they have
-       to survive a reload or a gold box would reopen as something else. */
-    builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes], pendingBoxes:state.pendingBoxes,
+    /* The collection and the shelf. Both are plain objects keyed by id, so they serialise as
+       they stand — no Map to spread, and a card or item the content no longer defines simply
+       sits there harmlessly until it is defined again. */
+    albums:state.albums, status:state.status,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
@@ -110,25 +118,39 @@ function loadState(){
     const d=JSON.parse(raw);
     if(typeof d!=="object"||d===null) return false;
     Object.keys(serializeState()).forEach(k=>{ if(k!=="v"&&d[k]!==undefined) state[k]=d[k]; });
-    /* The series index is restored before the builder array, because cfg.buildings depends on
-       it: a save from a longer content library must not leave the run pointing at a series
-       that no longer has episodes. */
+    /* The series index is restored before anything that depends on cfg.buildings: a save from
+       a longer content library must not leave the run pointing at a series that no longer has
+       episodes. */
     const playable=Economy.playableSeries().length;
     if(!(state.series>=0&&state.series<playable)) state.series=0;
     Economy.apply();
-    state.builder=Array.isArray(d.builder)&&d.builder.length
-      ? d.builder.map(b=>({tier:Math.min(Math.max(0,b.tier|0),Builders.maxTier())}))
-      : Builders.fresh();
-    if(state.builder.length!==Builders.count()) Builders.reshape();
-    /* Saves from before contents were decided at spawn stored bare tile indices. Accept both:
-       a number becomes a box with nothing known about it, and onLand draws for it then — which
-       is exactly what the old code did. */
-    state.boxes=new Map((Array.isArray(d.boxes)?d.boxes:[])
-      .map(e=>Array.isArray(e)?[e[0],e[1]]:[e,null])
-      .filter(([i])=>Number.isInteger(i)&&i>=0&&i<40));
-    /* Boxes bought but never thrown survive a reload — they are paid for, so losing them would
-       be losing a reward. They land the next time the player leaves the builders view. */
-    state.pendingBoxes=Math.max(0,Math.floor(+d.pendingBoxes||0));
+    /* THE COLLECTION. Sanitised rather than trusted: a board key has to be a positive integer
+       and a count a positive integer, but the card IDS are deliberately NOT filtered against
+       the current content. Board content is authored data that can be rewritten between
+       versions, and throwing away a card because this build has not heard of it would quietly
+       delete a collection. An unknown id is invisible in the album (Collection.cardOf returns
+       null for it) and comes back the moment the content does. */
+    state.albums={};
+    const rawAlbums=(d.albums&&typeof d.albums==="object")?d.albums:{};
+    Object.keys(rawAlbums).forEach(k=>{
+      const n=parseInt(k,10);
+      if(!(n>=1)) return;
+      const src=rawAlbums[k]||{}, out={};
+      Object.keys(src).forEach(id=>{ const c=Math.floor(+src[id]||0); if(c>0) out[id]=c; });
+      state.albums[String(n)]=out;
+    });
+    state.boardNum=Math.max(1,Math.floor(+d.boardNum||1));
+    if(!state.albums[String(state.boardNum)]) state.albums[String(state.boardNum)]={};
+    /* THE SHELF. Only items this build defines — unlike a card, a status item that no longer
+       exists is worth points nothing can explain, and the profile has nowhere to draw it. */
+    state.status={};
+    const rawStatus=(d.status&&typeof d.status==="object")?d.status:{};
+    Object.keys(rawStatus).forEach(id=>{
+      if(!Status.item(id)) return;
+      const e=rawStatus[id]||{};
+      state.status[id]={day:Math.max(1,Math.floor(+e.day||1)),
+                        how:["bought","earned","found"].includes(e.how)?e.how:"earned"};
+    });
     // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
     const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
     state.epQueue=rawQueue.filter(x=>Episodes.has(x));
@@ -139,14 +161,15 @@ function loadState(){
     state.pendingReveal=(pr&&typeof pr==="object"&&Episodes.has(pr.id)&&typeof pr.won==="boolean")
       ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0}
       : null;
-    /* Nothing to restore for the library: Builders.unlockedEpisodeIds() derives it from the
-       builder tiers just restored above. That is what makes an OLD save work — a run that had
-       four episodes unlocked and three of them watched still shows four, where a stored list
-       would have needed migrating and a fallback to the queue showed only the one unwatched. */
+    /* Nothing to restore for the library: Collection.unlockedEpisodeIds() derives it from the
+       albums just restored above. That is what makes an OLD save work — a run with four
+       episodes unlocked and three of them watched still shows four, where a stored list would
+       have needed migrating and a fallback to the queue showed only the one unwatched. */
     // no cap clamp on restore — purchased energy may legitimately exceed cfg.energyCap
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero
-    state.lastCoins=state.coins; state.lastClues=state.clues; state.lastEnergy=state.energy;
+    state.lastCoins=state.coins; state.lastEnergy=state.energy;
+    state.lastCards=Collection.collected(); state.lastStatus=Status.points();
     return true;
   }catch(e){ return false; }
 }

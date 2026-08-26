@@ -22,6 +22,22 @@ function fmtShort(n){
   return (neg?"-":"")+s+SHORT_UNITS[u];
 }
 const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+/* Run fn on the next paint — or on a short timer if there is not going to be one.
+
+   requestAnimationFrame is SUSPENDED in a background tab, so anything staged behind a bare rAF
+   simply never happens there. Every caller of this is deferring a style write so a CSS
+   transition has two different values to move between, and some of them have the rest of a
+   sequence behind that write: the status ribbon flips the rank inside it, and without the timer
+   a hidden tab would show the old rank until the beat ended.
+
+   Runs exactly once, whichever gets there first. Same rule the scene animations follow: frames
+   drive the picture, timers guarantee that it happens at all. */
+function nextPaint(fn){
+  let ran=false;
+  const go=()=>{ if(ran) return; ran=true; fn(); };
+  requestAnimationFrame(go);
+  setTimeout(go,32);
+}
 const rand=(a,b)=>a+Math.random()*(b-a);
 const chance=(p)=>Math.random()<p;
 function weighted(table){ const tot=table.reduce((a,x)=>a+x.weight,0); let r=Math.random()*tot;

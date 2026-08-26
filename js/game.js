@@ -5,7 +5,7 @@
    Event fields (any subset per event, played in this order):
      float:{text,color} · log:{icon,msg} · move:{path:[tileIdx,...],stepMs} · confetti:true · pause:ms */
 
-/* Builders, upgrades and episode unlocks live in js/builders/builders.js. */
+/* The collection, and what unlocks an episode, live in js/collection.js. */
 
 /* ---------- rolling ---------- */
 function rollDice(){ const d1=Math.floor(rand(1,7)),d2=Math.floor(rand(1,7)); return {d1,d2,steps:d1+d2}; }
@@ -19,14 +19,14 @@ function applyPassStart(mult){
 }
 
 /* Resolve whatever the token landed on. Mutates state fully; returns events for the UI to play.
-   Overlays (js/overlays/) resolve first since they sit on top of the tile; per-type landing
-   behavior lives in js/tiles/. Nothing tile-specific belongs in this function. */
+   Per-type landing behavior lives in js/tiles/; nothing tile-specific belongs in this function.
+
+   There is no overlay layer any more. Boxes used to sit on tiles and resolve before them; they
+   are now handed over and opened on the spot (js/tiles/deck-tile.js, js/boxes.js), so a tile
+   index has exactly one thing on it again. */
 function resolveLandingEvents(mult){
-  const ev=[]; const i=state.pos;
-  // an overlay may pay out more than once, so it may hand back an array (see js/overlays/overlay.js)
-  OVERLAYS.forEach(o=>{ if(o.has(i)){ const e=o.consume(i); if(e) ev.push(...[].concat(e)); } });
-  ev.push(...TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale}));
-  return ev;
+  const i=state.pos;
+  return TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale}).slice();
 }
 
 /* ---------- prediction ---------- */
@@ -38,9 +38,10 @@ function resolveLandingEvents(mult){
 function resolvePrediction({wager,odds,sel,correct,auto,id}){
   if(wager>0) state.coins-=wager;
   state.predsMade++;
-  /* Clues banked since the last prediction buy accuracy, then are spent — the economy model
-     treats them as a per-cycle flow, not a balance. They only decide the outcome in auto runs;
-     a human's pick still decides a manual one. See TODO.md. */
+  /* Clue CARDS banked since the last prediction buy accuracy, then are spent — the economy
+     model treats them as a per-cycle flow, not a balance. Only a new clue card counts (a
+     duplicate pays coins), and they only decide the outcome in auto runs; a human's pick still
+     decides a manual one. See TODO.md. */
   const accuracy=Economy.accuracyFor(state.cycleClues);
   const cluesSpent=state.cycleClues;
   state.cycleClues=0;
@@ -65,8 +66,8 @@ function advanceSession(){
   const refill=(cfg.energyCap-state.energy)*cfg.regenMin;
   const gap=Math.max(refill, 1440/cfg.sessionsPerDay);
   const regened=Math.floor(gap/cfg.regenMin);
-  // refills to the cap, but never drains a purchased overflow balance
-  state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+regened));
+  // refills to the cap, but never drains a purchased overflow balance (js/board-actor.js)
+  grantEnergy(regened);
   state.clock+=gap;
   const newDay=Math.floor(state.clock/1440)+1;
   const rewards=[];

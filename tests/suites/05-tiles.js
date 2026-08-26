@@ -236,67 +236,46 @@ test("premiere sweeps to Start at the configured speed", () => {
   eq(state.coins, (cfg.startPass + cfg.startLand) * cfg.boardScale);
 });
 
-suite("tiles: deck cards");
+suite("tiles: the deck tile hands over a box");
 
-function forceCard(name, fn) {
-  const saved = deck.map(c => c.weight);
-  deck.forEach(c => { c.weight = c.name === name ? 100 : 0; });
-  try { return fn(); } finally { deck.forEach((c, i) => { c.weight = saved[i]; }); }
-}
+/* The plot-twist deck is gone. Every one of its outcomes still exists — coins, energy, a
+   fine's opposite number — as rows in a box's table, so what this tile owes is a BOX, and
+   which tier it is. What comes out of one is tested in 03-collection.js, where the box lives. */
 
-test("a coin card pays and shows the drawn card", () => {
+test("landing hands over exactly one box, of a tier the config defines", () => {
   freshRun();
-  state.coins = 0;
-  const ev = forceCard("Windfall", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.coins, 300);
-  const card = ev.find(e => e.card).card;
-  eq(card.name, "Windfall");
-  eq(card.positive, true);
-  eq(ev[0].log.msg.includes("Windfall"), true, "the log line comes first");
+  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
+  const packs = ev.filter(e => e.pack);
+  eq(packs.length, 1);
+  ok(Boxes.tier(packs[0].pack.tier.key), "the tier has to be one of the three");
+  eq(packs[0].pack.drops.length, packs[0].pack.tier.items, "and it is already opened");
 });
 
-test("a fine costs coins, seeds VIP and reads as a loss", () => {
+test("the log names the box before the popup and its contents after", () => {
   freshRun();
-  state.coins = 1000; state.vip = 0;
-  const fine = deck.find(c => c.name === "Fine / Paparazzi");
-  const ev = forceCard("Fine / Paparazzi", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.coins, 1000 + fine.coins, "the loss comes off the balance");
-  eq(state.vip, fine.vip, "and is recycled into the VIP pool");
-  eq(ev.find(e => e.card).card.positive, false);
+  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
+  const packAt = ev.findIndex(e => e.pack);
+  ok(ev[packAt - 1] && ev[packAt - 1].log, "opened…");
+  ok(ev[packAt + 1] && ev[packAt + 1].log, "…and what it paid");
 });
 
-test("an energy card flags the dice shower", () => {
+test("the tier is drawn from deckBoxes, so the table alone decides how often a Diamond lands", () => {
   freshRun();
-  state.energy = 0;
-  const ev = forceCard("Small energy", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.energy, 2);
-  eq(ev.find(e => e.card).card.energy, true);
+  const saved = deckBoxes.map(d => d.weight);
+  try {
+    deckBoxes.forEach(d => { d.weight = d.key === "diamond" ? 100 : 0; });
+    for (let k = 0; k < 8; k++) eq(Boxes.drawTier(), "diamond");
+    deckBoxes.forEach(d => { d.weight = d.key === "silver" ? 100 : 0; });
+    for (let k = 0; k < 8; k++) eq(Boxes.drawTier(), "silver");
+  } finally { deckBoxes.forEach((d, i) => { d.weight = saved[i]; }); }
 });
 
-/* The deck pays no clues: the economy model moved every clue to the Mystery Box so that one
-   table sets the rate a prediction runs on. A card that grants clues would double-count. */
-test("no deck card grants clues — the Mystery Box is the only source", () => {
+test("the tile pays nothing of its own — the box is the whole payout", () => {
   freshRun();
-  eq(deck.filter(c => c.clues > 0).length, 0);
-  state.clues = 0; state.cycleClues = 0;
-  deck.forEach(c => forceCard(c.name, () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 })));
-  eq(state.clues, 0, "the album total stays put");
-  eq(state.cycleClues, 0, "and so does the flow");
-});
-
-test("the advance card walks to Start and pays the landing bonus", () => {
-  freshRun();
-  state.pos = 3; state.coins = 0;
-  const ev = forceCard("Advance to Start", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 }));
-  eq(state.pos, 0);
-  eq(ev.find(e => e.move).move.path.length, 37);
-  eq(state.coins, (cfg.startPass + cfg.startLand) * cfg.boardScale);
-  eq(ev.find(e => e.card).card.name, "Advance to Start");
-});
-
-test("card payouts scale with the multiplier", () => {
-  freshRun();
-  state.coins = 0;
-  forceCard("Small coins", () => TILE_TYPES.deck.onLand({ pos: 3, mult: 10, bs: 1 }));
-  eq(state.coins, 300, "30 x10");
+  state.coins = 0; state.vip = 0;
+  const before = state.coins;
+  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
+  const paid = Boxes.coinsIn(ev.find(e => e.pack).pack);
+  eq(state.coins, before + paid, "every coin came out of the box");
+  eq(state.vip, 0, "and the tile seeds no VIP pool of its own");
 });

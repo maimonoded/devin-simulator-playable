@@ -114,7 +114,7 @@ that is either a `SyntaxError` that kills the page (two top-level `const $`) or 
 the whole app. A separate realm also keeps the file standalone-runnable, which is the point above.
 
 The cost is one extra WebGL context while a game is open. That is fine and it is not what
-CLAUDE.md's "one renderer" rule is about: that rule is about the *board and builders sharing one
+CLAUDE.md's "one renderer" rule was about: that rule was about the *board and builders sharing one
 persistent renderer*, not about a transient page. The context goes away with the iframe.
 
 ## Adding a game

@@ -9,29 +9,36 @@ function closeEpisodeUi(){
   $("#scrim").classList.remove("show"); $("#scrim").innerHTML=""; pending=null;
 }
 
-/* A builder just completed, so an episode came with it. Ask rather than launch: banking several
-   and watching them back to back is how the show is actually consumed, and interrupting a roll
-   streak to sit through a video is not a choice the game should make for the player.
+/* A set of cards just completed an episode's page, so an episode came with it. Ask rather than
+   launch: banking several and watching them back to back is how the show is actually consumed,
+   and interrupting a roll streak to sit through a video is not a choice the game should make
+   for the player.
 
-   Declining costs nothing — the id stays in state.epQueue, and the builders view grows a button
-   for whatever is waiting there. */
+   Declining costs nothing — the id stays in state.epQueue, and the 🎬 button on the board
+   carries whatever is waiting there.
+
+   Returns a promise so playEvents can await it: the unlock is part of the roll's event list
+   now, and the roll loop has to wait for the answer the way it waits for every other popup. */
 function openEpisodeUnlock(id){
-  const ep=Episodes.get(id);
-  if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
-  const queued=state.epQueue.length;
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode unlocked</div><h2>${ep.title}</h2></div>
-    <div class="mbody">
-      <div class="hint">Call what happens next, then watch it.${
-        queued>1?` You have <b style="color:var(--pink)">${queued}</b> waiting.`:""}</div>
-      <div class="foot" style="margin-top:14px">
-        <button class="btn ghost" id="bingeLater" style="flex:1">Binge later</button>
-        <button class="btn pink" id="watchNow" style="flex:2">Watch now</button>
-      </div></div></div>`;
-  $("#scrim").classList.add("show");
-  /* Straight into the prediction — openPrediction replaces this modal's contents, so the two
-     screens read as one flow rather than a dialog that spawns another dialog. */
-  $("#watchNow").onclick=()=>openPrediction();
-  $("#bingeLater").onclick=()=>{ closeEpisodeUi(); renderAll(); };
+  return new Promise(resolve=>{
+    const ep=Episodes.get(id);
+    if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return resolve(); }
+    const queued=state.epQueue.length;
+    $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode unlocked</div><h2>${ep.title}</h2></div>
+      <div class="mbody">
+        <div class="hint">You collected all ${Collection.perEpisode()} of its cards. Call what happens next, then watch it.${
+          queued>1?` You have <b style="color:var(--pink)">${queued}</b> waiting.`:""}</div>
+        <div class="foot" style="margin-top:14px">
+          <button class="btn ghost" id="bingeLater" style="flex:1">Binge later</button>
+          <button class="btn pink" id="watchNow" style="flex:2">Watch now</button>
+        </div></div></div>`;
+    $("#scrim").classList.add("show");
+    /* Straight into the prediction — openPrediction replaces this modal's contents, so the two
+       screens read as one flow rather than a dialog that spawns another dialog. The promise is
+       settled either way: the roll loop is waiting on the DECISION, not on the episode. */
+    $("#watchNow").onclick=()=>{ resolve(); openPrediction(id); };
+    $("#bingeLater").onclick=()=>{ closeEpisodeUi(); renderAll(); resolve(); };
+  });
 }
 
 /* `wantId` lets the library start a prediction for a SPECIFIC unwatched episode instead of
@@ -46,8 +53,21 @@ function openPrediction(wantId){
       toast(`▶ Finish <b>${Episodes.titleOf(r.id)}</b> first — its result is still sealed`);
     return resumeReveal(r.id);
   }
-  const id=wantId!=null?wantId:state.epQueue[0];
-  if(id==null) return;
+  /* THE ORDERING RULE, ENFORCED IN ONE PLACE. Pages fill in whatever order the cards fall, but
+     the drama is serialised — episode 2's question gives away episode 1. So whatever id the
+     caller asked for, what actually plays is the next episode of the STORY, and only once its
+     page is complete. Every entry point (the library, the 🎬 button, the album's Watch button,
+     the "next episode" button on the result screen) comes through here, so none of them can
+     disagree about what is playable. */
+  const next=Collection.firstUnwatchedId();
+  if(next==null){
+    const blocked=Collection.blockedBy();
+    if(blocked) toast(`🔒 <b>${Episodes.titleOf(blocked)}</b> comes first — collect its cards`);
+    return;
+  }
+  if(wantId!=null&&wantId!==next)
+    toast(`▶ Episodes play in order — starting <b>${Episodes.titleOf(next)}</b>`);
+  const id=next;
   const ep=Episodes.get(id);
   if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
   // answers are shuffled every time, so the correct index in the file isn't a tell
@@ -86,10 +106,10 @@ function openPrediction(wantId){
      ever gets is a number going up in the HUD. */
   const clueHtml=state.cycleClues>0
     ? `<div class="hint" style="margin:6px 0 2px">
-         <b style="color:var(--teal)">${state.cycleClues}🔍</b> banked since your last prediction —
+         <b style="color:var(--teal)">${state.cycleClues}🔍</b> clue card${state.cycleClues>1?"s":""} banked since your last prediction —
          they lift the modelled accuracy to <b>${Math.round(Economy.accuracyFor(state.cycleClues)*100)}%</b>, and are spent here.</div>`
-    : `<div class="hint" style="margin:6px 0 2px">No clues banked — modelled accuracy sits at its floor of
-         <b>${Math.round(Economy.accuracyFor(0)*100)}%</b>. Mystery Boxes are where clues come from.</div>`;
+    : `<div class="hint" style="margin:6px 0 2px">No clue cards banked — modelled accuracy sits at its floor of
+         <b>${Math.round(Economy.accuracyFor(0)*100)}%</b>. Clue cards come out of boxes, and each new one counts once.</div>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
     ${clueHtml}
@@ -184,6 +204,9 @@ async function runReveal(r){
 
   state.pendingReveal=null;                     // watched: the answer is owed no longer
   scheduleSaveState();
+  /* Watching is one of the three things status is made of, so a milestone can fall due here
+     as surely as it can after a card lands. */
+  await afterCollect();
   showEpisodeResult(ep,r);
 }
 
@@ -204,15 +227,24 @@ function showEpisodeResult(ep,r){
   /* The episode left the queue when the bet was locked, so what is left is what is still
      waiting. Offer the next one straight from here: a binge should not mean closing back to
      the board and hunting for the button again between every episode. */
-  const more=state.epQueue.length;
-  const ctaHtml=more
+  /* "Next episode" counts what can be watched NEXT, not what is merely unlocked: offering it
+     when the next in story order is still uncollected would be a button that toasts a refusal. */
+  const more=Collection.firstUnwatchedId()?state.epQueue.length:0;
+  /* THE SET ENDS HERE, not when its last card landed. Collecting is the means; watching is the
+     point — so the celebration is owed to whichever episode turns out to be the last one seen,
+     which is always the one that just finished. */
+  const setDone=Collection.boardFinished();
+  const ctaHtml=setDone
+    ? `<button class="btn purple wide" id="finishSet" style="margin-top:16px">That is the set \u2014 see it \ud83c\udfc6</button>`
+    : more
     ? `<button class="btn pink wide" id="nextEp" style="margin-top:16px">Next episode \u2192
          <span class="badge" style="margin-left:8px">${more}</span></button>
        <button class="btn ghost wide" id="closeEp" style="margin-top:8px">Back to the board</button>`
     : `<button class="btn purple wide" id="closeEp" style="margin-top:16px">Back to the board</button>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${ep.title}</h2></div>
     <div class="mbody">${resultHtml}${ctaHtml}</div></div>`;
-  $("#closeEp").onclick=()=>{ closeEpisodeUi(); renderAll(); };
-  if(more) $("#nextEp").onclick=()=>openPrediction(Builders.firstUnwatchedId());
+  if($("#closeEp")) $("#closeEp").onclick=()=>{ closeEpisodeUi(); renderAll(); };
+  if(setDone) $("#finishSet").onclick=()=>{ closeEpisodeUi(); renderAll(); showBoardComplete(); };
+  else if(more) $("#nextEp").onclick=()=>openPrediction();
   renderAll();
 }

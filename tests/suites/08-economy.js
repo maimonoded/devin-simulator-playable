@@ -120,8 +120,8 @@ test("a later series prices and unlocks from its global builder number", () => {
   if (shape[1] && shape[1].builders > 0) {
     state.series = 1;
     eq(Economy.globalOf(0), shape[1].from);
-    near(Builders.cost(0, 0), Economy.costFor(shape[1].from, 1), 1e-9,
-         "series 2's first builder is priced as its global number, not as builder 1");
+    near(Economy.costFor(Economy.globalOf(0), 1), Economy.costFor(shape[1].from, 1), 1e-9,
+         "series 2's first entry is priced as its global number, not as number 1");
     state.series = 0;
   } else {
     // only one series has content in this library, which is itself the documented behaviour
@@ -215,7 +215,7 @@ test("a prediction spends the cycle's clues and resets the flow, leaving the alb
   const r = resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
   eq(r.cluesSpent, 3);
   near(r.accuracy, 0.67, 1e-9, "the outcome was modelled at the clued accuracy");
-  eq(state.cycleClues, 0, "the flow resets for the next builder");
+  eq(state.cycleClues, 0, "the flow resets for the next prediction");
   eq(state.clues, 9, "the album is cosmetic and untouched");
 });
 

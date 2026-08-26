@@ -4,23 +4,28 @@ let state={};
 function initState(){
   state={
     day:1, clock:9*60, sessionsToday:1,
-    /* Two clue counters, because the model uses clues for two unrelated things:
-         clues      — the album. A lifetime total, cosmetic, never spent.
+    /* Two clue counters. A clue is a CARD now (js/collection.js), but it still does the two
+       unrelated jobs it always did:
+         clues      — the lifetime total, never spent. Shown in the album's footer.
          cycleClues — the flow. Banked since the last prediction, spent on the next one
-                      (it buys accuracy, see Economy.accuracyFor) and reset to zero. */
+                      (it buys accuracy, see Economy.accuracyFor) and reset to zero.
+       Both are fed by Collection.add() when a NEW clue card lands — a duplicate pays coins,
+       not insight. */
     energy:cfg.energyCap, coins:0, clues:0, cycleClues:0, vip:0,
-    pos:0, mult:1, boardNum:1, series:0,
-    /* tile index → what that box holds, decided when it was placed (js/overlays/mystery-box.js).
-       A Map rather than a Set because the board shows a GOLD box on a tile holding clues. */
-    builder:Builders.fresh(), boxes:new Map(),
-    /* Boxes EARNED but not yet on the board. Upgrades bank them here rather than dropping them
-       straight onto tiles, because the player is looking at the builders screen when they buy —
-       a box appearing on a board they cannot see is a reward nobody witnesses. They are thrown
-       on when the player returns to the board (setBuildersView in js/ui/main.js). */
-    pendingBoxes:0,
+    pos:0, mult:1, series:0,
+    /* Which board of the collection is being played. Board n covers episodes
+       [(n-1)*cfg.episodesPerBoard, n*cfg.episodesPerBoard) of the library. */
+    boardNum:1,
+    /* THE COLLECTION. One album per board, keyed by board number, card id → how many held.
+       Kept forever rather than cleared on a board change: the album is a history, and past
+       boards are what Collection.unlockedEpisodeIds() reads their episodes off. */
+    albums:{"1":{}},
+    /* THE SHELF. Status item id → {day, how} — how being "bought" | "earned" | "found".
+       js/status.js. */
+    status:{},
     /* epQueue is what is still UNWATCHED, and it shrinks as episodes are watched. Which
-       episodes exist at all is NOT stored — it is derived from the completed builders, since
-       the episode id is the builder number (Builders.unlockedEpisodeIds). */
+       episodes exist at all is NOT stored — Collection.unlockedEpisodeIds() derives it from
+       the albums, because a completed page can never un-complete. */
     epQueue:[], epsWatched:0, boardsDone:0,
     /* A bet that was locked in but whose episode was never watched to the end. Holds the
        already-decided outcome so it can be revealed later, and is PERSISTED — otherwise
@@ -28,7 +33,7 @@ function initState(){
        {id, wager, odds, won, payout} or null. */
     pendingReveal:null,
     predWins:0, predLoss:0, streak:0, bestStreak:0, rolls:0, predsMade:0,
-    lastCoins:0, lastEnergy:cfg.energyCap, lastClues:0,
+    lastCoins:0, lastEnergy:cfg.energyCap, lastCards:0, lastStatus:0,
     animating:false, seriesDone:false,
   };
 }

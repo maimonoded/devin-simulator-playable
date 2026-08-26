@@ -23,6 +23,8 @@
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/drawer.css">
 <link rel="stylesheet" href="css/overlay.css">
+<!-- cards, the album, the box popup, the status shelf -->
+<link rel="stylesheet" href="css/collection.css">
 <!-- last, so its overrides win the cascade without needing specificity tricks -->
 <link rel="stylesheet" href="css/mobile.css">
 </head>
@@ -34,15 +36,26 @@
     <div class="daychip"><span class="d" id="hDay">Day 1</span><span class="c" id="hClock">9:00 AM</span></div>
     <div class="pills">
       <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
-      <div class="pill clues"><span class="ic">🔍</span><div><div class="v" id="hClues">0</div><div class="lb">Clues</div></div></div>
+      <div class="pill cards"><span class="ic">🃏</span><div><div class="v" id="hCards">0/25</div><div class="lb">This set</div></div></div>
       <div class="pill"><span class="ic">🌟</span><div><div class="v" id="hVip">0</div><div class="lb">VIP Pool</div></div></div>
       <div class="pill energywrap"><span class="ic">⚡</span><div style="flex:1">
         <div class="v"><span id="hEnergy">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hEnergyCap">50</span></span></div>
         <div class="ebar"><div class="efill" id="hEfill"></div></div></div></div>
     </div>
-    <!-- Player. Not changeable yet — it is the handle for the profile panel, which for now
-         holds only the progress reset. Pushed to the far right so the balances read left. -->
-    <button class="avatarBtn" id="avatarBtn" title="Player">💃</button>
+    <!-- Player. The handle for the profile panel — the status track and the shelf of things
+         that prove it. The rank rides beside the avatar rather than in the pill row, because it
+         is a property of the PLAYER, not a balance. Pushed right so the balances read left. -->
+    <div class="player">
+      <button class="avatarBtn" id="avatarBtn" title="Player">💃</button>
+      <!-- The rank rides beside the avatar as its own control, not inside it: the avatar is a
+           40px circle and a rank name is not, so nesting them cost the circle its shape and
+           spilled the text past the HUD's right edge on a phone. Both open the profile. -->
+      <button class="statusChip" id="hStatus" title="Your status">
+        <span class="rkIco" id="hRankIco">🎬</span>
+        <span class="rkName" id="hRank">Extra</span>
+        <span class="rkBar"><span class="rkFill" id="hRankFill"></span></span>
+      </button>
+    </div>
   </div>
 
   <!-- stage -->
@@ -56,6 +69,15 @@
       <div class="board" id="board">
         <div class="token" id="token"><div class="disc">💃</div></div>
       </div>
+      <!-- Opening a box is a 3D object in the scene (js/ui/box3d.js). This is the only DOM it
+           needs: the caption and the countdown, because a mesh cannot say "tap to open". Not a
+           panel and not a scrim — the board stays visible and live behind it. -->
+      <div class="packHud" id="packHud">
+        <span class="phText" id="packHudText"></span>
+        <span class="phBar"><span class="phFill" id="packHudFill"></span></span>
+      </div>
+      <!-- "Your status went up" — a ribbon over the board, not a dialog. js/ui/statusup.js -->
+      <div class="statusUp" id="statusUp"></div>
       <!-- win/loss reveal, sits flat above the 3D board -->
       <div class="centerfx" id="centerFx"></div>
       <!-- Bonus mini-games (minigames/, js/ui/minigame.js) mount an iframe here. Inside the
@@ -68,38 +90,20 @@
       <div class="sheet" id="sheetHost"></div>
       <!-- Play controls ride ON the board as a flat 2D layer pinned to its bottom edge, so the
            scene reads as a game screen rather than a viewport with a toolbar under it. -->
-      <!-- One row, evenly spaced: builders · stake · ROLL · album. These were three separate
-           things (an absolutely-positioned corner button plus a centred group) which collided
-           on a narrow screen and disagreed about their height. -->
+      <!-- One row, evenly spaced: episodes · stake · ROLL · album. -->
       <div class="playbar">
         <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
-        <!-- Into the builders view. Carries a dot when something is affordable, since the
-             board no longer shows builder progress at all. -->
-        <button class="btn navb" id="buildersBtn" title="Builders">🏗<i class="navDot" id="buildersDot"></i></button>
+        <!-- Episodes: straight into the next unwatched one when something is waiting, the
+             library otherwise. One button, because "watch the next" and "watch one again" are
+             the same intent from the player's side. The badge counts what is waiting. -->
+        <button class="btn navb" id="episodesBtn" title="Episodes">🎬<i class="navDot" id="episodesDot">0</i></button>
         <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
         <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
         <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
         <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
-        <!-- Clue album. Badged while there are clues banked for the next prediction, since
-             those are the ones about to be spent. -->
-        <button class="btn album" id="albumBtn" title="Clue album">🔍<i class="albumDot" id="albumDot"></i></button>
-      </div>
-      <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
-           until something has actually been unlocked. -->
-      <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
-      <!-- The builders view's own 2D layer. Board3D swaps the scene; .boardScene.showBuilders
-           swaps which of these two overlays is on screen. -->
-      <div class="buildersUi">
-        <button class="navBtn back" id="boardBtn" title="Back to the board">←</button>
-        <!-- Mystery boxes banked by upgrades and waiting to be thrown onto the board. This is
-             the only acknowledgement a purchase gets while the board is out of sight, so it
-             pops each time it changes. -->
-        <div class="boxCounter" id="boxCounter"><span class="boxIco">🎁</span><span id="boxCount">0</span></div>
-        <div class="buildersHead" id="buildersHead"></div>
-        <!-- Episodes banked by "Binge later", sitting just above the upgrade row. Hidden when
-             the queue is empty, so it only appears when there is something to watch. -->
-        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
-        <div class="buildersBar" id="buildersBar"></div>
+        <!-- The album: one page per episode, and the empty slots are the point. Badged while
+             clue cards are banked for the next prediction, since those are about to be spent. -->
+        <button class="btn album" id="albumBtn" title="Album">📔<i class="albumDot" id="albumDot"></i></button>
       </div>
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
@@ -115,7 +119,7 @@
          (the 🏗 button on the board), which is the only surface for it in either layout. -->
     <div class="card">
       <h3>🎬 Story <span id="epBadge" class="badge" style="margin-left:auto;display:none">0 ready</span></h3>
-      <div class="hint" id="storyHint">Upgrade a landmark to unlock the next episode.</div>
+      <div class="hint" id="storyHint">Collect a page of cards to unlock the next episode.</div>
       <button class="btn pink wide" id="watchBtn" style="margin-top:10px" disabled>Predict &amp; watch episode</button>
     </div>
 
@@ -125,7 +129,7 @@
         <div class="stat"><div class="v teal" id="sEps">0</div><div class="l">Episodes watched</div></div>
         <div class="stat"><div class="v gold" id="sAcc">—</div><div class="l">Prediction accuracy</div></div>
         <div class="stat"><div class="v" id="sStreak">0</div><div class="l">Current streak</div></div>
-        <div class="stat"><div class="v" id="sBoards">0</div><div class="l">Builders done</div></div>
+        <div class="stat"><div class="v" id="sSet">0/5</div><div class="l">This set unlocked</div></div>
         <div class="stat"><div class="v" id="sRolls">0</div><div class="l">Total rolls</div></div>
         <div class="stat"><div class="v" id="sSessions">1</div><div class="l">Session today</div></div>
       </div>
@@ -165,8 +169,6 @@
 <script src="js/config.js"></script>
 <script src="js/content.js"></script>
 <script src="js/episodes.js"></script>
-<!-- clue album content + the derivation that says which are owned -->
-<script src="js/clues.js"></script>
 <!-- episode content: one file per builder (see episodes/README.md) -->
 <script src="episodes/001.js"></script>
 <script src="episodes/002.js"></script>
@@ -192,10 +194,16 @@
 <script src="assets/env/scene.js"></script>
 <!-- who walks the board, and which way each one faces (see assets/npcs/README.md) -->
 <script src="assets/npcs/npcs.js"></script>
+<!-- what there is to collect, and the status shelf — content, read by the two engines below -->
+<script src="assets/cards/cards.js"></script>
+<script src="assets/status/status.js"></script>
+<!-- board-actor first: it owns grantEnergy(), which js/boxes.js calls -->
+<script src="js/board-actor.js"></script>
+<script src="js/collection.js"></script>
+<script src="js/status.js"></script>
+<script src="js/boxes.js"></script>
 <script src="js/state.js"></script>
 <script src="js/storage.js"></script>
-<script src="js/builders/builders.js"></script>
-<script src="js/board-actor.js"></script>
 <script src="js/tiles/tile.js"></script>
 <script src="js/tiles/standard-tile.js"></script>
 <script src="js/tiles/start-tile.js"></script>
@@ -204,18 +212,21 @@
 <script src="js/tiles/premiere-tile.js"></script>
 <script src="js/tiles/train-tile.js"></script>
 <script src="js/tiles/deck-tile.js"></script>
-<script src="js/overlays/overlay.js"></script>
-<script src="js/overlays/mystery-box.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui/fx.js"></script>
 <!-- after fx.js: falls back to its showCollect() when a game is off, missing or broken -->
 <script src="js/ui/minigame.js"></script>
+<!-- one card, drawn — shared by the album and the box popup -->
+<script src="js/ui/cardface.js"></script>
 <script src="js/ui/render.js"></script>
 <script src="js/ui/player.js"></script>
 <script src="js/ui/prediction.js"></script>
 <script src="js/ui/library.js"></script>
 <script src="js/ui/album.js"></script>
+<script src="js/ui/pack.js"></script>
 <script src="js/ui/profile.js"></script>
+<!-- after profile.js: the beat that shows the status track moving -->
+<script src="js/ui/statusup.js"></script>
 <script src="js/ui/store.js"></script>
 <script src="js/ui/finale.js"></script>
 <script src="js/ui/economy-panel.js"></script>

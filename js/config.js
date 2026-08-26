@@ -75,48 +75,52 @@ const DEFAULTS={
   stdBase:40, trainSmall:60, trainLarge:315, trainLargeChance:0.35, trainEV:149.25,
   startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
   boardScale:1,
-  /* Builder shape. The COST CURVE is not here — it is segmented and lives in js/economy.js,
-     because no single formula holds for a whole run. `buildings` is the current series'
-     length, seeded by Economy.apply(). */
+  /* ---- the collection ----
+     The shape of one turn of the loop: episodesPerBoard episodes on a board, each unlocked by
+     collectiblesPerEpisode named cards. Nothing here states the pool size — 5 x 5 makes it 25,
+     and it is DERIVED from the requirements in assets/cards/cards.js (see js/collection.js).
+     So changing either number is only half the job: the board has to be re-authored to match,
+     and Collection.validate() is what says whether it has been.
+
+     dupCoins is what a card you already hold is worth instead, multiplied by that tier's `dup`
+     (CARD_TIERS) — a duplicate diamond pays eight times a duplicate silver. */
+  episodesPerBoard:5, collectiblesPerEpisode:5, dupCoins:40,
+  /* ---- status ----
+     Points per unit of play, on top of the points the owned items carry themselves. This is
+     what makes the track climb for a player who never spends a coin. statusPriceScale moves
+     every shop price at once without editing the ten of them.
+
+     statusBarMs is how long the track takes to move when an item is earned and statusUpMs how
+     long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
+     both belong in the drawer. */
+  statusPerEpisode:2, statusPerCard:1, statusPerBoard:10, statusPriceScale:1,
+  statusBarMs:900, statusUpMs:1500,
+  /* What a box's `coins` outcome pays when its table row does not name an amount. */
+  boxCoins:60,
+  /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
+     its episode count. Nothing in the game reads these; they are the model's bookkeeping. */
   buildings:12, tiers:5, boxesPerUpgrade:1,
-  /* How many buildings the builders view shows at once. The page only advances once every
-     building on it is maxed, so this is also the size of a "chunk" of the series. */
-  builderPageSize:5,
-  /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
-  boxCoins:60, boxItemGapMs:260,
-  /* ---- the box throw ----
-     Boxes bought in the builders view are thrown onto the board when the player goes back to it,
-     in three phases: pull the camera out, rain the boxes down, put the camera back.
-
-     boxZoomOut is how far the camera pulls back (1 = not at all; 1.45 shows the whole ring).
-     The three times are the three phases, so the whole thing costs
-     boxZoomOutMs + boxThrowMs + boxZoomInMs whatever it is tuned to.
-
-     boxThrowMs is the TOTAL for the throw, not one box: the last box lands exactly on it however
-     many there are. Ten boxes in the same window means they overlap more, not that it runs ten
-     times as long — otherwise a big buy would strand the player watching a downpour. */
-  boxZoomOut:1.45, boxZoomOutMs:420, boxThrowMs:900, boxZoomInMs:420,
   /* ---- opening a box ----
-     Landing on one lifts it off its tile, floats it to the middle of the view swelling as it
-     goes, then pops it. boxRiseMs is the trip to the centre, boxSwellMs the last inflate before
-     it goes, boxOpenScale how many times its board size it reaches.
-     The pop is followed by the SPOILS: what was just won, held in the middle of the screen.
-     Floats over the token are too small and too far from where the player is looking after a
-     burst in the centre — the numbers have to appear where the box was.
-     boxSpoilsMs is that hold, and boxCluePopupMs is counted from the moment the spoils appear,
-     so the clue sheet follows the numbers rather than racing them. On a clue box the spoils stay
-     up until the sheet arrives, so the two never leave a blank gap between them. */
-  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxSpoilsMs:1200, boxCluePopupMs:2000,
-  /* ---- the gold (clue) box ----
-     A box is only a target if it can be picked out from across the board, and at tile size that
-     is a matter of pixels: colour alone loses against a pale cream board. So the gold one is also
-     bigger, self-lit, wrapped in a glow, and — the part that actually catches the eye — moving.
-     boxGoldGlow 0 turns the halo off, boxGoldSpinMs is one full turn. */
-  boxGoldScale:1.22, boxGoldGlow:0.7, boxGoldEmissive:0.45, boxGoldSpinMs:4200, boxGoldBob:0.09,
-  /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
-     gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
-     this long if the player doesn't tap Collect. */
-  clueCollectMs:3000,
+     Every box is opened the moment it is won (js/boxes.js, js/ui/pack.js) — none of them sit on
+     a tile any more, so there is no throw to tune and no gold box to pick out from across the
+     board. What is left is the popup's pacing.
+
+     packAutoOpenMs is the promise the loop is built on: the player may tap the box to open it,
+     and if they do not it opens itself after this. Five seconds is long enough to feel like a
+     choice and short enough that an idle session keeps moving.
+     packFlipMs is the card's flip, packRevealMs how long it is then held, packItemGapMs the
+     beat between two cards out of the same box, and packCloseMs the wait after the last one.
+     So a Diamond Box (items: 3) costs at worst
+     packAutoOpenMs + 3 x (packFlipMs + packRevealMs + packItemGapMs) + packCloseMs,
+     which is why the big tiers are bought rather than landed on.
+     packDupMs is the extra beat a duplicate holds while its coin consolation lands. */
+  packAutoOpenMs:5000, packFlipMs:420, packRevealMs:1500, packItemGapMs:420,
+  packCloseMs:600, packDupMs:900,
+  /* The box itself, as an object on the board. packBoxSize is its edge in tiles, packSwellMs the
+     strain before it bursts and packPopScale how far it inflates first. packCardSize is a
+     revealed card's height in tiles and packCardGap how far apart two of them sit — both are the
+     same units the board is measured in, because the cards hang in the world beside it. */
+  packBoxSize:2.3, packSwellMs:300, packPopScale:1.55, packCardSize:2.2, packCardGap:1.25,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
@@ -129,24 +133,90 @@ let cfg=Object.assign({},DEFAULTS);
 /* Roll stakes in cycle order. One button steps through these and wraps, so the order here IS
    the order the player sees. A stake costs that much energy per roll and multiplies the coins. */
 const MULTIPLIERS=[1,2,3,5,10];
+/* ---- the economy model's own tables ----
+   Both are still written by Economy.apply() from the loaded workbook, and both are still saved
+   and restored, because they are what the MODEL says the deck tile and the mystery box pay.
+   Neither is read by the game any more: the deck tile hands over a box (js/tiles/deck-tile.js)
+   and a box's contents come from boxTiers below. They are kept rather than deleted so an
+   imported workbook still round-trips, and so the numbers the collection loop replaced can be
+   compared against it. See "Known dead config" in CLAUDE.md. */
 let deck=[
   {name:"Small coins",weight:40,coins:30,energy:0,clues:0,vip:0},
   {name:"Medium coins",weight:15,coins:80,energy:0,clues:0,vip:0},
   {name:"Windfall",weight:5,coins:300,energy:0,clues:0,vip:0},
   {name:"Small energy",weight:15,coins:0,energy:2,clues:0,vip:0},
-  /* No clue card: all clues come from the Mystery Box, so the box's weights alone
-     set the rate a prediction runs on. */
   {name:"Insider tip",weight:10,coins:50,energy:0,clues:0,vip:0},
   {name:"Fine / Paparazzi",weight:10,coins:-80,energy:0,clues:0,vip:80},
   {name:"Advance to Start",weight:5,coins:0,energy:0,clues:0,vip:0,advance:true},
 ];
-/* The mystery box's SECOND item. Item 1 is always cfg.boxCoins. */
 let boxTable=[
   {name:"Coins",weight:33,amount:60,kind:"coins"},
   {name:"Energy",weight:33,amount:3,kind:"energy"},
   {name:"Clues",weight:33,amount:2,kind:"clues"},
 ];
+
+/* ---- the boxes ----
+   Three tiers, and a tier is TWO things at once: how many draws it makes (`items`) and how the
+   table those draws come from is weighted. A Diamond Box is not a Silver Box with better odds —
+   it is three draws against a table weighted at the rare end, which is what makes the tiers feel
+   different rather than merely priced differently.
+
+   `kind` in a row is resolved by js/boxes.js:
+     card    a character card at `tier`, drawn uniformly from that tier's slice of the pool
+     clue    a clue card, drawn uniformly from the board's clues
+     status  a status item nobody owns yet, by its own `box` weight (assets/status/status.js)
+     coins   `amount`, scaled by cfg.boardScale
+     energy  `amount`, topped up toward the cap, never reducing a purchased overflow
+
+   `coins` and `usd` are the two prices in the store — the coin price is what play buys, the
+   dollar price is what the simulated storefront charges. A tier with no `coins` cannot be
+   bought with coins at all; today all three can. */
+let boxTiers=[
+  { key:"silver", name:"Silver Box", icon:"\ud83c\udf81", rank:1, items:1,
+    art:"assets/boxes/silver.webp", coins:2500, usd:1.99,
+    table:[
+      {name:"Silver card", kind:"card", tier:"silver",  weight:44},
+      {name:"Gold card",   kind:"card", tier:"gold",    weight:6},
+      {name:"Diamond card",kind:"card", tier:"diamond", weight:0.6},
+      {name:"Clue card",   kind:"clue",                 weight:28},
+      {name:"Status item", kind:"status",               weight:1},
+      {name:"Coins",       kind:"coins",  amount:120,   weight:12},
+      {name:"Energy",      kind:"energy", amount:3,     weight:8},
+    ]},
+  { key:"gold", name:"Gold Box", icon:"\ud83c\udf81", rank:2, items:2,
+    art:"assets/boxes/gold.webp", coins:12000, usd:7.99,
+    table:[
+      {name:"Silver card", kind:"card", tier:"silver",  weight:26},
+      {name:"Gold card",   kind:"card", tier:"gold",    weight:26},
+      {name:"Diamond card",kind:"card", tier:"diamond", weight:4},
+      {name:"Clue card",   kind:"clue",                 weight:24},
+      {name:"Status item", kind:"status",               weight:4},
+      {name:"Coins",       kind:"coins",  amount:400,   weight:10},
+      {name:"Energy",      kind:"energy", amount:6,     weight:6},
+    ]},
+  { key:"diamond", name:"Diamond Box", icon:"\ud83c\udf81", rank:3, items:3,
+    art:"assets/boxes/diamond.webp", coins:45000, usd:24.99,
+    table:[
+      {name:"Silver card", kind:"card", tier:"silver",  weight:8},
+      {name:"Gold card",   kind:"card", tier:"gold",    weight:30},
+      {name:"Diamond card",kind:"card", tier:"diamond", weight:20},
+      {name:"Clue card",   kind:"clue",                 weight:20},
+      {name:"Status item", kind:"status",               weight:12},
+      {name:"Coins",       kind:"coins",  amount:1500,  weight:6},
+      {name:"Energy",      kind:"energy", amount:12,    weight:4},
+    ]},
+];
+/* Which box a deck tile hands over. Mostly Silver, so a Gold off a tile is a good turn and a
+   Diamond is a story — the paid tiers stay worth paying for. */
+let deckBoxes=[
+  { key:"silver",  weight:80 },
+  { key:"gold",    weight:17 },
+  { key:"diamond", weight:3 },
+];
+
 const defDeck=JSON.parse(JSON.stringify(deck));
+const defBoxTiers=JSON.parse(JSON.stringify(boxTiers));
+const defDeckBoxes=JSON.parse(JSON.stringify(deckBoxes));
 const defBox=JSON.parse(JSON.stringify(boxTable));
 
 /* The train's five-rung TRAIN_MULT spread used to live here, normalised so its mean landed on
@@ -174,8 +244,6 @@ const TUNING=[
    ["bonusGames","Bonus mini-games (0/1)",1],
    ["bonusLoadMs","Bonus game: opening animation (ms)",100],
    ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
-   ["boxItemGapMs","Mystery box: gap between its two items (ms)",20],
-   ["clueCollectMs","Clue popup: auto-close after (ms)",100],
    ["deckCardMs","Deck: card on screen (ms)",100],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
@@ -192,25 +260,20 @@ const TUNING=[
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],
    ["board3d","3D board (0/1) — reload to apply",1]]},
- /* The three phases of the box throw, each its own knob so the pacing can be tuned by feel
-    rather than by one number that moves all of it at once. */
- {group:"Mystery box throw",items:[
-   ["boxZoomOut","Camera zoom out (x, 1 = none)",0.05],
-   ["boxZoomOutMs","1 · Zoom out (ms)",20],
-   ["boxThrowMs","2 · Throwing the boxes, total (ms)",20],
-   ["boxZoomInMs","3 · Zoom back in (ms)",20]]},
- {group:"Mystery box opening",items:[
-   ["boxRiseMs","1 · Float to the centre (ms)",20],
-   ["boxSwellMs","2 · Swell before the pop (ms)",20],
-   ["boxOpenScale","Size it reaches (x board size)",0.25],
-   ["boxSpoilsMs","3 · Winnings held on screen (ms)",50],
-   ["boxCluePopupMs","4 · Clue sheet, after the winnings (ms)",50]]},
- {group:"Gold (clue) box",items:[
-   ["boxGoldScale","Size vs a plain box (x)",0.02],
-   ["boxGoldEmissive","Self-lit glow on the model",0.05],
-   ["boxGoldGlow","Halo around it (0 = off)",0.05],
-   ["boxGoldSpinMs","One full turn (ms)",100],
-   ["boxGoldBob","Bob height (tile units)",0.01]]},
+ /* Opening a box. The one knob the loop is actually built on is packAutoOpenMs: the player
+    may tap the box, and if they do not it opens itself after this. */
+ {group:"Opening a box",items:[
+   ["packAutoOpenMs","Opens itself after (ms)",250,{min:0,max:20000}],
+   ["packFlipMs","1 · Card flip (ms)",20],
+   ["packRevealMs","2 · Card held (ms)",50],
+   ["packItemGapMs","3 · Gap between two cards (ms)",20],
+   ["packDupMs","Duplicate: extra beat (ms)",50],
+   ["packBoxSize","Box size (tiles)",0.05,{min:0.4,max:4}],
+   ["packSwellMs","Swell before it bursts (ms)",20],
+   ["packPopScale","How far it inflates (×)",0.05,{min:1,max:3}],
+   ["packCardSize","Revealed card height (tiles)",0.1,{min:0.6,max:5}],
+   ["packCardGap","Revealed cards: gap (tiles)",0.05,{min:0.2,max:4}],
+   ["packCloseMs","4 · After the last card (ms)",50]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —
@@ -248,11 +311,21 @@ const TUNING=[
    ["diceSpread","How far apart they land",0.1,{min:0,max:5}],
    ["diceThrowFrom","Thrown from (tiles toward camera)",0.25,{min:0,max:10}],
    ["diceArc","Throw height",0.1,{min:0,max:8}]]},
- {group:"Builders & series",items:[
-   /* The cost curve is not here: it is segmented and belongs to the loaded economy model.
-      The drawer shows it read-only in the Economy panel (js/ui/economy-panel.js). */
-   ["boxesPerUpgrade","Boxes per upgrade",1],["boxCoins","Box item 1: coins",10],
-   ["buildings","Builders in this series",1],["tiers","Levels per builder",1]]},
+ /* The collection. episodesPerBoard and collectiblesPerEpisode are the SHAPE of a board, and
+    the board content has to match them — Collection.validate() is what checks that, and the
+    Collection panel in this drawer prints what it finds. */
+ {group:"The collection",items:[
+   ["episodesPerBoard","Episodes per board",1,{min:1,max:20}],
+   ["collectiblesPerEpisode","Cards per episode",1,{min:1,max:12}],
+   ["dupCoins","Duplicate card: coins (x its tier)",5],
+   ["boxCoins","Box: coins when the row says none",10]]},
+ {group:"Status",items:[
+   ["statusPerEpisode","Points per episode watched",1],
+   ["statusPerCard","Points per card collected",1],
+   ["statusPerBoard","Points per board finished",1],
+   ["statusPriceScale","Shop prices ×",0.05,{min:0.05,max:20}],
+   ["statusBarMs","Earned: track moves (ms)",50],
+   ["statusUpMs","Earned: held afterwards (ms)",50]]},
  {group:"Prediction & wager",items:[
    ["minWager","Minimum wager (floor under every tier)",10],
    ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],

@@ -19,8 +19,9 @@ import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
 import { Dice3D } from "./dice3d.js";
-import { Builders3D } from "./builders3d.js";
 import { NPC3D } from "./npc3d.js";
+import { Case3D } from "./case3d.js";
+import { Box3D } from "./box3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -28,32 +29,14 @@ const TILE = 1;                  // one tile = one world unit
    The gap existed for the plain placeholder slabs, which needed it to read as separate tiles. */
 const GAP = 0;
 const TILE_H = 0.16;             // tile slab thickness
+/* How far toward the camera a box and its cards stand, in world units. Under an orthographic
+   camera this ONLY reorders — nothing moves on screen and nothing changes size — so it is the
+   whole of what puts the box in front of the case board rather than tangled up in it. Well
+   inside the camera's 0.1–200 range. */
+const PACK_FRONT = 6;
 const EXTENT = N * TILE;         // board footprint
 /* The player piece. Absent file = the placeholder disc stays, so this is safe to remove. */
 const TOKEN_MODEL = "assets/token/token.glb";
-/* The mystery box sitting on a tile. Same deal: absent file falls back to the plain cube, so the
-   board never depends on the asset having been generated. Normalized to a 1x1 footprint with its
-   origin at the base, like the tiles, so BOX_SIZE is just how big it is in tile units. */
-const BOX_MODEL = "assets/props/models/mystery-box.glb";
-/* The gold one holds clues. Because contents are decided when a box is PLACED, the board can
-   say so before the player gets there — which is what turns a box into somewhere worth landing
-   rather than an invisible bonus. */
-const BOX_MODEL_GOLD = "assets/props/models/mystery-box-gold.glb";
-const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neighbouring tile
-/* Where a box's base goes: the slab's TOP, the same surface the token stands on and the same
-   value js/ui/npc3d.js calls FOOT_Y.
-
-   Not TILE_H/2, which is what this used to be. TILE_H/2 is where _loadModel GROUNDS A TILE MODEL
-   (`holder.position.y += TILE_H / 2 - box.min.y`), i.e. the underside of the tile's own paving —
-   half a slab BELOW the surface things stand on. A box placed there sinks 0.08 into its tile.
-   It got away with it for a while because a chunky object still reads as sitting on a tile when
-   its bottom centimetre is buried; the NPCs are what made the same mistake visible.
-
-   Every box height has to come from here: the resting place, the gold box's idle bob, and the
-   put-everything-back path after a cancelled throw. The throw itself captures the resting y and
-   restores it, so it follows on its own — but only because all three agree. */
-const BOX_Y = TILE_H;
-
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
   standard: 0x232a63,
@@ -92,21 +75,10 @@ const Board3D = {
   ready: false,
 
   _renderer: null, _scene: null, _camera: null, _host: null,
-  _tiles: [], _token: null, _boxes: new Map(), _models: new Map(), _gltf: null,
+  _tiles: [], _token: null, _models: new Map(), _gltf: null,
   _raf: 0,
-  /* The mystery box model, loaded once and cloned per box. */
-  _boxModel: null, _boxModelGold: null,
-  /* Frustum half-height from the last resize(), and the multiplier the box throw pulls the
-     camera out by. Kept apart so the throw can widen the view without resize() having to know
-     about it, and so a resize mid-throw still lands on the right base framing. */
-  _fit: 0, _aspect: 1, _zoom: 1, _zoomShown: 1,
-  /* Per-frame animations owned by the board (the box throw and the box opening). Same shape the
-     mini-games use. _fxDone holds the resolve of anything currently awaiting one of them, so a
-     teardown can settle it rather than leaving the roll loop waiting on an animation that will
-     never finish. */
-  _anims: [], _fxDone: [], _flying: null,
-  /* "board" | "builders" — which scene the one renderer is drawing. See setView(). */
-  _view: "board",
+  /* Frustum half-height and aspect from the last resize(). */
+  _fit: 0, _aspect: 1,
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
   /* _camTarget is where the camera is looking now, _camWant where it is heading. Keeping
      them apart is what makes the follow trail rather than snap. */
@@ -183,8 +155,11 @@ const Board3D = {
     }
 
     Env3D.init(this._scene);
-    /* Its own scene, drawn by this renderer — see setView(). */
-    Builders3D.init();
+    /* The current set, standing inside the ring. Its own group in this scene, so it is drawn,
+       depth-tested and moved by the camera like anything else on the board. */
+    Case3D.init(this._scene);
+    /* The box that pops open over the board, and the cards that come out of it. */
+    Box3D.init(this._scene);
     this.syncPageBackground();
     /* Init once, not per build(): the dice hang off their own group, which build() leaves
        alone, so they survive a board rebuild the way the token does. */
@@ -245,22 +220,17 @@ const Board3D = {
     this._fit = Math.max(halfH, halfW / aspect);
     this._aspect = aspect;
     this._applyFrustum();
-    /* The builders scene shares this canvas, so it re-fits on the same events — otherwise it
-       would still be framed for whatever size the window was when it was last shown. */
-    Builders3D.resize(w, h);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },
 
-  /* The camera's frustum = the fit resize() worked out, widened by whatever the box throw is
-     currently asking for. Cheap enough to call every frame while the zoom is moving. */
+  /* The camera's frustum = the fit resize() worked out. */
   _applyFrustum() {
-    const fit = this._fit * this._zoom, a = this._aspect;
+    const fit = this._fit, a = this._aspect;
     this._camera.left = -fit * a;
     this._camera.right = fit * a;
     this._camera.top = fit;
     this._camera.bottom = -fit;
     this._camera.updateProjectionMatrix();
-    this._zoomShown = this._zoom;
   },
 
   /* world position of a tile's centre (top surface) */
@@ -377,7 +347,6 @@ const Board3D = {
     }
 
     this._buildToken();
-    this._loadBoxModel();
     this.setTokenTile(state.pos, true);
   },
 
@@ -618,300 +587,58 @@ const Board3D = {
     }
   },
 
-  /* `boxes` is [{i, gold}] — which tiles hold a box and which of those are the clue ones. */
-  setOverlays(boxes) {
-    if (!this.available) return;
-    const want = new Map(boxes.map(b => [b.i, !!b.gold]));
-    for (const [i, mesh] of this._boxes) {
-      /* A box whose LOOK changed has to be rebuilt, not just left alone — that happens when a
-         pre-gold save is restored and its contents get drawn on the first landing. */
-      if (!want.has(i) || mesh.userData.gold !== want.get(i)) {
-        this._scene.remove(mesh); this._boxes.delete(i);
-      }
-    }
-    want.forEach((gold, i) => {
-      if (this._boxes.has(i)) return;
-      this._boxes.set(i, this._addBox(i, gold));
-    });
-  },
-
-  /* One box, resting on its tile. Uses the generated model if it has arrived and a plain cube
-     otherwise — the cube is not a placeholder to be removed later, it is the fallback for a
-     missing or failed asset, exactly like the token's disc. */
-  _addBox(i, gold) {
-    const holder = new THREE.Group();
-    const w = this._tileWorld(i);
-    holder.position.set(w.x, BOX_Y, w.z);
-    holder.userData.gold = !!gold;
-    /* Gold falls back to the plain box before it falls back to the cube: a wrong-coloured box
-       still reads as a box, where a cube reads as missing art. */
-    const model = (gold && this._boxModelGold) || this._boxModel;
-    holder.add(model
-      ? model.clone(true)
-      : new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3),
-                       new THREE.MeshLambertMaterial({ color: gold ? 0xffcb5c : COLORS.box })));
-    if (!model) holder.children[0].position.y = 0.15;   // cube pivots at its middle
-
-    /* The gold one has to be findable from across the board, where a tile is a few dozen pixels
-       and a colour difference alone is lost against the pale deck. So it is also bigger and
-       wears a halo — and it moves, which is what the eye actually catches. */
-    if (gold) {
-      holder.scale.setScalar(Math.max(0.2, +cfg.boxGoldScale || 1));
-      const glow = Math.max(0, +cfg.boxGoldGlow || 0);
-      if (glow > 0) {
-        const s = new THREE.Sprite(new THREE.SpriteMaterial({
-          map: this._glowTexture(), color: 0xffcb5c, transparent: true, opacity: glow,
-          depthWrite: false, blending: THREE.AdditiveBlending,
-        }));
-        s.scale.set(1.5, 1.5, 1);
-        s.position.y = BOX_SIZE * 0.55;
-        holder.add(s);
-        holder.userData.glow = s;
-      }
-    }
-    /* Turned to the camera like the piece: a wrapped box has a front (the bow's knot) and no
-       board edge to align with, so it should read from wherever the player is sitting. */
-    holder.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
-    this._scene.add(holder);
-    return holder;
-  },
-
-  /* A soft radial blob, drawn once and reused as the gold box's halo. Cheaper and softer than
-     any geometry, and as a sprite it always faces the camera. */
-  _glowTexture() {
-    if (this._goldGlowTex) return this._goldGlowTex;
-    const c = document.createElement("canvas");
-    c.width = c.height = 128;
-    const g = c.getContext("2d").createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, "rgba(255,235,170,1)");
-    g.addColorStop(0.35, "rgba(255,203,92,0.55)");
-    g.addColorStop(1, "rgba(255,203,92,0)");
-    const ctx = c.getContext("2d");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
-    this._goldGlowTex = new THREE.CanvasTexture(c);
-    return this._goldGlowTex;
-  },
-
-  /* Idle life on the gold boxes: a slow turn, a gentle bob and a breathing halo. Skipped while
-     any board tween is running — the throw and the opening own the transforms then, and a bob
-     added on top would fight them. */
-  _tickBoxes(t) {
-    if (this._anims.length) return;
-    for (const [i, g] of this._boxes) {
-      if (!g.userData.gold) continue;
-      const spin = Math.max(200, +cfg.boxGoldSpinMs || 4200);
-      g.rotation.y = (t / spin) * Math.PI * 2;
-      const bob = Math.max(0, +cfg.boxGoldBob || 0);
-      g.position.y = BOX_Y + Math.sin(t / 620 + i) * bob;
-      if (g.userData.glow) {
-        const k = 1 + Math.sin(t / 480 + i) * 0.12;
-        g.userData.glow.scale.set(1.5 * k, 1.5 * k, 1);
-      }
-    }
-  },
-
-  /* Load the box model once, then re-make any boxes already on the board so they pick it up.
-     Called from build(); failure is logged and leaves the cubes, which is a working board. */
-  _loadBoxModel() {
-    this._loadOneBoxModel(BOX_MODEL, "_boxModel");
-    this._loadOneBoxModel(BOX_MODEL_GOLD, "_boxModelGold");
-  },
-  _loadOneBoxModel(url, slot) {
-    if (this[slot]) return;
-    if (!this._gltf) this._gltf = new GLTFLoader();
-    this._gltf.load(url, (gltf) => {
-      const model = gltf.scene;
-      /* Measure from real vertices, not cached per-geometry boxes: setFromObject without the
-         precise flag returns the box OF a rotated box, which reads high and renders the prop
-         small. Same trap the tile loader documents. */
-      const size = new THREE.Box3().setFromObject(model, true).getSize(new THREE.Vector3());
-      model.scale.setScalar(BOX_SIZE / (Math.max(size.x, size.y, size.z) || 1));
-      model.traverse((o) => {
-        if (!o.isMesh) return;
-        o.castShadow = !!cfg.envShadows;
-        if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
-        /* Self-lit, so the gold box stays the brightest thing on the deck wherever the sun is
-           pointing. Cloned first — the loaded material is shared by every clone of this model,
-           which is fine here (all gold boxes want it) but must not leak to the plain one. */
-        if (slot === "_boxModelGold" && o.material?.emissive) {
-          o.material = o.material.clone();
-          o.material.emissive = new THREE.Color(0xffb020);
-          o.material.emissiveIntensity = Math.max(0, +cfg.boxGoldEmissive || 0);
-        }
-      });
-      this[slot] = model;
-      /* Anything already placed is still a cube (or the wrong colour) — swap it now rather than
-         waiting for the next board rebuild, which might not come until the player rolls. */
-      const live = [...this._boxes].map(([i, m]) => [i, m.userData.gold]);
-      live.forEach(([i]) => { this._scene.remove(this._boxes.get(i)); this._boxes.delete(i); });
-      live.forEach(([i, gold]) => this._boxes.set(i, this._addBox(i, gold)));
-    }, undefined, (e) => {
-      console.warn(`Board3D: mystery box ${url} failed to load, keeping the cube`, e);
-    });
-  },
-
-  /* ---------------- the box throw ----------------
-     Pull the camera out, rain the boxes onto their tiles, put the camera back. Returns a promise
-     that resolves when the whole thing is done, so the caller can await it before handing the
-     board back to the player.
-
-     Resolves — never rejects — on every path, including no boxes, no WebGL and a mid-throw view
-     switch. The caller clears state.pendingBoxes on the strength of it. */
-  throwOverlays(all, fresh) {
-    /* `all` is every box that should be on the board, `fresh` only the ones to animate. Boxes
-       already sitting there from earlier trips must not leap into the air again. */
-    this.setOverlays(all);
-    if (!this.available) return Promise.resolve();
-    const falling = (fresh || all).map(i => this._boxes.get(i)).filter(Boolean);
-    if (!falling.length) return Promise.resolve();
-
-    const zoomOut = Math.max(1, +cfg.boxZoomOut || 1);
-    const outMs = Math.max(0, +cfg.boxZoomOutMs || 0);
-    const throwMs = Math.max(1, +cfg.boxThrowMs || 1);
-    const inMs = Math.max(0, +cfg.boxZoomInMs || 0);
-
-    /* The whole throw fits in boxThrowMs however many boxes there are: each one falls for a
-       fixed share of the window and the starts are spread across what is left, so the last box
-       lands exactly on time. Ten boxes overlap more; they do not take ten times as long. */
-    const fallMs = throwMs * 0.62;
-    const gap = falling.length > 1 ? (throwMs - fallMs) / (falling.length - 1) : 0;
-
-    const rest = falling.map(g => g.position.y);
-    falling.forEach(g => { g.visible = false; });
-
-    return new Promise(resolve => {
-      this._fxDone.push(resolve);
-      const done = () => { falling.forEach((g, k) => { g.visible = true; g.position.y = rest[k]; g.rotation.z = 0; }); resolve(); };
-      this._tween(outMs, k => { this._zoom = 1 + (zoomOut - 1) * ease(k); }, () => {
-        falling.forEach((g, k) => {
-          const start = k * gap, spin = (k % 2 ? -1 : 1) * (0.5 + Math.random() * 0.7);
-          this._tween(fallMs, (t) => {
-            g.visible = true;
-            /* Fall from above with a squash-free bounce: overshoot slightly past the tile and
-               settle, which reads as weight without needing physics. */
-            const p = bounce(t);
-            g.position.y = rest[k] + (1 - p) * 7;
-            g.rotation.z = (1 - p) * spin;
-          }, null, start);
-        });
-        this._tween(throwMs, () => {}, () => {
-          this._tween(inMs, k => { this._zoom = zoomOut + (1 - zoomOut) * ease(k); }, () => {
-            this._zoom = 1;
-            this._fxDone = this._fxDone.filter(r => r !== resolve);
-            done();
-          });
-        });
-      });
-    });
-  },
+  /* The case board — redrawn only when what it says changes; see Case3D.sync(). */
+  syncCase(){ if (this.available) Case3D.sync(); },
 
   /* ---------------- opening a box ----------------
-     Lift it off its tile, float it to the middle of the view swelling as it goes, hold on a last
-     inflate, then pop. Resolves at the POP, not after — the caller fires the confetti and the
-     showers on that moment, and the box has to be gone by then.
+     Two beats, both in the scene and both awaited by the roll loop: the closed box waiting to be
+     tapped, then the cards flying out of the burst. The caller fires the confetti between them,
+     on the frame the box actually goes. */
+  packReady(){ return this.available && !Box3D.failed(); },
+  /* Where a box and its cards stand: over whatever the camera is aimed at, and pulled toward the
+     camera so they are IN FRONT of the board's own furniture.
 
-     The box is animated where it already is, in the board scene, rather than being re-drawn as a
-     DOM element over the canvas: it is a lit 3D object with a real texture, and a flat copy of it
-     floating over the board would not match. Flying it to the camera's aim point is what puts it
-     in the middle of the screen whatever the camera is following. */
-  openBox(i) {
+     Under an ORTHOGRAPHIC camera, moving along the view direction changes depth and nothing
+     else — no perspective, so the box does not grow and does not move on screen. It simply wins
+     the depth test against the case panels standing in the middle of the ring.
+
+     That is why nothing is hidden while a box is open. The first version switched the case board
+     off for the duration, which is the same mistake as fading it: things in a scene occlude each
+     other, they do not take turns existing. */
+  _packAnchor(){
+    const v = this._camTarget.clone();
+    const dir = new THREE.Vector3();
+    this._camera.getWorldDirection(dir);
+    return v.addScaledVector(dir, -PACK_FRONT);
+  },
+  presentBox(tier){
     if (!this.available) return Promise.resolve();
-    const g = this._boxes.get(i);
-    if (!g) return Promise.resolve();
-
-    const riseMs = Math.max(1, +cfg.boxRiseMs || 1);
-    const swellMs = Math.max(0, +cfg.boxSwellMs || 0);
-    const grow = Math.max(1, +cfg.boxOpenScale || 1);
-
-    const from = g.position.clone();
-    const s0 = g.scale.x;
-    /* The middle of the screen in world terms is what the camera is aimed at, lifted so the box
-       floats clear of the board rather than sinking into it. */
-    const to = this._camTarget.clone();
-    to.y = from.y + 2.2;
-
-    /* Nothing else may be resolving on this box while it flies — take it out of the map now, so
-       a renderOverlays() mid-flight (the state no longer lists it) can't remove it underneath us. */
-    this._boxes.delete(i);
-
-    return new Promise(resolve => {
-      /* Registered so a mid-roll error can settle this instead of stranding an inflated box in
-         mid-air and leaving roll() awaiting a pop that never comes. */
-      this._flying = g;
-      this._fxDone.push(resolve);
-      const finish = () => {
-        this._flying = null;
-        this._fxDone = this._fxDone.filter(r => r !== resolve);
-        resolve();
-      };
-      this._tween(riseMs, k => {
-        const e = ease(k);
-        g.position.lerpVectors(from, to, e);
-        /* A little arc on the way up, and a slow turn so the ribbon catches the light. */
-        g.position.y += Math.sin(e * Math.PI) * 0.6;
-        g.scale.setScalar(s0 * (1 + (grow - 1) * e));
-        g.rotation.y += 0.06;
-      }, () => {
-        this._tween(swellMs, k => {
-          /* The tell: it strains, wobbling faster and faster, just before it goes. */
-          const puff = 1 + 0.16 * k + Math.sin(k * Math.PI * 6) * 0.05 * k;
-          g.scale.setScalar(s0 * grow * puff);
-          g.rotation.z = Math.sin(k * Math.PI * 8) * 0.09 * k;
-        }, () => {
-          this._scene.remove(g);
-          finish();
-        });
-      });
-    });
+    return Box3D.present(tier, this._packAnchor());
   },
-
-  /* Stop every board animation and clean up after it. Called from clearOverlayFx() when a roll
-     dies mid-way: an inflated box left hanging over the board is the visible symptom, but the
-     one that actually matters is the promise — roll()'s finally is what clears state.animating,
-     and it only runs once the await returns. */
-  cancelBoxFx() {
-    if (!this.available) return;
-    this._anims.length = 0;
-    if (this._flying) { this._scene.remove(this._flying); this._flying = null; }
-    /* Anything caught mid-throw is invisible or in the air — put every box back on its tile, so
-       the board matches state whichever frame we stopped on. */
-    for (const [i, g] of this._boxes) {
-      const w = this._tileWorld(i);
-      g.visible = true; g.position.set(w.x, BOX_Y, w.z); g.rotation.z = 0;
-    }
-    const waiting = this._fxDone; this._fxDone = [];
-    waiting.forEach(r => r());
-    /* The throw may have died with the camera pulled out — put it back. */
-    if (this._zoom !== 1) { this._zoom = 1; this._applyFrustum(); }
+  revealDrops(drops, onShow){
+    if (!this.available) return Promise.resolve();
+    return Box3D.reveal(drops, this._packAnchor(), onShow);
   },
+  endPack(){ /* nothing to restore: nothing was hidden */ },
+  cancelPack(){ if (this.available) Box3D.cancel(); },
+  /* Which episode panel is under this point, or null. Sprites, so a plain Raycaster works.
 
-  /* A frame-stepped tween. delay lets the throw stagger without a nest of setTimeouts, which
-     matters because these have to stop when the board does — a pending timeout firing into a
-     torn-down scene is how the dice used to throw after a reset. */
-  _tween(dur, step, end, delay = 0) {
-    if (dur <= 0 && delay <= 0) { step && step(1); end && end(); return; }
-    this._anims.push({ t: -delay, dur: Math.max(1, dur), step, end });
-  },
-
-  /* The buildings live in their own scene now (js/ui/builders3d.js) — the board's middle is
-     where dice land and reveals play, which is no place for a progress readout. */
-  setBuilders() {
-    if (!this.available) return;
-    Builders3D.build();
-    if (this._view === "builders") this.resize();   // slot count may have changed the fit
-  },
-
-  /* ---------------- views ----------------
-     One renderer, one canvas, two scenes. A second WebGLRenderer would take a second GL
-     context and browsers cap those — losing one silently kills the board. */
-  view() { return this._view; },
-  setView(name) {
-    const next = name === "builders" ? "builders" : "board";
-    if (next === this._view) return this._view;
-    this._view = next;
-    if (next === "builders") Builders3D.build();
-    this.resize();                     // each scene fits the canvas its own way
-    return this._view;
+     Slot 0 is a legitimate answer and is falsy — every caller must test against null. */
+  caseAt(clientX, clientY){
+    if (!this.available) return null;
+    const r = this._renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - r.left) / r.width) * 2 - 1,
+      -((clientY - r.top) / r.height) * 2 + 1);
+    if (!this._ray) this._ray = new THREE.Raycaster();
+    this._ray.setFromCamera(ndc, this._camera);
+    /* The row is rebuilt whenever a card lands, and a fresh sprite's world matrix is stale until
+       the next render — so a tap in the frame right after a card arrives would miss every panel.
+       Update before testing rather than trusting the render loop to have got there first. */
+    const sprites = Case3D.sprites();
+    sprites.forEach(sp => sp.updateMatrixWorld());
+    const hits = this._ray.intersectObjects(sprites, false);
+    return hits.length ? hits[0].object.userData.page : null;
   },
 
   /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
@@ -959,9 +686,14 @@ const Board3D = {
 
   /* Screen position of a tile, for DOM overlays (floating rewards, tile labels). */
   screenPosOf(i, lift = 0) {
-    if (!this.available) return null;
     const w = this._tileWorld(i);
-    const v = new THREE.Vector3(w.x, w.y + lift, w.z).project(this._camera);
+    return this.screenPosOfWorld(w.x, w.y + lift, w.z);
+  },
+  /* The same projection for any point in the world, which is what lets a DOM layer be anchored
+     to somewhere that is not a tile — the case board sits at the middle of the ring. */
+  screenPosOfWorld(x, y, z) {
+    if (!this.available) return null;
+    const v = new THREE.Vector3(x, y, z).project(this._camera);
     const rect = this._renderer.domElement.getBoundingClientRect();
     const host = this._host.getBoundingClientRect();
     return {
@@ -986,22 +718,8 @@ const Board3D = {
         p.y = TILE_H;
       }
     }
-    /* Only the active scene ticks and draws. The board's camera-follow and the dice are
-       pointless work while the builders screen is up, and the tile labels are hidden there. */
-    if (this._view === "builders") {
-      Builders3D.tick(1 / 60);
-      this._renderer.render(Builders3D.scene(), Builders3D.camera());
-      return;
-    }
-    /* The board's own tweens (the box throw). Stepped before the camera so a zoom change lands
-       in the same frame it was asked for rather than one late. */
-    this._stepAnims(1000 / 60);
-    this._tickBoxes(performance.now());
-    /* The cast keeps walking through a box throw, unlike the boxes' own idle tick: nothing here
-       shares an object with the board's tweens, and a world that freezes whenever something else
-       is happening reads worse than one that carries on. */
     NPC3D.tick(1000 / 60);
-    if (this._zoom !== this._zoomShown) this._applyFrustum();
+    Box3D.tick(1000 / 60);
     this._followCamera();
     Env3D.tick(1 / 60);
     Dice3D.tick();
@@ -1035,13 +753,18 @@ const Board3D = {
 
     canvas.style.cursor = "grab";
     canvas.addEventListener("pointerdown", (e) => {
-      if (!cfg.camDrag || e.button !== 0) return;
+      if (e.button !== 0) return;
+      /* Remember where the press started so pointerup can tell a TAP from a PAN. Without this,
+         any attempt to tap a panel that moved the cursor a pixel would pan instead. */
+      this._press = { x: e.clientX, y: e.clientY, moved: 0 };
+      if (!cfg.camDrag) return;              // picking still works; only panning is off
       this._drag = { x: e.clientX, y: e.clientY };
       this._camManual = true;
       canvas.setPointerCapture(e.pointerId);
       canvas.style.cursor = "grabbing";
     });
     canvas.addEventListener("pointermove", (e) => {
+      if (this._press) this._press.moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
       if (!this._drag) return;
       const dx = e.clientX - this._drag.x, dy = e.clientY - this._drag.y;
       this._drag.x = e.clientX; this._drag.y = e.clientY;
@@ -1063,12 +786,26 @@ const Board3D = {
       this._camWant.y = 0;
     });
     const end = (e) => {
-      if (!this._drag) return;
-      this._drag = null;
-      canvas.style.cursor = "grab";
-      if (e.pointerId != null && canvas.hasPointerCapture?.(e.pointerId)) {
-        canvas.releasePointerCapture(e.pointerId);
+      if (this._drag) {
+        this._drag = null;
+        canvas.style.cursor = "grab";
+        if (e.pointerId != null && canvas.hasPointerCapture?.(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
       }
+      /* A press that barely moved is a TAP. Four pixels of slop, because a finger on glass never
+         holds still and a thumb that drifts three pixels still meant to press the thing. */
+      const p = this._press;
+      this._press = null;
+      if (!p || p.moved > 4) return;
+      /* The box wins over everything: while one is waiting to be opened it is the only thing on
+         screen the player is being asked to touch, and a tap that misses the mesh by a few
+         pixels still obviously meant to open it. So the whole board is the target. */
+      if (Box3D.targets().length){ Box3D.tap(); return; }
+      /* Cards on screen: a tap takes them away early rather than making the player wait it out. */
+      if (Box3D.dismissable()){ Box3D.dismiss(); return; }
+      const page = this.caseAt(e.clientX, e.clientY);
+      if (page != null && typeof onCasePanelTap === "function") onCasePanelTap(page);
     };
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);
@@ -1130,19 +867,6 @@ const Board3D = {
     const lim = EXTENT / 2 + (cfg.camEdgePad ?? 0.5);
     v.x = Math.max(-lim, Math.min(lim, v.x));
     v.z = Math.max(-lim, Math.min(lim, v.z));
-  },
-
-  /* Advance the board's tweens by one frame. Iterated backwards so an `end` callback that queues
-     the next phase (which the throw does at every step) can push onto the list mid-iteration. */
-  _stepAnims(ms) {
-    for (let n = this._anims.length - 1; n >= 0; n--) {
-      const a = this._anims[n];
-      a.t += ms;
-      if (a.t < 0) continue;                      // still in its stagger delay
-      const k = Math.min(1, a.t / a.dur);
-      a.step && a.step(k);
-      if (k >= 1) { this._anims.splice(n, 1); a.end && a.end(); }
-    }
   },
 
   _followCamera() {

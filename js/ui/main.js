@@ -2,16 +2,15 @@
 /* Orchestration: turns user input into game.js calls, plays back the returned
    events with animation/timing, wires all buttons, and boots the app. */
 
-/* Play a game.js event list: float → log → move → confetti → reveal → collect → pause.
-   reveal and collect block the roll loop (and therefore auto-play) until they finish. */
+/* Play a game.js event list: float → log → move → confetti → card → reveal → collect → pack →
+   unlock → set complete → pause. Everything from `card` down blocks the roll loop (and
+   therefore auto-play) until it finishes. */
 async function playEvents(events){
   for(const ev of events){
-    /* renderHUD on a float too, not only on the blocking three below. A mystery box pays out
-       entirely in floats, so without this the coin and clue counters sat still through the
-       whole collection and only jumped at the end of the roll — which reads as "I collected
-       it and nothing happened". */
-    /* Before the floats: the box has to pop before its numbers can come out of the burst. */
-    if(ev.boxOpen){ renderHUD(); await showBoxOpen(ev.boxOpen); }
+    /* renderHUD on a float too, not only on the blocking beats. A box pays out entirely in
+       state changes, so without this the coin and card counters would sit still through the
+       whole collection and only jump at the end of the roll — which reads as "I collected it
+       and nothing happened". */
     if(ev.float){ floatToken(ev.float.text,ev.float.color); renderHUD(); }
     if(ev.log) log(ev.log.icon,ev.log.msg);
     if(ev.move){ for(const p of ev.move.path){ state.pos=p; positionToken(); await sleep(ev.move.stepMs); } }
@@ -20,12 +19,54 @@ async function playEvents(events){
     if(ev.card){ renderHUD(); await showCard(ev.card); }
     if(ev.reveal){ renderHUD(); await showReveal(ev.reveal); }
     if(ev.collect){ renderHUD(); await showCollect(ev.collect); }
-    if(ev.clue){ renderHUD(); await showClue(ev.clue); }
-    /* Last of the blocking three: a mini-game takes the whole frame, so anything else this
+    /* A box: closed, tapped or opened by its own timer, then its cards one at a time.
+       Deliberately NOT renderHUD() first, unlike every other beat above. The cards are already
+       banked by the time this runs, so refreshing the HUD here would tick the counter to 1/25
+       while the box is still shut — the reveal spoiled by its own scoreboard. showPack calls
+       renderHUD as each card turns over instead. */
+    if(ev.pack){ await showPack(ev.pack); }
+    /* …and only then what the cards bought, in the order they happened. */
+    if(ev.statusUp){ renderAll(); await showStatusUp(ev.statusUp); }
+    if(ev.unlock){ renderAll(); await showUnlocks(ev.unlock.ids); }
+    if(ev.boardDone){ renderAll(); await showBoardComplete(); }
+    /* Last of the blocking beats: a mini-game takes the whole frame, so anything else this
        event carries should have been shown before it opens. */
     if(ev.minigame){ renderHUD(); await showMinigame(ev.minigame); }
     if(ev.pause) await sleep(ev.pause);
   }
+}
+
+/* Episodes just unlocked by the cards that landed.
+
+   The log and the toast always happen; the modal only for a human, because an auto run must
+   never be stopped by one — that is the rule both auto modes are built on. Declining costs
+   nothing: the ids are already on state.epQueue, and the 🎬 button on the board carries them. */
+async function showUnlocks(ids){
+  ids.forEach(id=>log("🎬",`Episode unlocked · <b>${Episodes.titleOf(id)}</b>`));
+  if(!ids.length) return;
+  toast(`🎬 Episode unlocked — <b>${Episodes.titleOf(ids[0])}</b>${ids.length>1?` +${ids.length-1} more`:""}`);
+  if(autoMode!==null) return;
+  /* Only offer to watch what can actually be watched. A page that fills out of order is a real
+     unlock — it is in the library, and the album shows it collected — but the story is not ready
+     for it, so pushing "watch now" would open a dialog whose button refuses. */
+  const playable=Collection.firstUnwatchedId();
+  if(!playable) return;
+  await openEpisodeUnlock(playable);
+}
+
+/* Status milestones met by whatever just happened — a card collected, an episode watched, a
+   set finished, a roll made. Idempotent (js/status.js), so calling it after every beat costs
+   nothing and missing one only delays a toast. */
+async function afterCollect(){
+  const before=Status.points();
+  const got=Status.sweep();
+  if(!got.length) return;
+  got.forEach(i=>log("⭐",`Status · earned <b>${i.name}</b> · +${i.points}`));
+  renderAll();
+  /* The same beat a box's status drop gets — an item earned by playing is the same kind of
+     thing as one found in a box, so it is shown the same way rather than as a toast that
+     scrolls past. */
+  await showStatusUp({items:got,from:before,to:Status.points()});
 }
 
 async function roll(){
@@ -54,32 +95,21 @@ async function roll(){
       floatToken("+"+fmt(pass),"var(--gold)"); log("⭐",`Passed Start · +<b>${fmt(pass)}</b> coins`);
     }
     await playEvents(resolveLandingEvents(mult));
+    /* Milestones this roll just met. Awaited, and inside the try, so the track's beat plays
+       while the board is still locked — a reward that arrives after Roll is live again is a
+       reward the player is already rolling through. */
+    await afterCollect();
   }catch(e){
     console.error("roll failed:",e);
     log("⚠️","<b>Something went wrong mid-roll</b> — board recovered.");
     clearOverlayFx();
+    /* The sweep is idempotent, so a roll that died still hands over what was earned — just
+       without the ceremony, since the ceremony is what may have broken. */
+    Status.sweep();
   }finally{
-    state.animating=false; renderAll();
+    state.animating=false;
+    renderAll();
   }
-}
-
-/* Upgrade button handler: apply in logic, announce in UI. */
-function uiUpgrade(bIdx){
-  const r=Builders.upgrade(bIdx); if(!r) return;
-  log("🏗️",`Builder ${bIdx+1} → level ${r.level}/${Builders.maxTier()} · −<b>${fmt(r.cost)}</b>`);
-  if(r.builderDone) log("🏗️",`<b>Builder ${bIdx+1} fully upgraded</b> (${Builders.doneCount()}/${Builders.count()} done)`);
-  // episodes unlock only when a builder is completed
-  if(r.title){
-    toast(`🎬 Episode unlocked — <b>${r.title}</b>`);
-    log("🎬",`Episode unlocked · <b>${r.title}</b>`);
-  }
-  if(r.seriesDone) seriesComplete();
-  renderAll();
-  /* Offer it the moment it unlocks — but only to a human, and only when the finale is not
-     already on screen. An auto run must never be stopped by a modal (that is the rule the two
-     auto modes are built on), and stacking this over seriesComplete() would bury the finale.
-     Either way the id stays queued, so nothing is lost by not asking. */
-  if(r.episodeId && !r.seriesDone && autoMode===null) openEpisodeUnlock(r.episodeId);
 }
 
 function nextSession(){
@@ -92,7 +122,7 @@ function nextSession(){
 
 /* Two auto modes, each a toggle (click to start, click again to stop after the current roll):
      "roll"    — rolls only, nothing else. Stops when energy can't cover the multiplier.
-     "session" — rolls AND spends coins on the cheapest upgrades (internal balancing tool).
+     "session" — rolls AND spends the coins (internal balancing tool).
    Only one can own the loop at a time. */
 let autoMode=null;   // null | "roll" | "session"
 async function runAuto(mode){
@@ -105,11 +135,7 @@ async function runAuto(mode){
       if(state.energy<state.mult){ outOfEnergy=true; break; }   // re-checked each pass: mult can change mid-run
       await roll();
       if(state.animating) break;   // a roll bailed out unexpectedly — don't spin
-      if(mode==="session"){
-        // opportunistically upgrade the cheapest available builder to keep the loop turning
-        let up=Builders.cheapest();
-        while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=Builders.cheapest(); }
-      }
+      if(mode==="session"){ await autoSpend(); await autoWatch(); }
       await sleep(60);
     }
   }finally{
@@ -118,18 +144,61 @@ async function runAuto(mode){
     renderAll();
   }
 }
+/* The session loop's coin sink, and the reason it is a balancing tool rather than a fast
+   player: it converts every spare coin into progress, boxes first because those are what move
+   the collection, then the status shelf.
+
+   Boxes go through openBoxEvents() like every other box, so the batch run draws against exactly
+   the same tables a human does — and showPack() takes its fast path in this mode, so nothing is
+   watched. Cheapest first, mirroring the builder loop this replaced. */
+async function autoSpend(){
+  let t=Boxes.cheapest();
+  while(t && !state.seriesDone && autoMode==="session"){
+    state.coins-=t.coins;
+    await playEvents(openBoxEvents(t.key));
+    t=Boxes.cheapest();
+  }
+  let item=Status.cheapestBuyable();
+  while(item){
+    const r=Status.buy(item.id);
+    if(!r) break;
+    log("🛍",`Bought <b>${r.item.name}</b> · −${fmt(r.cost)} coins · +${r.item.points} status`);
+    item=Status.cheapestBuyable();
+  }
+  await afterCollect();
+}
+/* The balancing tool has to WATCH, or a set can never turn over: a set is finished when its
+   episodes have been seen, and nobody is at the keyboard to see them.
+
+   No modal, no video, no answer picked — resolvePrediction's `auto` path decides the outcome
+   from the modelled accuracy (Economy.accuracyFor, which the clue cards raise), which is the
+   whole point of the mode. The stake is the tier the workbook's projections assume, and the
+   payout is priced at cfg.avgOdds: the model's own average, which is exactly what a projection
+   of "what a bettor gets" is built on. That is this knob's first honest call site.
+
+   Auto-play session only. Auto roll simulates a real player, and a real player chooses when to
+   watch — which is why neither mode opens the prediction modal on its own. */
+async function autoWatch(){
+  let id=Collection.firstUnwatchedId(), n=0;
+  while(id&&autoMode==="session"&&n++<200){
+    const ep=Episodes.get(id);
+    if(!ep) break;
+    const wager=Economy.canWager(state.coins)
+      ? Economy.wagerTier(Economy.DEFAULT_TIER,state.coins).amount : 0;
+    const odds=Math.max(1,+cfg.avgOdds||1);
+    const r=resolvePrediction({wager,odds,sel:ep.correct,correct:ep.correct,auto:true,id});
+    log("🎬",`${ep.title} · ${wager
+      ? (r.won?`won +${fmt(r.payout)}`:`lost ${fmt(wager)}`)
+      : "watched, no wager"} (auto)`);
+    id=Collection.firstUnwatchedId();
+  }
+  /* And the set turns over, silently — showBoardComplete's own auto path does the advance. */
+  if(Collection.boardFinished()) await playEvents([{boardDone:{board:Collection.num()}}]);
+  await afterCollect();
+}
 const autoRoll=()=>runAuto("roll");
 const autoPlay=()=>runAuto("session");
 function stopAuto(){ if(autoMode!==null){ autoMode=null; renderAll(); } }
-
-/* Builder button click. Upgrades stay clickable during auto-roll, so buying one is
-   also how you take manual control: stop the loop, let the in-flight roll finish
-   (Builders.upgrade refuses mid-animation), then buy. */
-async function onUpgradeClick(bIdx){
-  stopAuto();
-  while(state.animating) await sleep(50);
-  uiUpgrade(bIdx);
-}
 
 /* ---------------- wiring ---------------- */
 /* ?view=mobile: reparent the HUD and the store button INTO the board scene, so the whole game
@@ -182,49 +251,21 @@ if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE){
   btn.addEventListener("pointercancel",endHold);
 })();
 $("#autoBtn").onclick=autoPlay;
-/* Builders view. The buildings are a separate 3D scene, so switching means moving the DOM
-   overlay AND the scene the renderer draws — doing both here is what keeps them from ever
-   disagreeing about which view is up. */
-function setBuildersView(on){
-  $("#boardScene").classList.toggle("showBuilders",!!on);
-  if(use3d()&&window.Board3D&&Board3D.available) Board3D.setView(on?"builders":"board");
-  renderAll();
-  if(!on) deliverBoxes();
-}
-/* Boxes bought while the builders screen was up are thrown onto the board now that it is back.
-
-   The state moves FIRST and the animation is decoration on top: spawn() picks the tiles and
-   clears the pending count synchronously, so a reload, a view switch or a missing WebGL context
-   mid-throw all leave the boxes correctly on the board rather than lost. The only thing that can
-   be interrupted is the picture.
-
-   Not awaited by anything: the player is back on the board and free to roll, and roll() blocks
-   on state.animating rather than on this. */
-function deliverBoxes(){
-  const n=state.pendingBoxes|0;
-  if(n<=0) return;
-  const spawned=OVERLAY_TYPES.mysteryBox.spawn(n);
-  /* Fewer free tiles than boxes: the rest stay banked for the next trip back, so a full board
-     never silently eats a reward the player paid for. */
-  state.pendingBoxes=Math.max(0,n-spawned.length);
-  renderAll();
-  if(!spawned.length) return;
-  log("🎁",`<b>${spawned.length}</b> mystery box${spawned.length>1?"es":""} dropped on the board`);
-  /* Auto-play session is the batch tool — thousands of upgrades, nobody watching. It gets the
-     boxes without the show, exactly as it skips episode video and the bonus games. */
-  if(autoMode==="session"||!use3d()||!window.Board3D||!Board3D.available) return;
-  Board3D.throwOverlays(
-    OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))),spawned);
-}
-$("#buildersBtn").onclick=()=>setBuildersView(true);
-$("#boardBtn").onclick=()=>setBuildersView(false);
-/* Straight into the prediction for the earliest unwatched episode — same ordering rule the
-   library enforces, so the two entry points can never disagree about what plays next. */
-$("#bingeBtn").onclick=()=>openPrediction(Builders.firstUnwatchedId());
-$("#libraryBtn").onclick=()=>openLibrary();
+/* The 🎬 button is both routes into an episode: straight into the earliest unwatched one when
+   something is waiting, and the library otherwise. One button, because "watch the next one" and
+   "watch one again" are the same intent from the player's side. */
+$("#episodesBtn").onclick=()=>{
+  /* Into the next episode when there IS one to watch, the library otherwise. A sealed reveal
+     wins over both: that result is owed before anything else can start. */
+  if(state.pendingReveal||Collection.firstUnwatchedId()) openPrediction();
+  else openLibrary();
+};
 $("#albumBtn").onclick=()=>openAlbum();
+/* Both halves of the player block open the profile — the avatar and the rank beside it are one
+   control as far as the player is concerned. */
 $("#avatarBtn").onclick=()=>openProfile();
-$("#watchBtn").onclick=openPrediction;
+$("#hStatus").onclick=()=>openProfile();
+$("#watchBtn").onclick=()=>openPrediction();
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;
 /* 9:16 preview. The class goes on .stage and CSS reshapes .boardScene; Board3D's
@@ -281,8 +322,16 @@ function boot(){
   const restored=loadState();   // overlay saved progress, if any
   buildBoard(); buildTuning(); setDice(3,4); syncMultButton(); renderAll();
   applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
-  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
-  else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");
+  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${Collection.collected()}/${Collection.poolSize()} cards in set ${Collection.num()}.`);
+  else log("✨","Welcome to <b>Harbour Heights</b>. Roll to find cards, collect a set to unlock an episode, predict to win.");
+  /* The board content is authored data, and a mis-authored board is the one failure that would
+     be invisible in play — a card that can drop but is never wanted just looks like bad luck.
+     Say so in the log rather than only in the tests. */
+  const bad=Collection.validate();
+  if(bad.length){
+    console.warn("Collection:",bad);
+    log("⚠️",`<b>Set ${Collection.num()} does not add up</b> — ${bad.length} problem${bad.length>1?"s":""}, see the console.`);
+  }
   if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
 }
 window.boot=boot;

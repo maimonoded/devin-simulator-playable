@@ -5,6 +5,15 @@
    Reward + presentation logic lives here once so neither side duplicates it.
    Nothing in here touches the DOM: the gain* helpers mutate state and return
    playback events, which ui/main.js playEvents() renders. */
+/* THE one rule about energy, in one place: top up TOWARD the cap, and never reduce a balance
+   already above it. Store energy packs are far larger than cfg.energyCap and that overflow is
+   legitimate, so a naive `Math.min(cap, energy + n)` silently deletes a purchase. Every path
+   that adds energy goes through here — BoardActor.gainEnergy below, Boxes.dropEnergy, and the
+   session refill in js/game.js. See CLAUDE.md, "Energy may exceed the cap". */
+function grantEnergy(n){
+  state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+n));
+}
+
 class BoardActor {
   /* ---- rewards ---- */
   gainCoins(amount,text,color){
@@ -12,9 +21,9 @@ class BoardActor {
     return {float:{text:text??"+"+fmt(amount),color:color||"var(--gold)"}};
   }
   /* Tops up toward the cap, but never reduces a balance already above it
-     (store purchases are allowed to overflow the cap). */
+     (store purchases are allowed to overflow the cap). See grantEnergy below. */
   gainEnergy(n,text){
-    state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+n));
+    grantEnergy(n);
     return {float:{text:text??"+"+n+"⚡",color:"var(--teal)"}};
   }
   /* Feeds both counters: the album total and the per-prediction flow that buys accuracy. */

@@ -21,10 +21,12 @@ const APP_FILES = [
   "js/env-model.js",
   "js/dice-model.js",
   "assets/env/scene.js",
+  /* content the collection and the status track are read from */
+  "assets/cards/cards.js",
+  "assets/status/status.js",
   "js/state.js",
   "js/storage.js",
   "js/episodes.js",
-  "js/clues.js",
   ...fs.readdirSync(path.join(ROOT, "episodes"))
       .filter(f => /^\d+\.js$/.test(f)).sort().map(f => "episodes/" + f),
   /* xlsx.js is browser-only at runtime, but it must still LOAD in a bare context —
@@ -33,13 +35,14 @@ const APP_FILES = [
   "js/xlsx.js",
   "js/economy.js",
   "js/economy-import.js",
+  /* board-actor.js owns grantEnergy(), which js/boxes.js calls */
   "js/board-actor.js",
-  "js/builders/builders.js",
+  "js/collection.js",
+  "js/status.js",
+  "js/boxes.js",
   "js/tiles/tile.js",
   ...fs.readdirSync(path.join(ROOT, "js/tiles"))
       .filter(f => f.endsWith("-tile.js")).sort().map(f => "js/tiles/" + f),
-  "js/overlays/overlay.js",
-  "js/overlays/mystery-box.js",
   "js/game.js",
 ];
 
@@ -118,12 +121,21 @@ vm.runInContext(`
     Object.assign(cfg, JSON.parse(JSON.stringify(DEFAULTS)));
     deck = JSON.parse(JSON.stringify(defDeck));
     boxTable = JSON.parse(JSON.stringify(defBox));
+    boxTiers = JSON.parse(JSON.stringify(defBoxTiers));
+    deckBoxes = JSON.parse(JSON.stringify(defDeckBoxes));
   }
   function freshRun(){
     resetCfg();
     initState();
-    if (typeof OVERLAYS !== "undefined") OVERLAYS.forEach(o => o.clear());
     return state;
+  }
+  /* Force a box tier's table to one outcome, always restored. The drop tables are weighted, so
+     a test that wants "a silver card" has to say so rather than roll for it. */
+  function forceBox(tierKey, match, fn){
+    const t = Boxes.tier(tierKey);
+    const saved = t.table.map(r => r.weight);
+    t.table.forEach(r => { r.weight = match(r) ? 100 : 0; });
+    try { return fn(); } finally { t.table.forEach((r, i) => { r.weight = saved[i]; }); }
   }
   /* Deterministic randomness: feeds Math.random a fixed sequence, always restored.
      Not a mock of anything the app owns — just removing the nondeterminism. */
