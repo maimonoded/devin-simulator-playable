@@ -1,33 +1,56 @@
-# Boxes — the only way anything is collected
+# Packs — the only way anything is collected
 
-Three tiers, defined in [`js/config.js`](../../js/config.js) as `boxTiers` and opened by
-[`js/boxes.js`](../../js/boxes.js). The art here is what the player taps.
+Three of them (GDD §4.5), defined in [`js/config.js`](../../js/config.js) as `boxTiers` and opened
+by [`js/boxes.js`](../../js/boxes.js). The art here is what the player taps.
 
 ```
 assets/boxes/
-  silver.webp  gold.webp  diamond.webp    the store's shelf art
+  silver.webp  gold.webp  insider.webp    the store's shelf art
   models/box.glb  models/box-gold.glb     the thing you actually tap
 ```
 
-## A tier is two things at once
+## REAL MONEY BUYS MONEY, AND ONLY MONEY BUYS PACKS
 
-`items` (how many draws it makes) **and** how its `table` is weighted. A Diamond Box is not a
-Silver Box with better odds — it is three draws against a table weighted at the rare end, which
-is what makes the tiers feel different rather than merely priced differently.
+§8.4, and it is a standing constraint rather than a preference. A pack has **no dollar price** —
+the store's only dollar prices are on coins. A paid loot box sitting beside a wagering mechanic
+draws regulatory attention well beyond either alone, and the separation costs the design nothing
+because coins still buy everything.
+
+## A pack is two things at once
+
+`items` (how many draws it makes) **and** how its `table` is weighted. Premium is not Standard
+with better odds — it is three draws against a table with rarity floors on some rows, which is
+what makes the tiers feel different rather than merely priced differently.
 
 A table row's `kind` is resolved by `Boxes.drawDrop()`:
 
 | kind | pays |
 |---|---|
-| `card` | a character card at `tier`, drawn uniformly from that tier's slice of the pool |
-| `clue` | a clue card, drawn uniformly from the board's clues |
+| `card` | one card from the Season catalogue, at or above `floor` — a **guarantee, not a target** |
+| `clue` | one clue for the episode being worked on |
 | `status` | a status item nobody owns yet, by its own `box` weight |
 | `coins` | `amount`, scaled by `cfg.boardScale` |
 | `energy` | `amount`, topped up toward the cap and never reducing a purchased overflow |
 
-**Every empty case falls forward rather than paying nothing**: a tier with no cards left in the
-pool falls to any card, a card outcome on a board with no cards falls to a clue, and a status
-outcome with the shelf full falls to coins. A box always pays.
+## The Insider
+
+§6.5. Two fields on the tier make it what it is:
+
+- **`clue: "fresh"`** — one clue you do **not** already hold, drawn off the top and *on top of*
+  its three card draws. Paying for the guarantee with a card slot would make it a worse card pack
+  rather than a story one. It is the pack you buy when the story has stalled.
+- **`escalates: true`** — its price climbs by `cfg.insiderStep` for every Insider bought since
+  the last episode unlocked, and resets the moment one does (`Collection.claimUnlocked`). That is
+  what caps sprint speed **by design** rather than by a cooldown: a player can always buy the
+  next clue, and can never buy ten of them cheaply. The store says so on the card, because a
+  price that climbs without explaining itself reads as a bug.
+
+`Boxes.buyEvents()` spends **and** opens, in one place — so the store, a Status milestone and the
+auto-play session cannot disagree about what a pack costs or about the Insider's counter.
+
+**Every empty case falls forward rather than paying nothing**: a rarity floor with nothing
+authored above it falls DOWN to a commoner one, a clue with the whole story already unlocked
+falls to coins, and a status outcome with the shelf full falls to coins. A pack always pays.
 
 ## Where boxes come from
 

@@ -407,3 +407,47 @@ test("nonsense that parses is still refused", () => {
   ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C54", 0.1)), "x.xlsx", null).ok,
      "an accuracy cap below the floor would make clues harmful");
 });
+
+suite("economy: the status track (GDD 5.4)");
+
+test("the model owns the Season gate, and apply() projects it", () => {
+  resetCfg();
+  Economy.apply();
+  const st = Economy.model().status;
+  eq(cfg.statusLevels, st.levels);
+  eq(cfg.statusFirst, st.first);
+  eq(cfg.statusTotal, st.total);
+  eq(cfg.statusPerEpisode, st.perEpisode);
+  eq(cfg.statusPerPrediction, st.perPrediction);
+  eq(cfg.trophyStatus, st.perTrophy);
+});
+
+test("every status key the model sets is on OWNED_CFG_KEYS", () => {
+  /* This is the list js/storage.js uses to decide what a saved config may override. A key the
+     model sets but does not own is a number a stale save can quietly outvote — which is exactly
+     how the track spent an afternoon paying 2 points an episode instead of 50. */
+  ["statusLevels", "statusFirst", "statusTotal",
+   "statusPerEpisode", "statusPerPrediction", "trophyStatus"].forEach(k =>
+    ok(Economy.OWNED_CFG_KEYS.includes(k), k + " is projected but not owned"));
+});
+
+test("the curve sums to the total, whatever the total is", () => {
+  resetCfg();
+  [30000, 12000, 90000].forEach(total => {
+    cfg.statusTotal = total;
+    eq(Economy.statusGate(), total, "the TOTAL is the authoritative knob");
+    eq(Economy.statusCurve().length, cfg.statusLevels);
+  });
+  resetCfg();
+});
+
+test("a total too small for the opening climb flattens rather than going backwards", () => {
+  resetCfg();
+  cfg.statusFirst = 1000; cfg.statusTotal = 100;      // 29 climbs of 1000 cannot fit in 100
+  eq(Economy.statusStep(), 0, "a negative step would make later levels CHEAPER");
+  for (let n = 2; n < cfg.statusLevels; n++)
+    ok(Economy.statusCostOf(n) >= Economy.statusCostOf(n - 1), `level ${n} got cheaper`);
+  eq(Economy.statusGate(), (cfg.statusLevels - 1) * cfg.statusFirst,
+     "the gate is raised to the flat floor rather than the curve being bent");
+  resetCfg();
+});

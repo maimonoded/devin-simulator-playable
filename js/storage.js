@@ -74,13 +74,21 @@ function loadConfig(){
       if(Array.isArray(d.deck)&&d.deck.length) deck=d.deck;
       if(Array.isArray(d.boxTable)&&d.boxTable.length) boxTable=d.boxTable;
     }
-    /* The box tables are NOT economy-owned — no workbook describes them yet — so they survive
-       a model change the way the camera settings do. Guarded on shape rather than trusted: a
-       tier list from an older build that is missing a tier would leave the store with a button
-       that opens nothing. */
-    if(Array.isArray(d.boxTiers)&&d.boxTiers.length===boxTiers.length
+    /* The pack tables are NOT economy-owned — no workbook describes them yet — so they survive
+       a model change the way the camera settings do. Guarded on IDENTITY rather than shape: the
+       stored list has to name exactly the packs this build ships.
+
+       Shape alone was not enough, and the way it failed is worth remembering. The three tiers
+       were once silver/gold/diamond and are now standard/premium/insider; a saved list of three
+       tables each with rows passed a shape check and quietly replaced the shipped packs with
+       ones whose keys nothing else in the game recognises — the store still drew, and every
+       button opened nothing. A list from another build is not a tuning, it is a different game's
+       config, and the right thing to do with it is drop it. */
+    const shippedTiers=boxTiers.map(t=>t.key).join(",");
+    if(Array.isArray(d.boxTiers)&&d.boxTiers.map(t=>t&&t.key).join(",")===shippedTiers
        && d.boxTiers.every(t=>t&&Array.isArray(t.table)&&t.table.length)) boxTiers=d.boxTiers;
-    if(Array.isArray(d.deckBoxes)&&d.deckBoxes.length===deckBoxes.length) deckBoxes=d.deckBoxes;
+    const shippedDeck=deckBoxes.map(t=>t.key).join(",");
+    if(Array.isArray(d.deckBoxes)&&d.deckBoxes.map(t=>t&&t.key).join(",")===shippedDeck) deckBoxes=d.deckBoxes;
     return true;
   }catch(e){ return false; }
 }

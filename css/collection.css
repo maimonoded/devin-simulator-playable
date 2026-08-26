@@ -401,6 +401,9 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    beside the result rather than folded into a sentence under it. */
 .predSpoils{display:flex;gap:12px;justify-content:center;margin:14px 0 4px}
 .psItem{display:flex;flex-direction:column;align-items:center;gap:5px;width:78px}
+/* The card is aspect-ratio only, so without a width of its own it collapses to nothing inside
+   a flex column — which is exactly what it did the first time this shipped. */
+.psItem .ccard{width:100%}
 .psTag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800}
 
 /* The Insider pack says WHY it costs what it costs — a price that climbs without explaining

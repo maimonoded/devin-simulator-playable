@@ -197,7 +197,8 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
 | Session & time | `js/game.js` `advanceSession()` | Rolls cost energy (`mult` per roll), never coins. "Next session" advances the clock by the greater of a full refill (`regenMin` minutes per energy point) and one session slot (`1440 / sessionsPerDay` minutes), refills energy and pays a login reward on each day rollover. |
 | Persistence | `js/storage.js` | Two independent localStorage slots — config and progress — with separate **Reset config** and **Reset user** buttons in the tuning drawer. Everything is guarded, so blocked storage degrades to "don't persist". |
-| Store | `js/ui/store.js` `openStore()` | Button top-right of the board. The three box tiers (for coins **or** a dollar price), plus instant grants: coins 10k/100k/1M, energy 100/1k/10k. Dollar prices are labels — nothing is charged, because it is the money side of the economy being modelled, not transacted. |
+| Store | `js/ui/store.js` `openStore()` | Button top-right of the board. **Real money buys Money, and only Money buys packs** (GDD §8.4) — the dollar prices are on coins and nothing else, and even those are labels. The three packs and the energy grants are bought with coins. |
+| Packs | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | Standard · Premium · **Insider** (§4.5). A rarity **floor** is a guarantee, not a target. The Insider guarantees one clue you do not already hold, on top of its draws, and its price climbs with every one bought since the last unlock (§6.5). `Boxes.buyEvents()` spends and opens in one place. → [README](assets/boxes/README.md) |
 
 ### The loop, in one pass
 
@@ -409,6 +410,14 @@ more than 1% off the spreadsheet. **`EconomyImport` cannot yet produce this shap
 builds one segment from the v3 layout, so importing any workbook today flattens the pacing.
 See [TODO.md](TODO.md).
 
+**The model now has a Status tab** (§5.4). `economy.status` holds the Season's levels, its
+opening climb, its **total** — the Season gate, which the doc calls "the single most important
+value in the game" — and the two per-source inflows the collection cannot pay for you. It is
+there rather than in `cfg` for a reason worth remembering: `OWNED_CFG_KEYS` is what lets a model
+version bump drop a stale save's overrides, and a number that is not owned can be quietly
+outvoted by a config saved months ago. That is exactly how the track spent an afternoon paying 2
+points an episode instead of 50. **Bump `economy.version` whenever an owned value changes.**
+
 **Boot order is economy → config → state** (`boot()` in `js/ui/main.js`). The model is applied
 first and the saved tuning is overlaid on top, and the config slot is stamped with the economy
 version it was edited against. On a version change the economy-owned keys are dropped from the
@@ -459,6 +468,27 @@ a human's pick wins on its merits.
 **Cards gate nothing.** They are collectibles, and what they buy is Status. `Collection.pageReady`
 and friends read through to `Clues`, so the album, the case board and the library all show the
 clue gate; the cards still have their page, as a display of what the set contains.
+
+### Flat odds, and what a prediction actually pays
+
+**Every answer pays the same multiplier** (§7.3). Per-answer odds leaked the answer — a 1.5
+beside a 3.2 tells you which one the writers think is true before you have read either — and they
+made a guess about a story read as a betting market. `Economy.flatMultiplier()` is that number;
+it was already the model's own average and already what the auto-play session priced its payouts
+at, so nothing in the spreadsheet moved. `answers[].odds` stays in the episode files and is read
+by nothing.
+
+**Every prediction pays a Collectible** (§7.4) — won, lost or skipped — so a round is never one
+that gave you nothing, and the collectible rather than the coin number is the headline on the
+result screen. A correct call pays a better one (`cfg.predRewardFloor`) *and* a **trophy** unique
+to that episode: a "Called it", the only thing in the game a pack cannot contain, which is
+exactly why it is worth having. Trophies are Showcase pieces and count on the Status track.
+
+**The reward rides on the sealed reveal.** A reveal can outlive the tab, and a trophy arriving
+with no explanation is worse than one arriving late — so `state.pendingReveal` carries the card
+id and the trophy flag, and the result screen names them whenever it finally runs.
+
+**The record counts a call, not a stake.** See "Status is a LEVEL" above.
 
 ### Energy may exceed the cap
 
@@ -573,6 +603,11 @@ three-rung reveal, so the ladder is live and the two payout scalars are not.
 **`clueAlbumSize` is dead.** It was the cosmetic target for a lifetime clue count that no
 longer exists — clues are per-episode now and `Clues.total()` derives the total. The key is
 still imported from the workbook and still projected onto `cfg`, so it round-trips.
+
+**`answers[].odds` is dead.** Odds are flat now (§7.3) and come from `Economy.flatMultiplier()`.
+The per-answer values stay in the episode files because they are authored content and
+`episodes/README.md` still documents the field — but nothing reads them, and an episode with
+wildly different odds on its two answers is no longer a balance problem, only a stale one.
 
 `secPerRoll` is in the tuning drawer but read by nothing. It is still used by the economy
 spreadsheet (seconds-per-roll derives its "active minutes per session"), so wiring it up is

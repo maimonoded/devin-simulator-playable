@@ -182,22 +182,41 @@ test("the Insider's clue is one you do not already hold", () => {
   }
 });
 
-test("the Insider's price climbs with every one bought, and an unlock resets it", () => {
+test("the Insider's price climbs with every one bought since the last unlock", () => {
   freshRun();
   const base = Boxes.priceOf("insider");
   eq(Boxes.priceOf("standard"), Math.round(Boxes.tier("standard").coins * cfg.boardScale),
      "a flat pack does not escalate");
+  /* Read as a pure function of the counter rather than by buying: a pack GUARANTEES a clue, so
+     buying a few in a row can unlock an episode, which resets the counter — correct behaviour,
+     and it made this test fail one run in five when it tried to drive the counter by shopping. */
+  let last = base;
+  for (let n = 1; n <= 5; n++) {
+    state.insiderBought = n;
+    const p = Boxes.priceOf("insider");
+    ok(p > last, `GDD 6.5 — pack ${n + 1} has to cost more than pack ${n}`);
+    last = p;
+  }
+  state.insiderBought = 0;
+  eq(Boxes.priceOf("insider"), base);
+});
+
+test("buying an Insider bumps the counter, and an unlock puts it back", () => {
+  freshRun();
   state.coins = 1e9;
+  const before = Collection.unlockSnapshot();
   Boxes.buyEvents("insider");
-  const second = Boxes.priceOf("insider");
-  ok(second > base, "GDD 6.5 — sprint speed is capped by price, not by a cooldown");
-  Boxes.buyEvents("insider");
-  ok(Boxes.priceOf("insider") > second, "…and it keeps climbing");
-  /* An episode unlocking is what resets it. */
-  const beforeSnap = Collection.unlockSnapshot();
-  unlockEpisode(Episodes.ids()[0]);
-  eq(state.insiderBought, 0);
-  eq(Boxes.priceOf("insider"), base, "back to base the moment the story moves");
+  /* Either it bumped, or the guaranteed clue unlocked an episode and reset it — and an unlock
+     resetting it is the whole rule, so both are the rule holding. */
+  const unlocked = Collection.unlockedEpisodeIds().length > before.length;
+  eq(state.insiderBought, unlocked ? 0 : 1);
+  /* Now force one, and watch it reset. */
+  state.insiderBought = 4;
+  const snap = Collection.unlockSnapshot();
+  const ep = Clues.currentId();
+  state.clues[ep] = Clues.authoredFor(ep).slice(0, Clues.requiredFor(ep)).map(c => c.id);
+  Collection.claimUnlocked(snap);
+  eq(state.insiderBought, 0, "back to base the moment the story moves");
 });
 
 test("buyEvents spends exactly once and refuses when it cannot pay", () => {

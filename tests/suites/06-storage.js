@@ -250,15 +250,34 @@ test("the box tables round-trip, and a wrong-shaped one is refused", () => {
   eq(boxTiers[0].table[0].weight, 77, "an edited drop weight comes back");
   eq(deckBoxes[0].weight, 55);
 
-  /* A tier list from an older build that is short a tier would leave the store with a button
+  /* A pack list from an older build that is short a pack would leave the store with a button
      that opens nothing, so it is refused wholesale rather than merged. */
   const raw = JSON.parse(localStorage.getItem("pmdrama.cfg.v1"));
   raw.boxTiers = raw.boxTiers.slice(0, 2);
   localStorage.setItem("pmdrama.cfg.v1", JSON.stringify(raw));
   resetCfg();
   ok(loadConfig());
-  eq(boxTiers.length, defBoxTiers.length, "the shipped tiers stand");
+  eq(boxTiers.length, defBoxTiers.length, "the shipped packs stand");
   eq(boxTiers[0].table[0].weight, defBoxTiers[0].table[0].weight);
+  clearConfig();
+  resetCfg();
+});
+
+test("a pack list with the RIGHT shape but the wrong names is refused too", () => {
+  resetCfg();
+  saveConfig();
+  /* This is how the packs were once lost. Three tiers named silver/gold/diamond pass every
+     shape test there is and are a different game's config: the store drew, and every button
+     opened nothing. Identity, not shape. */
+  const raw = JSON.parse(localStorage.getItem("pmdrama.cfg.v1"));
+  raw.boxTiers = raw.boxTiers.map((t, i) => ({ ...t, key: ["silver", "gold", "diamond"][i] }));
+  raw.deckBoxes = raw.deckBoxes.map((t, i) => ({ ...t, key: ["silver", "gold", "diamond"][i] }));
+  localStorage.setItem("pmdrama.cfg.v1", JSON.stringify(raw));
+  resetCfg();
+  ok(loadConfig());
+  deepEq(boxTiers.map(t => t.key), defBoxTiers.map(t => t.key), "the shipped packs stand");
+  deepEq(deckBoxes.map(t => t.key), defDeckBoxes.map(t => t.key));
+  boxTiers.forEach(t => ok(Boxes.tier(t.key), `${t.key} has to be a pack the game knows`));
   clearConfig();
   resetCfg();
 });

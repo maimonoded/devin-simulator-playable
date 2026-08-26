@@ -31,6 +31,25 @@ function renderProfile(){
   const acc=(()=>{ const t=state.predWins+state.predLoss; return t?Math.round(state.predWins/t*100)+"%":"—"; })();
   const [eps,epTotal]=Collection.boardProgress();
 
+  /* THE TROPHIES (GDD §7.4). Shown above the shelf and apart from it, because they are the one
+     thing here that cannot be bought or pulled — every other row is something the store or a
+     pack could have handed over, and this row is only ever earned by calling an episode right.
+     A locked slot per unwatched episode would spoil the running order, so only what has been
+     won is drawn, with the count carrying the rest. */
+  const won=Status.trophyIds();
+  const trophies=won.length?`<div class="stZone">
+      <div class="stZoneHead">🎯 Called it
+        <span class="stZoneCount">${won.length}/${Episodes.count()}</span></div>
+      <div class="stGrid">${won.map(id=>{
+        const t=Status.trophyOf(id);
+        return `<div class="stItem got" title="${t.name.replace(/"/g,"&quot;")}">
+            <div class="stArt" style="${cardArtCss(t.art)}"></div>
+            <div class="stName">${Episodes.titleOf(id)}</div>
+            <div class="stSub">+${t.points} status</div>
+          </div>`;
+      }).join("")}</div>
+    </div>`:"";
+
   const zones=Status.zones().map(z=>{
     const items=Status.itemsInZone(z.key);
     if(!items.length) return "";
@@ -52,12 +71,8 @@ function renderProfile(){
                 next?` · ${next.icon} ${next.name} at ${next.from}`:""}</span>`
                 :`<span class="rankNext">Season complete</span>`}</div>
         <div class="albumBar"><div class="albumFill" style="width:${pct}%"></div></div>
-        <div class="rankWhy">
-          <span>🏆 ${fmt(Status.itemPoints())} owned</span>
-          <span>🎬 ${state.epsWatched} watched</span>
-          <span>🃏 ${Status.cardsCollected()} cards</span>
-          <span>📚 ${state.boardsDone} sets</span>
-        </div>
+        <div class="rankWhy">${Status.breakdown().map(b=>
+          `<span>${{cards:"🃏",items:"🏆",watched:"🎬",called:"🎯"}[b.key]} ${fmt(b.points)} ${b.name.toLowerCase()}</span>`).join("")}</div>
       </div>
 
       <div class="profileGrid">
@@ -69,6 +84,7 @@ function renderProfile(){
         <div class="pstat"><div class="v">${Status.ownedCount()}/${Status.items().length}</div><div class="l">Status items</div></div>
       </div>
 
+      ${trophies}
       <div class="stRoom">${zones}</div>
 
       <button class="btn ghost wide danger" id="resetPlayer" style="margin-top:14px">🗑 Reset player progress</button>
