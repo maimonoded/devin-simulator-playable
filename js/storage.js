@@ -93,10 +93,10 @@ function serializeState(){
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
     energy:state.energy, coins:state.coins, clues:state.clues, clueDay:state.clueDay, vip:state.vip,
     pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series, season:state.season,
-    /* The collection and the shelf. Both are plain objects keyed by id, so they serialise as
-       they stand — no Map to spread, and a card or item the content no longer defines simply
-       sits there harmlessly until it is defined again. */
-    albums:state.albums, status:state.status,
+    /* The collection, the finished sets and the shelf. All plain objects keyed by id, so they
+       serialise as they stand — no Map to spread, and a card or item the content no longer
+       defines simply sits there harmlessly until it is defined again. */
+    cards:state.cards, setsDone:state.setsDone, status:state.status,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
@@ -125,20 +125,19 @@ function loadState(){
     if(!(state.series>=0&&state.series<playable)) state.series=0;
     Economy.apply();
     /* THE COLLECTION. Sanitised rather than trusted: a board key has to be a positive integer
-       and a count a positive integer, but the card IDS are deliberately NOT filtered against
-       the current content. Board content is authored data that can be rewritten between
-       versions, and throwing away a card because this build has not heard of it would quietly
-       delete a collection. An unknown id is invisible in the album (Collection.cardOf returns
-       null for it) and comes back the moment the content does. */
-    state.albums={};
-    const rawAlbums=(d.albums&&typeof d.albums==="object")?d.albums:{};
-    Object.keys(rawAlbums).forEach(k=>{
-      const n=parseInt(k,10);
-      if(!(n>=1)) return;
-      const src=rawAlbums[k]||{}, out={};
-      Object.keys(src).forEach(id=>{ const c=Math.floor(+src[id]||0); if(c>0) out[id]=c; });
-      state.albums[String(n)]=out;
-    });
+       a count has to be a positive integer, but the card IDS are deliberately NOT filtered
+       against the current catalogue. A Season's cards are authored data that can be rewritten
+       between versions, and throwing away a card because this build has not heard of it would
+       quietly delete a collection. An unknown id is invisible in the collection (Cards.get
+       returns null for it) and comes back the moment the content does. */
+    state.cards={};
+    const rawCards=(d.cards&&typeof d.cards==="object")?d.cards:{};
+    Object.keys(rawCards).forEach(id=>{ const c=Math.floor(+rawCards[id]||0); if(c>0) state.cards[id]=c; });
+    /* Finished sets: only keys this build's catalogue still defines. Unlike a card, a set that
+       no longer exists is a bonus nothing can explain and a row the collection cannot draw. */
+    state.setsDone={};
+    const rawSets=(d.setsDone&&typeof d.setsDone==="object")?d.setsDone:{};
+    Object.keys(rawSets).forEach(k=>{ if(Cards.setOf(k)) state.setsDone[k]=Math.max(1,Math.floor(+rawSets[k]||1)); });
     /* THE EVIDENCE. Sanitised the same way and for the same reason as the albums: the episode
        keys are checked but the CLUE IDS are not, because an episode's clue list is authored
        content that can be rewritten, and dropping a clue this build has not heard of would
@@ -163,7 +162,6 @@ function loadState(){
        this one would otherwise leave the board empty and every tile undefined. */
     state.season=Math.min(Math.max(0,Math.floor(+d.season||0)),BOARD_SEASONS.length-1);
     state.boardNum=Math.max(1,Math.floor(+d.boardNum||1));
-    if(!state.albums[String(state.boardNum)]) state.albums[String(state.boardNum)]={};
     /* THE SHELF. Only items this build defines — unlike a card, a status item that no longer
        exists is worth points nothing can explain, and the profile has nowhere to draw it. */
     state.status={};
@@ -191,14 +189,14 @@ function loadState(){
       ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0}
       : null;
     /* Nothing to restore for the library: Collection.unlockedEpisodeIds() derives it from the
-       albums just restored above. That is what makes an OLD save work — a run with four
-       episodes unlocked and three of them watched still shows four, where a stored list would
-       have needed migrating and a fallback to the queue showed only the one unwatched. */
+       evidence restored above. That is what makes an OLD save work — a run with four episodes
+       unlocked and three of them watched still shows four, where a stored list would have
+       needed migrating and a fallback to the queue showed only the one unwatched. */
     // no cap clamp on restore — purchased energy may legitimately exceed cfg.energyCap
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero
     state.lastCoins=state.coins; state.lastEnergy=state.energy;
-    state.lastCards=Collection.collected(); state.lastStatus=Status.points();
+    state.lastCards=Cards.owned(); state.lastStatus=Status.points();
     return true;
   }catch(e){ return false; }
 }

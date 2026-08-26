@@ -77,7 +77,8 @@ js/
   episodes.js       episode registry
   board-actor.js    shared base: reward helpers, grantEnergy, presentation event builders
   clues.js          WHAT UNLOCKS AN EPISODE: per-episode evidence, and the edge it buys
-  collection.js     the card album: the pool, the per-set pages, duplicates
+  cards.js          THE COLLECTION: the Season catalogue, copies, conversion, sets
+  collection.js     the ARC and the library — which episodes, unlocked, watched, turned over
   status.js         the status track: points, ranks, buying, milestone sweep
   boxes.js          the three box tiers, the drop tables, and openBoxEvents()
   tiles/            ONE class for the four pooled types, plus the four corners → js/tiles/README.md
@@ -186,7 +187,7 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 | Bonus mini-games | `minigames/` `js/ui/minigame.js` | A **pool row may name a game** — the two that do sit in the `bonus` table the arrivals draw from, so a mini-game is a property of the outcome rather than of the ground you are standing on. Each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | **Clues** | `js/clues.js` `episodes/NNN.js` | **What unlocks an episode**, and the evidence you bet on — one object doing both jobs (GDD §6.1). Each episode authors eight; `cfg.cluesPerEpisode` of them unlocks it, so two players arrive at the same wager holding different evidence. A duplicate pays coins. The catch-up valve eases the requirement by one a day after `cfg.clueStuckDays`. |
-| **The collection** | `js/collection.js` `assets/cards/` | The card album. A **set** is `cfg.episodesPerBoard` episodes, each unlocked by `cfg.collectiblesPerEpisode` named cards — 5 × 5, so 25 distinct cards a set. Three things are derived rather than stored: the **pool** (the union of the episodes' requirements, so a card that can drop but is never wanted is a validation error), **which episodes are unlocked** (read off the albums, which are kept per set forever), and **which set an episode belongs to** (its position in `Episodes.ids()`). → [README](assets/cards/README.md) |
+| **The collection** | `js/cards.js` `assets/cards/` | 150 cards a Season — 90 Common, 38 Rare, 18 Epic, 4 Legendary — in **15 sets of ten** (GDD §4.6). Three copies **convert** a card into its Collectible, which is what pays Status; copies past that trickle. A set is a target and **never a gate**. Ownership is Season-wide and survives a Season reset. → [README](assets/cards/README.md) |
 | **Boxes** | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | The only way anything is collected. Three tiers, each `items` draws against its own weighted table. Opened the moment they are won — and **not in a dialog**: the box is the same GLB the board used to stand on a tile, it arrives over the middle of the board, and you tap the mesh. It bursts where it stood and the cards fly out and hang in the air. The only DOM is a caption and the countdown bar (`js/ui/pack.js`), which also holds the modal fallback for when there is no WebGL. Every empty case falls forward, so a box always pays. → [README](assets/boxes/README.md) |
 | **The case board** | `js/ui/case3d.js` | The current set, standing **inside the ring**: five panels, one per episode, each holding that episode's five card slots with the collected cards' own art in them. Each panel is a canvas painted once and used as the texture of an **upright plane standing on the board** — see "Nothing on the board fades or hides" below. Tapping a panel opens the album there (`Board3D.caseAt()` raycasts them; the tap/pan split lives in `_initDrag`). |
 | **Status** | `js/status.js` `js/ui/profile.js` `js/ui/statusup.js` `assets/status/` | The player's standing. Points come from owned items **plus** episodes watched **plus** cards collected, so play alone climbs and buying alone does not finish. Every one of the ten items has both a coin price and a play milestone. Rank shows beside the avatar in the HUD, and earning an item plays a beat that shows the track actually moving. A status item wears a **gold frame** everywhere it appears — see below. → [README](assets/status/README.md) |
@@ -203,7 +204,8 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
                      →  money · a CARD · a clue · energy · a move · flavour
       →  a clue      →  filed against the episode being worked on  (js/clues.js)
-      →  a card      →  banked, and held on screen if it is new  (js/boxes.js drawCardEvents)
+      →  a card      →  banked. New → held on screen. Third copy → CONVERTS, and says so.
+                        Any other copy → coins, and the board keeps moving  (js/cards.js)
       →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
                         (the Premiere's free pack, and the store)
    four of an episode's eight clues  →  it UNLOCKS  →  predict & watch, IN STORY ORDER
@@ -269,26 +271,54 @@ A box and its cards are put **in front** rather than the board being taken away:
 moves the anchor along the view direction toward the camera, which under an orthographic camera
 changes depth and *nothing else* — it does not move on screen and does not change size.
 
-### A status item is framed; a collection card is not
+### Two axes: the FRAME is the family, the BADGE is the rarity
 
-They come out of the same box seconds apart and are completely different things: a card belongs
-to an episode's page and is spent unlocking it, while a status item goes on the player's shelf
-and stays there. So the difference is carried by the frame, not by a label — a gold double frame
-with corner ticks, which no card of any tier ever wears. It is painted into the canvas for the
-in-scene card (`js/ui/box3d.js`), and is `.ccard.kind-status` + `.ccFrame` in
-`css/collection.css` for the DOM fallback and `.stItem.got` on the profile shelf. All three have
-to move together; that is the cost of the card looking the same everywhere.
+A card face reads two independent fields and never lets one decide both:
 
-**Earning one plays a beat** (`js/ui/statusup.js`): the item in its frame, the points gained, and
-the track moving from where it was to where it is. When the points cross a rank boundary the bar
-cannot simply animate to its new fraction — it would run *backwards*, because the new rank starts
-near empty. So it fills to the top of the old rank, the rank flips, and it fills again from the
-bottom of the new one: two moves, in the order the progress actually happened.
+| axis | drives | values |
+|---|---|---|
+| **family** | the **frame** | `collection` · `clue` · `status` |
+| **rarity** | a **named, coloured badge** | Common · Rare · Epic · Legendary |
+
+The families come out of the same box seconds apart and are completely different things. A
+collection card belongs to a set and is worth Status. A **clue** is a sentence you have to read —
+so it is the one face built to be read: warm paper, sitting crooked, typewriter face, tape holding
+it down. A **status item** goes on the player's shelf and stays there, and wears a gold double
+frame with corner ticks that no collection card of any rarity ever wears.
+
+The frame carries it, because a label can be missed and a frame cannot. And because the two axes
+are independent, an Epic collection card and a status item can never be mistaken for one another
+however good the art is.
+
+Both halves have to move together in three places: the canvas path (`js/ui/box3d.js`,
+`js/ui/case3d.js`), the DOM path (`js/ui/cardface.js`, `.fam-*` and `.rar-*` in
+`css/collection.css`), and the profile shelf. That is the cost of a card looking the same
+everywhere, and it is the point.
+
+**A small slot abbreviates rather than clipping.** An album row is ten cards wide, and a clipped
+"LEGENDAR" reads as a bug where "Leg" reads as an abbreviation — hence `short` in `CARD_RARITIES`.
+
+**Most Commons have no art, on purpose.** Ninety pieces of generated art would cost more to make
+than they would ever be looked at, so `cardFace()` falls back to a procedural face hashed off the
+card id — same card, same colours, every time. Painted art earns its place at the top of the
+ladder, where §4.2 says an Epic is "the pull that makes a pack memorable"; all 18 Epics and all
+4 Legendaries have it.
+
+**Earning a status item plays a beat** (`js/ui/statusup.js`): the item in its frame, the points
+gained, and the track moving from where it was to where it is. When the points cross a rank
+boundary the bar cannot simply animate to its new fraction — it would run *backwards*, because
+the new rank starts near empty. So it fills to the top of the old rank, the rank flips, and it
+fills again from the bottom of the new one: two moves, in the order the progress actually
+happened.
 
 Both routes go through it — a box's `{statusUp}` event and the milestone sweep in
 `afterCollect()` — because an item earned by playing is the same kind of thing as one found in a
 box. It blocks the roll loop like every other reward beat, and skips entirely in an auto-play
 session.
+
+**A completed card set gets its own, smaller beat** (`showSetComplete` in `js/ui/finale.js`). It
+is a reward, not a chapter ending, and it never gated anything — so it says what it paid and gets
+out of the way. Like every blocking beat it resolves on a timer as well as on a click.
 
 ### The scene's animations are driven by frames but ENDED by timers
 

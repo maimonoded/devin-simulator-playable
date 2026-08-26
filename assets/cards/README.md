@@ -1,91 +1,72 @@
-# Cards — what there is to collect
+# The collection
 
-The collection is the game's progression: a **set** is `cfg.episodesPerBoard` episodes, each
-unlocked by owning `cfg.collectiblesPerEpisode` named cards. Board 1 is 5 × 5, so its pool is
-**25 distinct cards** and every one of them is needed exactly once.
+`cards.js` is the Season catalogue — **150 cards, in 15 sets of ten**. Content, like
+[`assets/board/board.js`](../board/README.md); the engine is [`js/cards.js`](../../js/cards.js).
 
-```
-assets/cards/
-  cards.js            CARD_TIERS + CARD_BOARDS — the content
-  board1/*.webp       the art: one portrait per character, one still life per clue
-```
+## What changed, and why it matters
 
-The engine that reads this is [`js/collection.js`](../../js/collection.js); the card is drawn by
-[`js/ui/cardface.js`](../../js/ui/cardface.js) and styled in
-[`css/collection.css`](../../css/collection.css).
+Cards used to **be** the gate: five named ones unlocked an episode, so the pool was derived from
+the episodes' requirements and every card had a job. GDD §6.1 moved the gate to
+[clues](../../js/clues.js), and that frees the collection to be what §4 actually describes — a
+catalogue you are never finished with, whose only job is Status and the satisfaction of the thing
+itself.
 
-## The pool is derived, not declared
+So there are no requirements here any more. **A card is wanted because it is missing.**
 
-Nothing anywhere says "25". The pool of a board is the **union of its episodes' `needs`**, so a
-card that can drop but is never wanted — or a requirement naming a card that does not exist — is
-a `Collection.validate()` error rather than a silent hole. The tuning drawer prints what it
-finds, and `boot()` logs it.
+## The shape (§4.6)
 
-## Card ids
+| Rarity | Count | Drop weight | Converts for | Each copy past that | Duplicate coins |
+|---|---|---|---|---|---|
+| Common | 90 | 60% | 10 | 2 | ×1 |
+| Rare | 38 | 25% | 30 | 6 | ×3 |
+| Epic | 18 | 12% | 100 | 20 | ×8 |
+| Legendary | 4 | 3% | 400 | 80 | ×25 |
 
-A card id is a string, and it is the whole identity — ownership, drop tables and requirements all
-key off it:
+Per set that is six Commons and a tail: eight sets carry three Rares and an Epic, three carry two
+Rares and two Epics, and four carry two Rares, an Epic and one of the Season's four Legendaries.
+`Cards.validate()` checks the totals, because "90/38/18/4" is a balance decision and a typo in it
+is invisible in play — the game would simply feel slightly wrong for a whole Season.
 
-```
-char:simon@gold      a character portrait at a tier
-clue:sign            a clue card (no tier — see below)
-```
+## Three copies convert
 
-## Three tiers off one portrait
+§4.3, and it is the rule that makes a duplicate worth pulling. Copies accumulate; the **third**
+converts the card into its Collectible, which is what pays Status. Past the third, copies trickle
+Status directly, so no pull is ever dead — GDD §12 lists that as one of three non-negotiable
+mitigations for a game where both tracks are random.
 
-Character cards come in three tiers, and **the tier is a frame drawn in CSS, not a second piece
-of art**. Three portraits of the same person differing only in rarity would be three near
-identical images to generate, store and tell apart. It also means adding a tier is a line in
-`CARD_TIERS` rather than a re-render of the whole cast.
+Nothing about conversion is stored. `state.cards` is copies held, and converted is
+`count >= cfg.cardCopiesToConvert`. One number, one derivation, nothing to drift.
 
-| field | meaning |
-|---|---|
-| `key` | what an id says: `char:simon@gold` |
-| `rank` | the order, rarest last |
-| `dup` | what a **second** copy is worth, as a multiplier on `cfg.dupCoins` |
-| `icon` | shown on the card's ribbon |
+## A set is a target, never a gate
 
-## Clue cards are deliberately different
+§4.4. Completing one pays coins and Status and nothing depends on it having happened. The only
+thing about a set that has to be *stored* is whether its bonus was already paid (`state.setsDone`)
+— "was this given" is not derivable from a collection that only ever grows.
 
-They are the one kind whose art carries information out of the story rather than a face, and the
-one kind that feeds the wager: collecting a **new** clue card banks a clue for the next
-prediction, exactly as the old mystery box did (a duplicate pays coins, not insight). So they
-carry **no tier at all** and wear a paper evidence-tag treatment — dashed cream border, tape,
-typewriter face — which is three signals that this is a different *kind* of thing, readable from
-across the album.
+## Ids
 
-## Authoring a board
+A card's id is the whole identity — ownership, drop tables and the Showcase all key off it — and
+it must be unique **across every Season**, not just within one. A Season's cards persist after its
+reset (§5.3), so two Seasons reusing `the-blanket` would silently merge two different cards into
+one pile. `validate()` refuses it.
 
-```js
-{
-  board: 2,
-  name: "…",
-  art: "assets/cards/board2/",
-  characters: [{ id, name, role, art }],      // one portrait each
-  clues:      [{ id, name, art }],            // `name` is the line printed on the card
-  episodes: [{ ep: "006", needs: ["char:…@silver", "clue:…", …] }],
-}
-```
+## Art
 
-`needs` **is** the requirement — which card, at which tier — and it is data precisely so
-"episode 5 wants the whole cast in diamond" is a decision made here rather than a rule buried in
-the unlock check. Board 1 escalates: silver across the opening two, gold through the middle, the
-full diamond cast last.
+`art` is **optional** and names a file in `s1/`. Absent means the procedural face
+([`js/ui/cardface.js`](../../js/ui/cardface.js)), which is the right answer for most of the ninety
+Commons: ninety pieces of generated art would cost more to make than they would ever be looked at.
 
-Only board 1 is authored. `Collection.boardFor(n)` past the last authored board returns that
-board re-pointed at board *n*'s episodes, so the loop never dead-ends on missing content and
-authoring board 2 for real is an entry in `cards.js`, not a code change. A derived board reuses
-the template's art, which is honest about what it is: the same cast, a new set to collect.
+The top of the ladder is where painted art earns its place — §4.2 calls an Epic "the pull that
+makes a pack memorable", and a memorable pull cannot be a gradient. **All 18 Epics and all 4
+Legendaries are painted**, plus nine lower-rarity cards that reuse the evidence images.
 
-## The art
+Generated with Scenario at 864×1152 and sized down to ~420px wide, ~30 KB each.
 
-Generated with the Scenario MCP (`model_bytedance-seedream-5-0-pro`) at 864 × 1152, then
-resized to 432 wide and encoded to WebP — ~25 KB a card against ~2 MB for the source PNG, which
-is what makes a 25-card set cost half a megabyte instead of fifty.
+## Adding a card
 
-One locked style block for the cast (painterly romance-drama poster, warm key light from the
-upper left, teal and plum shadows, dark bokeh background) and one for the clues (the same light
-on a single object, shot as evidence). **No text of any kind** is generated — names, tiers and
-counts are DOM over the art, so they stay crisp and translatable. On the clue prompts, writing
-that belongs to the object is asked for as *illegible*: a will has to look like a will without
-the generator inventing words.
+1. A row in the right set's `cards` array: `{ id, name, rarity }`, plus `art` if it has any.
+2. Keep the set at ten and the Season totals at 90/38/18/4 — swap a card out rather than growing
+   a set, or `Cards.validate()` will say so at boot and in the tuning drawer.
+3. Drop the art in `s1/` if there is any.
+
+No code changes. A new Season is a new entry in `CARD_SEASONS` with its own `art` directory.

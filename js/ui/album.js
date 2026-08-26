@@ -1,131 +1,154 @@
 "use strict";
-/* The album — one page per episode, and the empty slots are the point.
+/* The collection — 150 cards a Season, in fifteen sets of ten, and the empty slots are the
+   point. A collection you cannot see the shape of is not a collection, so a set shows all ten
+   slots whether you hold them or not: owned cards in full, missing ones silhouetted but NAMED
+   and BADGED, because "Epic" is what tells you whether a gap is a week's play or a lucky
+   Tuesday.
 
-   A collection you cannot see the shape of is not a collection, so a page shows all
-   cfg.collectiblesPerEpisode slots whether you hold them or not: owned cards in full, missing
-   ones silhouetted but NAMED, because "Simon, Gold" is a different thing to chase than "Simon,
-   Silver" and the player has to be able to tell which one is still out there.
+   Paged by SET rather than shown as one grid of 150. A set is the unit that completes and pays
+   (GDD §4.4), so it is the unit worth looking at — and the page you land on is the one closest
+   to finishing, which answers "what am I nearly done with" without a tap.
 
-   Paged rather than one long grid. The board is five episodes and each one is a set of five —
-   that structure is the progression, and a flat grid of twenty-five throws it away. The page
-   you land on is the first UNFINISHED one, so opening the album answers "what am I working on"
-   without a tap.
+   ---- what this is NOT any more ----
 
-   Past boards are still here. Albums are kept forever (js/collection.js), so the board strip
-   at the top walks back through every finished set — the collection is a history, not a
-   scoreboard that resets.
+   It used to be one page per episode, because five cards unlocked one. Clues do that now
+   (js/clues.js), so the collection has stopped being a progress bar for the story and gone back
+   to being a collection. What the story costs is shown on the case board in the ring, and
+   tapping a panel there opens the EVIDENCE (openEvidence below), not this.
 
-   Nothing here writes state. The album is a view of the albums and the requirements, so opening
-   it can never change a run. The one exception is the Watch button, which is a route into the
-   prediction flow rather than a change of its own. */
+   Nothing here writes state. Opening it can never change a run. */
 
-/* Which board and page are on screen. Deliberately NOT persisted: it is where you are looking,
-   not where you are. Reset to the current board and its first unfinished page on each open. */
-let albumBoard=null, albumPage=0;
+/* Which set is on screen. Deliberately NOT persisted: it is where you are looking, not where
+   you are. */
+let albumSet = 0;
 
 function openAlbum(){
-  albumBoard=Collection.num();
-  const pages=Collection.pages(albumBoard);
-  albumPage=Math.max(0,pages.findIndex(p=>!Collection.pageReady(p,albumBoard)));
-  if(albumPage<0) albumPage=0;
+  const sets = Cards.sets();
+  /* The set closest to done, ignoring the ones already finished — "what am I nearly done with". */
+  let best = 0, bestShort = Infinity;
+  sets.forEach((s, i) => {
+    const [got, need] = Cards.setProgress(s.key);
+    const short = need - got;
+    if (short > 0 && short < bestShort){ bestShort = short; best = i; }
+  });
+  albumSet = best;
   renderAlbum();
 }
 
 function renderAlbum(){
-  const host=$("#sheetHost");
-  const n=albumBoard, board=Collection.boardFor(n);
-  const pages=Collection.pages(n);
-  const pool=Collection.poolSize(n), got=Collection.collected(n);
-  const pct=pool?Math.round(got/pool*100):0;
-  const [eps,epTotal]=Collection.boardProgress(n);
+  const host = $("#sheetHost");
+  const sets = Cards.sets(), season = Cards.season();
+  const set = sets[albumSet] || sets[0];
+  const owned = Cards.owned(), pool = Cards.poolSize();
+  const pct = pool ? Math.round(owned / pool * 100) : 0;
 
-  /* The board strip: every board that has been started, current one last. One button when
-     there is only one, which is the normal case early on. */
-  const boards=[];
-  for(let b=1;b<=Collection.num();b++) boards.push(b);
-  const strip=boards.length>1
-    ? `<div class="albBoards">${boards.map(b=>{
-         const done=Collection.boardComplete(b);
-         return `<button class="albBoard${b===n?" sel":""}${done?" done":""}" data-b="${b}">
-             ${done?"✓":""} Set ${b}</button>`;
-       }).join("")}</div>`
-    : "";
+  const body = set ? albumSetHtml(set) :
+    `<div class="hint" style="margin:20px 0;text-align:center">No cards are authored for this Season.</div>`;
 
-  const page=pages[albumPage];
-  const body=page?albumPageHtml(page,n):
-    `<div class="hint" style="margin:20px 0;text-align:center">This set has no episodes —
-       the library has run out. That is the end of the story, for now.</div>`;
-
-  host.innerHTML=`<div class="modal albumModal"><div class="top">
+  host.innerHTML = `<div class="modal albumModal"><div class="top">
       <button class="sheetX" id="albumX" title="Close">✕</button>
-      <div class="eyebrow">Set ${n} · ${board.name}</div><h2>${got} of ${pool} cards</h2></div>
+      <div class="eyebrow">${season ? season.name : "Collection"} · ${Cards.completedSets().length}/${sets.length} sets</div>
+      <h2>${owned} of ${pool} cards</h2></div>
     <div class="mbody">
-      ${strip}
       <div class="albumBar"><div class="albumFill" style="width:${pct}%"></div></div>
       <div class="hint" style="margin:6px 0 10px">
-        <b style="color:var(--pink)">${eps}</b>/${epTotal} episodes unlocked ·
-        ${Clues.total()?`<b style="color:var(--teal)">${fmt(Clues.total())}</b> clues filed`
-                     :`clue cards lift your next prediction`}</div>
+        <b style="color:var(--gold)">${Cards.convertedCount()}</b> collected —
+        ${Cards.copiesToConvert()} copies convert a card and pay its status.</div>
       ${body}
       <div class="albNav">
-        <button class="btn ghost albArrow" id="albPrev" ${albumPage<=0?"disabled":""}>‹</button>
-        <div class="albDots">${pages.map((p,i)=>{
-          const ready=Collection.pageReady(p,n);
-          return `<button class="albDot${i===albumPage?" sel":""}${ready?" done":""}"
-             data-p="${i}" title="Episode ${p.ep}"></button>`;
+        <button class="btn ghost albArrow" id="albPrev" ${albumSet <= 0 ? "disabled" : ""}>‹</button>
+        <div class="albDots">${sets.map((s, i) => {
+          const done = Cards.setComplete(s.key);
+          return `<button class="albDot${i === albumSet ? " sel" : ""}${done ? " done" : ""}"
+             data-p="${i}" title="${s.name}"></button>`;
         }).join("")}</div>
-        <button class="btn ghost albArrow" id="albNext" ${albumPage>=pages.length-1?"disabled":""}>›</button>
+        <button class="btn ghost albArrow" id="albNext" ${albumSet >= sets.length - 1 ? "disabled" : ""}>›</button>
       </div>
       <button class="btn ghost wide" id="albumClose" style="margin-top:10px">Close</button>
     </div></div>`;
   host.classList.add("show");
 
-  const close=()=>{ host.classList.remove("show"); host.innerHTML=""; host.onclick=null; renderAll(); };
-  $("#albumClose").onclick=close;
-  $("#albumX").onclick=close;
-  host.onclick=(e)=>{ if(e.target===host) close(); };
+  const close = () => { host.classList.remove("show"); host.innerHTML = ""; host.onclick = null; renderAll(); };
+  $("#albumClose").onclick = close;
+  $("#albumX").onclick = close;
+  host.onclick = (e) => { if (e.target === host) close(); };
 
-  const go=(i)=>{ albumPage=Math.max(0,Math.min(pages.length-1,i)); renderAlbum(); };
-  $("#albPrev").onclick=()=>go(albumPage-1);
-  $("#albNext").onclick=()=>go(albumPage+1);
-  host.querySelectorAll(".albDot").forEach(b=>b.onclick=()=>go(+b.dataset.p));
-  host.querySelectorAll(".albBoard").forEach(b=>b.onclick=()=>{
-    albumBoard=+b.dataset.b; albumPage=0; renderAlbum();
-  });
-  const watch=$("#albWatch");
-  if(watch) watch.onclick=()=>{ close(); openPrediction(page.ep); };
+  const go = (i) => { albumSet = Math.max(0, Math.min(sets.length - 1, i)); renderAlbum(); };
+  $("#albPrev").onclick = () => go(albumSet - 1);
+  $("#albNext").onclick = () => go(albumSet + 1);
+  host.querySelectorAll(".albDot").forEach(b => b.onclick = () => go(+b.dataset.p));
 }
 
-/* One page: the episode it unlocks, and its slots. */
-function albumPageHtml(page,n){
-  const [got,need]=Collection.pageProgress(page,n);
-  const ready=Collection.pageReady(page,n);
-  const ep=Episodes.get(page.ep);
-  const unwatched=state.epQueue.includes(page.ep);
-  const slots=page.needs.map(id=>{
-    const card=Collection.cardOf(id,n);
-    const owned=Collection.has(id,n);
-    return `<div class="albSlot">${cardFace(card,{owned,count:Collection.countOf(id,n),size:"sm"})}</div>`;
-  }).join("");
-  /* The page's own status line does the work the dots cannot: what this set of five BUYS, and —
-     when the cards are all in but the story is not ready for it — which episode comes first.
-     The drama is serialised, so a complete page is not automatically a watchable one. */
-  const blocked=ready&&unwatched&&!Collection.canWatch(page.ep)?Collection.blockedBy():null;
-  const foot=!ready
-    ? `<div class="albNeed">${need-got} more to unlock <b>“${ep?ep.title:page.ep}”</b></div>`
-    : blocked
-    ? `<div class="albNeed">🔒 Collected — but
-         <b>“${Episodes.titleOf(blocked)}”</b> has to be watched first</div>`
-    : unwatched
-    ? `<button class="btn pink wide" id="albWatch">▶ Predict &amp; watch “${ep?ep.title:page.ep}”</button>`
-    : `<div class="albDone">✓ Unlocked and watched</div>`;
-  return `<div class="albPage${ready?" ready":""}">
+/* One set: its ten slots, and what finishing it is worth. A set NEVER gates anything (§4.4),
+   so this footer promises a reward and never a requirement. */
+function albumSetHtml(set){
+  const [got, need] = Cards.setProgress(set.key);
+  const done = Cards.setComplete(set.key);
+  const claimed = Cards.setClaimed(set.key);
+  const slots = set.cards.map(c =>
+    `<div class="albSlot">${cardFace(c, { owned: Cards.has(c.id), count: Cards.count(c.id), size: "sm" })}</div>`
+  ).join("");
+  const foot = done
+    ? (claimed
+        ? `<div class="albDone">✓ Complete — ${fmt(Math.round(cfg.setBonusCoins * cfg.boardScale))}🪙 and
+             ${cfg.setBonusStatus} status collected</div>`
+        : `<div class="albNeed">✓ Complete — the bonus lands on your next roll</div>`)
+    : `<div class="albNeed"><b>${need - got}</b> more to finish this set ·
+         ${fmt(Math.round(cfg.setBonusCoins * cfg.boardScale))}🪙 and ${cfg.setBonusStatus} status when you do</div>`;
+  return `<div class="albPage${done ? " ready" : ""}">
       <div class="albHead">
-        <span class="albEp">Episode ${page.ep}</span>
-        <span class="albTitle">${ep?ep.title:"—"}</span>
-        <span class="albCount${ready?" done":""}">${got}/${need}${ready?" ✓":""}</span>
+        <span class="albEp">Set ${albumSet + 1}</span>
+        <span class="albTitle">${set.name}</span>
+        <span class="albCount${done ? " done" : ""}">${got}/${need}${done ? " ✓" : ""}</span>
       </div>
-      <div class="albGrid">${slots}</div>
+      <div class="albGrid ten">${slots}</div>
       <div class="albFoot">${foot}</div>
     </div>`;
+}
+
+/* ---------------- the evidence, for one episode ----------------
+   What tapping a case-board panel opens. The panel shows an episode's clue slots, so the sheet
+   behind it has to be those clues — the same list the wager screen calls "Review the evidence",
+   reachable before you are ready to bet. */
+function openEvidence(ep){
+  const host = $("#sheetHost");
+  const [got, need] = Clues.progressFor(ep);
+  const held = Clues.evidenceFor(ep);
+  const unlocked = Clues.isUnlocked(ep);
+  const unwatched = state.epQueue.includes(ep);
+  const blocked = unlocked && unwatched && !Collection.canWatch(ep) ? Collection.blockedBy() : null;
+  const rows = held.length
+    ? `<ul class="evList">${held.map(c => `<li>${c.text}</li>`).join("")}</ul>`
+    : `<p class="hint" style="margin:0">Nothing on file yet. Clues come off the cast's tiles.</p>`;
+  /* The gaps are drawn, not just counted: an empty slot is what makes a collection legible, and
+     the evidence board is a collection too. */
+  const gaps = Math.max(0, need - got);
+  const foot = !unlocked
+    ? `<div class="albNeed"><b>${gaps}</b> more clue${gaps === 1 ? "" : "s"} to unlock this episode</div>`
+    : blocked
+    ? `<div class="albNeed">🔒 Unlocked — but <b>“${Episodes.titleOf(blocked)}”</b> has to be watched first</div>`
+    : unwatched
+    ? `<button class="btn pink wide" id="evWatch">▶ Predict &amp; watch</button>`
+    : `<div class="albDone">✓ Watched</div>`;
+
+  host.innerHTML = `<div class="modal albumModal"><div class="top">
+      <button class="sheetX" id="evX" title="Close">✕</button>
+      <div class="eyebrow">Episode ${ep} · the evidence</div>
+      <h2>${Episodes.titleOf(ep)}</h2></div>
+    <div class="mbody">
+      <div class="albumBar"><div class="albumFill" style="width:${need ? Math.round(got / need * 100) : 0}%"></div></div>
+      <div class="hint" style="margin:6px 0 10px"><b style="color:var(--teal)">${got}</b>/${need} clues ·
+        ${Clues.authoredFor(ep).length} exist, so no two players read the same file.</div>
+      ${rows}
+      ${gaps ? `<div class="evGaps">${Array.from({ length: gaps }, () => `<div class="evGap"></div>`).join("")}</div>` : ""}
+      <div class="albFoot">${foot}</div>
+      <button class="btn ghost wide" id="evClose" style="margin-top:10px">Close</button>
+    </div></div>`;
+  host.classList.add("show");
+  const close = () => { host.classList.remove("show"); host.innerHTML = ""; host.onclick = null; renderAll(); };
+  $("#evClose").onclick = close;
+  $("#evX").onclick = close;
+  host.onclick = (e) => { if (e.target === host) close(); };
+  const w = $("#evWatch");
+  if (w) w.onclick = () => { close(); openPrediction(ep); };
 }

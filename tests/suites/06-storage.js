@@ -61,16 +61,18 @@ test("serializeState captures progress and omits transient fields", () => {
   eq(s.rolls, 7);
   eq("animating" in s, false, "animating must not be persisted");
   eq("lastCoins" in s, false, "tween baselines must not be persisted");
-  ok(s.albums && typeof s.albums === "object", "the collection rides along");
+  ok(s.cards && typeof s.cards === "object", "the collection rides along");
+  ok(s.setsDone && typeof s.setsDone === "object", "and so do the sets already paid for");
   ok(s.status && typeof s.status === "object", "and so does the shelf");
 });
 
 test("save then load restores a run", () => {
   freshRun();
-  state.coins = 4321; state.clues = { "001": ["c2", "c5"] }; state.clueDay = { "001": 2 }; state.vip = 99; state.day = 4;
+  state.clues = { "001": ["c2", "c5"] }; state.clueDay = { "001": 2 }; state.vip = 99; state.day = 4;
   state.energy = 17; state.pos = 23; state.mult = 5; state.rolls = 12;
-  const held = Collection.pool()[0];
-  Collection.add(held, 2);
+  const held = Cards.all()[0].id;
+  Cards.add(held, 2);                           // pays a duplicate consolation, so set coins after
+  state.coins = 4321;
   Status.grant("mug", "bought");
   saveState();
 
@@ -85,7 +87,7 @@ test("save then load restores a run", () => {
   eq(state.pos, 23);
   eq(state.mult, 5);
   eq(state.rolls, 12);
-  eq(Collection.countOf(held), 2, "duplicates survive — the count is the album's memory");
+  eq(Cards.count(held), 2, "duplicates survive — the count is the album's memory");
   ok(Status.owns("mug"));
   eq(Status.howGot("mug"), "bought", "and how it arrived, which the profile shows");
   eq(state.animating, false, "always restored idle");
@@ -94,51 +96,50 @@ test("save then load restores a run", () => {
 
 test("a finished board and the one after it both come back", () => {
   freshRun();
-  Collection.pool(1).forEach(id => Collection.add(id, 1));
+  Cards.all().slice(0, 6).forEach(c => Cards.add(c.id, 1));
   /* Cards no longer finish a set: its episodes have to be unlocked by clues AND watched. */
   Collection.pages(1).forEach(p => watchEpisode(unlockEpisode(p.ep)));
   Collection.advanceBoard();
-  Collection.add(Collection.pool()[0], 1);
   const unlocked = Collection.unlockedEpisodeIds().slice();
   saveState();
   freshRun();
   loadState();
   eq(state.boardNum, 2);
   eq(state.boardsDone, 1);
-  eq(Collection.collected(1), Collection.poolSize(1), "set 1's album is kept, not cleared");
-  eq(Collection.collected(2), 1);
+  eq(Cards.owned(), 6, "the collection is Season-wide, so turning a set over keeps every card");
   deepEq(Collection.unlockedEpisodeIds(), unlocked,
-         "the library is derived from the albums, so it survives without being stored");
+         "the library is derived from the evidence, so it survives without being stored");
 });
 
-test("a corrupt album degrades to an empty one rather than NaN", () => {
+test("a corrupt collection degrades to an empty one rather than NaN", () => {
   freshRun();
   saveState();
   const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1") || "{}");
-  raw.albums = { "1": { "char:simon@gold": "lots", "clue:sign": -3, "clue:will": 2 },
-                 "notaboard": { "clue:sign": 1 }, "0": { "clue:sign": 1 } };
+  raw.cards = { "folded-blanket": "lots", "cold-coffee": -3, "borrowed-coat": 2 };
+  raw.setsDone = { "the-street": 4, "a-set-that-never-existed": 9 };
   raw.boardNum = "x";
   localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
   ok(loadState());
-  eq(state.boardNum, 1, "a bad board number falls back to the first");
-  eq(Collection.countOf("char:simon@gold"), 0, "a non-numeric count is dropped");
-  eq(Collection.countOf("clue:sign"), 0, "and so is a negative one");
-  eq(Collection.countOf("clue:will"), 2, "the good entry survives");
-  eq(state.albums["notaboard"], undefined, "a key that is not a board number is not a board");
-  eq(state.albums["0"], undefined);
+  eq(state.boardNum, 1, "a bad set number falls back to the first");
+  eq(Cards.count("folded-blanket"), 0, "a non-numeric count is dropped");
+  eq(Cards.count("cold-coffee"), 0, "and so is a negative one");
+  eq(Cards.count("borrowed-coat"), 2, "the good entry survives");
+  eq(Cards.setClaimed("the-street"), true, "a real set's payment is remembered");
+  eq(Cards.setClaimed("a-set-that-never-existed"), false,
+     "…and one this build cannot draw is a bonus nothing could explain");
 });
 
 test("a card this build no longer defines is kept, not deleted", () => {
   freshRun();
   saveState();
   const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1") || "{}");
-  raw.albums = { "1": { "char:someone-from-a-later-set@gold": 3 } };
+  raw.cards = { "a-card-from-a-later-season": 3 };
   localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
   ok(loadState());
-  /* Board content is authored data that gets rewritten. Throwing the card away because this
+  /* A Season's cards are authored data that gets rewritten. Throwing the card away because this
      build has not heard of it would quietly delete a collection; it is invisible instead. */
-  eq(state.albums["1"]["char:someone-from-a-later-set@gold"], 3);
-  eq(Collection.cardOf("char:someone-from-a-later-set@gold"), null, "and it draws as nothing");
+  eq(Cards.count("a-card-from-a-later-season"), 3);
+  eq(Cards.get("a-card-from-a-later-season"), null, "and it draws as nothing");
 });
 
 test("a status item this build no longer defines IS dropped", () => {

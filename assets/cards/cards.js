@@ -1,99 +1,265 @@
 "use strict";
-/* The collection — what there is to collect, and what each episode costs in cards.
+/* The collection — the 150 things there are to collect in a Season.
 
-   A classic script defining globals, for the same reason assets/env/scene.js and
-   assets/npcs/npcs.js are: everything outside js/ui/board3d.js is classic scripts sharing
-   globals, and this file is edited by hand far more often than the code that reads it.
-   The engine that reads it is js/collection.js.
+   Content, like assets/board/board.js and assets/pools/pools.js: a classic script defining
+   globals, edited by hand far more often than the code that reads it. The engine is js/cards.js.
 
-   ---- the shape of a board ----
+   ---- what changed, and why it matters ----
 
-   A BOARD is one turn of the game loop: cfg.episodesPerBoard episodes, each unlocked by
-   cfg.collectiblesPerEpisode cards. Board 1 is 5 x 5, so its pool is 25 distinct cards and
-   every one of them is needed exactly once. Nothing here states 25 — the pool is DERIVED as
-   the union of the episodes' `needs`, which is what makes a mis-authored board a validation
-   error (Collection.validate) rather than a card that can drop but is never wanted.
+   Cards used to BE the gate: five named ones unlocked an episode, so the pool was derived from
+   the episodes' requirements and every card had a job. GDD §6.1 moved the gate to clues, and
+   that frees the collection to be what §4 actually describes — a Season-wide catalogue you are
+   never finished with, whose only job is Status and the satisfaction of the thing itself.
 
-   ---- card ids ----
+   So there are no "requirements" here any more. A card is wanted because it is missing.
 
-   A card id is a string, and it is the whole identity — ownership, drop tables and episode
-   requirements all key off it:
+   ---- the shape (§4.6) ----
 
-     char:simon@gold     a character portrait at a tier
-     clue:sign           a clue card (clue cards have no tier — see below)
+   150 cards a Season: 90 Common, 38 Rare, 18 Epic, 4 Legendary, in 15 SETS OF TEN. A set is a
+   collection target and NEVER a gate (§4.4) — completing one pays a bonus and a display piece,
+   and a player who completes none is only poorer, never stuck.
 
-   Character cards come in THREE TIERS off ONE portrait. The tier is a frame drawn in CSS
-   (css/collection.css), not a second piece of art: three portraits of the same person that
-   differ only in rarity would be three near-identical images to generate, store and tell
-   apart. It also means a new tier is a line in CARD_TIERS rather than a re-render of the cast.
+   Per set that works out at six Commons and a tail: eight sets carry three Rares and an Epic,
+   three carry two Rares and two Epics, and four carry two Rares, an Epic and the Season's one
+   Legendary apiece. Cards.validate() checks the totals, because "90/38/18/4" is a balance
+   decision and a typo in it is invisible in play.
 
-   Clue cards are deliberately NOT tiered. They are the one kind whose art carries information
-   — an object out of the story — so a clue at three rarities would be the same evidence three
-   times. They also look different from every other card by design (see the .clue rules in
-   css/collection.css), because they are the kind that feeds the prediction: collecting one
-   banks a clue for the next wager exactly as the old mystery box did.
+   ---- ids ----
 
-   ---- boards past the authored ones ----
+   A card's id is the whole identity — ownership, drop tables and the Showcase all key off it —
+   and it must be unique across every Season, not just within one. A Season's cards persist
+   after its reset (§5.3), so two Seasons reusing "the-blanket" would silently merge two
+   different cards into one pile. validate() refuses it.
 
-   Only board 1 is authored. Collection.boardFor(n) derives any board past the last authored
-   one from the last authored one, re-pointing it at that board's episodes — so the loop runs
-   as long as there are episode files and adding real content later is an entry here, not a
-   code change. See js/collection.js. */
+   ---- art ----
 
-/* Rarity, rarest last. `rank` is the order. `dup` is what a SECOND copy is worth, as a
-   multiplier on cfg.dupCoins — a duplicate diamond has to feel like a diamond even though the
-   album already has one, and the rarer the card the more that consolation is worth. How often
-   each tier drops is not here: that is per box tier, in js/boxes.js. */
-const CARD_TIERS = [
-  { key: "silver",  name: "Silver",  rank: 1, dup: 1, icon: "🥈" },
-  { key: "gold",    name: "Gold",    rank: 2, dup: 3, icon: "🥇" },
-  { key: "diamond", name: "Diamond", rank: 3, dup: 8, icon: "💎" },
+   `art` is OPTIONAL and names a file under the Season's `art` directory. Absent means the
+   procedural face (js/ui/cardface.js), which is the right answer for most of the 90 Commons:
+   ninety pieces of generated art would cost more to make than they would ever be looked at.
+   The top of the ladder is where painted art earns its place — §4.2 calls an Epic "the pull
+   that makes a pack memorable", and a memorable pull cannot be a gradient. */
+
+/* Rarity. `weight` is how often it drops (§4.2's 60/25/12/3, summing to 100), `status` what
+   CONVERTING one pays (§5.1), `trickle` what each copy past the third pays instead, and `dup`
+   the multiplier on cfg.dupCoins for a duplicate that has not converted yet.
+
+   `short` is the same name for a slot too small to hold it — an album row is ten cards wide, and
+   a clipped "LEGENDAR" reads as a bug where "Leg" reads as an abbreviation.
+
+   `color` is the rarity badge, drawn on every card face in both the canvas and the DOM path.
+   The FAMILY decides the frame and the RARITY decides the badge — two independent axes, so a
+   status item in a gold frame and an Epic collection card can never be mistaken for each other
+   however good the art is. See CLAUDE.md. */
+const CARD_RARITIES = [
+  { key: "common",    name: "Common",    short: "Com",  rank: 1, weight: 60, status: 10,  trickle: 2,  dup: 1,  color: "#8fa3c9" },
+  { key: "rare",      name: "Rare",      short: "Rare", rank: 2, weight: 25, status: 30,  trickle: 6,  dup: 3,  color: "#4f9dff" },
+  { key: "epic",      name: "Epic",      short: "Epic", rank: 3, weight: 12, status: 100, trickle: 20, dup: 8,  color: "#b06bff" },
+  { key: "legendary", name: "Legendary", short: "Leg",  rank: 4, weight: 3,  status: 400, trickle: 80, dup: 25, color: "#ffcb5c" },
 ];
 
-const CARD_BOARDS = [
-  {
-    board: 1,
-    name: "Six Months on the Street",
-    /* Every art path in this board is relative to here. */
-    art: "assets/cards/board1/",
-    /* The cast. One portrait each; CARD_TIERS decides how many cards that portrait becomes. */
-    characters: [
-      { id: "simon",    name: "Simon",    role: "The man on the bench",     art: "simon.webp" },
-      { id: "victoria", name: "Victoria", role: "The bride with no groom",  art: "victoria.webp" },
-      { id: "carl",     name: "Carl",     role: "The fiancé, caught",       art: "carl.webp" },
-      { id: "diane",    name: "Diane",    role: "The mother of the bride",  art: "diane.webp" },
-      { id: "grandma",  name: "Grandma",  role: "The one nobody fools",     art: "grandma.webp" },
-    ],
-    /* The clues, written as the line that goes on the card. */
-    clues: [
-      { id: "sign",      name: "A cardboard sign, lettered in a steady hand", art: "clue-sign.webp" },
-      { id: "shoes",     name: "Shoes worth more than the coat",             art: "clue-shoes.webp" },
-      { id: "card",      name: "A bank card, unused, six months expired",    art: "clue-card.webp" },
-      { id: "bench",     name: "The bench he never sleeps on",               art: "clue-bench.webp" },
-      { id: "phone",     name: "A phone that only ever receives",            art: "clue-phone.webp" },
-      { id: "will",      name: "A will with one name struck through",        art: "clue-will.webp" },
-      { id: "chair",     name: "The brother who took the meeting",           art: "clue-chair.webp" },
-      { id: "photo",     name: "A photograph cropped to two people",         art: "clue-photo.webp" },
-      { id: "cash",      name: "Legal fees paid in cash",                    art: "clue-cash.webp" },
-      { id: "signature", name: "A signature that leans the wrong way",       art: "clue-signature.webp" },
-    ],
-    /* One page of the album per episode, in order. `needs` IS the requirement — which card, at
-       which tier — and it is data precisely so "episode 5 wants the whole cast in diamond" is a
-       decision made here rather than a rule buried in the unlock check.
+/* Shorthands, so a 150-row catalogue reads as a catalogue rather than as JSON. */
+const C = "common", R = "rare", E = "epic", L = "legendary";
 
-       The set escalates: silver across the opening two, gold through the middle, and the last
-       episode holds the diamond cast, so the rarest tier is what gates the end of the board. */
-    episodes: [
-      { ep: "001", needs: ["char:simon@silver", "char:victoria@silver",
-                           "clue:sign", "clue:shoes", "clue:card"] },
-      { ep: "002", needs: ["char:carl@silver", "char:diane@silver", "char:grandma@silver",
-                           "clue:bench", "clue:phone"] },
-      { ep: "003", needs: ["char:simon@gold", "char:victoria@gold", "char:carl@gold",
-                           "clue:will", "clue:chair"] },
-      { ep: "004", needs: ["char:diane@gold", "char:grandma@gold",
-                           "clue:photo", "clue:cash", "clue:signature"] },
-      { ep: "005", needs: ["char:simon@diamond", "char:victoria@diamond", "char:carl@diamond",
-                           "char:diane@diamond", "char:grandma@diamond"] },
+const CARD_SEASONS = [
+  {
+    season: 1,
+    name: "Harbour Heights",
+    art: "assets/cards/s1/",
+    sets: [
+      { key: "the-street", name: "The Street", cards: [
+        { id: "folded-blanket",    name: "A Folded Blanket",           rarity: C },
+        { id: "shelter-queue",     name: "The Shelter Queue",          rarity: C },
+        { id: "cold-coffee",       name: "Cold Coffee",                rarity: C },
+        { id: "borrowed-coat",     name: "A Borrowed Coat",            rarity: C },
+        { id: "dock-bench",        name: "The Bench by the Docks",     rarity: C, art: "clue-bench.webp" },
+        { id: "yesterdays-paper",  name: "Yesterday's Paper",          rarity: C },
+        { id: "locked-garage",     name: "The Locked Garage",          rarity: R },
+        { id: "cash-envelope",     name: "A Cash Envelope",            rarity: R, art: "clue-cash.webp" },
+        { id: "through-the-glass", name: "The Photograph Through the Glass", rarity: E, art: "clue-photo.webp" },
+        { id: "six-months",        name: "Six Months on the Street",   rarity: L, art: "six-months.webp"  },
+      ] },
+
+      { key: "the-family", name: "The Family", cards: [
+        { id: "sunday-lunch",      name: "Sunday Lunch",               rarity: C },
+        { id: "good-tablecloth",   name: "The Good Tablecloth",        rarity: C },
+        { id: "address-book",      name: "Mum's Address Book",         rarity: C },
+        { id: "fridge-calendar",   name: "A Fridge Calendar",          rarity: C },
+        { id: "spare-room",        name: "The Spare Room",             rarity: C },
+        { id: "empty-chair",       name: "The Empty Chair",            rarity: C, art: "clue-chair.webp" },
+        { id: "front-door-key",    name: "The Front Door Key",         rarity: R },
+        { id: "argument-in-hall",  name: "An Argument in the Hall",    rarity: R },
+        { id: "victoria",          name: "Victoria",                   rarity: E, art: "victoria.webp" },
+        { id: "victorias-mother",  name: "Victoria's Mother",          rarity: E, art: "diane.webp" },
+      ] },
+
+      { key: "carls-circle", name: "Carl's Circle", cards: [
+        { id: "returned-ring",     name: "A Returned Ring",            rarity: C },
+        { id: "cousins-bracelet",  name: "The Cousin's Bracelet",      rarity: C },
+        { id: "unread-message",    name: "An Unread Message",          rarity: C, art: "clue-phone.webp" },
+        { id: "carls-watch",       name: "Carl's Watch",               rarity: C },
+        { id: "business-card",     name: "The Firm's Business Card",   rarity: C, art: "clue-card.webp" },
+        { id: "blocked-number",    name: "A Blocked Number",           rarity: C },
+        { id: "coldest-thing",     name: "The Coldest Thing He Said",  rarity: R },
+        { id: "his-new-job",       name: "His New Job",                rarity: R },
+        { id: "the-cousin",        name: "The Cousin",                 rarity: R },
+        { id: "carl",              name: "Carl",                       rarity: E, art: "carl.webp" },
+      ] },
+
+      { key: "the-registry", name: "The Registry Office", cards: [
+        { id: "numbered-ticket",   name: "A Numbered Ticket",          rarity: C },
+        { id: "waiting-bench",     name: "The Waiting Bench",          rarity: C },
+        { id: "cheap-biro",        name: "A Cheap Biro",               rarity: C },
+        { id: "registrars-desk",   name: "The Registrar's Desk",       rarity: C },
+        { id: "witness-form",      name: "A Witness Form",             rarity: C },
+        { id: "two-signatures",    name: "Two Signatures",             rarity: C, art: "clue-signature.webp" },
+        { id: "the-long-pause",    name: "The Long Pause",             rarity: R },
+        { id: "identification",    name: "Identification",             rarity: R },
+        { id: "registrars-face",   name: "The Registrar's Face",       rarity: E, art: "registrars-face.webp"  },
+        { id: "the-name",          name: "The Name on the Certificate", rarity: L, art: "the-name.webp"  },
+      ] },
+
+      { key: "harbour-heights", name: "Harbour Heights", cards: [
+        { id: "harbour-wall",      name: "The Harbour Wall",           rarity: C },
+        { id: "gulls-on-the-rail", name: "Gulls on the Rail",          rarity: C },
+        { id: "chip-shop-window",  name: "A Chip Shop Window",         rarity: C },
+        { id: "the-bus-stop",      name: "The Bus Stop",               rarity: C },
+        { id: "boats-at-dawn",     name: "Fishing Boats at Dawn",      rarity: C },
+        { id: "church-spire",      name: "The Church Spire",           rarity: C },
+        { id: "notice-board",      name: "The Town Notice Board",      rarity: R, art: "clue-sign.webp" },
+        { id: "rumour-at-bakers",  name: "A Rumour at the Baker's",    rarity: R },
+        { id: "the-long-pier",     name: "The Long Pier",              rarity: R },
+        { id: "heights-at-night",  name: "Harbour Heights at Night",   rarity: E, art: "heights-at-night.webp"  },
+      ] },
+
+      { key: "the-wedding", name: "The Wedding", cards: [
+        { id: "an-invitation",     name: "An Invitation",              rarity: C },
+        { id: "rush-job",          name: "A Rush Job at the Printers", rarity: C },
+        { id: "white-ribbon",      name: "White Ribbon",               rarity: C },
+        { id: "caterers-quote",    name: "The Caterer's Quote",        rarity: C },
+        { id: "size-sevens",       name: "A Pair of Size Sevens",      rarity: C, art: "clue-shoes.webp" },
+        { id: "folding-chairs",    name: "Folding Chairs",             rarity: C },
+        { id: "the-church-slot",   name: "The Church Slot",            rarity: R },
+        { id: "grandmas-blessing", name: "Grandma's Blessing",         rarity: R },
+        { id: "christmas-day",     name: "Christmas Day",              rarity: E, art: "christmas-day.webp"  },
+        { id: "the-first-dance",   name: "The First Dance",            rarity: E, art: "the-first-dance.webp"  },
+      ] },
+
+      { key: "the-rose", name: "The Rose Hotel", cards: [
+        { id: "brass-key-fob",     name: "A Brass Key Fob",            rarity: C },
+        { id: "lobby-carpet",      name: "The Lobby Carpet",           rarity: C },
+        { id: "bell-on-the-desk",  name: "A Bell on the Desk",         rarity: C },
+        { id: "rose-wallpaper",    name: "Rose Wallpaper",             rarity: C },
+        { id: "ballroom-doors",    name: "The Ballroom Doors",         rarity: C },
+        { id: "silver-tray",       name: "A Silver Tray",              rarity: C },
+        { id: "the-cancellation",  name: "The Cancellation",           rarity: R },
+        { id: "deposit-unpaid",    name: "A Deposit Nobody Paid",      rarity: R },
+        { id: "managers-slip",     name: "The Manager's Correction",   rarity: R },
+        { id: "the-rose-hotel",    name: "The Rose Hotel",             rarity: E, art: "the-rose-hotel.webp"  },
+      ] },
+
+      { key: "jones-airlines", name: "Jones Airlines", cards: [
+        { id: "boarding-pass",     name: "A Boarding Pass",            rarity: C },
+        { id: "baggage-tag",       name: "The Baggage Tag",            rarity: C },
+        { id: "safety-card",       name: "A Safety Card",              rarity: C },
+        { id: "cabin-crew-wings",  name: "Cabin Crew Wings",           rarity: C },
+        { id: "tarmac-at-dusk",    name: "The Tarmac at Dusk",         rarity: C },
+        { id: "window-seat",       name: "A Window Seat",              rarity: C },
+        { id: "the-livery",        name: "The Livery",                 rarity: R },
+        { id: "empty-first-row",   name: "An Empty First Row",         rarity: R },
+        { id: "name-on-the-tail",  name: "The Name on the Tail",       rarity: E, art: "name-on-the-tail.webp"  },
+        { id: "jones-airlines",    name: "Jones Airlines",             rarity: L, art: "jones-airlines.webp"  },
+      ] },
+
+      { key: "the-terminal", name: "The Terminal", cards: [
+        { id: "departures-board",  name: "The Departures Board",       rarity: C },
+        { id: "rope-barrier",      name: "A Rope Barrier",             rarity: C },
+        { id: "one-desk-open",     name: "One Desk Open",              rarity: C },
+        { id: "rolling-suitcase",  name: "A Rolling Suitcase",         rarity: C },
+        { id: "security-lane",     name: "The Security Lane",          rarity: C },
+        { id: "a-paper-cup",       name: "A Paper Cup",                rarity: C },
+        { id: "phones-raised",     name: "Phones Raised in the Queue", rarity: R },
+        { id: "camera-above",      name: "The Camera Above the Desk",  rarity: R },
+        { id: "a-raised-voice",    name: "A Raised Voice",             rarity: R },
+        { id: "escorted-out",      name: "Escorted Out",               rarity: E, art: "escorted-out.webp"  },
+      ] },
+
+      { key: "texas", name: "Texas", cards: [
+        { id: "rented-sedan",      name: "A Rented Sedan",             rarity: C },
+        { id: "red-dust",          name: "Red Dust",                   rarity: C },
+        { id: "diner-menu",        name: "A Diner Menu",               rarity: C },
+        { id: "long-straight-road",name: "The Long Straight Road",     rarity: C },
+        { id: "motel-sign",        name: "A Motel Sign",               rarity: C },
+        { id: "boots-by-the-door", name: "Boots by the Door",          rarity: C },
+        { id: "thirty-hours",      name: "Thirty Hours by Road",       rarity: R },
+        { id: "the-state-line",    name: "The State Line",             rarity: R },
+        { id: "out-of-range",      name: "A Station Out of Range",     rarity: R },
+        { id: "the-jones-ranch",   name: "The Jones Ranch",            rarity: E, art: "the-jones-ranch.webp"  },
+      ] },
+
+      { key: "the-press", name: "The Press", cards: [
+        { id: "a-press-badge",     name: "A Press Badge",              rarity: C },
+        { id: "camera-flash",      name: "A Camera Flash",             rarity: C },
+        { id: "front-page",        name: "Yesterday's Front Page",     rarity: C },
+        { id: "voice-recorder",    name: "A Voice Recorder",           rarity: C },
+        { id: "the-doorstep",      name: "The Doorstep",               rarity: C },
+        { id: "a-notebook",        name: "A Notebook",                 rarity: C },
+        { id: "it-circulated",     name: "The Photograph That Circulated", rarity: R },
+        { id: "press-office",      name: "The Press Office's Silence", rarity: R },
+        { id: "share-price",       name: "A Share-Price Story",        rarity: R },
+        { id: "reported-found",    name: "Reported Found",             rarity: E, art: "reported-found.webp"  },
+      ] },
+
+      { key: "the-boardroom", name: "The Boardroom", cards: [
+        { id: "a-long-table",      name: "A Long Table",               rarity: C },
+        { id: "water-glasses",     name: "Water Glasses",              rarity: C },
+        { id: "chair-at-the-head", name: "The Chair at the Head",      rarity: C },
+        { id: "a-bound-report",    name: "A Bound Report",             rarity: C },
+        { id: "the-company-seal",  name: "The Company Seal",           rarity: C },
+        { id: "a-nameplate",       name: "A Nameplate",                rarity: C },
+        { id: "the-search",        name: "The Search Nobody Called Off", rarity: R },
+        { id: "vote-postponed",    name: "A Vote Postponed",           rarity: R },
+        { id: "the-board",         name: "The Board",                  rarity: E, art: "the-board.webp"  },
+        { id: "jones-ceo",         name: "Simon Jones, CEO",           rarity: E, art: "jones-ceo.webp"  },
+      ] },
+
+      { key: "grandmas-things", name: "Grandma's Things", cards: [
+        { id: "tin-of-buttons",    name: "A Tin of Buttons",           rarity: C },
+        { id: "lavender",          name: "Lavender",                   rarity: C },
+        { id: "reading-glasses",   name: "Her Reading Glasses",        rarity: C },
+        { id: "crocheted-blanket", name: "A Crocheted Blanket",        rarity: C },
+        { id: "the-good-china",    name: "The Good China",             rarity: C },
+        { id: "wind-up-clock",     name: "A Wind-Up Clock",            rarity: C },
+        { id: "consultants-letter",name: "The Consultant's Letter",    rarity: R },
+        { id: "photo-from-1962",   name: "A Photograph from 1962",     rarity: R },
+        { id: "her-wedding-ring",  name: "Her Wedding Ring",           rarity: R },
+        { id: "grandma",           name: "Grandma",                    rarity: E, art: "grandma.webp" },
+      ] },
+
+      { key: "the-suite", name: "The Honeymoon Suite", cards: [
+        { id: "rose-petals",       name: "Rose Petals",                rarity: C },
+        { id: "one-blanket",       name: "One Blanket",                rarity: C },
+        { id: "bare-floorboards",  name: "Bare Floorboards",           rarity: C },
+        { id: "turned-down-bed",   name: "A Turned-Down Bed",          rarity: C },
+        { id: "a-cold-radiator",   name: "A Cold Radiator",            rarity: C },
+        { id: "two-in-the-morning",name: "Two in the Morning",         rarity: C },
+        { id: "closed-outside",    name: "The Door Closed From Outside", rarity: R },
+        { id: "an-heirloom",       name: "An Heirloom",                rarity: R },
+        { id: "the-floor-offered", name: "The Floor He Offered",       rarity: R },
+        { id: "one-bed",           name: "One Bed",                    rarity: E, art: "one-bed.webp"  },
+      ] },
+
+      { key: "the-reveal", name: "The Reveal", cards: [
+        { id: "missing-notice",    name: "A Missing-Person Notice",    rarity: C },
+        { id: "old-headline",      name: "A Six-Month-Old Headline",   rarity: C },
+        { id: "unopened-letter",   name: "An Unopened Letter",         rarity: C, art: "clue-will.webp" },
+        { id: "law-firms-crest",   name: "A Law Firm's Crest",         rarity: C },
+        { id: "a-dictaphone",      name: "A Dictaphone",               rarity: C },
+        { id: "a-lobby-window",    name: "A Lobby Window",             rarity: C },
+        { id: "what-she-doesnt",   name: "What She Still Doesn't Know", rarity: R },
+        { id: "the-word-unsaid",   name: "The Word Nobody Said",       rarity: R },
+        { id: "richest-man",       name: "The Nation's Richest Man",   rarity: E, art: "richest-man.webp"  },
+        { id: "simon",             name: "Simon",                      rarity: L, art: "simon.webp" },
+      ] },
     ],
   },
 ];

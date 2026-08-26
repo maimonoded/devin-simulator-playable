@@ -290,7 +290,7 @@ export const Box3D = {
     let ornate = false;
     if (drop.kind === "card" && drop.card){
       const card = drop.card;
-      const t = card.tier ? Collection.tier(card.tier) : null;
+      const t = card.rarity ? Cards.rarity(card.rarity) : null;
       edge = card.kind === "clue" ? "#d9cdae"
            : card.tier === "diamond" ? "#8ef0ff"
            : card.tier === "gold" ? "#ffcb5c" : "#c9d2e0";

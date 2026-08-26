@@ -96,7 +96,7 @@ export const Case3D = {
        asking for that sync here is what stops the card waiting for the next roll to appear. */
     onArtLoad(() => { this._sig = null; this.sync(); });
     /* NOT sync() here. Board3D.init() runs before boot() calls initState(), so there is no
-       state.albums to read yet. renderAll() calls sync the moment state exists, so the row
+       state.clues to read yet. renderAll() calls sync the moment state exists, so the row
        appears on the first render either way. */
   },
   sprites(){ return this._group ? this._group.children : []; },
@@ -111,14 +111,15 @@ export const Case3D = {
      shows, so a change the player can see always redraws and nothing else does. */
   sync(){
     if (!this._scene) return;
-    if (typeof state === "undefined" || !state.albums || typeof Collection === "undefined") return;
+    if (typeof state === "undefined" || !state.clues || typeof Collection === "undefined") return;
     const n = Collection.num();
     const pages = Collection.pages(n);
-    const sig = pages.map(p =>
-      p.needs.map(id => Collection.countOf(id, n) > 0 ? "1" : "0").join("") +
-      (state.epQueue.includes(p.ep) ? "q" : "") +
-      (Collection.canWatch(p.ep) ? "!" : "")).join("|")
-      + `#${n}/${this._phone() ? "p" : "d"}/${artTick()}`;
+    const sig = pages.map(p => {
+      const [got, need] = Clues.progressFor(p.ep);
+      return `${got}/${need}` +
+        (state.epQueue.includes(p.ep) ? "q" : "") +
+        (Collection.canWatch(p.ep) ? "!" : "");
+    }).join("|") + `#${n}/${this._phone() ? "p" : "d"}/${artTick()}`;
     if (sig === this._sig) return;
     this._sig = sig;
 
@@ -167,22 +168,24 @@ export const Case3D = {
     });
   },
 
-  /* One panel's face: the episode's header, and its slots stacked. A collected slot carries the
-     card's own art; an empty one is a dashed outline the same size and shape, so "3 of 5" reads
-     without counting and you can see the shape of what is missing.
+  /* One panel's face: the episode's header, and its EVIDENCE slots stacked — one per clue the
+     episode still costs (GDD §6.1). A slot you hold is a filled paper tag; one you do not is a
+     dashed outline the same size and shape, so "3 of 4" reads without counting and the gap is
+     visible from across the board.
 
-     The art is CROPPED to the top of the portrait rather than scaled whole: a slot is a wide
-     band, and a whole card squeezed into it puts the face where nobody can see it. */
+     They stopped being card slots when cards stopped being the gate. What stands in the ring is
+     the story's progress bar, and the story is bought with clues. */
   _panelTexture(page, k, boardNum){
-    const needs = page.needs;
-    const slotH = Math.round(F.slotW * 0.44);
-    const H = panelHeight(needs.length, slotH);
+    const [held, want] = Clues.progressFor(page.ep);
+    const slots = Math.max(1, want);
+    const slotH = Math.round(F.slotW * 0.28);
+    const H = panelHeight(slots, slotH);
     const c = document.createElement("canvas");
     c.width = F.w; c.height = H;
     const x = c.getContext("2d");
 
-    const [got, need] = Collection.pageProgress(page, boardNum);
-    const ready = Collection.pageReady(page, boardNum);
+    const got = held, need = want;
+    const ready = Collection.pageReady(page);
     const seen = ready && !state.epQueue.includes(page.ep);
     const next = Collection.canWatch(page.ep);
 
@@ -213,33 +216,32 @@ export const Case3D = {
     x.textAlign = "center"; x.textBaseline = "middle";
     x.fillText(head, F.w / 2, F.pad + F.head / 2, F.w - F.pad * 2);
 
-    /* slots */
+    /* slots — evidence tags, filled left to right */
     let y = F.pad + F.head + F.headGap;
-    needs.forEach(id => {
-      const card = Collection.cardOf(id, boardNum);
-      const owned = Collection.countOf(id, boardNum) > 0;
-      const img = owned && card ? art(card.art) : null;
-      roundRect(x, 0, F.pad, y, F.slotW, slotH, 5);
-      if (img){
-        x.save(); x.clip();
-        /* Cover, anchored near the top — a portrait cropped to a band keeps the face. */
-        const s = Math.max(F.slotW / img.width, slotH / img.height);
-        const w = img.width * s, h = img.height * s;
-        x.drawImage(img, F.pad + (F.slotW - w) / 2, y - h * 0.14, w, h);
-        x.restore();
-        x.lineWidth = 1.5; x.strokeStyle = "rgba(255,255,255,.30)"; x.setLineDash([]); x.stroke();
+    for (let i = 0; i < slots; i++){
+      const have = i < held;
+      roundRect(x, 0, F.pad, y, F.slotW, slotH, 4);
+      if (have){
+        /* Paper, because a clue is a written thing everywhere else it appears. */
+        x.fillStyle = "#efe4c8"; x.fill();
+        x.lineWidth = 1.5; x.setLineDash([]); x.strokeStyle = "rgba(120,105,70,.5)"; x.stroke();
+        /* Two ruled lines, so it reads as a note rather than as a filled bar. */
+        x.strokeStyle = "rgba(80,68,40,.35)"; x.lineWidth = 1.5;
+        for (let r = 0; r < 2; r++){
+          const ry = y + slotH * (0.36 + r * 0.3);
+          x.beginPath();
+          x.moveTo(F.pad + 7, ry);
+          x.lineTo(F.pad + F.slotW - (r ? 20 : 7), ry);
+          x.stroke();
+        }
       }else{
-        x.fillStyle = skin.slot;
-        x.fill();
-        x.lineWidth = 1.5;
-        x.setLineDash([5, 4]);
-        x.strokeStyle = card && card.kind === "clue"
-          ? "rgba(230,214,176,.55)" : "rgba(214,222,255,.45)";
-        x.stroke();
+        x.fillStyle = skin.slot; x.fill();
+        x.lineWidth = 1.5; x.setLineDash([5, 4]);
+        x.strokeStyle = "rgba(230,214,176,.45)"; x.stroke();
         x.setLineDash([]);
       }
       y += slotH + F.slotGap;
-    });
+    }
 
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;

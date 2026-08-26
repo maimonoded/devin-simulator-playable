@@ -26,7 +26,7 @@ function openEpisodeUnlock(id){
     const queued=state.epQueue.length;
     $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode unlocked</div><h2>${ep.title}</h2></div>
       <div class="mbody">
-        <div class="hint">You collected all ${Collection.perEpisode()} of its cards. Call what happens next, then watch it.${
+        <div class="hint">You have the evidence. Call what happens next, then watch it.${
           queued>1?` You have <b style="color:var(--pink)">${queued}</b> waiting.`:""}</div>
         <div class="foot" style="margin-top:14px">
           <button class="btn ghost" id="bingeLater" style="flex:1">Binge later</button>

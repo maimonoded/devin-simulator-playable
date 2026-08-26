@@ -70,12 +70,12 @@ function buildTuning(){
   /* The collection, checked. A mis-authored board is the one failure invisible in play, so the
      drawer prints what Collection.validate() found rather than leaving it to the console. */
   const cwrap=document.createElement("div"); cwrap.className="tgroup";
-  const bad=Collection.validate();
+  const bad=Collection.validate().concat(Cards.validate());
   cwrap.innerHTML=`<h4>Set ${Collection.num()} · ${Collection.boardFor(Collection.num()).name}</h4>
     <p class="hint" style="margin:0 0 8px">
-      ${Collection.pages().length} episodes × ${Collection.perEpisode()} cards =
-      <b>${Collection.poolSize()}</b> in the pool ·
-      <b>${Collection.collected()}</b> collected.</p>
+      ${Collection.pages().length} episodes · <b>${Cards.owned()}</b>/<b>${Cards.poolSize()}</b>
+      cards held, <b>${Cards.convertedCount()}</b> converted ·
+      <b>${Cards.completedSets().length}</b>/${Cards.sets().length} sets done.</p>
     ${bad.length
       ? `<p class="hint" style="color:var(--pink);margin:0"><b>${bad.length} problem${bad.length>1?"s":""}:</b></p>
          <ul style="margin:6px 0 0 16px;padding:0;font-size:12px;color:var(--muted)">

@@ -157,13 +157,15 @@ function positionToken(instant){
 function renderCaseBoard(){
   if(use3d()&&window.Board3D&&Board3D.available&&Board3D.syncCase) Board3D.syncCase();
 }
-/* Tapping a panel opens the album at that page — called from js/ui/board3d.js, which is the only
-   place that knows a press was a tap rather than a pan. */
+/* Tapping a panel opens THAT EPISODE'S EVIDENCE — called from js/ui/board3d.js, which is the
+   only place that knows a press was a tap rather than a pan.
+
+   Not the collection: the panel shows an episode's clue slots, so what is behind it has to be
+   those clues. The cards live under the album button. */
 function onCasePanelTap(page){
   if(state.animating) return;
-  albumBoard=Collection.num();
-  albumPage=page;
-  renderAlbum();
+  const p=Collection.pages()[page];
+  if(p) openEvidence(p.ep);
 }
 
 function renderHUD(){
@@ -175,7 +177,7 @@ function renderHUD(){
   /* The card counter is progress through THIS SET, not a lifetime total. The set is what the
      player is working on — "18/25" is a sentence about what to do next, where a number that
      only ever climbs is a sentence about the past. */
-  const cards=Collection.collected(), pool=Collection.poolSize();
+  const cards=Cards.owned(), pool=Cards.poolSize();
   tweenNumber($("#hCards"),state.lastCards,cards,v=>`${Math.round(v)}/${pool}`);
   state.lastCards=cards;
   $("#hVip").textContent=fmt(state.vip);

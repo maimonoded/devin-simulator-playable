@@ -54,11 +54,9 @@ const Status = {
   },
 
   /* ---------------- points and ranks ---------------- */
-  /* Cards ever collected, across every album — the collecting half of the play score. */
-  cardsCollected() {
-    const albums = state.albums || {};
-    return Object.keys(albums).reduce((a, k) => a + Object.keys(albums[k] || {}).length, 0);
-  },
+  /* Distinct cards ever held — the collecting half of the play score. Phase 4 replaces this
+     whole scale with GDD §5's level and its four inflows; until then a card is worth a card. */
+  cardsCollected() { return Object.keys(state.cards || {}).length; },
   itemPoints() { return this.ownedIds().reduce((a, id) => a + (this.item(id).points || 0), 0); },
   playPoints() {
     return Math.round(

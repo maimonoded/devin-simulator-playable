@@ -160,17 +160,16 @@ test("a loss takes coins, feeds the Gala pot, and never digs below zero", () => 
   });
 });
 
-test("a card row banks a card, and a duplicate pays instead of blocking", () => {
+test("a card row banks a card, and a plain duplicate pays instead of blocking", () => {
   freshRun();
   forcePool("money", r => r.kind === "card", () => {
     const ev = landOn("std");
-    eq(Collection.collected(), 1, "the card is banked before any of this is shown");
+    eq(Cards.owned(), 1, "the card is banked before any of this is shown");
     eq(evField(ev, "card").length, 1, "a card you did not have holds the screen");
-    /* The same card again: coins, a float, and the roll keeps moving. */
-    const id = Object.keys(Collection.albumOf())[0];
+    /* Another copy of something already held: coins, a float, and the roll keeps moving. */
     const coins = state.coins;
     let dupe = null;
-    for (let k = 0; k < 200 && !dupe; k++) {
+    for (let k = 0; k < 400 && !dupe; k++) {
       const e2 = landOn("std");
       if (!evField(e2, "card").length) dupe = e2;
     }
@@ -189,10 +188,10 @@ test("energy tops up and an event row pays nothing at all", () => {
   });
   forcePool("money", r => r.kind === "event", () => {
     state.coins = 0; state.energy = 5;
-    const before = Collection.collected();
+    const before = Cards.owned();
     const ev = landOn("std");
     eq(state.coins, 0); eq(Clues.total(), 0); eq(state.energy, 5);
-    eq(Collection.collected(), before, "an event row is flavour, and flavour is free");
+    eq(Cards.owned(), before, "an event row is flavour, and flavour is free");
     eq(evField(ev, "log").length, 1, "it still earns its line in the log");
   });
 });
@@ -279,7 +278,7 @@ test("The Gala collects the whole pot, leaves it empty, and still pays a card", 
   eq(state.vip, 0, "and left empty");
   eq(ev.find(e => e.reveal).reveal.positive, true);
   eq(ev.find(e => e.reveal).reveal.ms, cfg.vipRevealMs, "the Gala uses its own dwell");
-  eq(Collection.collected(), 1, "guaranteed a card even so");
+  eq(Cards.owned(), 1, "guaranteed a card even so");
 });
 
 test("an empty pot still pays a card, so the Gala is never a wasted landing", () => {
@@ -287,7 +286,7 @@ test("an empty pot still pays a card, so the Gala is never a wasted landing", ()
   state.vip = 0; state.coins = 0;
   const ev = TILE_TYPES.gala.onLand({ pos: 20, mult: 1, bs: 1 });
   ok(!ev.some(e => e.reveal && e.reveal.positive), "an empty pot reads as the letdown it is");
-  eq(Collection.collected(), 1, "…and the card is the consolation");
+  eq(Cards.owned(), 1, "…and the card is the consolation");
 });
 
 test("The Scoop teleports to an NPC tile and triggers it", () => {

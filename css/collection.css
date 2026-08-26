@@ -21,21 +21,35 @@
 .ccFoot{position:absolute;left:0;right:0;bottom:0;padding:14px 7px 6px;
   background:linear-gradient(180deg,rgba(8,10,28,0),rgba(8,10,28,.88) 42%,rgba(8,10,28,.97));
   pointer-events:none}
-.ccName{font-family:Georgia,serif;font-weight:700;line-height:1.15;color:var(--text)}
+/* Two lines, then an ellipsis. A long name is a real case — "The Photograph Through the Glass"
+   is four lines in a small slot — and letting it grow pushes the card's own foot off the art. */
+.ccName{font-family:Georgia,serif;font-weight:700;line-height:1.15;color:var(--text);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ccSub{color:var(--muted);line-height:1.2;margin-top:1px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .size-sm .ccName{font-size:10px} .size-sm .ccSub{font-size:8px}
 .size-md .ccName{font-size:13px} .size-md .ccSub{font-size:10px}
 .size-lg .ccName{font-size:17px} .size-lg .ccSub{font-size:12px}
-/* The rarity ribbon. Drawn on locked slots too: "Simon, Gold" is a different thing to chase
-   from "Simon, Silver", and the album has to say which one is still missing. */
-.ccTier{position:absolute;top:5px;left:5px;z-index:2;border-radius:999px;
-  padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.04em;
-  background:rgba(8,10,28,.82);border:1px solid var(--line);color:var(--text)}
-.size-sm .ccTier{font-size:7.5px;padding:1.5px 5px;top:4px;left:4px}
-.size-lg .ccTier{font-size:11px;padding:3px 9px}
-.ccCount{position:absolute;top:5px;right:5px;z-index:2;border-radius:999px;padding:2px 7px;
-  font-size:9px;font-weight:800;background:rgba(8,10,28,.82);border:1px solid var(--line);color:var(--gold)}
+/* ---------- the rarity badge ----------
+   NAMED and COLOURED, and drawn on locked slots too: "Epic" is what tells you whether the gap
+   in the row is a week's play or a lucky Tuesday. The colour comes from the catalogue as
+   --rar (assets/cards/cards.js), so adding a rarity is a data change, not a stylesheet one. */
+.ccRar{position:absolute;top:5px;left:5px;z-index:3;border-radius:999px;
+  padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  background:rgba(8,10,28,.85);border:1px solid color-mix(in srgb,var(--rar) 55%,transparent);
+  color:var(--rar)}
+/* Small slots run the rarity name and the copy count along one line, so both have to shrink or
+   the longest name ("LEGENDARY") clips into the count. */
+.size-sm .ccRar{font-size:6.5px;padding:1.5px 4px;top:4px;left:4px;letter-spacing:.01em;
+  white-space:nowrap}
+.size-lg .ccRar{font-size:11px;padding:3px 9px}
+.ccCount{position:absolute;top:5px;right:5px;z-index:3;border-radius:999px;padding:2px 7px;
+  font-size:9px;font-weight:800;background:rgba(8,10,28,.82);border:1px solid var(--line);color:var(--muted)}
+.size-sm .ccCount{font-size:6.5px;padding:1.5px 4px;top:4px;right:4px}
+.ccCount.conv{color:var(--gold);border-color:rgba(255,203,92,.5)}
+.ccDup{position:absolute;left:0;right:0;bottom:34%;z-index:3;text-align:center;
+  font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--gold);
+  background:rgba(8,10,28,.7);padding:3px 0}
 .ccLock{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;
   font-size:22px;opacity:.5}
 .size-sm .ccLock{font-size:15px}
@@ -45,63 +59,71 @@
 .size-sm .ccPlain{font-size:13px}
 .size-lg .ccPlain{font-size:28px}
 
-/* ---------- rarity ----------
-   Colour, glow and a top-edge highlight. Diamond also gets a slow shimmer, because the rarest
+/* ---------- rarity, on the card itself ----------
+   Border colour and glow, escalating. Legendary also gets a slow shimmer, because the rarest
    thing on screen should be the one that moves. */
-.ccard.tier-silver{border-color:#c9d2e0;box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 1px rgba(201,210,224,.25)}
-.ccard.tier-gold{border-color:var(--gold);box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 14px rgba(255,203,92,.28)}
-.ccard.tier-diamond{border-color:#8ef0ff;
-  box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 22px rgba(142,240,255,.42)}
-.tier-silver .ccTier{color:#e6ecf5;border-color:rgba(201,210,224,.5)}
-.tier-gold .ccTier{color:var(--gold);border-color:rgba(255,203,92,.55)}
-.tier-diamond .ccTier{color:#a8f4ff;border-color:rgba(142,240,255,.6)}
-.ccard.tier-diamond.got .ccSheen{
-  background:linear-gradient(115deg,rgba(255,255,255,.22) 0%,rgba(142,240,255,.10) 30%,
+.ccard.rar-common{border-color:#5d6a8c}
+.ccard.rar-rare{border-color:#4f9dff;box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 12px rgba(79,157,255,.26)}
+.ccard.rar-epic{border-color:#b06bff;box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 18px rgba(176,107,255,.34)}
+.ccard.rar-legendary{border-color:var(--gold);
+  box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 26px rgba(255,203,92,.45)}
+.ccard.rar-legendary.got .ccSheen{
+  background:linear-gradient(115deg,rgba(255,255,255,.22) 0%,rgba(255,203,92,.12) 30%,
                              rgba(255,255,255,0) 55%,rgba(255,255,255,.16) 100%);
   background-size:250% 250%;animation:ccShimmer 3.4s ease-in-out infinite}
 @keyframes ccShimmer{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 
-/* ---------- clue cards look different ----------
-   Not a rarity at all — an evidence tag. Warm paper edge, a slight sit-crooked, the art pushed
-   toward the story's teal, and the line set in a typewriter face rather than the serif the cast
-   cards use. Three signals, so it reads as a different KIND of thing from across the album. */
-.ccard.kind-clue{border-color:#d9cdae;border-style:dashed;
-  box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 1px rgba(217,205,174,.18);
-  transform:rotate(-1.1deg)}
-.ccard.kind-clue .ccArt{filter:saturate(.72) contrast(1.06)}
-.ccard.kind-clue .ccFoot{
-  background:linear-gradient(180deg,rgba(20,16,10,0),rgba(24,20,12,.9) 40%,rgba(24,20,12,.98))}
-.ccard.kind-clue .ccName{font-family:"Courier New",ui-monospace,monospace;font-weight:700;
-  color:#f2e8d0;letter-spacing:-.01em;white-space:normal}
-.ccard.kind-clue .ccSub{color:#c2b48d}
-.ccard.kind-clue .ccTier,.ccTier.clue{background:#f2e8d0;color:#33281a;border-color:#d9cdae;
-  border-radius:3px;letter-spacing:.08em;text-transform:uppercase}
-/* The tape holding it in the album. */
-.ccard.kind-clue::after{content:"";position:absolute;top:-7px;left:50%;translate:-50% 0;z-index:3;
-  width:38%;height:15px;background:rgba(242,232,208,.34);
-  border-left:1px solid rgba(242,232,208,.2);border-right:1px solid rgba(242,232,208,.2);
-  transform:rotate(1.6deg)}
-.size-sm.kind-clue::after{height:11px;top:-5px}
+/* ---------- THE FRAME IS THE FAMILY ----------
+   Three families come out of the same box seconds apart and are completely different things: a
+   collection card belongs to a set, a status item goes on the shelf and stays there, and a clue
+   is a sentence you have to read. The frame carries that, because a label can be missed and a
+   frame cannot — and it is independent of the rarity badge above, so an Epic card and a status
+   item can never be mistaken for one another however good the art is. */
 
-/* ---------- status items are FRAMED, not dealt ----------
-   A card belongs to an episode's page and is spent unlocking it; a status item goes on the
-   player's shelf and stays there. They come out of the same box seconds apart, so the difference
-   has to be visible at a glance — a gold double frame with corner ticks, which no card of any
-   tier ever wears. (The same frame is painted into the canvas for the in-scene card:
-   js/ui/box3d.js.) */
-.ccard.kind-status{border-color:var(--gold);border-width:3px;
+/* collection — the default. A thin inner rule, lit once the card has converted. */
+.ccard.fam-collection .ccFrame{position:absolute;inset:6px;z-index:2;pointer-events:none;
+  border-radius:6px;border:1px solid rgba(255,255,255,.10)}
+.ccard.fam-collection.conv{box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 16px rgba(255,203,92,.30)}
+.ccard.fam-collection.conv .ccFrame{border-color:rgba(255,203,92,.5)}
+
+/* clue — an evidence tag. Warm paper edge, sits crooked, typewriter face, and tape holding it
+   down. Three signals, so it reads as a different KIND of thing from across the room. */
+.ccard.fam-clue{border-color:#d9cdae;border-style:dashed;
+  box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 1px rgba(217,205,174,.18);
+  transform:rotate(-1.1deg);background:#efe4c8}
+.ccard.fam-clue .ccArt{background:#f2e8d0;display:flex;align-items:center;justify-content:center;
+  padding:16px 12px 34%}
+.ccard.fam-clue .ccArt span{font-family:"Courier New",ui-monospace,monospace;font-size:11px;
+  line-height:1.45;color:#33281a;text-align:center}
+.size-sm.fam-clue .ccArt span{font-size:7.5px;line-height:1.35}
+.size-lg.fam-clue .ccArt span{font-size:14px}
+.ccard.fam-clue .ccFoot{
+  background:linear-gradient(180deg,rgba(242,232,208,0),rgba(228,216,186,.95) 40%,rgba(224,211,178,1))}
+.ccard.fam-clue .ccName{font-family:"Courier New",ui-monospace,monospace;font-weight:700;
+  color:#33281a;letter-spacing:.06em;text-transform:uppercase}
+.ccard.fam-clue .ccSub{color:#6b5c3c}
+.ccard.fam-clue .ccRar{background:#33281a;border-radius:3px;letter-spacing:.08em}
+.ccard.fam-clue::after{content:"";position:absolute;top:-7px;left:50%;translate:-50% 0;z-index:4;
+  width:38%;height:15px;background:rgba(242,232,208,.5);
+  border-left:1px solid rgba(120,105,70,.2);border-right:1px solid rgba(120,105,70,.2);
+  transform:rotate(1.6deg)}
+.size-sm.fam-clue::after{height:11px;top:-5px}
+
+/* status — a gold double frame with corner ticks, which no collection card of any rarity ever
+   wears. (The same frame is painted into the canvas for the in-scene card: js/ui/box3d.js.) */
+.ccard.fam-status{border-color:var(--gold);border-width:3px;
   box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 22px rgba(255,203,92,.45)}
-.ccFrame{position:absolute;inset:7px;z-index:2;pointer-events:none;border-radius:6px;
-  border:1.5px solid rgba(255,203,92,.55)}
-.ccFrame::before,.ccFrame::after{content:"";position:absolute;width:16px;height:16px;
-  border:2.5px solid var(--gold)}
-.ccFrame::before{top:-4px;left:-4px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}
-.ccFrame::after{bottom:-4px;right:-4px;border-left:0;border-top:0;border-radius:0 0 4px 0}
+.ccard.fam-status .ccFrame{position:absolute;inset:7px;z-index:2;pointer-events:none;
+  border-radius:6px;border:1.5px solid rgba(255,203,92,.55)}
+.ccard.fam-status .ccFrame::before,.ccard.fam-status .ccFrame::after{content:"";position:absolute;
+  width:16px;height:16px;border:2.5px solid var(--gold)}
+.ccard.fam-status .ccFrame::before{top:-4px;left:-4px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}
+.ccard.fam-status .ccFrame::after{bottom:-4px;right:-4px;border-left:0;border-top:0;border-radius:0 0 4px 0}
 .size-sm .ccFrame{inset:5px}
-.size-sm .ccFrame::before,.size-sm .ccFrame::after{width:11px;height:11px}
-.ccTier.status{color:var(--gold);border-color:rgba(255,203,92,.6)}
-.ccard.kind-coins,.ccard.kind-energy{border-color:var(--line);background:linear-gradient(180deg,#232a63,#141838)}
-.ccard.kind-energy .ccPlain{color:var(--teal)}
+.size-sm.fam-status .ccFrame::before,.size-sm.fam-status .ccFrame::after{width:11px;height:11px}
+
+.ccard.fam-coins,.ccard.fam-energy{border-color:var(--line);background:linear-gradient(180deg,#232a63,#141838)}
+.ccard.fam-energy .ccPlain{color:var(--teal)}
 
 /* ---------- locked ----------
    Silhouetted, not hidden. You can see the shape of what is missing, which is the whole reason
@@ -110,8 +132,8 @@
 .ccard.locked .ccArt{filter:grayscale(1) brightness(.3) contrast(.9)}
 .ccard.locked .ccName{color:var(--muted)}
 .ccard.locked .ccSheen{display:none}
-.ccard.locked.kind-clue{transform:rotate(-1.1deg)}
-.ccard.locked.kind-clue::after{opacity:.35}
+.ccard.locked.fam-clue{transform:rotate(-1.1deg)}
+.ccard.locked.fam-clue::after{opacity:.35}
 .ccard.unknown{display:flex;align-items:center;justify-content:center;border-style:dashed}
 
 /* ---------- the flip ----------
@@ -122,7 +144,7 @@
   0%{transform:perspective(700px) rotateY(90deg) scale(.86);opacity:0}
   60%{opacity:1}
   100%{transform:perspective(700px) rotateY(0) scale(1);opacity:1}}
-.ccard.kind-clue.flip{animation-name:ccFlipClue}
+.ccard.fam-clue.flip{animation-name:ccFlipClue}
 @keyframes ccFlipClue{
   0%{transform:perspective(700px) rotateY(90deg) rotate(-1.1deg) scale(.86);opacity:0}
   60%{opacity:1}
@@ -353,3 +375,23 @@ html.viewMobile .packHud{bottom:calc(104px + var(--safeB,0px))}
 .suNew.in{opacity:1;transform:translateY(0)}
 
 html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12px 13px}
+
+/* A ten-card set needs a tighter grid than a five-card page did. */
+.albGrid.ten{grid-template-columns:repeat(5,1fr)}
+/* The clues an episode is still missing, drawn rather than counted — same reason the collection
+   shows empty slots at all. */
+.evGaps{display:flex;gap:6px;margin-top:8px}
+.evGap{flex:1;height:26px;border-radius:4px;border:1.5px dashed rgba(230,214,176,.45)}
+
+/* ---------- a card set completed ----------
+   Deliberately smaller than the set-of-episodes celebration: this is a reward, not a chapter
+   ending, and it never gated anything. */
+.setDone{display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:linear-gradient(180deg,rgba(20,24,56,.97),rgba(10,13,36,.98));
+  border:2px solid var(--gold);border-radius:16px;padding:16px 20px;
+  box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 30px rgba(255,203,92,.28)}
+.sdEyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:800}
+.sdName{font-family:Georgia,serif;font-size:22px;font-weight:700;color:var(--text)}
+.sdRow{display:flex;gap:5px}
+.sdChip{width:44px}
+.sdPaid{font-size:13px;font-weight:800;color:var(--gold)}

@@ -26,6 +26,7 @@ async function playEvents(events){
        renderHUD as each card turns over instead. */
     if(ev.pack){ await showPack(ev.pack); }
     /* …and only then what the cards bought, in the order they happened. */
+    if(ev.setDone){ renderAll(); await showSetComplete(ev.setDone); }
     if(ev.statusUp){ renderAll(); await showStatusUp(ev.statusUp); }
     if(ev.unlock){ renderAll(); await showUnlocks(ev.unlock.ids); }
     if(ev.boardDone){ renderAll(); await showBoardComplete(); }
@@ -322,7 +323,7 @@ function boot(){
   const restored=loadState();   // overlay saved progress, if any
   buildBoard(); buildTuning(); setDice(3,4); syncMultButton(); renderAll();
   applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
-  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${Collection.collected()}/${Collection.poolSize()} cards in set ${Collection.num()}.`);
+  if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${Cards.owned()}/${Cards.poolSize()} cards · set ${Collection.num()}.`);
   else log("✨","Welcome to <b>Harbour Heights</b>. Roll to find cards, collect a set to unlock an episode, predict to win.");
   /* The board content is authored data, and a mis-authored board is the one failure that would
      be invisible in play — a card that can drop but is never wanted just looks like bad luck.
@@ -330,7 +331,8 @@ function boot(){
   [["Set "+Collection.num(),Collection.validate()],
    ["The board",validateBoard()],
    ["The pools",Pools.validate()],
-   ["The clues",Clues.validate()]].forEach(([what,bad])=>{
+   ["The clues",Clues.validate()],
+   ["The collection",Cards.validate()]].forEach(([what,bad])=>{
     if(!bad.length) return;
     console.warn(what+":",bad);
     log("⚠️",`<b>${what} does not add up</b> — ${bad.length} problem${bad.length>1?"s":""}, see the console.`);

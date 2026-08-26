@@ -82,16 +82,21 @@ const DEFAULTS={
   stdBase:40, trainSmall:60, trainLarge:315, trainLargeChance:0.35, trainEV:149.25,
   startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
   boardScale:1,
-  /* ---- the collection ----
-     The shape of one turn of the loop: episodesPerBoard episodes on a board, each unlocked by
-     collectiblesPerEpisode named cards. Nothing here states the pool size — 5 x 5 makes it 25,
-     and it is DERIVED from the requirements in assets/cards/cards.js (see js/collection.js).
-     So changing either number is only half the job: the board has to be re-authored to match,
-     and Collection.validate() is what says whether it has been.
+  /* ---- the arc ----
+     How many episodes a set covers. Nothing about the CARDS is derived from it any more: cards
+     stopped gating episodes (GDD 6.1), so a set is a run of the story and nothing else. */
+  episodesPerBoard:5,
+  /* ---- the collection (js/cards.js) ----
+     cardCopiesToConvert is GDD 4.3's rule: the third copy of a card converts it into that
+     card's Collectible, which is what pays Status. Copies past that trickle Status directly,
+     so no pull is ever dead.
 
-     dupCoins is what a card you already hold is worth instead, multiplied by that tier's `dup`
-     (CARD_TIERS) — a duplicate diamond pays eight times a duplicate silver. */
-  episodesPerBoard:5, collectiblesPerEpisode:5, dupCoins:40,
+     dupCoins is what a copy that did NOT convert pays instead, multiplied by that rarity's
+     `dup` (CARD_RARITIES) — a duplicate Legendary pays twenty-five times a duplicate Common.
+
+     setBonus* is 4.4's set-completion reward. A set is a collection TARGET and never a gate,
+     so this is generous and nothing anywhere depends on it having been earned. */
+  cardCopiesToConvert:3, dupCoins:40, setBonusCoins:5000, setBonusStatus:250,
   /* ---- status ----
      Points per unit of play, on top of the points the owned items carry themselves. This is
      what makes the track climb for a player who never spends a coin. statusPriceScale moves
@@ -128,6 +133,9 @@ const DEFAULTS={
      revealed card's height in tiles and packCardGap how far apart two of them sit — both are the
      same units the board is measured in, because the cards hang in the world beside it. */
   packBoxSize:2.3, packSwellMs:300, packPopScale:1.55, packCardSize:2.2, packCardGap:1.25,
+  /* How long a completed CARD SET is held on screen. Shorter than a set of episodes
+     finishing, on purpose: it is a reward, not a chapter ending. */
+  setDoneMs:2600,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
@@ -177,8 +185,10 @@ let boxTable=[
    different rather than merely priced differently.
 
    `kind` in a row is resolved by js/boxes.js:
-     card    a character card at `tier`, drawn uniformly from that tier's slice of the pool
-     clue    a clue card, drawn uniformly from the board's clues
+     card    one card from the Season catalogue (js/cards.js). `floor` is a rarity GUARANTEE —
+             the draw comes out at that rarity or better — so the tiers differ in what they can
+             produce and not merely in how often
+     clue    one clue for the episode being worked on (js/clues.js)
      status  a status item nobody owns yet, by its own `box` weight (assets/status/status.js)
      coins   `amount`, scaled by cfg.boardScale
      energy  `amount`, topped up toward the cap, never reducing a purchased overflow
@@ -190,35 +200,35 @@ let boxTiers=[
   { key:"silver", name:"Silver Box", icon:"\ud83c\udf81", rank:1, items:1,
     art:"assets/boxes/silver.webp", coins:2500, usd:1.99,
     table:[
-      {name:"Silver card", kind:"card", tier:"silver",  weight:44},
-      {name:"Gold card",   kind:"card", tier:"gold",    weight:6},
-      {name:"Diamond card",kind:"card", tier:"diamond", weight:0.6},
-      {name:"Clue card",   kind:"clue",                 weight:28},
-      {name:"Status item", kind:"status",               weight:1},
-      {name:"Coins",       kind:"coins",  amount:120,   weight:12},
-      {name:"Energy",      kind:"energy", amount:3,     weight:8},
+      {name:"A card",       kind:"card",                 weight:52},
+      {name:"Rare or up",   kind:"card",  floor:"rare",  weight:6},
+      {name:"A clue",       kind:"clue",                 weight:21},
+      {name:"Status item",  kind:"status",               weight:1},
+      {name:"Coins",        kind:"coins",  amount:120,   weight:12},
+      {name:"Energy",       kind:"energy", amount:3,     weight:8},
     ]},
   { key:"gold", name:"Gold Box", icon:"\ud83c\udf81", rank:2, items:2,
     art:"assets/boxes/gold.webp", coins:12000, usd:7.99,
     table:[
-      {name:"Silver card", kind:"card", tier:"silver",  weight:26},
-      {name:"Gold card",   kind:"card", tier:"gold",    weight:26},
-      {name:"Diamond card",kind:"card", tier:"diamond", weight:4},
-      {name:"Clue card",   kind:"clue",                 weight:24},
-      {name:"Status item", kind:"status",               weight:4},
-      {name:"Coins",       kind:"coins",  amount:400,   weight:10},
-      {name:"Energy",      kind:"energy", amount:6,     weight:6},
+      {name:"A card",       kind:"card",                  weight:30},
+      {name:"Rare or up",   kind:"card",  floor:"rare",   weight:24},
+      {name:"Epic or up",   kind:"card",  floor:"epic",   weight:4},
+      {name:"A clue",       kind:"clue",                  weight:22},
+      {name:"Status item",  kind:"status",                weight:4},
+      {name:"Coins",        kind:"coins",  amount:400,    weight:10},
+      {name:"Energy",       kind:"energy", amount:6,      weight:6},
     ]},
   { key:"diamond", name:"Diamond Box", icon:"\ud83c\udf81", rank:3, items:3,
     art:"assets/boxes/diamond.webp", coins:45000, usd:24.99,
     table:[
-      {name:"Silver card", kind:"card", tier:"silver",  weight:8},
-      {name:"Gold card",   kind:"card", tier:"gold",    weight:30},
-      {name:"Diamond card",kind:"card", tier:"diamond", weight:20},
-      {name:"Clue card",   kind:"clue",                 weight:20},
-      {name:"Status item", kind:"status",               weight:12},
-      {name:"Coins",       kind:"coins",  amount:1500,  weight:6},
-      {name:"Energy",      kind:"energy", amount:12,    weight:4},
+      {name:"A card",       kind:"card",                     weight:8},
+      {name:"Rare or up",   kind:"card",  floor:"rare",      weight:30},
+      {name:"Epic or up",   kind:"card",  floor:"epic",      weight:18},
+      {name:"Legendary",    kind:"card",  floor:"legendary", weight:2},
+      {name:"A clue",       kind:"clue",                     weight:20},
+      {name:"Status item",  kind:"status",                   weight:12},
+      {name:"Coins",        kind:"coins",  amount:1500,      weight:6},
+      {name:"Energy",       kind:"energy", amount:12,        weight:4},
     ]},
 ];
 /* Which box a deck tile hands over. Mostly Silver, so a Gold off a tile is a good turn and a
@@ -289,7 +299,8 @@ const TUNING=[
    ["packPopScale","How far it inflates (×)",0.05,{min:1,max:3}],
    ["packCardSize","Revealed card height (tiles)",0.1,{min:0.6,max:5}],
    ["packCardGap","Revealed cards: gap (tiles)",0.05,{min:0.2,max:4}],
-   ["packCloseMs","4 · After the last card (ms)",50]]},
+   ["packCloseMs","4 · After the last card (ms)",50],
+   ["setDoneMs","Card set complete: hold (ms)",100]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —
@@ -331,9 +342,11 @@ const TUNING=[
     the board content has to match them — Collection.validate() is what checks that, and the
     Collection panel in this drawer prints what it finds. */
  {group:"The collection",items:[
-   ["episodesPerBoard","Episodes per board",1,{min:1,max:20}],
-   ["collectiblesPerEpisode","Cards per episode",1,{min:1,max:12}],
-   ["dupCoins","Duplicate card: coins (x its tier)",5],
+   ["episodesPerBoard","Episodes per set",1,{min:1,max:20}],
+   ["cardCopiesToConvert","Copies that convert a card",1,{min:1,max:10}],
+   ["dupCoins","Duplicate card: coins (x its rarity)",5],
+   ["setBonusCoins","Card set completed: coins",100,{min:0}],
+   ["setBonusStatus","Card set completed: status",10,{min:0}],
    ["boxCoins","Box: coins when the row says none",10]]},
  {group:"Status",items:[
    ["statusPerEpisode","Points per episode watched",1],

@@ -41,6 +41,8 @@ const APP_FILES = [
   "js/economy-import.js",
   /* what unlocks an episode: the clues, read off the episode files above */
   "js/clues.js",
+  /* the Season catalogue, and what owning it is worth */
+  "js/cards.js",
   /* board-actor.js owns grantEnergy(), which js/boxes.js calls */
   "js/board-actor.js",
   "js/collection.js",

@@ -18,17 +18,17 @@
    is not a Silver Box with better odds, it is three draws against a table weighted at the rare
    end. The table's `kind` is what the draw resolves to:
 
-     card    a character card at `tier`, drawn uniformly from that tier's pool
-     clue    a clue card, drawn uniformly from the board's clues
+     card    one card from the Season catalogue, at or above `floor` (js/cards.js)
+     clue    one clue for the episode being worked on (js/clues.js)
      status  a status item nobody owns yet, by its own `box` weight (js/status.js)
      coins   `amount`, scaled by cfg.boardScale like every other payout
      energy  `amount`, topped up toward the cap and never reducing a purchased overflow
 
    ---- what happens when a category is empty ----
 
-   Every empty case falls forward rather than paying nothing: a tier with no cards left in the
-   pool falls to any card, a card outcome on a board with no cards falls to a clue, and a status
-   outcome with the shelf full falls to coins. A box always pays. */
+   Every empty case falls forward rather than paying nothing: a rarity with nothing authored at
+   it falls DOWN to a commoner one, a clue with the whole story already unlocked falls to coins,
+   and a status outcome with the shelf full falls to coins. A box always pays. */
 
 const Boxes = {
   /* ---------------- tiers ---------------- */
@@ -64,7 +64,7 @@ const Boxes = {
   },
   drawDrop(t) {
     const pick = weighted(t.table) || { kind: "coins", amount: cfg.boxCoins };
-    if (pick.kind === "card") return this.dropCard(pick.tier);
+    if (pick.kind === "card") return this.dropCard(pick.floor);
     if (pick.kind === "clue") return this.dropClue();
     if (pick.kind === "status") return this.dropStatus() || this.dropCoins(pick);
     if (pick.kind === "energy") return this.dropEnergy(pick);
@@ -72,30 +72,20 @@ const Boxes = {
   },
 
   /* ---------------- the drops ---------------- */
-  dropCard(tier) {
-    let ids = Collection.poolOf("char", tier);
-    if (!ids.length) ids = Collection.poolOf("char", null);   // this board has no such tier
-    if (!ids.length) return this.dropClue();                  // …or no characters at all
-    return this.bankCard(ids[Math.floor(rand(0, ids.length))]);
+  /* `floor` is a rarity guarantee, not a target: Cards.draw falls DOWN when a rarity has
+     nothing authored at it, so a box can never hand over nothing. */
+  dropCard(floor) {
+    const r = Cards.drawAndAdd(floor || null);
+    if (!r) return this.dropCoins({ amount: cfg.boxCoins });
+    return Object.assign({ kind: "card" }, r);
   },
+  /* A clue is not a card any more (GDD 6.1) — it is evidence for the episode being worked on,
+     and Clues.grant() owns every rule about which one and what a repeat pays. With the story
+     fully unlocked there is nothing to learn, so it falls to coins. */
   dropClue() {
-    const ids = Collection.poolOf("clue", null);
-    if (!ids.length) return this.dropCoins({ amount: cfg.boxCoins });
-    return this.bankCard(ids[Math.floor(rand(0, ids.length))]);
-  },
-  /* Bank one card. A duplicate still lands in the album (the count is the collection's memory
-     of it) and pays its tier's consolation instead of being silently swallowed. */
-  bankCard(id) {
-    const card = Collection.cardOf(id);
-    const r = Collection.add(id, 1);
-    let coins = 0;
-    if (!r.isNew) { coins = this.dupValue(card); state.coins += coins; }
-    return { kind: "card", id, card, isNew: r.isNew, count: r.count, coins };
-  },
-  dupValue(card) {
-    const t = card && card.tier ? Collection.tier(card.tier) : null;
-    const mult = t && t.dup ? t.dup : 1;
-    return Math.round((cfg.dupCoins || 0) * mult * (cfg.boardScale || 1));
+    const got = Clues.grant();
+    if (!got) return this.dropCoins({ amount: cfg.boxCoins });
+    return { kind: "clue", ep: got.id, clue: got.clue, isNew: got.isNew, coins: got.coins };
   },
   dropStatus() {
     const item = Status.drawUnowned();
@@ -119,6 +109,8 @@ const Boxes = {
   coinsIn(res) { return res.drops.reduce((a, d) => a + (d.kind === "coins" ? d.amount : (d.coins || 0)), 0); },
   energyIn(res) { return res.drops.reduce((a, d) => a + (d.kind === "energy" ? d.amount : 0), 0); },
   newCardsIn(res) { return res.drops.filter(d => d.kind === "card" && d.isNew).length; },
+  convertedIn(res) { return res.drops.filter(d => d.kind === "card" && d.converted).length; },
+  statusIn(res) { return res.drops.reduce((a, d) => a + (d.status || 0), 0); },
 };
 
 /* ---------------- cards landing, and what follows ----------------
@@ -145,6 +137,14 @@ function bankedEvents(draw){
      own points. */
   const shelved=res.drops.filter(d=>d.kind==="status").map(d=>d.item);
   if(shelved.length) after.push({statusUp:{items:shelved,from:statusBefore,to:Status.points()}});
+  /* A card set finished by whatever just landed. Swept rather than checked at the call site,
+     because five different things bank cards and every one of them owes the same payment — and
+     because it is IDEMPOTENT: an unclaimed set stays unclaimed, so a missed sweep is a delayed
+     bonus and never a lost one. A set never gates anything (GDD 4.4), so this is pure reward. */
+  Cards.unclaimedSets().forEach(set=>{
+    const paid=Cards.claimSet(set.key);
+    if(paid) after.push({setDone:paid});
+  });
   if(fresh.length) after.push({unlock:{ids:fresh}});
   /* A set is NOT over when its last card lands — it is over when its last episode has been
      watched, and an episode cannot be watched before it is collected. So the celebration lives
@@ -185,24 +185,30 @@ function openBoxEvents(tierKey){
    That is also why a duplicate never feels like a wasted pull — it pays, quietly, at the speed
    its value deserves. `tier` narrows the draw (the Gala's "Rare or better"); null draws from
    the whole pool, and Boxes.dropCard falls forward when a tier has nothing left in it. */
-function drawCardEvents(label,icon,tier){
-  const ico=icon||"🃏";
-  const {res,after}=bankedEvents(()=>({drops:[Boxes.dropCard(tier||null)]}));
+function drawCardEvents(label,icon,floor){
+  const ico=icon||"\ud83c\udccf";
+  const {res,after}=bankedEvents(()=>({drops:[Boxes.dropCard(floor||null)]}));
   const d=res.drops[0];
-  /* dropCard falls to a clue and then to coins on a board with nothing left to collect. */
+  /* dropCard falls to coins only when the catalogue is empty, which validate() forbids. */
   if(d.kind!=="card")
     return [{float:{text:"+"+fmt(d.amount),color:"var(--gold)"},
              log:{icon:ico,msg:`${label} · +<b>${fmt(d.amount)}</b> coins`}},...after];
   const name=d.card?d.card.name:d.id;
-  if(!d.isNew)
+  /* THREE BEATS, and the gap between them is the design (GDD 4.3):
+       a card you did not have  →  held on screen
+       the copy that CONVERTS   →  held on screen, and says so — this is the payoff
+       any other copy           →  a coin float, and the board keeps moving */
+  if(!d.isNew&&!d.converted)
     return [{float:{text:"+"+fmt(d.coins),color:"var(--gold)"},
-             log:{icon:ico,msg:`${label} · ${name} again · +<b>${fmt(d.coins)}</b> coins`}},...after];
+             log:{icon:ico,msg:`${label} · ${name} \u00d7${d.count} · +<b>${fmt(d.coins)}</b> coins`}},...after];
   return [
-    {float:{text:"🃏 "+name,color:"var(--teal)"},
-     log:{icon:ico,msg:`${label} · <b>${name}</b> collected`}},
-    /* The card's own face, not a generic panel — the album and the box popup already share
-       cardFace(), and a card drawn off a tile is the same card. */
-    {card:{name,collectible:d.card,count:d.count,positive:true}},
+    {float:{text:(d.converted?"\u2b50 ":"\ud83c\udccf ")+name,color:"var(--teal)"},
+     log:{icon:ico,msg:d.converted
+       ? `${label} · <b>${name}</b> collected \u2014 +${d.status} status`
+       : `${label} · <b>${name}</b> found`}},
+    /* The card's own face, not a generic panel — the collection and the box popup already
+       share cardFace(), and a card drawn off a tile is the same card. */
+    {card:{name,collectible:d.card,count:d.count,converted:d.converted,positive:true}},
     ...after,
   ];
 }
@@ -213,11 +219,15 @@ function boxSummary(res){
   res.drops.forEach(d=>{
     if(d.kind==="card"){
       const n=d.card?d.card.name:d.id;
-      parts.push(d.isNew?`<b>${n}</b>`:`${n} (dupe +${fmt(d.coins)})`);
+      if(d.isNew) parts.push(`<b>${n}</b>`);
+      else if(d.converted) parts.push(`<b>${n}</b> collected!`);
+      else parts.push(`${n} (dupe +${fmt(d.coins)})`);
     }
+    else if(d.kind==="clue") parts.push(d.isNew?`a clue on <b>${Episodes.titleOf(d.ep)}</b>`
+                                               :`a clue you had (+${fmt(d.coins)})`);
     else if(d.kind==="status") parts.push(`<b>${d.item.name}</b>`);
     else if(d.kind==="coins") parts.push(`+${fmt(d.amount)} coins`);
-    else if(d.kind==="energy") parts.push(`+${d.amount}⚡`);
+    else if(d.kind==="energy") parts.push(`+${d.amount}\u26a1`);
   });
-  return parts.join(" · ")||"nothing";
+  return parts.join(" \u00b7 ")||"nothing";
 }
