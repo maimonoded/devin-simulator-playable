@@ -26,7 +26,8 @@ function openProfile(){ renderProfile(); }
 function renderProfile(){
   const host=$("#sheetHost");
   const pts=Status.points(), rank=Status.rank(pts), next=Status.nextRank(pts);
-  const pct=Math.round(Status.rankProgress(pts)*100);
+  const lv=Status.level(pts), maxLv=Status.maxLevel();
+  const pct=Math.round(Status.levelProgress(pts)*100);
   const acc=(()=>{ const t=state.predWins+state.predLoss; return t?Math.round(state.predWins/t*100)+"%":"—"; })();
   const [eps,epTotal]=Collection.boardProgress();
 
@@ -42,12 +43,14 @@ function renderProfile(){
 
   host.innerHTML=`<div class="modal profileModal"><div class="top">
       <button class="sheetX" id="profileX" title="Close">✕</button>
-      <div class="eyebrow">Your profile</div><h2>${rank.icon} ${rank.name}</h2></div>
+      <div class="eyebrow">Your profile · level ${lv} of ${maxLv}</div>
+      <h2>${rank.icon} ${rank.name}</h2></div>
     <div class="mbody">
       <div class="rankBox">
-        <div class="rankLine"><b>${fmt(pts)}</b> status
-          ${next?`<span class="rankNext">${fmt(Status.toNext(pts))} to ${next.icon} ${next.name}</span>`
-                :`<span class="rankNext">top rank</span>`}</div>
+        <div class="rankLine"><b>${fmt(pts)}</b> status this Season
+          ${lv<maxLv?`<span class="rankNext">${fmt(Status.toNextLevel(pts))} to level ${lv+1}${
+                next?` · ${next.icon} ${next.name} at ${next.from}`:""}</span>`
+                :`<span class="rankNext">Season complete</span>`}</div>
         <div class="albumBar"><div class="albumFill" style="width:${pct}%"></div></div>
         <div class="rankWhy">
           <span>🏆 ${fmt(Status.itemPoints())} owned</span>

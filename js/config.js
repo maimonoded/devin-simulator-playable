@@ -97,16 +97,25 @@ const DEFAULTS={
      setBonus* is 4.4's set-completion reward. A set is a collection TARGET and never a gate,
      so this is generous and nothing anywhere depends on it having been earned. */
   cardCopiesToConvert:3, dupCoins:40, setBonusCoins:5000, setBonusStatus:250,
-  /* ---- status ----
-     Points per unit of play, on top of the points the owned items carry themselves. This is
-     what makes the track climb for a player who never spends a coin. statusPriceScale moves
-     every shop price at once without editing the ten of them.
+  /* ---- status (js/status.js, GDD 5) ----
+     Status is a LEVEL, 1 to statusLevels, and it resets every Season. The two inflows priced
+     here are the two the collection cannot pay for you: an episode WATCHED and a prediction
+     CALLED RIGHT. The other two — converting a card and completing a set — are priced by the
+     rarity table and setBonusStatus above.
 
-     statusBarMs is how long the track takes to move when an item is earned and statusUpMs how
+     statusLevels / statusFirst / statusTotal describe the curve, which is built in
+     js/economy.js beside the cost curve because 5.4 calls the Season gate "the single most
+     important value in the game". THE TOTAL IS THE AUTHORITATIVE KNOB: the per-level costs ramp
+     linearly from statusFirst and are solved so they sum to exactly statusTotal, so moving the
+     total moves how long a Season takes and nothing else has to be re-derived.
+
+     statusPriceScale moves every shop price at once without editing the ten of them.
+     statusBarMs is how long the track takes to move when status is earned and statusUpMs how
      long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
      both belong in the drawer. */
-  statusPerEpisode:2, statusPerCard:1, statusPerBoard:10, statusPriceScale:1,
-  statusBarMs:900, statusUpMs:1500,
+  statusPerEpisode:50, statusPerPrediction:150,
+  statusLevels:30, statusFirst:200, statusTotal:30000,
+  statusPriceScale:1, statusBarMs:900, statusUpMs:1500,
   /* What a box's `coins` outcome pays when its table row does not name an amount. */
   boxCoins:60,
   /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
@@ -349,9 +358,11 @@ const TUNING=[
    ["setBonusStatus","Card set completed: status",10,{min:0}],
    ["boxCoins","Box: coins when the row says none",10]]},
  {group:"Status",items:[
-   ["statusPerEpisode","Points per episode watched",1],
-   ["statusPerCard","Points per card collected",1],
-   ["statusPerBoard","Points per board finished",1],
+   ["statusPerEpisode","Status per episode watched",5],
+   ["statusPerPrediction","Status per correct prediction",5],
+   ["statusLevels","Levels in a Season",1,{min:2,max:99}],
+   ["statusFirst","Status for level 2",10,{min:1}],
+   ["statusTotal","Status for the whole Season",500,{min:100}],
    ["statusPriceScale","Shop prices ×",0.05,{min:0.05,max:20}],
    ["statusBarMs","Earned: track moves (ms)",50],
    ["statusUpMs","Earned: held afterwards (ms)",50]]},

@@ -97,6 +97,7 @@ function serializeState(){
        serialise as they stand — no Map to spread, and a card or item the content no longer
        defines simply sits there harmlessly until it is defined again. */
     cards:state.cards, setsDone:state.setsDone, status:state.status,
+    seasonFrom:state.seasonFrom, seasonsDone:state.seasonsDone, statusMilestones:state.statusMilestones,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
@@ -162,6 +163,18 @@ function loadState(){
        this one would otherwise leave the board empty and every tile undefined. */
     state.season=Math.min(Math.max(0,Math.floor(+d.season||0)),BOARD_SEASONS.length-1);
     state.boardNum=Math.max(1,Math.floor(+d.boardNum||1));
+    /* THE SEASON BASELINE and the milestones already paid. The baseline is clamped at zero and
+       the milestone keys are checked against this build's list — a milestone that no longer
+       exists is a payment nothing can explain, and leaving it in would only suppress a real one
+       if the levels were ever renumbered. */
+    state.seasonFrom=Math.max(0,Math.floor(+d.seasonFrom||0));
+    state.seasonsDone=Math.max(0,Math.floor(+d.seasonsDone||0));
+    state.statusMilestones={};
+    const rawMs=(d.statusMilestones&&typeof d.statusMilestones==="object")?d.statusMilestones:{};
+    Object.keys(rawMs).forEach(k=>{
+      if(STATUS_MILESTONES.some(m=>String(m.level)===String(k)))
+        state.statusMilestones[String(k)]=Math.max(1,Math.floor(+rawMs[k]||1));
+    });
     /* THE SHELF. Only items this build defines — unlike a card, a status item that no longer
        exists is worth points nothing can explain, and the profile has nowhere to draw it. */
     state.status={};

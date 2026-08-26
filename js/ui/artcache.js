@@ -1,7 +1,7 @@
 /* Card and item art, decoded once and shared by everything that paints a canvas face.
 
    Two things draw cards into a canvas — the case board standing inside the ring
-   (js/ui/case3d.js) and the box that pops open on it (js/ui/box3d.js) — and both need the same
+   (js/ui/estate3d.js) and the box that pops open on it (js/ui/box3d.js) — both need the same
    pictures. One cache, so an image is fetched and decoded once however many faces use it.
 
    ---- why this has a callback ----

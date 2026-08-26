@@ -49,7 +49,8 @@ assets/dice/        the die: models/die.glb, built not reconstructed    → asse
 assets/npcs/        the series' characters, to stand on tiles           → assets/npcs/README.md
 assets/cards/       WHAT THERE IS TO COLLECT: cards.js + the card art   → assets/cards/README.md
 assets/status/      the status track and its ten items                  → assets/status/README.md
-assets/estate/      the Status Estate, six tiers of one building         → assets/estate/README.md
+assets/estate/      THE OBJECT AT THE BOARD'S CENTRE: six tiers of one building
+                                                                → assets/estate/README.md
 assets/boxes/       the three box tiers' art                            → assets/boxes/README.md
 minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
@@ -90,7 +91,7 @@ js/
     env3d.js        the island, sea and props around the board (imported by board3d.js)
     dice3d.js       the dice, thrown onto the board (imported by board3d.js)
     npc3d.js        the series' characters, walking the ring (imported by board3d.js)
-    case3d.js       THE CURRENT SET, standing inside the ring (imported by board3d.js)
+    estate3d.js     THE STATUS ESTATE, standing inside the ring (imported by board3d.js)
     box3d.js        THE BOX you tap to open, and the cards out of it (imported by board3d.js)
     artcache.js     card/item images, decoded once and shared by both of those
     cardface.js     ONE CARD, DRAWN — shared by the album and the box popup
@@ -189,8 +190,8 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 | **Clues** | `js/clues.js` `episodes/NNN.js` | **What unlocks an episode**, and the evidence you bet on — one object doing both jobs (GDD §6.1). Each episode authors eight; `cfg.cluesPerEpisode` of them unlocks it, so two players arrive at the same wager holding different evidence. A duplicate pays coins. The catch-up valve eases the requirement by one a day after `cfg.clueStuckDays`. |
 | **The collection** | `js/cards.js` `assets/cards/` | 150 cards a Season — 90 Common, 38 Rare, 18 Epic, 4 Legendary — in **15 sets of ten** (GDD §4.6). Three copies **convert** a card into its Collectible, which is what pays Status; copies past that trickle. A set is a target and **never a gate**. Ownership is Season-wide and survives a Season reset. → [README](assets/cards/README.md) |
 | **Boxes** | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | The only way anything is collected. Three tiers, each `items` draws against its own weighted table. Opened the moment they are won — and **not in a dialog**: the box is the same GLB the board used to stand on a tile, it arrives over the middle of the board, and you tap the mesh. It bursts where it stood and the cards fly out and hang in the air. The only DOM is a caption and the countdown bar (`js/ui/pack.js`), which also holds the modal fallback for when there is no WebGL. Every empty case falls forward, so a box always pays. → [README](assets/boxes/README.md) |
-| **The case board** | `js/ui/case3d.js` | The current set, standing **inside the ring**: five panels, one per episode, each holding that episode's five card slots with the collected cards' own art in them. Each panel is a canvas painted once and used as the texture of an **upright plane standing on the board** — see "Nothing on the board fades or hides" below. Tapping a panel opens the album there (`Board3D.caseAt()` raycasts them; the tap/pan split lives in `_initDrag`). |
-| **Status** | `js/status.js` `js/ui/profile.js` `js/ui/statusup.js` `assets/status/` | The player's standing. Points come from owned items **plus** episodes watched **plus** cards collected, so play alone climbs and buying alone does not finish. Every one of the ten items has both a coin price and a play milestone. Rank shows beside the avatar in the HUD, and earning an item plays a beat that shows the track actually moving. A status item wears a **gold frame** everywhere it appears — see below. → [README](assets/status/README.md) |
+| **Status** | `js/status.js` `js/ui/profile.js` `assets/status/` | **A LEVEL, 1–30, that resets every Season** (GDD §5). Four inflows, every one of them *derived*: converting a card, completing a set, watching an episode, calling a prediction right. Milestones every five levels pay a clue cache, energy or a pack. The curve lives in the economy model — §5.4 calls the Season gate "the single most important value in the game". → [README](assets/status/README.md) |
+| **The Status Estate** | `js/ui/estate3d.js` `assets/estate/` | The object at the board's centre, upgrading with the level (§3.5). One tier per status band, so the title and the house change in the same beat. → [README](assets/estate/README.md) |
 | NPCs | `assets/npcs/` `js/ui/npc3d.js` | Simon, Victoria and Carl, walking the ring clockwise on the tiles' **inner** edge — the tile centre is taken by art and the token. **Scenery, deliberately**: they own no state, are not persisted, and pay nothing, so they stay outside the event list that everything else reaches the player through. Scaled by **height** like the player piece and held under `cfg.tokenHeight`, so a figure walking in front of the token can never bury it. Who walks and which way each faces is data in `assets/npcs/npcs.js` — facing is not a convention here, since one of the three fronts −X. **`cfg.npcs` ships at 0**, and off means the models are never fetched: `NPC3D.init()` deliberately does not load, `tick()` does on the first frame it runs enabled, so the drawer toggle still works with no reload. Switching back off hides them rather than dropping them. → [README](assets/npcs/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
@@ -251,7 +252,7 @@ Three rules hold the whole thing together and are worth knowing before changing 
 Three separate bugs turned out to be the same mistake, so it is worth stating once: **things in
 the scene occlude each other; they do not take turns existing.**
 
-- The case board first dimmed to 16% whenever the board was animating. It was chrome pretending
+- What stands in the ring first dimmed to 16% whenever the board was animating. It was chrome pretending
   to be scenery.
 - It was then a DOM layer projected onto the board's centre each frame — which draws *after* the
   whole scene whatever its depth, so it floated over the dice and lagged the camera by a frame.
@@ -270,6 +271,48 @@ constants keep meaning screen size.
 A box and its cards are put **in front** rather than the board being taken away: `_packAnchor()`
 moves the anchor along the view direction toward the camera, which under an orthographic camera
 changes depth and *nothing else* — it does not move on screen and does not change size.
+
+### Status is a LEVEL, and every inflow is derived
+
+GDD §5. Status is 1 to `cfg.statusLevels` (thirty), and reaching the top **is** the Season gate.
+Four inflows (§5.1), and not one of them is stored:
+
+| inflow | where it already lives |
+|---|---|
+| converting a card — the third copy | `state.cards`, priced by the rarity table |
+| completing a set of ten | `state.setsDone`, priced by `cfg.setBonusStatus` |
+| watching an episode | `state.epsWatched` × `cfg.statusPerEpisode` |
+| calling a prediction right | `state.predWins` × `cfg.statusPerPrediction` |
+
+The shelf items are Collectibles too — granted whole rather than converted, and the seed of the
+Showcase (§5.2). So a player who never spends a coin still climbs, and one who buys the whole
+shelf still has to watch the show and call it right to finish a Season.
+
+**The one stored thing is a baseline.** `state.seasonFrom` is the lifetime total at the moment
+this Season began; points this Season are the difference. That is what lets §5.3's reset take
+Status to zero while the collection, the Showcase and the lifetime prediction record all persist:
+nothing is deleted, **the line just moves**.
+
+**The record counts a call, not a stake.** A correct prediction pays Status and goes on the
+lifetime record whether or not there was money on it — "Skip & watch" is always offered, and a
+player who takes it and calls it right has still called it right. A skip with no answer picked is
+not a call at all and lands on neither side, because a null pick would otherwise read as a loss.
+
+**The curve lives in the economy model** (`Economy.statusCurve()`), beside the cost curve,
+because §5.4 calls the Season gate "the single most important value in the game". **The TOTAL is
+the authoritative knob**: per-level costs ramp linearly from `cfg.statusFirst` and the step is
+*solved* so the ramp sums to exactly `cfg.statusTotal`. So moving the total moves how long a
+Season takes and nothing else has to be re-derived. Thirty levels are twenty-nine climbs, which
+is why the solve uses `L−1`: level 1 is free.
+
+**Milestones every five levels** (§5.3) pay a clue cache, energy or a pack. The clue cache is
+what couples the two tracks: the Status track buying story progress is the reason climbing it is
+worth doing. Each pays once, and *that* is the second stored thing — "was this given" is not
+derivable from a level that only goes up.
+
+**Six bands over thirty levels** puts a new title on the profile every five, which is also where
+the milestones and the estate tiers land. Not a coincidence: a milestone, a new title and a new
+house arriving together is one beat instead of three.
 
 ### Two axes: the FRAME is the family, the BADGE is the rarity
 
@@ -291,7 +334,7 @@ are independent, an Epic collection card and a status item can never be mistaken
 however good the art is.
 
 Both halves have to move together in three places: the canvas path (`js/ui/box3d.js`,
-`js/ui/case3d.js`), the DOM path (`js/ui/cardface.js`, `.fam-*` and `.rar-*` in
+`js/ui/estate3d.js`), the DOM path (`js/ui/cardface.js`, `.fam-*` and `.rar-*` in
 `css/collection.css`), and the profile shelf. That is the cost of a card looking the same
 everywhere, and it is the point.
 

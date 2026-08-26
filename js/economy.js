@@ -301,6 +301,48 @@ const Economy = {
     return (s ? s.from : 1) + bIdx;
   },
 
+  /* ---------------- the status curve (GDD 5.4) ----------------
+
+     Thirty levels a Season, and reaching the top is the Season gate. 5.4 calls that "the single
+     most important value in the game", which is why the curve lives here beside the cost curve
+     rather than as a scalar in cfg.
+
+     THE TOTAL IS THE AUTHORITATIVE KNOB. Per-level costs ramp linearly from cfg.statusFirst, and
+     the step is SOLVED so the whole ramp sums to exactly cfg.statusTotal:
+
+       total = (L−1)·first + step·(L−2)(L−1)/2   →   step = (total − (L−1)·first) / ((L−2)(L−1)/2)
+
+     L−1 rather than L because level 1 is free: thirty levels are twenty-nine climbs.
+
+     So moving statusTotal moves how long a Season takes and nothing else has to be re-derived —
+     which is what you want from the one number the whole schedule hangs on. A step that comes
+     out negative (a total too small for the opening cost) is clamped to a flat ramp rather than
+     producing levels that get cheaper, which would read as a bug to anyone watching the bar.
+
+     Returns CUMULATIVE thresholds, [0, c1, c1+c2, …], so index n is the points needed to be at
+     level n+1. Length is levels; the last entry is the Season gate. */
+  statusLevels() { return Math.max(2, Math.round(+cfg.statusLevels || 2)); },
+  statusStep() {
+    const L = this.statusLevels(), first = Math.max(1, +cfg.statusFirst || 1);
+    const climbs = L - 1;
+    if (climbs < 2) return 0;
+    const total = Math.max(climbs * first, +cfg.statusTotal || 0);
+    return Math.max(0, (total - climbs * first) / ((climbs - 1) * climbs / 2));
+  },
+  /* What level n→n+1 costs on its own. Level 1 is free — everyone starts there. */
+  statusCostOf(level) {
+    const L = this.statusLevels();
+    if (!(level >= 1) || level >= L) return 0;
+    return Math.max(1, Math.round((+cfg.statusFirst || 1) + (level - 1) * this.statusStep()));
+  },
+  statusCurve() {
+    const L = this.statusLevels(), out = [0];
+    for (let n = 1; n < L; n++) out.push(out[n - 1] + this.statusCostOf(n));
+    return out;
+  },
+  /* The Season gate: points to reach the top level. */
+  statusGate() { const c = this.statusCurve(); return c[c.length - 1]; },
+
   /* ---------------- prediction ---------------- */
 
   /* The workbook's clue edge: every clue banked this cycle buys accuracy, up to a cap.

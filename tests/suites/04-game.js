@@ -99,15 +99,35 @@ test("watching consumes exactly one queued episode and counts it", () => {
   eq(state.predsMade, 1);
 });
 
-test("a zero wager changes no coins but still resolves and counts", () => {
+test("a zero wager changes no coins but the call still goes on the record", () => {
   setupPrediction();
   const before = state.coins;
   const r = resolvePrediction({ wager: 0, odds: 2, sel: 1, correct: 0, auto: false });
   eq(state.coins, before, "no stake, no payout");
   eq(r.won, false);
-  eq(state.predWins, 0);
-  eq(state.predLoss, 0, "unwagered results must not pollute accuracy");
+  eq(r.called, true);
+  eq(state.predLoss, 1, "a wrong call is a wrong call whether or not it was staked");
   eq(state.epsWatched, 1);
+});
+
+test("a correct call with no stake pays status and counts as a win", () => {
+  setupPrediction();
+  const before = Status.points();
+  const r = resolvePrediction({ wager: 0, odds: 2, sel: 0, correct: 0, auto: false });
+  eq(r.won, true);
+  eq(state.predWins, 1);
+  eq(state.coins, 1e4, "…but there is still no payout without a stake");
+  eq(Status.points(), before + cfg.statusPerPrediction + cfg.statusPerEpisode,
+     "two of GDD 5.1's inflows at once — it was watched AND called right");
+});
+
+test("a SKIP is not a call, and lands on neither side of the record", () => {
+  setupPrediction();
+  const r = resolvePrediction({ wager: 0, odds: 2, sel: null, correct: 0, auto: false });
+  eq(r.called, false);
+  eq(state.predWins, 0);
+  eq(state.predLoss, 0, "a null pick would otherwise read as a loss");
+  eq(state.epsWatched, 1, "it was still watched");
 });
 
 test("an id consumes THAT episode, not whichever is at the front", () => {

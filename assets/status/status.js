@@ -5,15 +5,23 @@
 
    ---- what status is ----
 
-   Status is a POINT TOTAL with named milestones, and it comes from three places at once:
+   Status is a LEVEL, 1 to cfg.statusLevels, and it resets every Season (GDD 5). Reaching the top
+   is the Season gate — 5.4 calls that "the single most important value in the game", which is why
+   the curve lives in the economy model (js/economy.js) beside the cost curve rather than as a
+   scalar in cfg.
 
-     items      the things below, each worth `points` once owned
-     watching   cfg.statusPerEpisode for every episode watched
-     collecting cfg.statusPerCard for every card in the collection, cfg.statusPerBoard a board
+   Points come from four inflows (5.1), and every one of them is DERIVED — there is no stored
+   score to drift:
 
-   So a player who never spends a coin still climbs — slowly — and a player who buys the whole
-   shelf still has to watch the show to reach the top rank. That split is the point: status is
-   meant to be the thing both loops feed, not a second currency.
+     converting   a card's third copy turns it into a Collectible worth its rarity, and copies
+                  past that trickle (js/cards.js)
+     completing   a set of ten
+     watching     cfg.statusPerEpisode an episode
+     predicting   cfg.statusPerPrediction a correct call
+
+   The items below are Collectibles too — granted whole rather than converted, and the seed of
+   the Showcase (5.2). So a player who never spends a coin still climbs, and a player who buys the
+   whole shelf still has to watch the show and call it right to finish a Season.
 
    ---- how an item is obtained ----
 
@@ -40,15 +48,39 @@ const STATUS_ZONES = [
   { key: "wardrobe", name: "In the closet", icon: "👗" },
 ];
 
-/* Rarest last. `at` is the point total that opens the rank. The first must be at 0 — a player
-   with nothing still has a standing, and js/status.js falls back to the first entry. */
+/* The named bands, keyed by LEVEL rather than by points — a level is what the player watches,
+   and a band is five of them. `from` is the level that opens the band, and the first must be 1:
+   a player at level 1 still has a standing, and js/status.js falls back to the first entry.
+
+   Six bands over thirty levels puts a new name on the profile every five levels, which is also
+   where the milestones land. That is not a coincidence: a milestone and a new title arriving
+   together is one beat instead of two. */
 const STATUS_RANKS = [
-  { at:   0, name: "Extra",     icon: "🎬" },
-  { at:  25, name: "Fan",       icon: "💗" },
-  { at:  60, name: "Insider",   icon: "🎟" },
-  { at: 110, name: "Regular",   icon: "⭐" },
-  { at: 180, name: "VIP",       icon: "🌟" },
-  { at: 260, name: "Producer",  icon: "👑" },
+  { from:  1, name: "Extra",     icon: "🎬" },
+  { from:  6, name: "Fan",       icon: "💗" },
+  { from: 11, name: "Insider",   icon: "🎟" },
+  { from: 16, name: "Regular",   icon: "⭐" },
+  { from: 21, name: "VIP",       icon: "🌟" },
+  { from: 26, name: "Producer",  icon: "👑" },
+];
+
+/* MILESTONES, every five levels (GDD 5.3). What they pay is chosen to push back on the thing
+   that is scarcest at that point in a Season:
+
+     a clue cache  accelerates the STORY, which is the whole reason Status is worth climbing —
+                   5.3 wants the two tracks coupled, and this is the coupling
+     energy        buys more rolls, which is the other track
+     a pack        the collection, and the only one of the three that is pure reward
+
+   Each is claimed once and the record is stored (state.statusMilestones), because "was this
+   given" is not derivable from a level that only goes up. */
+const STATUS_MILESTONES = [
+  { level:  5, kind: "clues",  amount: 2,          blurb: "Two clues, on the house." },
+  { level: 10, kind: "energy", amount: 20,         blurb: "A full tank and then some." },
+  { level: 15, kind: "pack",   tier: "gold",       blurb: "A Gold Box." },
+  { level: 20, kind: "clues",  amount: 4,          blurb: "Four clues — the story owes you." },
+  { level: 25, kind: "energy", amount: 50,         blurb: "Enough to finish the week." },
+  { level: 30, kind: "pack",   tier: "diamond",    blurb: "A Diamond Box, and the Season is yours." },
 ];
 
 const STATUS_ITEMS = [

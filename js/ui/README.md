@@ -12,9 +12,9 @@ it mutates `state` and returns *event lists* that `playEvents()` here plays back
 | [album.js](album.js) | The album — one page per episode, with the empty slots named so the player knows what to chase. Paged, and past sets are still reachable. |
 | [profile.js](profile.js) | The status track and the shelf of things that prove it. The only place status items are bought. |
 | [statusup.js](statusup.js) | The beat an earned status item plays: the item in its gold frame, the points gained, and the track moving — filling to the top of the old rank and again from the bottom of the new one when it turns over. A ribbon over the board, not a dialog. |
-| [case3d.js](case3d.js) | The current set, standing inside the board ring — five canvas-painted panels standing upright on the board, so they are scene objects rather than an overlay. A module, imported by board3d.js. |
+| [estate3d.js](estate3d.js) | **The Status Estate**, standing inside the board ring (GDD §3.5) — one canvas-painted plane standing upright on the board, upgrading with Status level. A scene object, not an overlay. A module, imported by board3d.js. |
 | [box3d.js](box3d.js) | The box you tap to open, and the cards that fly out of it. Both are in the scene; the only DOM in the beat is pack.js's caption and countdown. A module, imported by board3d.js. |
-| [artcache.js](artcache.js) | Card and item images, decoded once and shared by case3d and box3d, with a callback so a face painted before its art arrived repaints when it lands. |
+| [artcache.js](artcache.js) | Card and item images, decoded once and shared by estate3d and box3d, with a callback so a face painted before its art arrived repaints when it lands. |
 | [player.js](player.js) | The episode video player — both `playerMarkup(id)` and the `playVideo(id)` behaviour that drives it (autoplay, no-seek, pause, 2×, progress, session skip, missing-video fallback). |
 | [prediction.js](prediction.js) | Predict & watch: the betting modal, playback, and the result screen. |
 | [store.js](store.js) | The coin/energy top-up modal. |

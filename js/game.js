@@ -63,11 +63,18 @@ function resolvePrediction({wager,odds,sel,correct,auto,id}){
   if(id!=null){ const k=state.epQueue.indexOf(id); if(k>=0) state.epQueue.splice(k,1); }
   else state.epQueue.shift();
   let payout=0;
-  if(wager>0){
-    if(won){ payout=wager*odds; state.coins+=payout; state.predWins++; state.streak++; state.bestStreak=Math.max(state.bestStreak,state.streak); }
+  if(wager>0&&won){ payout=wager*odds; state.coins+=payout; }
+  /* THE RECORD COUNTS A CALL, NOT A STAKE. A correct prediction pays Status (GDD 5.1) and goes
+     on the lifetime record whether or not there was money on it — "Skip & watch" is always
+     offered (see CLAUDE.md on `participation`), and a player who takes it and calls it right
+     has still called it right. A skip with no answer picked is not a call at all, so it counts
+     as neither: sel is null there, and a null would otherwise read as a loss. */
+  const called=auto||sel!=null;
+  if(called){
+    if(won){ state.predWins++; state.streak++; state.bestStreak=Math.max(state.bestStreak,state.streak); }
     else { state.predLoss++; state.streak=0; }
   }
-  return {won,payout,accuracy,cluesSpent};
+  return {won,payout,accuracy,cluesSpent,called};
 }
 
 /* ---------- time ---------- */

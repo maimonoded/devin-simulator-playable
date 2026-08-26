@@ -149,23 +149,22 @@ function positionToken(instant){
   if(instant) requestAnimationFrame(()=>{tok.style.transition="";});
 }
 /* The case board — the current set, standing inside the ring. It is geometry in the board's own
-   scene (js/ui/case3d.js), not a DOM layer, so there is nothing to position here: this only asks
+   scene (js/ui/estate3d.js), not a DOM layer, so there is nothing to position here: this only asks
    it to redraw, and it decides for itself whether anything actually changed.
 
    The legacy CSS board has no scene to put it in and so has no case board; the album button is
    the route to the same information there. */
+/* Kept under the old name because renderAll() and the pack flow both call it; what stands in
+   the ring is the Status Estate now (js/ui/estate3d.js). */
 function renderCaseBoard(){
   if(use3d()&&window.Board3D&&Board3D.available&&Board3D.syncCase) Board3D.syncCase();
 }
-/* Tapping a panel opens THAT EPISODE'S EVIDENCE — called from js/ui/board3d.js, which is the
-   only place that knows a press was a tap rather than a pan.
-
-   Not the collection: the panel shows an episode's clue slots, so what is behind it has to be
-   those clues. The cards live under the album button. */
-function onCasePanelTap(page){
+/* Tapping the estate opens the PROFILE — called from js/ui/board3d.js, which is the only place
+   that knows a press was a tap rather than a pan. The estate is a picture of the Status track,
+   so what is behind it is the track. */
+function onEstateTap(){
   if(state.animating) return;
-  const p=Collection.pages()[page];
-  if(p) openEvidence(p.ep);
+  openProfile();
 }
 
 function renderHUD(){
@@ -186,20 +185,24 @@ function renderHUD(){
   $("#hEfill").style.width=Math.max(0,Math.min(100,(state.energy/cfg.energyCap)*100))+"%";
   renderStatusChip();
 }
-/* The status track, beside the avatar. Rank name, and how far through it — the profile is one
-   tap away for the detail, so what belongs here is only "where am I and am I moving". */
+/* The status track, beside the avatar. The band's title and how far through the LEVEL — the
+   profile is one tap away for the detail, so what belongs here is only "where am I and am I
+   moving". The bar is the level rather than the band because a level moves several times a
+   session and a band moves once every five; a bar that never visibly fills is not a bar. */
 function renderStatusChip(){
   const el=$("#hStatus"); if(!el) return;
-  const pts=Status.points(), rank=Status.rank(pts);
-  $("#hRank").textContent=rank.name;
+  const pts=Status.points(), rank=Status.rank(pts), lv=Status.level(pts);
+  $("#hRank").textContent=`${rank.name} · ${lv}`;
   $("#hRankIco").textContent=rank.icon;
-  $("#hRankFill").style.width=Math.round(Status.rankProgress(pts)*100)+"%";
+  $("#hRankFill").style.width=Math.round(Status.levelProgress(pts)*100)+"%";
   /* Pop when the number moves, since the chip is small and easy to miss. */
   if(state.lastStatus!==pts){
     el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
     state.lastStatus=pts;
   }
-  el.title=`${fmt(pts)} status · ${Status.toNext(pts)?`${fmt(Status.toNext(pts))} to ${Status.nextRank(pts).name}`:"top rank"}`;
+  const owed=Status.toNextLevel(pts);
+  el.title=`Level ${lv}/${Status.maxLevel()} · ${fmt(pts)} status · ${
+    owed?`${fmt(owed)} to level ${lv+1}`:"Season complete"}`;
 }
 function renderStats(){
   $("#sEps").textContent=state.epsWatched;

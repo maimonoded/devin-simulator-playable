@@ -46,7 +46,7 @@ const SKIN = {
 /* Where the box hangs while it waits to be opened: above whatever the camera is aimed at, so it
    is in the middle of the screen however the follow camera has wandered. */
 const HOVER_Y = 2.0;
-/* Mirrors ENV_CAM.el / the 45° azimuth in js/ui/board3d.js — see the note in js/ui/case3d.js.
+/* Mirrors ENV_CAM.el / the 45° azimuth in js/ui/board3d.js — see the note in js/ui/estate3d.js.
    The cards stand upright in the air for the same reason the case panels do: a quad that faces
    the camera has one depth, and one depth is what let the board's furniture hide the dice. */
 const FORESHORTEN = 1 / Math.cos(38 * Math.PI / 180);
@@ -246,7 +246,7 @@ export const Box3D = {
 
   /* One drop's face, painted to a canvas: the art, the name, the tier, and — when it is one you
      already hold — the band that says so and what it paid instead. */
-  /* An UPRIGHT plane, yawed to face the camera — see the long note in js/ui/case3d.js. A quad
+  /* An UPRIGHT plane, yawed to face the camera — see the long note in js/ui/estate3d.js. A quad
      that faces the camera has a single depth, and that is what let the board's furniture swallow
      the dice; standing it up gives it real depth down its height. */
   _card(drop, h){

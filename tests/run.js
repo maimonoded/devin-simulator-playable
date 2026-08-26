@@ -28,6 +28,7 @@ const APP_FILES = [
   /* content the collection and the status track are read from */
   "assets/cards/cards.js",
   "assets/status/status.js",
+  "assets/estate/estate.js",
   "js/state.js",
   "js/storage.js",
   "js/episodes.js",

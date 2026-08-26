@@ -15,12 +15,16 @@
    visible and live behind it. It blocks the roll loop the way every other reward beat does, and
    a tap takes it away early.
 
-   ---- the rank change ----
+   ---- the level change ----
 
-   When the points cross a rank boundary the bar cannot simply animate to its new fraction — it
-   would run backwards, because the new rank starts near empty. So it fills to the top of the old
-   rank first, the rank flips, and then it fills to where it really is. Two moves, in the order
-   the player's progress actually happened. */
+   When the points cross a LEVEL boundary the bar cannot simply animate to its new fraction — it
+   would run backwards, because the new level starts near empty. So it fills to the top of the old
+   level first, the level flips, and then it fills to where it really is. Two moves, in the order
+   the player's progress actually happened.
+
+   Crossing several levels at once (a set completing is 250 points, and an early level costs 200)
+   is the same beat: it fills, flips to the level actually reached, and fills again. Animating
+   every level in between would be honest and unwatchable. */
 
 function showStatusUp(up){
   return new Promise(resolve=>{
@@ -29,15 +33,16 @@ function showStatusUp(up){
     if(auto||!el||!up||!up.items||!up.items.length) return resolve();
 
     const from=up.from|0, to=up.to|0;
+    const lvFrom=Status.level(from), lvTo=Status.level(to);
     const rankFrom=Status.rank(from), rankTo=Status.rank(to);
-    const levelled=rankFrom.name!==rankTo.name;
+    const levelled=lvTo>lvFrom;
     const barMs=Math.max(0,cfg.statusBarMs||0);
     const holdMs=Math.max(0,cfg.statusUpMs||0);
 
     const items=up.items.map(i=>
       `<span class="suItem" style="${cardArtCss(i.art)}" title="${i.name.replace(/"/g,"&quot;")}"></span>`).join("");
     const names=up.items.map(i=>i.name).join(" · ");
-    const next=Status.nextRank(to);
+    const owed=Status.toNextLevel(to);
     el.innerHTML=`
       <div class="suRow">
         <span class="suArt">${items}</span>
@@ -48,16 +53,17 @@ function showStatusUp(up){
       </div>
       <div class="suTrack">
         <span class="suIco" id="suIco">${rankFrom.icon}</span>
-        <span class="suName" id="suName">${rankFrom.name}</span>
+        <span class="suName" id="suName">Level ${lvFrom}</span>
         <span class="suBar"><span class="suFill" id="suFill"></span></span>
-        <span class="suNext" id="suNext">${next?`${fmt(Status.toNext(to))} to ${next.name}`:"top rank"}</span>
+        <span class="suNext" id="suNext">${owed?`${fmt(owed)} to ${lvTo+1}`:"Season complete"}</span>
       </div>
-      ${levelled?`<div class="suNew" id="suNew">New rank · ${rankTo.icon} ${rankTo.name}</div>`:""}`;
+      ${levelled?`<div class="suNew" id="suNew">Level ${lvTo}${
+          rankTo.name!==rankFrom.name?` · ${rankTo.icon} ${rankTo.name}`:""}</div>`:""}`;
     el.classList.add("show");
     el.classList.toggle("levelled",levelled);
 
     const fill=$("#suFill");
-    const pct=(p)=>Math.round(Status.rankProgress(p)*100)+"%";
+    const pct=(p)=>Math.round(Status.levelProgress(p)*100)+"%";
     fill.style.transition="none";
     fill.style.width=pct(from);
 
@@ -82,15 +88,15 @@ function showStatusUp(up){
         fill.style.transition=`width ${barMs}ms cubic-bezier(.2,.9,.3,1)`;
         fill.style.width=pct(to);
       }else{
-        /* 1 · to the top of the rank they were in */
+        /* 1 · to the top of the level they were in */
         const half=Math.max(1,Math.round(barMs*0.45));
         fill.style.transition=`width ${half}ms cubic-bezier(.3,.8,.4,1)`;
         fill.style.width="100%";
         later(()=>{
-          /* 2 · the rank turns over, and the bar starts again where the new one starts */
+          /* 2 · the level turns over, and the bar starts again where the new one starts */
           const ico=$("#suIco"), name=$("#suName"), tag=$("#suNew");
           if(ico) ico.textContent=rankTo.icon;
-          if(name){ name.textContent=rankTo.name; name.classList.add("pop"); }
+          if(name){ name.textContent="Level "+lvTo; name.classList.add("pop"); }
           if(tag) tag.classList.add("in");
           if(ico) ico.classList.add("pop");
           confetti();

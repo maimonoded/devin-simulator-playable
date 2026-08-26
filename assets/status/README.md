@@ -2,24 +2,49 @@
 
 ```
 assets/status/
-  status.js           STATUS_ZONES + STATUS_RANKS + STATUS_ITEMS
+  status.js           STATUS_ZONES + STATUS_RANKS + STATUS_MILESTONES + STATUS_ITEMS
   items/*.webp        the art, one square per item
 ```
 
 Read by [`js/status.js`](../../js/status.js); rendered by
-[`js/ui/profile.js`](../../js/ui/profile.js), with the rank beside the avatar in the HUD.
+[`js/ui/profile.js`](../../js/ui/profile.js), with the band and level beside the avatar in the
+HUD, and drawn as a building at the board's centre by
+[`js/ui/estate3d.js`](../estate/README.md).
 
-## Points come from three places at once
+## Status is a LEVEL that resets every Season
 
-| source | knob |
+1 to `cfg.statusLevels` (thirty). Reaching the top **is** the Season gate (GDD §5.4), which is why
+the curve lives in the economy model rather than in `cfg`.
+
+## Four inflows, all of them derived
+
+| inflow | knob |
 |---|---|
-| the items owned | each item's `points` |
-| watching | `cfg.statusPerEpisode` per episode watched |
-| collecting | `cfg.statusPerCard` per card, `cfg.statusPerBoard` per set finished |
+| converting a card — its **third** copy | that rarity's `status`, then `trickle` per copy after |
+| completing a set of ten | `cfg.setBonusStatus` |
+| watching an episode | `cfg.statusPerEpisode` |
+| calling a prediction right | `cfg.statusPerPrediction` |
 
-So a player who never spends a coin still climbs, and a player who buys the whole shelf still has
-to watch the show to reach the top rank. **That split is the design** — status is the one number
-both loops feed. `STATUS_RANKS` names the milestones; the first must be at 0.
+None of these is stored: each is already written down somewhere else, and a second copy would
+drift. The items below are Collectibles too — granted whole rather than converted, and the seed
+of the Showcase (§5.2). So a player who never spends a coin still climbs, and one who buys the
+whole shelf still has to watch the show and call it right to finish a Season.
+
+The **one** stored number is `state.seasonFrom`: the lifetime total when this Season began.
+Points this Season are the difference, which is how §5.3's reset takes Status to zero while the
+collection, the Showcase and the prediction record all persist — nothing is deleted, the line
+just moves.
+
+## Bands and milestones
+
+`STATUS_RANKS` names a band every five levels, and the first must open at level 1. `STATUS_MILESTONES`
+pays at the same levels — a clue cache, energy or a pack — and the estate changes there too. That
+alignment is deliberate: a milestone, a new title and a new house arriving together is one beat
+instead of three.
+
+A milestone pays once, and that record (`state.statusMilestones`) is the second stored thing:
+"was this given" is not derivable from a level that only goes up. A clue cache is what couples
+the two tracks — the Status track buying story progress is the reason climbing it is worth doing.
 
 ## Every item is both bought and earned
 

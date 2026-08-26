@@ -20,7 +20,7 @@ import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
 import { Dice3D } from "./dice3d.js";
 import { NPC3D } from "./npc3d.js";
-import { Case3D } from "./case3d.js";
+import { Estate3D } from "./estate3d.js";
 import { Box3D } from "./box3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
@@ -158,7 +158,7 @@ const Board3D = {
     Env3D.init(this._scene);
     /* The current set, standing inside the ring. Its own group in this scene, so it is drawn,
        depth-tested and moved by the camera like anything else on the board. */
-    Case3D.init(this._scene);
+    Estate3D.init(this._scene);
     /* The box that pops open over the board, and the cards that come out of it. */
     Box3D.init(this._scene);
     this.syncPageBackground();
@@ -588,8 +588,8 @@ const Board3D = {
     }
   },
 
-  /* The case board — redrawn only when what it says changes; see Case3D.sync(). */
-  syncCase(){ if (this.available) Case3D.sync(); },
+  /* The Status Estate — redrawn only when what it shows changes; see Estate3D.sync(). */
+  syncCase(){ if (this.available) Estate3D.sync(); },
 
   /* ---------------- opening a box ----------------
      Two beats, both in the scene and both awaited by the roll loop: the closed box waiting to be
@@ -622,9 +622,7 @@ const Board3D = {
   },
   endPack(){ /* nothing to restore: nothing was hidden */ },
   cancelPack(){ if (this.available) Box3D.cancel(); },
-  /* Which episode panel is under this point, or null. Sprites, so a plain Raycaster works.
-
-     Slot 0 is a legitimate answer and is falsy — every caller must test against null. */
+  /* True when this point is on the Status Estate. */
   caseAt(clientX, clientY){
     if (!this.available) return null;
     const r = this._renderer.domElement.getBoundingClientRect();
@@ -633,13 +631,12 @@ const Board3D = {
       -((clientY - r.top) / r.height) * 2 + 1);
     if (!this._ray) this._ray = new THREE.Raycaster();
     this._ray.setFromCamera(ndc, this._camera);
-    /* The row is rebuilt whenever a card lands, and a fresh sprite's world matrix is stale until
-       the next render — so a tap in the frame right after a card arrives would miss every panel.
-       Update before testing rather than trusting the render loop to have got there first. */
-    const sprites = Case3D.sprites();
-    sprites.forEach(sp => sp.updateMatrixWorld());
-    const hits = this._ray.intersectObjects(sprites, false);
-    return hits.length ? hits[0].object.userData.page : null;
+    /* The estate is rebuilt whenever the level moves, and a fresh mesh's world matrix is stale
+       until the next render — so a tap in the frame right after a level-up would miss it. Update
+       before testing rather than trusting the render loop to have got there first. */
+    const meshes = Estate3D.meshes();
+    meshes.forEach(m => m.updateMatrixWorld());
+    return this._ray.intersectObjects(meshes, false).length > 0;
   },
 
   /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
@@ -805,8 +802,7 @@ const Board3D = {
       if (Box3D.targets().length){ Box3D.tap(); return; }
       /* Cards on screen: a tap takes them away early rather than making the player wait it out. */
       if (Box3D.dismissable()){ Box3D.dismiss(); return; }
-      const page = this.caseAt(e.clientX, e.clientY);
-      if (page != null && typeof onCasePanelTap === "function") onCasePanelTap(page);
+      if (this.caseAt(e.clientX, e.clientY) && typeof onEstateTap === "function") onEstateTap();
     };
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);

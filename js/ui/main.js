@@ -61,13 +61,41 @@ async function showUnlocks(ids){
 async function afterCollect(){
   const before=Status.points();
   const got=Status.sweep();
-  if(!got.length) return;
-  got.forEach(i=>log("⭐",`Status · earned <b>${i.name}</b> · +${i.points}`));
-  renderAll();
-  /* The same beat a box's status drop gets — an item earned by playing is the same kind of
-     thing as one found in a box, so it is shown the same way rather than as a toast that
-     scrolls past. */
-  await showStatusUp({items:got,from:before,to:Status.points()});
+  if(got.length){
+    got.forEach(i=>log("⭐",`Status · earned <b>${i.name}</b> · +${i.points}`));
+    renderAll();
+    /* The same beat a box's status drop gets — an item earned by playing is the same kind of
+       thing as one found in a box, so it is shown the same way rather than as a toast that
+       scrolls past. */
+    await showStatusUp({items:got,from:before,to:Status.points()});
+  }
+  /* …and every LEVEL milestone the points just crossed (GDD 5.3). After the item sweep, because
+     an item is worth points and can be the thing that crosses the level. */
+  await afterMilestones();
+}
+
+/* Status milestones, every five levels. Each pays once; the sweep is idempotent, so a missed
+   one is a delayed reward and never a lost one. A pack milestone opens the box for real, which
+   is why this awaits playEvents rather than announcing it. */
+async function afterMilestones(){
+  const paid=Status.milestoneSweep();
+  for(const p of paid){
+    const m=p.milestone;
+    log("🏅",`Level <b>${m.level}</b> · ${m.blurb}`);
+    renderAll();
+    if(p.clues.length){
+      p.clues.forEach(c=>log("🔍",`Clue cache · <i>${c.clue.text}</i>`));
+      toast(`🏅 Level ${m.level} — <b>${p.clues.length} clue${p.clues.length>1?"s":""}</b>`);
+      /* A clue cache can complete an episode, and the unlock owes the same beat it owes
+         anywhere else — so it goes through the event list rather than round it. */
+      const fresh=Collection.claimUnlocked(Collection.unlockedEpisodeIds()
+        .filter(id=>state.epQueue.includes(id)||Collection.watchedIds().includes(id)));
+      if(fresh.length) await playEvents([{unlock:{ids:fresh}}]);
+    }
+    if(p.energy) toast(`🏅 Level ${m.level} — <b>+${p.energy}</b> energy`);
+    if(p.tier) await playEvents(openBoxEvents(p.tier));
+  }
+  if(paid.length) renderAll();
 }
 
 async function roll(){
@@ -332,7 +360,8 @@ function boot(){
    ["The board",validateBoard()],
    ["The pools",Pools.validate()],
    ["The clues",Clues.validate()],
-   ["The collection",Cards.validate()]].forEach(([what,bad])=>{
+   ["The collection",Cards.validate()],
+   ["Status",Status.validate()]].forEach(([what,bad])=>{
     if(!bad.length) return;
     console.warn(what+":",bad);
     log("⚠️",`<b>${what} does not add up</b> — ${bad.length} problem${bad.length>1?"s":""}, see the console.`);
