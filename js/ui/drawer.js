@@ -30,18 +30,25 @@ function buildTuning(){
     });
     body.appendChild(wrap);
   });
-  /* The box tables — the three tiers, and what each row's weight is worth in the draw.
+  /* The pack tables — the three packs, and what each row's weight is worth in the draw.
      This replaced the deck and mystery-box editors: neither table is read by the game any more
-     (js/config.js says why they are still there), and the boxes are where every card, coin and
+     (js/config.js says why they are still there), and packs are where every card, coin and
      point of energy now comes from. Percentages are shown alongside the raw weight because a
-     weight only means something against the column's total. */
+     weight only means something against the column's total.
+
+     NO DOLLAR PRICE. GDD 8.4: real money buys Money, and only Money buys packs — the tiers
+     stopped carrying a `usd` when that landed, and this line still printing one is what took
+     the whole boot down with it, because buildTuning() runs before renderAll(). */
   boxTiers.forEach((t,ti)=>{
     const wrap=document.createElement("div"); wrap.className="tgroup";
     const total=t.table.reduce((a,r)=>a+r.weight,0)||1;
-    wrap.innerHTML=`<h4>${t.icon} ${t.name} · ${t.items} draw${t.items>1?"s":""}</h4>
-      <p class="hint" style="margin:0 0 8px">Bought for 🪙 ${fmt(t.coins)} or $${t.usd.toFixed(2)},
+    const price=Boxes.priceOf(t.key);
+    wrap.innerHTML=`<h4>${t.icon} ${t.name} · ${t.items} draw${t.items>1?"s":""}${
+        t.clue==="fresh"?" + a clue":""}</h4>
+      <p class="hint" style="margin:0 0 8px">Bought for 🪙 ${fmt(price)}${
+        t.escalates?` (×${(1+(+cfg.insiderStep||0)).toFixed(2)} per one bought since the last unlock)`:""},
       and one of the ${Math.round((deckBoxes.find(d=>d.key===t.key)||{weight:0}).weight)}%
-      of deck-tile boxes that come out this tier.</p>`;
+      of packs the Premiere hands over that come out this tier.</p>`;
     const tb=document.createElement("table"); tb.className="ttable";
     tb.innerHTML=`<tr><th>Drop</th><th>Weight</th><th>%</th><th>Amount</th></tr>`;
     t.table.forEach((r,i)=>{

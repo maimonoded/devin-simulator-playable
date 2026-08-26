@@ -173,9 +173,9 @@ function renderHUD(){
   const ap=h<12?"AM":"PM"; let h12=h%12; if(h12===0)h12=12;
   $("#hClock").textContent=`${h12}:${String(m).padStart(2,"0")} ${ap}`;
   tweenNumber($("#hCoins"),state.lastCoins,state.coins,v=>fmt(v)); state.lastCoins=state.coins;
-  /* The card counter is progress through THIS SET, not a lifetime total. The set is what the
-     player is working on — "18/25" is a sentence about what to do next, where a number that
-     only ever climbs is a sentence about the past. */
+  /* The card counter is the Season's collection, not a per-set total: cards stopped being tied
+     to a set of episodes when clues took over the gate (GDD 6.1), and 150 is what there is to
+     collect. What the player is working on NEXT is the story panel's job. */
   const cards=Cards.owned(), pool=Cards.poolSize();
   tweenNumber($("#hCards"),state.lastCards,cards,v=>`${Math.round(v)}/${pool}`);
   state.lastCards=cards;

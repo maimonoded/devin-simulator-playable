@@ -111,8 +111,11 @@ async function roll(){
     await sleep(cfg.diceToMoveMs);      // reveal → token starts moving
 
     let passedStart=false;
+    /* boardSize(), not 40: the ring is data per Season now (assets/board/board.js), and this was
+       the last place that still knew how big it was. */
+    const n=boardSize();
     for(let s=0;s<steps;s++){
-      state.pos=(state.pos+1)%40;
+      state.pos=(state.pos+1)%n;
       if(state.pos===0) passedStart=true;
       positionToken();
     if(!use3d()){ const tok=$("#token"); tok.classList.remove("hop"); void tok.offsetWidth; tok.classList.add("hop"); }
@@ -353,7 +356,23 @@ function boot(){
   loadConfig();                 // initState() reads cfg.energyCap, so this must precede it
   initState();
   const restored=loadState();   // overlay saved progress, if any
-  buildBoard(); buildTuning(); setDice(3,4); syncMultButton(); renderAll();
+  buildBoard();
+  /* THE DRAWER MUST NOT BE ABLE TO TAKE THE BOARD DOWN WITH IT. buildTuning() paints a
+     developer surface — every knob, every drop table — and it runs before renderAll(). A single
+     stale field in it therefore used to leave the whole game on its static markup: no HUD, no
+     story panel, no activity log, and no error a player could act on. (It happened: the tuning
+     drawer printed a pack's dollar price after GDD 8.4 removed it.)
+
+     Same shape as roll()'s try/finally, and for the same reason: the thing that must always
+     happen is the render. */
+  try{ buildTuning(); }
+  catch(e){
+    console.error("buildTuning failed:",e);
+    const body=$("#tuningBody");
+    if(body) body.innerHTML=`<p class="hint" style="color:var(--pink)">The tuning drawer failed to
+      build — see the console. The game is unaffected.</p>`;
+  }
+  setDice(3,4); syncMultButton(); renderAll();
   applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
   if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${Cards.owned()}/${Cards.poolSize()} cards · set ${Collection.num()}.`);
   else log("✨","Welcome to <b>Harbour Heights</b>. Roll to find cards, collect a set to unlock an episode, predict to win.");

@@ -205,9 +205,22 @@ function showCollect(c){
     $("#scrim").onclick=(e)=>{ if(e.target===$("#scrim")) finish(); };
   });
 }
+/* A number counting up to its new value.
+
+   WRITES THE VALUE FIRST, THEN ANIMATES. The animation is a bare requestAnimationFrame, which is
+   suspended in a background tab — and this is TEXT, not a style value, so a suspended frame loop
+   means the counter shows whatever the markup shipped with until the tab is looked at again. It
+   did exactly that: a restored session sat on the HUD's hardcoded "0/25" while the state behind
+   it said eleven of a hundred and fifty.
+
+   So the final value is written synchronously and unconditionally, and the tween is decoration
+   over the top of a HUD that is already correct. See CLAUDE.md on rAF and background tabs. */
 function tweenNumber(el,from,to,fmtFn){
+  if(!el) return;
+  el.textContent=fmtFn(to);
+  if(from===to||(typeof document!=="undefined"&&document.hidden)) return;
   const t0=performance.now(),dur=450;
   function step(now){ const k=Math.min(1,(now-t0)/dur); const v=from+(to-from)*(1-Math.pow(1-k,3));
-    el.textContent=fmtFn(v); if(k<1) requestAnimationFrame(step); }
+    el.textContent=fmtFn(k>=1?to:v); if(k<1) requestAnimationFrame(step); }
   requestAnimationFrame(step);
 }
