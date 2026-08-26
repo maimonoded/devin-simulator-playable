@@ -92,7 +92,7 @@ function serializeState(){
   return {v:2,
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
     energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
-    pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
+    pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series, season:state.season,
     /* The collection and the shelf. Both are plain objects keyed by id, so they serialise as
        they stand — no Map to spread, and a card or item the content no longer defines simply
        sits there harmlessly until it is defined again. */
@@ -139,6 +139,9 @@ function loadState(){
       Object.keys(src).forEach(id=>{ const c=Math.floor(+src[id]||0); if(c>0) out[id]=c; });
       state.albums[String(n)]=out;
     });
+    /* Clamped to a Season that actually exists: a save from a build with more Seasons than
+       this one would otherwise leave the board empty and every tile undefined. */
+    state.season=Math.min(Math.max(0,Math.floor(+d.season||0)),BOARD_SEASONS.length-1);
     state.boardNum=Math.max(1,Math.floor(+d.boardNum||1));
     if(!state.albums[String(state.boardNum)]) state.albums[String(state.boardNum)]={};
     /* THE SHELF. Only items this build defines — unlike a card, a status item that no longer

@@ -187,7 +187,12 @@
 <script src="js/xlsx.js"></script>
 <script src="js/economy.js"></script>
 <script src="js/economy-import.js"></script>
+<!-- the board and the pools are CONTENT: what the ring is made of, and what a landing can
+     turn up. Both load before the engines that read them. -->
+<script src="assets/board/board.js"></script>
+<script src="assets/pools/pools.js"></script>
 <script src="js/board-model.js"></script>
+<script src="js/pools.js"></script>
 <script src="js/env-model.js"></script>
 <script src="js/dice-model.js"></script>
 <!-- environment placement manifest (see assets/env/ART-BRIEF-ENV.md) -->
@@ -205,13 +210,11 @@
 <script src="js/state.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/tiles/tile.js"></script>
-<script src="js/tiles/standard-tile.js"></script>
-<script src="js/tiles/start-tile.js"></script>
-<script src="js/tiles/spa-tile.js"></script>
-<script src="js/tiles/vip-tile.js"></script>
+<script src="js/tiles/pool-tile.js"></script>
 <script src="js/tiles/premiere-tile.js"></script>
-<script src="js/tiles/train-tile.js"></script>
-<script src="js/tiles/deck-tile.js"></script>
+<script src="js/tiles/spa-tile.js"></script>
+<script src="js/tiles/gala-tile.js"></script>
+<script src="js/tiles/scoop-tile.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui/fx.js"></script>
 <!-- after fx.js: falls back to its showCollect() when a game is off, missing or broken -->

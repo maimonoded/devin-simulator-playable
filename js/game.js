@@ -19,14 +19,20 @@ function applyPassStart(mult){
 }
 
 /* Resolve whatever the token landed on. Mutates state fully; returns events for the UI to play.
-   Per-type landing behavior lives in js/tiles/; nothing tile-specific belongs in this function.
 
-   There is no overlay layer any more. Boxes used to sit on tiles and resolve before them; they
-   are now handed over and opened on the spot (js/tiles/deck-tile.js, js/boxes.js), so a tile
-   index has exactly one thing on it again. */
+   This is a dispatch and nothing else, and it stays that way. Four of the board's eight types
+   are one class drawing from a weighted pool (js/tiles/pool-tile.js) and the four corners are
+   the only bespoke behaviours left (GDD 3.4) — so "what a tile does" is answered in js/tiles/
+   and in assets/pools/pools.js, never here.
+
+   The guard is for a board naming a type nobody registered. validateBoard() and Pools.validate()
+   both report that at boot; landing on it mid-roll should be a quiet nothing, not a thrown
+   error that leaves state.animating stuck and the Roll button dead. */
 function resolveLandingEvents(mult){
   const i=state.pos;
-  return TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale}).slice();
+  const tile=TILE_TYPES[tileType(i)];
+  if(!tile) return [];
+  return tile.onLand({pos:i,mult,bs:cfg.boardScale}).slice();
 }
 
 /* ---------- prediction ---------- */

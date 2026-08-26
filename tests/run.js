@@ -17,7 +17,11 @@ const APP_FILES = [
   "js/util.js",
   "js/config.js",
   "js/content.js",
+  /* the board and the pools are content; their engines read them */
+  "assets/board/board.js",
+  "assets/pools/pools.js",
   "js/board-model.js",
+  "js/pools.js",
   "js/env-model.js",
   "js/dice-model.js",
   "assets/env/scene.js",
@@ -136,6 +140,15 @@ vm.runInContext(`
     const saved = t.table.map(r => r.weight);
     t.table.forEach(r => { r.weight = match(r) ? 100 : 0; });
     try { return fn(); } finally { t.table.forEach((r, i) => { r.weight = saved[i]; }); }
+  }
+  /* The same trick for a POOL: force one row to be the only drawable one, always restored.
+     Every landing is a weighted draw now, so a test that wants "a clue off an NPC tile" has to
+     say so rather than roll for it and hope. */
+  function forcePool(key, match, fn){
+    const t = Pools.table(key);
+    const saved = t.map(r => r.weight);
+    t.forEach(r => { r.weight = match(r) ? 100 : 0; });
+    try { return fn(); } finally { t.forEach((r, i) => { r.weight = saved[i]; }); }
   }
   /* Deterministic randomness: feeds Math.random a fixed sequence, always restored.
      Not a mock of anything the app owns — just removing the nondeterminism. */

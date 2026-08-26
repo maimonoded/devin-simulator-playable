@@ -13,6 +13,11 @@ function initState(){
        not insight. */
     energy:cfg.energyCap, coins:0, clues:0, cycleClues:0, vip:0,
     pos:0, mult:1, series:0,
+    /* Which Season's board is being played — an INDEX into BOARD_SEASONS (assets/board/board.js),
+       so 0 is Season 1. The board's size, shape and every tile's type come from there, which is
+       why this has to be state rather than a constant: GDD 5.3's Season reset swaps the board,
+       the card set and the cast in one move, and this is the cursor it moves. */
+    season:0,
     /* Which board of the collection is being played. Board n covers episodes
        [(n-1)*cfg.episodesPerBoard, n*cfg.episodesPerBoard) of the library. */
     boardNum:1,

@@ -102,57 +102,84 @@ test("the train's two bonuses are a well-formed pair", () => {
 
 suite("board-model");
 
-test("tileType maps every index and only to known types", () => {
-  const known = new Set(["start", "spa", "vip", "premiere", "train", "deck", "standard"]);
-  for (let i = 0; i < 40; i++) ok(known.has(tileType(i)), `tile ${i} -> ${tileType(i)}`);
+test("the shipped board validates, and every tile is a corner or a pool", () => {
+  deepEq(validateBoard(0), [], "Season 1 must be well-formed");
+  const known = new Set([...BOARD_CORNERS, ...Object.keys(TILE_POOLS)]);
+  for (let i = 0; i < boardSize(); i++) ok(known.has(tileType(i)), `tile ${i} -> ${tileType(i)}`);
 });
 
-test("corners, trains and decks sit where the layout says", () => {
-  eq(tileType(0), "start"); eq(tileType(10), "spa");
-  eq(tileType(20), "vip");  eq(tileType(30), "premiere");
-  [5, 15, 25, 35].forEach(i => eq(tileType(i), "train", `tile ${i}`));
-  [3, 8, 13, 18, 23, 28].forEach(i => eq(tileType(i), "deck", `tile ${i}`));
-  eq(tileType(1), "standard");
+test("the four corners sit one per side, and Season 1 is GDD 3.1's budget", () => {
+  const per = boardSize() / 4;
+  BOARD_CORNERS.forEach((c, k) => eq(tileType(k * per), c, `corner ${k}`));
+  const count = t => tilesOfType(t).length;
+  eq(boardSize(), 40);
+  eq(count("std"), 20);      eq(count("npc"), 6);
+  eq(count("arrival"), 4);   eq(count("twist"), 6);
+  eq(count("std") + count("npc") + count("arrival") + count("twist") + 4, boardSize());
 });
 
-test("there are 26 standard tiles", () => {
-  let n = 0;
-  for (let i = 0; i < 40; i++) if (tileType(i) === "standard") n++;
-  eq(n, 26);
+test("the arrivals sit at the side midpoints", () => {
+  const per = boardSize() / 4;
+  deepEq(tilesOfType("arrival"), [0, 1, 2, 3].map(k => k * per + per / 2));
 });
 
-test("gridPos gives 40 unique cells inside an 11x11 ring", () => {
+test("an NPC tile names who is on it, and a plain tile names nobody", () => {
+  tilesOfType("npc").forEach(i => ok(tileArg(i), `tile ${i} has no character on it`));
+  eq(tileArg(tilesOfType("std")[0]), null);
+});
+
+test("validateBoard reports EVERY problem, not the first", () => {
+  const real = BOARD_SEASONS[0];
+  BOARD_SEASONS[0] = { season: 9, name: "broken", tiles: ["std", "std", "npc", "nonsense"] };
+  try {
+    const errs = validateBoard(0);
+    ok(errs.length >= 3, "a corner in the wrong place, an unknown type and a nameless NPC: " + errs.join(" | "));
+    ok(errs.some(e => /premiere/.test(e)), "the missing corner");
+    ok(errs.some(e => /nonsense/.test(e)), "the unknown type");
+    ok(errs.some(e => /nobody on it/.test(e)), "the nameless NPC");
+  } finally { BOARD_SEASONS[0] = real; }
+});
+
+test("a board must divide by four so its sides are equal", () => {
+  const real = BOARD_SEASONS[0];
+  BOARD_SEASONS[0] = { season: 9, name: "odd", tiles: new Array(38).fill("std") };
+  try { ok(validateBoard(0).some(e => /divide by 4/.test(e))); }
+  finally { BOARD_SEASONS[0] = real; }
+});
+
+test("gridPos gives one unique ring cell per tile, on a grid of side N/4+1", () => {
+  const n = boardSize(), m = gridN() - 1;
+  eq(gridN(), n / 4 + 1, "the ring's four sides share their corners");
   const cells = new Set();
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < n; i++) {
     const p = gridPos(i);
-    ok(p.r >= 0 && p.r <= 10 && p.c >= 0 && p.c <= 10, `tile ${i} off-grid`);
-    ok(p.r === 0 || p.r === 10 || p.c === 0 || p.c === 10, `tile ${i} not on the ring`);
+    ok(p.r >= 0 && p.r <= m && p.c >= 0 && p.c <= m, `tile ${i} off-grid`);
+    ok(p.r === 0 || p.r === m || p.c === 0 || p.c === m, `tile ${i} not on the ring`);
     cells.add(p.r + "," + p.c);
   }
-  eq(cells.size, 40, "duplicate grid cell");
+  eq(cells.size, n, "duplicate grid cell");
 });
 
 test("Start sits at the bottom-facing corner and corners are corners", () => {
-  deepEq(gridPos(0), { r: 10, c: 10 }, "Start should be the screen-bottom vertex");
-  [0, 10, 20, 30].forEach(i => {
+  const m = gridN() - 1, per = boardSize() / 4;
+  deepEq(gridPos(0), { r: m, c: m }, "Start should be the screen-bottom vertex");
+  [0, 1, 2, 3].map(k => k * per).forEach(i => {
     const p = gridPos(i);
-    ok((p.r === 0 || p.r === 10) && (p.c === 0 || p.c === 10), `corner tile ${i} not on a grid corner`);
+    ok((p.r === 0 || p.r === m) && (p.c === 0 || p.c === m), `corner tile ${i} not on a grid corner`);
   });
 });
 
 test("consecutive tiles are always grid-adjacent", () => {
-  for (let i = 0; i < 40; i++) {
-    const a = gridPos(i), b = gridPos((i + 1) % 40);
-    eq(Math.abs(a.r - b.r) + Math.abs(a.c - b.c), 1, `tiles ${i}->${(i + 1) % 40} not adjacent`);
+  const n = boardSize();
+  for (let i = 0; i < n; i++) {
+    const a = gridPos(i), b = gridPos((i + 1) % n);
+    eq(Math.abs(a.r - b.r) + Math.abs(a.c - b.c), 1, `tiles ${i}->${(i + 1) % n} not adjacent`);
   }
 });
 
-test("stdWeights covers exactly the standard tiles and averages 1", () => {
-  const keys = Object.keys(stdWeights).map(Number);
-  eq(keys.length, 26);
-  keys.forEach(i => eq(tileType(i), "standard", `weight on non-standard tile ${i}`));
-  const mean = keys.reduce((a, i) => a + stdWeights[i], 0) / keys.length;
-  near(mean, 1, 1e-9);
+test("no tile carries a printed value any more — the position weights are gone", () => {
+  ok(typeof stdWeights === "undefined",
+     "a tile that draws cannot advertise a number; the weights must be gone, not shadowed");
 });
 
 test("tileImagePath is 1-based and points into assets/tiles", () => {

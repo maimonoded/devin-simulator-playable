@@ -4,6 +4,13 @@ const DEFAULTS={
   energyCap:30, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
+  /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
+     whole journey rather than a per-tile speed. */
+  scoopStepMs:260,
+  /* The two corners that hand something over. galaTier is the floor on the Gala's
+     guaranteed card — GDD 3.4's "Rare or better" in the tier vocabulary the collection
+     speaks today; premiereBox is the free pack for landing on Start. */
+  galaTier:"gold", premiereBox:"silver",
   fallbackSceneMs:1700, longPressMs:350,
   /* Bonus mini-games — the full-frame games the train tile opens (minigames/, js/ui/minigame.js).
      bonusGames 0 falls back to the plain Collect popup, which is also what happens on its own if
@@ -245,17 +252,18 @@ const TUNING=[
    ["bonusLoadMs","Bonus game: opening animation (ms)",100],
    ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
    ["deckCardMs","Deck: card on screen (ms)",100],
-   ["vipRevealMs","VIP: dwell before moving on (ms)",100],
+   ["vipRevealMs","Gala: dwell before moving on (ms)",100],
+   ["scoopStepMs","Scoop: teleport (ms)",20],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
-   ["startRevealMs","Start: dwell on tile (ms)",50]]},
+   ["startRevealMs","Premiere: dwell on tile (ms)",50]]},
  {group:"Tile values (base coins)",items:[
    ["stdBase","Standard base coins (avg)",1],
    /* The train's two outcomes, straight from the model. cfg.trainEV is derived from them
       and so is deliberately not editable here. */
    ["trainSmall","Train: small bonus",5],["trainLarge","Train: large bonus",5],
    ["trainLargeChance","Train: chance of the large bonus",0.05],
-   ["startPass","Start pass bonus",10],["startLand","Start landing extra",10],
-   ["spaEnergy","Spa Day energy grant",1],["vipSeed","VIP seed per lap",5],
+   ["startPass","Premiere pass bonus",10],["startLand","Premiere landing extra",10],
+   ["spaEnergy","Spa Day energy grant",1],["vipSeed","Gala pot seed per lap",5],
    ["boardScale","Board scale",0.1],
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],

@@ -9,27 +9,44 @@ suite("game: landing dispatch");
 
 test("resolveLandingEvents delegates to the tile for that index", () => {
   freshRun();
-  state.pos = 9; state.coins = 0;
-  resolveLandingEvents(1);
-  near(state.coins, cfg.stdBase * stdWeights[9] * cfg.boardScale, 1e-9);
+  forcePool("money", r => r.kind === "money" && r.amount === 30, () => {
+    state.pos = tilesOfType("std")[0]; state.coins = 0;
+    resolveLandingEvents(1);
+    eq(state.coins, 30 * cfg.boardScale);
+  });
 });
 
 test("a landing yields that tile's events and nothing else", () => {
   freshRun();
-  state.pos = 3;                                   // a deck tile: hands over a box
-  const ev = resolveLandingEvents(1);
-  ok(ev.some(e => e.pack), "the deck tile's box");
-  state.pos = 9;                                   // a standard tile: coins only
-  const plain = resolveLandingEvents(1);
-  eq(plain.filter(e => e.pack).length, 0, "nothing arrives from a layer that no longer exists");
+  state.pos = 0;                                   // the Premiere: a free pack
+  ok(resolveLandingEvents(1).some(e => e.pack), "the Premiere's pack");
+  forcePool("money", r => r.kind === "money", () => {
+    state.pos = tilesOfType("std")[0];
+    eq(resolveLandingEvents(1).filter(e => e.pack).length, 0,
+       "nothing arrives from a layer that no longer exists");
+  });
+});
+
+test("a board type nobody registered is a quiet nothing, not a thrown roll", () => {
+  freshRun();
+  const real = BOARD_SEASONS[0];
+  BOARD_SEASONS[0] = { season: 9, name: "x", tiles: real.tiles.map((t, i) => i === 9 ? "ghost" : t) };
+  try {
+    state.pos = 9;
+    deepEq(resolveLandingEvents(1), [], "state.animating must never be left stuck by a throw");
+  } finally { BOARD_SEASONS[0] = real; }
 });
 
 test("the returned list is a copy — a caller cannot mutate the tile's own array", () => {
   freshRun();
-  state.pos = 9;
-  const a = resolveLandingEvents(1);
-  a.push({ log: { icon: "x", msg: "x" } });
-  eq(resolveLandingEvents(1).length, a.length - 1);
+  /* Pinned to one row, because two landings are two independent draws now and would differ
+     in length for reasons that have nothing to do with aliasing. */
+  forcePool("money", r => r.kind === "money" && r.amount === 30, () => {
+    state.pos = tilesOfType("std")[0];
+    const a = resolveLandingEvents(1);
+    a.push({ log: { icon: "x", msg: "x" } });
+    eq(resolveLandingEvents(1).length, a.length - 1);
+  });
 });
 
 suite("storage");

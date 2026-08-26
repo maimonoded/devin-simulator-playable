@@ -78,7 +78,7 @@ function onTileModelled(i){
 function buildBoardLabels(){
   const layer=$("#boardLabels"); if(!layer) return;
   layer.innerHTML="";
-  for(let i=0;i<40;i++){
+  for(let i=0;i<boardSize();i++){
     const def=TILE_TYPES[tileType(i)];
     const el=document.createElement("div");
     el.className="blabel"; el.dataset.i=i;
@@ -126,7 +126,7 @@ function buildBoard(){
   if(use3d()){ Board3D.build(); buildBoardLabels(); renderCaseBoard(); return; }
   const board=$("#board");
   board.querySelectorAll(".tile").forEach(t=>t.remove());
-  for(let i=0;i<40;i++){
+  for(let i=0;i<boardSize();i++){
     const t=tileType(i); const def=TILE_TYPES[t]; const p=gridPos(i);
     const el=document.createElement("div");
     el.className="tile "+(def.corner?"corner "+t:t);

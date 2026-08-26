@@ -144,11 +144,19 @@ function clearOverlayFx(){
     Board3D.cancelPack();
 }
 /* Drawn deck card, flipped onto the board centre and held for cfg.deckCardMs. */
+/* A card, held on screen for cfg.deckCardMs.
+
+   `collectible` is a card from the collection, and when it is there the card's OWN face is
+   drawn — the same cardFace() the album and the box popup use. A card that looked like two
+   different things in the two places it appears is not a collection (CLAUDE.md). Without one
+   this falls back to the generic panel, which is what a pool row's flavour outcome gets. */
 function showCard(c){
   const el=$("#centerFx");
   el.className="centerfx show card "+(c.positive?"win":"lose");
-  el.innerHTML=`<div class="playcard">
-      <div class="pcTop">Plot Twist</div>
+  el.innerHTML=c.collectible
+    ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count})
+    : `<div class="playcard">
+      <div class="pcTop">${c.top||"Plot Twist"}</div>
       <div class="pcIco">🃏</div>
       <div class="pcName">${c.name}</div>
       ${c.big?`<div class="pcAmt">${c.big}</div>`:""}

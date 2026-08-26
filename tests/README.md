@@ -25,23 +25,29 @@ sequence and always restores it. Weighted tables are steered by temporarily zero
 (`forceCard`, `forceDrop`) rather than by stubbing `weighted()`.
 
 Helpers available in suites: `suite`, `test`, `ok`, `eq`, `near`, `deepEq`, `throws`,
-`withRandom`, `withQuietConsole`, `freshRun()`, `resetCfg()`.
+`withRandom`, `withQuietConsole`, `freshRun()`, `resetCfg()`, `forceBox()`, `forcePool()`.
+
+`forcePool(key, match, fn)` pins a pool to one row and always restores it. Every landing is a
+weighted draw now, so a test that wants "a clue off an NPC tile" has to say so — rolling for it
+and hoping would test the random number generator, not the tile.
 
 ## What's covered
 
 | Suite | Covers |
 |---|---|
-| [01-core](suites/01-core.js) | `util` (fmt, rand, chance, weighted, shuffle), config invariants (every tuning key has a default, train EV normalises to 1), `board-model` (tile types, grid uniqueness/adjacency, Start at the bottom vertex, stdWeights mean, pathToStart) |
+| [01-core](suites/01-core.js) | `util` (fmt, rand, chance, weighted, shuffle), config invariants (every tuning key has a default, train EV normalises to 1), `board-model` — the shipped Season validating clean, GDD §3.1's tile budget, corners one per side, arrivals at the side midpoints, `validateBoard` reporting every problem at once, and geometry (grid uniqueness/adjacency, Start at the bottom vertex, `pathToStart`) asserted against `boardSize()` rather than a hardcoded 40 |
 | [02-episodes](suites/02-episodes.js) | Every shipped episode file validated against the schema; registry lookups; id→video derivation; cycling past the last episode; the full `difficulty` normalisation matrix |
 | [03-collection](suites/03-collection.js) | The board's shape and that the shipped one validates clean; the pool derived from the requirements; card ids; owning and duplicating; **a new clue card feeds both clue counters and a duplicate feeds neither**; per-board albums; unlocking; **watching in strict story order**; a set finishing on the last watch rather than the last card; board advance; box drops per tier, duplicate consolation, the status slot and its coin fallback; status points, ranks, buying and the milestone sweep |
 | [04-game](suites/04-game.js) | Dice bounds, `spendRoll`, lap bonus, prediction resolution (correct/wrong, streaks, queue consumption, zero-wager, manual vs auto accuracy), session/time (refill, day rollover, login rewards, multi-day skips, over-cap energy) |
-| [05-tiles](suites/05-tiles.js) | `BoardActor` reward + presentation builders, the tile registry, and every tile's landing behaviour asserted on returned event lists — including train EV over 4,000 draws, and the deck tile handing over exactly one box of a real tier and paying nothing of its own |
-| [06-storage](suites/06-storage.js) | Landing dispatch, and storage: serialize/restore round-trip including the albums and the shelf, a finished set surviving a reload, **a card this build no longer defines is kept while a status item that no longer exists is dropped**, corrupt albums degrading rather than poisoning, over-cap energy, legacy-queue migration, the box tables round-tripping and a wrong-shaped one being refused, config merge onto `DEFAULTS` |
+| [05-tiles](suites/05-tiles.js) | `BoardActor` reward + presentation builders; the registry (the four pooled types being **one class**, only the corners flagged as corners, nothing printing a value); the draw — a tile reaching its own pool and no other, a loss feeding the Gala pot and never digging below zero, a duplicate paying instead of blocking, a bonus row banking before the game opens and a ladder row's amount being a ceiling; and the four corners, including the Scoop teleporting in **one step** so no lap bonus is paid, and every NPC tile being reachable from it |
+| [10-pools](suites/10-pools.js) | `pools`: the shipped tables validating clean, weights summing to 100, every board type pointing at a table that exists, **no pool being pure**, only the Mixed pool taking money away, 20,000 draws matching the authored weights, board share vs pool share, the card/clue rates landing near GDD §4.6 and §6.6, and `validate()` catching a zero-weight table, a nameless row, an unknown kind, a payload-less kind and a tile pointing at a pool that does not exist |
+| [06-storage](suites/06-storage.js) | Landing dispatch — including a board type nobody registered being a quiet nothing rather than a throw that would leave `state.animating` stuck — and storage: serialize/restore round-trip including the albums and the shelf, a finished set surviving a reload, **a card this build no longer defines is kept while a status item that no longer exists is dropped**, corrupt albums degrading rather than poisoning, over-cap energy, legacy-queue migration, the box tables round-tripping and a wrong-shaped one being refused, config merge onto `DEFAULTS` |
 | [08-economy](suites/08-economy.js) | `economy`: the solved exponent, the shipped curve reproducing the workbook's builder-1 prices, segment selection, `bIndex`/`baseMode` boundary behaviour, explicit segments, series planning and clamping to available episodes, global builder numbering, the clue→accuracy arc and its spend-and-reset, and the projection onto `cfg`. `economy-import`: the structural gate — missing sheets, an empty or already-loaded version, a moved label, a non-numeric value, an unpayable box outcome, a deck without exactly one advance card, and the all-errors-at-once contract |
 | [07-env](suites/07-env.js) | `env-model`: the screen-space axes, the region visible at every window aspect, the sight-line height budget (including the case a corner-based budget gets wrong), and the placement manifest — datum resolution, deck scaling from the board plus its border, quarter-turn-only deck yaw, the problem list, `repeat` expansion, and a check that the shipped `assets/env/scene.js` places every piece legally |
 
 The suite is regression-checked: reintroducing the energy-cap clamp, unlocking episodes per level
-instead of per completion, or rotating the board back all produce failures.
+instead of per completion, rotating the board back, bringing back `stdWeights`, or walking the
+Scoop's teleport instead of jumping it all produce failures.
 
 ---
 

@@ -1,14 +1,23 @@
 "use strict";
-/* board-actor.js · tiles/* — landing behaviour, asserted on the returned event lists */
+/* board-actor.js · pools.js · tiles/* — landing behaviour, asserted on the returned event lists.
+
+   Every landing is a weighted draw now (GDD §3.2), so most of these tests pin one row of one
+   pool with forcePool() and then assert on what that row turned into. Rolling for it and hoping
+   would test the random number generator, not the tile. */
 
 /* Collect every float/log/reveal/etc. an event list carries. */
 function evField(events, field) { return events.filter(e => e[field]).map(e => e[field]); }
+/* Land on a tile of a given type — the first one the board has. */
+function landOn(type, ctx) {
+  const i = tilesOfType(type)[0];
+  return TILE_TYPES[type].onLand(Object.assign({ pos: i, mult: 1, bs: cfg.boardScale }, ctx));
+}
 
 suite("board-actor: reward helpers");
 
 test("gainCoins adds coins and returns a float event", () => {
   freshRun();
-  const t = TILE_TYPES.standard;
+  const t = TILE_TYPES.std;
   state.coins = 100;
   const ev = t.gainCoins(50);
   eq(state.coins, 150);
@@ -18,53 +27,51 @@ test("gainCoins adds coins and returns a float event", () => {
 
 test("gainEnergy tops up to the cap", () => {
   freshRun();
-  const t = TILE_TYPES.standard;
   state.energy = cfg.energyCap - 2;
-  t.gainEnergy(10);
+  TILE_TYPES.std.gainEnergy(10);
   eq(state.energy, cfg.energyCap, "clamped to the cap");
 });
 
 test("gainEnergy never reduces a balance already above the cap", () => {
   freshRun();
-  const t = TILE_TYPES.standard;
   state.energy = 500;                      // bought from the store
-  t.gainEnergy(5);
+  TILE_TYPES.std.gainEnergy(5);
   eq(state.energy, 500, "an over-cap balance must not be clamped down");
 });
 
 test("gainClues adds clues", () => {
   freshRun();
   state.clues = 2;
-  TILE_TYPES.standard.gainClues(3);
+  TILE_TYPES.std.gainClues(3);
   eq(state.clues, 5);
 });
 
 test("presentation builders produce well-formed events", () => {
-  const t = TILE_TYPES.standard;
+  const t = TILE_TYPES.std;
   deepEq(t.reveal("+5", "sub", { positive: true, energy: true, ms: 900 }),
          { reveal: { big: "+5", sub: "sub", positive: true, energy: true, ms: 900 } });
   deepEq(t.reveal("x", "y"), { reveal: { big: "x", sub: "y", positive: false, energy: false, ms: undefined } });
-  deepEq(t.collect("+9", "Train bonus"), { collect: { big: "+9", sub: "Train bonus" } });
+  deepEq(t.collect("+9", "Bonus"), { collect: { big: "+9", sub: "Bonus" } });
   deepEq(t.card("Windfall", "+300", { positive: true }),
          { card: { name: "Windfall", big: "+300", positive: true, energy: false } });
 });
 
-test("startLandingBonus pays pass + land and seeds VIP", () => {
+test("startLandingBonus pays pass + land and seeds the Gala pot", () => {
   freshRun();
   state.coins = 0; state.vip = 0;
-  const paid = TILE_TYPES.start.startLandingBonus(2);
+  const paid = TILE_TYPES.premiere.startLandingBonus(2);
   eq(paid, (cfg.startPass + cfg.startLand) * cfg.boardScale * 2);
   eq(state.coins, paid);
-  eq(state.vip, cfg.vipSeed * cfg.boardScale);
+  eq(state.vip, cfg.vipSeed * cfg.boardScale, "the pot is still state.vip — see js/tiles/tile.js");
 });
 
 test("advanceToStart moves the token to 0 and reveals the bonus", () => {
   freshRun();
   state.pos = 30;
-  const ev = TILE_TYPES.premiere.advanceToStart(30, 1, 90, "swept");
+  const ev = TILE_TYPES.std.advanceToStart(30, 1, 90, "swept");
   eq(state.pos, 0, "token must land on Start");
   const move = ev.find(e => e.move);
-  eq(move.move.path.length, 10);
+  eq(move.move.path.length, boardSize() - 30);
   eq(move.move.path[move.move.path.length - 1], 0);
   eq(move.move.stepMs, 90);
   const reveal = ev.find(e => e.reveal).reveal;
@@ -77,7 +84,7 @@ suite("tiles: registry");
 
 test("every board type has a registered tile", () => {
   const types = new Set();
-  for (let i = 0; i < 40; i++) types.add(tileType(i));
+  for (let i = 0; i < boardSize(); i++) types.add(tileType(i));
   types.forEach(t => ok(TILE_TYPES[t], "no tile registered for " + t));
 });
 
@@ -92,190 +99,219 @@ test("tiles inherit the shared base and expose the render contract", () => {
 });
 
 test("only the four corners are flagged as corners", () => {
-  ["start", "spa", "vip", "premiere"].forEach(t => eq(TILE_TYPES[t].corner, true, t));
-  ["standard", "train", "deck"].forEach(t => eq(TILE_TYPES[t].corner, false, t));
+  BOARD_CORNERS.forEach(t => eq(TILE_TYPES[t].corner, true, t));
+  Object.keys(TILE_POOLS).forEach(t => eq(TILE_TYPES[t].corner, false, t));
 });
 
-suite("tiles: landing behaviour");
-
-test("standard pays its printed value and prints what it pays", () => {
-  freshRun();
-  state.coins = 0;
-  const i = 9;
-  const ev = TILE_TYPES.standard.onLand({ pos: i, mult: 1, bs: cfg.boardScale });
-  const expected = cfg.stdBase * stdWeights[i] * cfg.boardScale;
-  near(state.coins, expected, 1e-9);
-  eq(TILE_TYPES.standard.valueLabel(i), String(Math.round(expected)));
-  eq(evField(ev, "reveal").length, 0, "standard tiles must not interrupt play");
+test("the four pooled types are one class, told apart only by their pool and icon", () => {
+  const pooled = Object.keys(TILE_POOLS).map(t => TILE_TYPES[t]);
+  pooled.forEach(t => ok(t instanceof PoolTile, t.type + " should be a PoolTile"));
+  eq(new Set(pooled.map(t => t.icon)).size, pooled.length, "each needs its own fallback icon");
+  eq(new Set(pooled.map(t => t.constructor)).size, 1, "and they must all be the SAME class");
 });
 
-test("standard payout scales with the multiplier", () => {
-  freshRun();
-  state.coins = 0;
-  TILE_TYPES.standard.onLand({ pos: 9, mult: 5, bs: 1 });
-  near(state.coins, cfg.stdBase * stdWeights[9] * 5, 1e-9);
+test("no tile prints a value — a tile that draws cannot advertise a number", () => {
+  Object.values(TILE_TYPES).forEach(t => eq(t.valueLabel(3), "", t.type));
 });
 
-test("train pays around its REAL ev on average, not the model's", () => {
+suite("tiles: the draw");
+
+test("a landing draws from ITS pool, not from any other", () => {
   freshRun();
-  state.coins = 0;
-  const N = 8000;
-  for (let k = 0; k < N; k++) TILE_TYPES.train.onLand({ mult: 1, bs: 1 });
-  const real = Economy.trainRealEV();
-  near(state.coins / N, real, real * 0.08, "train payout should track Economy.trainRealEV()");
-  // and that number is deliberately BELOW what the sheet says, because the large bonus is
-  // presented as a ladder and an even pick of 1/3, 2/3 and the top pays 2/3 of the top
-  ok(real < cfg.trainEV, `real ${real.toFixed(2)} must sit under model ${cfg.trainEV}`);
-  near(real, cfg.trainSmall * (1 - cfg.trainLargeChance)
-           + cfg.trainLarge * (2 / 3) * cfg.trainLargeChance, 1e-9);
+  /* Give the clue pool nothing but clues and the money pool nothing but money, then land on
+     one of each: the tile must reach the table its type points at. */
+  forcePool("clue", r => r.kind === "clue", () =>
+    forcePool("money", r => r.kind === "money", () => {
+      state.clues = 0; state.coins = 0;
+      landOn("npc");
+      eq(state.clues, 1, "an NPC tile draws the clue pool");
+      eq(state.coins, 0);
+      landOn("std");
+      ok(state.coins > 0, "a standard tile draws the money pool");
+      eq(state.clues, 1);
+    }));
 });
 
-test("train pays only the four values its two bonuses can produce", () => {
+test("money pays, scales with the multiplier, and never interrupts play", () => {
   freshRun();
-  const seen = new Set();
-  for (let k = 0; k < 900; k++) {
+  forcePool("money", r => r.kind === "money" && r.amount === 30, () => {
     state.coins = 0;
-    TILE_TYPES.train.onLand({ mult: 1, bs: 1 });
-    seen.add(state.coins);
-  }
-  const rungs = Economy.trainLadder(cfg.trainLarge).tiers;
-  const allowed = new Set([cfg.trainSmall, ...rungs]);
-  eq(seen.size, allowed.size, [...seen].sort((a, b) => a - b).join(" / "));
-  [...seen].forEach(v => ok(allowed.has(v), `unexpected payout ${v}`));
+    const ev = landOn("std");
+    eq(state.coins, 30 * cfg.boardScale);
+    eq(evField(ev, "reveal").length, 0, "a money row must not block the roll loop");
+    eq(evField(ev, "log").length, 1, "but it does say what happened");
+    state.coins = 0;
+    landOn("std", { mult: 5, bs: 1 });
+    eq(state.coins, 150);
+  });
 });
 
-test("the large bonus ladder is exact thirds, ascending, topped by the model's number", () => {
+test("a loss takes coins, feeds the Gala pot, and never digs below zero", () => {
+  freshRun();
+  forcePool("mixed", r => r.kind === "money" && r.amount < 0, () => {
+    state.coins = 10000; state.vip = 0;
+    landOn("twist");
+    const taken = 10000 - state.coins;
+    ok(taken > 0, "a negative row has to take something");
+    eq(state.vip, taken, "and every coin of it lands in the pot");
+    /* …and with nothing to take, nothing is taken and nothing is invented. */
+    state.coins = 0; state.vip = 0;
+    landOn("twist");
+    eq(state.coins, 0, "a player with nothing must not go negative");
+    eq(state.vip, 0, "and the pot cannot be fed money that never existed");
+  });
+});
+
+test("a card row banks a card, and a duplicate pays instead of blocking", () => {
+  freshRun();
+  forcePool("money", r => r.kind === "card", () => {
+    const ev = landOn("std");
+    eq(Collection.collected(), 1, "the card is banked before any of this is shown");
+    eq(evField(ev, "card").length, 1, "a card you did not have holds the screen");
+    /* The same card again: coins, a float, and the roll keeps moving. */
+    const id = Object.keys(Collection.albumOf())[0];
+    const coins = state.coins;
+    let dupe = null;
+    for (let k = 0; k < 200 && !dupe; k++) {
+      const e2 = landOn("std");
+      if (!evField(e2, "card").length) dupe = e2;
+    }
+    ok(dupe, "a duplicate has to turn up eventually");
+    ok(state.coins > coins, "and it pays coins rather than nothing");
+    eq(evField(dupe, "reveal").length, 0, "a duplicate must never block");
+  });
+});
+
+test("energy tops up and an event row pays nothing at all", () => {
+  freshRun();
+  forcePool("bonus", r => r.kind === "energy", () => {
+    state.energy = 0;
+    landOn("arrival");
+    ok(state.energy > 0);
+  });
+  forcePool("money", r => r.kind === "event", () => {
+    state.coins = 0; state.clues = 0; state.energy = 5;
+    const before = Collection.collected();
+    const ev = landOn("std");
+    eq(state.coins, 0); eq(state.clues, 0); eq(state.energy, 5);
+    eq(Collection.collected(), before, "an event row is flavour, and flavour is free");
+    eq(evField(ev, "log").length, 1, "it still earns its line in the log");
+  });
+});
+
+test("a move row is the only kind that relocates the token", () => {
+  freshRun();
+  forcePool("mixed", r => r.kind === "move" && r.to === "start", () => {
+    const from = tilesOfType("twist")[1];
+    state.pos = from; state.coins = 0;
+    const ev = TILE_TYPES.twist.onLand({ pos: from, mult: 1, bs: 1 });
+    eq(state.pos, 0, "advance to Start means Start");
+    eq(ev.find(e => e.move).move.stepMs, cfg.premiereStepMs);
+    eq(state.coins, (cfg.startPass + cfg.startLand) * cfg.boardScale);
+  });
+});
+
+suite("tiles: the bonus games");
+
+test("a money row may open a mini-game, and the coins are banked before it does", () => {
+  freshRun();
+  forcePool("bonus", r => r.game === "train-small", () => {
+    state.coins = 0;
+    const ev = landOn("arrival");
+    const mg = evField(ev, "minigame");
+    eq(mg.length, 1, "the row names a game, so a game opens");
+    eq(mg[0].amount, state.coins, "the game is handed exactly what was already paid");
+    eq(mg[0].game, "train-small");
+    /* the gain event has to come first — the money is not the game's to decide */
+    ok(ev.findIndex(e => e.float) < ev.findIndex(e => e.minigame));
+  });
+});
+
+test("a ladder row makes its amount a CEILING and pays the rung that won", () => {
+  freshRun();
+  forcePool("bonus", r => r.ladder, () => {
+    const row = Pools.table("bonus").find(r => r.ladder);
+    for (let k = 0; k < 60; k++) {
+      state.coins = 0;
+      const mg = evField(landOn("arrival"), "minigame")[0];
+      eq(mg.tiers.length, 3, "three rungs to reveal");
+      eq(mg.tiers[mg.winIndex], mg.amount, "the winning rung IS what was paid");
+      eq(mg.amount, state.coins);
+      ok(mg.amount <= row.amount * cfg.boardScale, `${mg.amount} must not exceed the ceiling`);
+    }
+  });
+});
+
+test("the ladder is exact thirds, ascending, topped by the row's number", () => {
   const { tiers, winIndex } = Economy.trainLadder(300);
   deepEq(tiers, [100, 200, 300]);
-  ok(tiers[0] < tiers[1] && tiers[1] < tiers[2], "rungs must ascend");
   ok(winIndex >= 0 && winIndex <= 2, "winIndex must address a rung");
-  // the top rung is the model's number untouched, whatever the multiplier scaled it to
-  eq(Economy.trainLadder(cfg.trainLarge).tiers[2], cfg.trainLarge);
 });
 
-test("every rung wins sometimes, and only the three rungs ever do", () => {
-  const hits = [0, 0, 0];
-  for (let k = 0; k < 600; k++) hits[Economy.trainLadder(300).winIndex]++;
-  hits.forEach((h, i) => ok(h > 100, `rung ${i} came up ${h}/600 — should be about even`));
-});
+suite("tiles: the four corners");
 
-test("train opens a bonus mini-game carrying the amount it already paid", () => {
+test("Spa Day grants energy, flags the dice shower, and never takes anything", () => {
   freshRun();
-  state.coins = 0;
-  const ev = TILE_TYPES.train.onLand({ mult: 1, bs: 1 });
-  const mg = evField(ev, "minigame");
-  eq(mg.length, 1, "train must open a mini-game");
-  eq(evField(ev, "log").length, 1);
-  // the coins are banked BEFORE the game opens; the game is only handed the number
-  eq(mg[0].amount, state.coins, "the mini-game must be told exactly what was paid");
-  ok(["train-small", "train-large"].includes(mg[0].game), mg[0].game);
-  if (mg[0].game === "train-large") {
-    eq(mg[0].tiers.length, 3, "the large game gets the whole ladder to render");
-    eq(mg[0].tiers[mg[0].winIndex], mg[0].amount,
-       "the winning rung must be the amount that was actually paid");
-  } else {
-    eq(mg[0].amount, cfg.trainSmall);
-  }
-});
-
-test("the mini-game scales with the multiplier and never invents a payout", () => {
-  freshRun();
-  for (let k = 0; k < 200; k++) {
-    state.coins = 0;
-    const mg = evField(TILE_TYPES.train.onLand({ mult: 5, bs: 2 }), "minigame")[0];
-    eq(mg.amount, state.coins, "the game is handed exactly what was banked");
-    const top = (mg.game === "train-large" ? cfg.trainLarge : cfg.trainSmall) * 10;
-    ok(mg.amount <= top, `${mg.amount} must not exceed the scaled top rung ${top}`);
-  }
-});
-
-test("spa grants energy and flags the dice shower", () => {
-  freshRun();
-  state.energy = 0;
+  state.energy = 0; state.coins = 500;
   const ev = TILE_TYPES.spa.onLand({});
   eq(state.energy, cfg.spaEnergy);
+  eq(state.coins, 500, "the rest beat is never a penalty");
   const r = ev.find(e => e.reveal).reveal;
   eq(r.positive, true);
   eq(r.energy, true, "energy wins get the dice shower");
 });
 
-test("vip collects the whole pool, then leaves it empty", () => {
-  freshRun();
-  state.vip = 400; state.coins = 0;
-  const ev = TILE_TYPES.vip.onLand({});
-  eq(state.coins, 400);
-  eq(state.vip, 0);
-  eq(ev.find(e => e.reveal).reveal.positive, true);
-  // second visit with an empty pool
-  const ev2 = TILE_TYPES.vip.onLand({});
-  eq(state.coins, 400, "nothing more to collect");
-  eq(ev2.find(e => e.reveal).reveal.positive, false, "empty pool reads as a loss");
-});
-
-test("vip uses its own dwell time", () => {
-  freshRun();
-  state.vip = 10;
-  eq(TILE_TYPES.vip.onLand({}).find(e => e.reveal).reveal.ms, cfg.vipRevealMs);
-});
-
-test("start pays pass + land and dwells for startRevealMs", () => {
+test("The Premiere pays pass + land, seeds the pot, and hands over a free pack", () => {
   freshRun();
   state.coins = 0; state.vip = 0;
-  const ev = TILE_TYPES.start.onLand({ mult: 1 });
-  eq(state.coins, (cfg.startPass + cfg.startLand) * cfg.boardScale);
+  const ev = TILE_TYPES.premiere.onLand({ mult: 1 });
+  const packs = evField(ev, "pack");
+  eq(packs.length, 1, "landing on the Premiere is a pack on the house");
   eq(state.vip, cfg.vipSeed * cfg.boardScale);
+  eq(state.coins, (cfg.startPass + cfg.startLand) * cfg.boardScale + Boxes.coinsIn(packs[0]),
+     "the coins are the landing bonus plus whatever the pack paid, and nothing else");
   eq(ev.find(e => e.reveal).reveal.ms, cfg.startRevealMs);
 });
 
-test("premiere sweeps to Start at the configured speed", () => {
+test("The Gala collects the whole pot, leaves it empty, and still pays a card", () => {
   freshRun();
-  state.pos = 30; state.coins = 0;
-  const ev = TILE_TYPES.premiere.onLand({ pos: 30, mult: 1 });
-  eq(state.pos, 0);
-  eq(ev.find(e => e.move).move.stepMs, cfg.premiereStepMs);
-  eq(state.coins, (cfg.startPass + cfg.startLand) * cfg.boardScale);
+  state.vip = 400; state.coins = 0;
+  const ev = TILE_TYPES.gala.onLand({ pos: 20, mult: 1, bs: 1 });
+  ok(state.coins >= 400, "the pot is collected");
+  eq(state.vip, 0, "and left empty");
+  eq(ev.find(e => e.reveal).reveal.positive, true);
+  eq(ev.find(e => e.reveal).reveal.ms, cfg.vipRevealMs, "the Gala uses its own dwell");
+  eq(Collection.collected(), 1, "guaranteed a card even so");
 });
 
-suite("tiles: the deck tile hands over a box");
-
-/* The plot-twist deck is gone. Every one of its outcomes still exists — coins, energy, a
-   fine's opposite number — as rows in a box's table, so what this tile owes is a BOX, and
-   which tier it is. What comes out of one is tested in 03-collection.js, where the box lives. */
-
-test("landing hands over exactly one box, of a tier the config defines", () => {
+test("an empty pot still pays a card, so the Gala is never a wasted landing", () => {
   freshRun();
-  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
-  const packs = ev.filter(e => e.pack);
-  eq(packs.length, 1);
-  ok(Boxes.tier(packs[0].pack.tier.key), "the tier has to be one of the three");
-  eq(packs[0].pack.drops.length, packs[0].pack.tier.items, "and it is already opened");
+  state.vip = 0; state.coins = 0;
+  const ev = TILE_TYPES.gala.onLand({ pos: 20, mult: 1, bs: 1 });
+  ok(!ev.some(e => e.reveal && e.reveal.positive), "an empty pot reads as the letdown it is");
+  eq(Collection.collected(), 1, "…and the card is the consolation");
 });
 
-test("the log names the box before the popup and its contents after", () => {
+test("The Scoop teleports to an NPC tile and triggers it", () => {
   freshRun();
-  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
-  const packAt = ev.findIndex(e => e.pack);
-  ok(ev[packAt - 1] && ev[packAt - 1].log, "opened…");
-  ok(ev[packAt + 1] && ev[packAt + 1].log, "…and what it paid");
+  const npcs = tilesOfType("npc");
+  forcePool("clue", r => r.kind === "clue", () => {
+    for (let k = 0; k < 40; k++) {
+      state.pos = 30; state.clues = 0; state.coins = 0;
+      const ev = TILE_TYPES.scoop.onLand({ pos: 30, mult: 1, bs: 1 });
+      ok(npcs.includes(state.pos), `landed on ${state.pos}, which is not an NPC tile`);
+      eq(state.clues, 1, "and the tile it lands on actually fires");
+      const move = ev.find(e => e.move).move;
+      eq(move.path.length, 1, "a teleport is one step — walking it would pay a lap bonus");
+      eq(move.path[0], state.pos);
+      eq(state.coins, 0, "so no lap bonus is paid");
+    }
+  });
 });
 
-test("the tier is drawn from deckBoxes, so the table alone decides how often a Diamond lands", () => {
+test("every NPC tile is reachable from the Scoop", () => {
   freshRun();
-  const saved = deckBoxes.map(d => d.weight);
-  try {
-    deckBoxes.forEach(d => { d.weight = d.key === "diamond" ? 100 : 0; });
-    for (let k = 0; k < 8; k++) eq(Boxes.drawTier(), "diamond");
-    deckBoxes.forEach(d => { d.weight = d.key === "silver" ? 100 : 0; });
-    for (let k = 0; k < 8; k++) eq(Boxes.drawTier(), "silver");
-  } finally { deckBoxes.forEach((d, i) => { d.weight = saved[i]; }); }
-});
-
-test("the tile pays nothing of its own — the box is the whole payout", () => {
-  freshRun();
-  state.coins = 0; state.vip = 0;
-  const before = state.coins;
-  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
-  const paid = Boxes.coinsIn(ev.find(e => e.pack).pack);
-  eq(state.coins, before + paid, "every coin came out of the box");
-  eq(state.vip, 0, "and the tile seeds no VIP pool of its own");
+  const seen = new Set();
+  for (let k = 0; k < 600; k++) { state.pos = 30; TILE_TYPES.scoop.onLand({ pos: 30, mult: 1, bs: 1 }); seen.add(state.pos); }
+  eq(seen.size, tilesOfType("npc").length, "a tile the Scoop can never reach is a dead tile");
 });

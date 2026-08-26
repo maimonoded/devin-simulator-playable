@@ -121,41 +121,92 @@ const Boxes = {
   newCardsIn(res) { return res.drops.filter(d => d.kind === "card" && d.isNew).length; },
 };
 
-/* One box, opened, as an event list — the shape everything else in the game speaks.
+/* ---------------- cards landing, and what follows ----------------
 
-   Free function rather than a method because both callers are outside a box: the deck tile
-   (js/tiles/deck-tile.js) and the store (js/ui/store.js). A box bought is exactly a box landed
-   on, and this is what guarantees it: one code path, so the drop odds, the episode unlock and
-   the board-complete check cannot diverge between them.
+   Banking cards is never the whole story: a card can complete an episode's page, a status item
+   can move the rank, and the last watch of a set can finish the board. Every source of cards
+   owes the same three checks in the same order, and this is where they live once.
 
-   State is mutated before the first event is returned. The events are presentation. */
-function openBoxEvents(tierKey){
+   `draw` is a CALLBACK rather than a result because the unlock snapshot has to be taken BEFORE
+   anything is banked — "unlocked" is derived from the albums (CLAUDE.md), so the only way to
+   know what changed is to look before and compare after. Handing over a finished result would
+   be one instruction too late. */
+function bankedEvents(draw){
   const before=Collection.unlockSnapshot();
-  /* Snapshotted BEFORE the box, because the beat that shows the track moving needs somewhere to
-     move from — and by the time the events are built, everything has already been banked. */
+  /* Snapshotted here too, because the beat that shows the status track moving needs somewhere
+     to move FROM — and by the time the events are built, everything has already been banked. */
   const statusBefore=Status.points();
-  const res=Boxes.open(tierKey);
+  const res=draw();
   const fresh=Collection.claimUnlocked(before);
-
-  const ev=[{log:{icon:res.tier.icon,msg:`<b>${res.tier.name}</b> \u2014 opening\u2026`}}];
-  /* The popup blocks, so everything below it lands after the player has seen what came out. */
-  ev.push({pack:res});
-  ev.push({log:{icon:res.tier.icon,msg:boxSummary(res)}});
+  const after=[];
   /* A status item is a different kind of thing from a card and it earns its own beat: the track
-     moving, and the rank turning over when it turns over. The cards collected in the same box
+     moving, and the rank turning over when it turns over. Cards collected in the same breath
      count toward the same jump, which is why this reads the whole delta rather than the item's
      own points. */
   const shelved=res.drops.filter(d=>d.kind==="status").map(d=>d.item);
-  if(shelved.length) ev.push({statusUp:{items:shelved,from:statusBefore,to:Status.points()}});
-  if(fresh.length) ev.push({unlock:{ids:fresh}});
+  if(shelved.length) after.push({statusUp:{items:shelved,from:statusBefore,to:Status.points()}});
+  if(fresh.length) after.push({unlock:{ids:fresh}});
   /* A set is NOT over when its last card lands — it is over when its last episode has been
      watched, and an episode cannot be watched before it is collected. So the celebration lives
      at the end of the prediction flow, not here. The check is still made, because "collected
      and watched" is one predicate and one predicate should have one caller shape; it simply
      cannot be true on this path unless something upstream changes. */
-  if(Collection.boardFinished()) ev.push({boardDone:{board:Collection.num()}});
-  return ev;
+  if(Collection.boardFinished()) after.push({boardDone:{board:Collection.num()}});
+  return {res,after};
 }
+
+/* One box, opened, as an event list — the shape everything else in the game speaks.
+
+   Free function rather than a method because every caller is outside a box: the Premiere corner
+   (js/tiles/premiere-tile.js) and the store (js/ui/store.js). A box bought is exactly a box
+   landed on, and this is what guarantees it: one code path, so the drop odds, the episode
+   unlock and the board-complete check cannot diverge between them.
+
+   State is mutated before the first event is returned. The events are presentation. */
+function openBoxEvents(tierKey){
+  const {res,after}=bankedEvents(()=>Boxes.open(tierKey));
+  return [
+    {log:{icon:res.tier.icon,msg:`<b>${res.tier.name}</b> — opening…`}},
+    /* The popup blocks, so everything below it lands after the player has seen what came out. */
+    {pack:res},
+    {log:{icon:res.tier.icon,msg:boxSummary(res)}},
+    ...after,
+  ];
+}
+
+/* ONE card, drawn and banked — what a `card` row from any pool turns into (js/tiles/pool-tile.js).
+
+   A card comes up on roughly a quarter of all landings (GDD §4.6 wants about twelve a day), so
+   it cannot open the box ceremony every time. The split is the whole design of the beat:
+
+     a card you did not have  →  held on screen, and the roll waits for it
+     one you did              →  a coin float, and the board keeps moving
+
+   That is also why a duplicate never feels like a wasted pull — it pays, quietly, at the speed
+   its value deserves. `tier` narrows the draw (the Gala's "Rare or better"); null draws from
+   the whole pool, and Boxes.dropCard falls forward when a tier has nothing left in it. */
+function drawCardEvents(label,icon,tier){
+  const ico=icon||"🃏";
+  const {res,after}=bankedEvents(()=>({drops:[Boxes.dropCard(tier||null)]}));
+  const d=res.drops[0];
+  /* dropCard falls to a clue and then to coins on a board with nothing left to collect. */
+  if(d.kind!=="card")
+    return [{float:{text:"+"+fmt(d.amount),color:"var(--gold)"},
+             log:{icon:ico,msg:`${label} · +<b>${fmt(d.amount)}</b> coins`}},...after];
+  const name=d.card?d.card.name:d.id;
+  if(!d.isNew)
+    return [{float:{text:"+"+fmt(d.coins),color:"var(--gold)"},
+             log:{icon:ico,msg:`${label} · ${name} again · +<b>${fmt(d.coins)}</b> coins`}},...after];
+  return [
+    {float:{text:"🃏 "+name,color:"var(--teal)"},
+     log:{icon:ico,msg:`${label} · <b>${name}</b> collected`}},
+    /* The card's own face, not a generic panel — the album and the box popup already share
+       cardFace(), and a card drawn off a tile is the same card. */
+    {card:{name,collectible:d.card,count:d.count,positive:true}},
+    ...after,
+  ];
+}
+
 /* One line for the activity log: what the box actually paid. */
 function boxSummary(res){
   const parts=[];
@@ -166,7 +217,7 @@ function boxSummary(res){
     }
     else if(d.kind==="status") parts.push(`<b>${d.item.name}</b>`);
     else if(d.kind==="coins") parts.push(`+${fmt(d.amount)} coins`);
-    else if(d.kind==="energy") parts.push(`+${d.amount}\u26a1`);
+    else if(d.kind==="energy") parts.push(`+${d.amount}⚡`);
   });
-  return parts.join(" \u00b7 ")||"nothing";
+  return parts.join(" · ")||"nothing";
 }

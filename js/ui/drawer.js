@@ -82,6 +82,27 @@ function buildTuning(){
            ${bad.map(x=>`<li>${x}</li>`).join("")}</ul>`
       : `<p class="hint" style="color:var(--teal);margin:0">✓ Every card is wanted exactly once.</p>`}`;
   body.appendChild(cwrap);
+  /* The board and the pools, checked the same way and for the same reason. The two draw rates
+     are printed because a weight means nothing without its total: a 52% clue pool on six of
+     forty tiles is a 10% clue rate per roll, and it is the second number anyone tuning pacing
+     needs (GDD 6.6). */
+  const pwrap=document.createElement("div"); pwrap.className="tgroup";
+  const pbad=validateBoard().concat(Pools.validate());
+  const rolls=40, per=k=>(Pools.boardShareOf(k)*rolls).toFixed(1);
+  pwrap.innerHTML=`<h4>Board · ${boardSeason().name}</h4>
+    <p class="hint" style="margin:0 0 8px">
+      ${boardSize()} tiles ·
+      ${Object.keys(TILE_POOLS).map(t=>`${tilesOfType(t).length} ${t}`).join(" · ")} ·
+      4 corners</p>
+    <p class="hint" style="margin:0 0 8px">Per 40 rolls: <b>${per("card")}</b> cards ·
+      <b>${per("clue")}</b> clues · <b>${(Pools.boardShareOf("money")*100).toFixed(0)}%</b> of
+      landings pay money.</p>
+    ${pbad.length
+      ? `<p class="hint" style="color:var(--pink);margin:0"><b>${pbad.length} problem${pbad.length>1?"s":""}:</b></p>
+         <ul style="margin:6px 0 0 16px;padding:0;font-size:12px;color:var(--muted)">
+           ${pbad.map(x=>`<li>${x}</li>`).join("")}</ul>`
+      : `<p class="hint" style="color:var(--teal);margin:0">✓ Every tile has somewhere to draw from.</p>`}`;
+  body.appendChild(pwrap);
   // the loaded economy model: provenance, its cost curve, its series, and the import button
   buildEconomyPanel(body);
   // resets — config and player progress are separate storage slots, reset independently
@@ -126,9 +147,12 @@ function syncTuningInputs(){
   document.querySelectorAll("#tuningBody input[data-key]").forEach(inp=>{ inp.value=cfg[inp.dataset.key]; });
   document.querySelectorAll("#tuningBody select[data-key]").forEach(sel=>{ sel.value=cfg[sel.dataset.key]; });
 }
-function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clamp + token speed
-  document.querySelectorAll(".tile.standard .val").forEach(el=>{
-    const i=+el.closest(".tile").dataset.i; el.textContent=TILE_TYPES.standard.valueLabel(i); });
+function onCfgChange(){ // recompute per-tile labels + energy cap clamp + token speed
+  /* Nothing prints a value today — a pooled tile draws, so a number on it would be a lie
+     (js/tiles/pool-tile.js). The refresh stays because valueLabel() is still the registry's
+     way for a tile type to say something about itself, and a future one may. */
+  document.querySelectorAll("#board .tile .val").forEach(el=>{
+    const i=+el.closest(".tile").dataset.i; el.textContent=TILE_TYPES[tileType(i)].valueLabel(i); });
   // the 3D board keeps its labels in a DOM layer over the canvas
   document.querySelectorAll("#boardLabels .blabel").forEach(el=>{
     const i=+el.dataset.i; const v=el.querySelector(".val");

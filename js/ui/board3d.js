@@ -39,19 +39,20 @@ const EXTENT = N * TILE;         // board footprint
 const TOKEN_MODEL = "assets/token/token.glb";
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
 const COLORS = {
-  standard: 0x232a63,
+  std:      0x232a63,           // the Money pool — the bulk of the ring
   corner:   0x272e63,
-  start:    0x3a3016,
+  premiere: 0x3a3016,           // corner 0, and the only tile with a colour of its own
   spa:      0x232a63,
-  vip:      0x232a63,
-  premiere: 0x232a63,
-  train:    0x2a2f66,
-  deck:     0x2b2560,
+  gala:     0x232a63,
+  scoop:    0x232a63,
+  arrival:  0x2a2f66,
+  npc:      0x243063,
+  twist:    0x2b2560,
   edge: {                        // the coloured borders the CSS tiles carry
-    start:    0xffcb5c,
+    premiere: 0xffcb5c,
     spa:      0x2dd4bf,
-    vip:      0x8b6dff,
-    premiere: 0xff6fa5,
+    gala:     0x8b6dff,
+    scoop:    0xff6fa5,
   },
   token:    0xff6fa5,
   tower:    0x8b6dff,
@@ -323,9 +324,9 @@ const Board3D = {
     this._models.clear();
 
     const geo = new THREE.BoxGeometry(TILE - GAP, TILE_H, TILE - GAP);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < boardSize(); i++) {
       const type = tileType(i);
-      const mat = new THREE.MeshLambertMaterial({ color: COLORS[type] ?? COLORS.standard });
+      const mat = new THREE.MeshLambertMaterial({ color: COLORS[type] ?? COLORS.std });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.copy(this._tileWorld(i));
       mesh.userData.tile = i;

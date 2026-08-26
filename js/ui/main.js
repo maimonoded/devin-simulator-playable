@@ -327,11 +327,13 @@ function boot(){
   /* The board content is authored data, and a mis-authored board is the one failure that would
      be invisible in play — a card that can drop but is never wanted just looks like bad luck.
      Say so in the log rather than only in the tests. */
-  const bad=Collection.validate();
-  if(bad.length){
-    console.warn("Collection:",bad);
-    log("⚠️",`<b>Set ${Collection.num()} does not add up</b> — ${bad.length} problem${bad.length>1?"s":""}, see the console.`);
-  }
+  [["Set "+Collection.num(),Collection.validate()],
+   ["The board",validateBoard()],
+   ["The pools",Pools.validate()]].forEach(([what,bad])=>{
+    if(!bad.length) return;
+    console.warn(what+":",bad);
+    log("⚠️",`<b>${what} does not add up</b> — ${bad.length} problem${bad.length>1?"s":""}, see the console.`);
+  });
   if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
 }
 window.boot=boot;

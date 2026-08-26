@@ -46,12 +46,15 @@ body.board3d .board{display:none}
            transform:rotate(-45deg) rotateX(-52deg)} /* counter board tilt for legibility */
 .tile .ico{transform:rotate(-45deg) rotateX(-52deg)}
 .tile.corner{background:linear-gradient(180deg,var(--panel2),#1a2054);border-color:var(--purple)}
-.tile.start{background:linear-gradient(180deg,#3a3016,#241d0d);border-color:var(--gold)}
+/* The four corners (GDD 3.4) carry a border colour; the pooled types carry a tint.
+   These names come straight from assets/board/board.js — a tile's class IS its type. */
+.tile.premiere{background:linear-gradient(180deg,#3a3016,#241d0d);border-color:var(--gold)}
 .tile.spa{border-color:var(--teal)}
-.tile.vip{border-color:var(--purple)}
-.tile.premiere{border-color:var(--pink)}
-.tile.train{background:linear-gradient(180deg,#2a2f66,#1d2350)}
-.tile.deck{background:linear-gradient(180deg,#2b2560,#1e1a48)}
+.tile.gala{border-color:var(--purple)}
+.tile.scoop{border-color:var(--pink)}
+.tile.arrival{background:linear-gradient(180deg,#2a2f66,#1d2350)}
+.tile.twist{background:linear-gradient(180deg,#2b2560,#1e1a48)}
+.tile.npc{background:linear-gradient(180deg,#243063,#182047)}
 .tile.lit{background:var(--gold);box-shadow:0 0 18px rgba(255,203,92,.8),inset 0 -3px 0 rgba(0,0,0,.2)}
 
 /* Artwork (assets/tiles/N.png). MUST come after the .tile.<type> rules above: those use the

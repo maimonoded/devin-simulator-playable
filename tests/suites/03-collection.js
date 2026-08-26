@@ -328,12 +328,37 @@ test("openBoxEvents does not end a set — collecting the last card is not watch
   });
 });
 
-test("the deck tile hands over a box and nothing else", () => {
+test("landing on the Premiere hands over a box and nothing else", () => {
   freshRun();
-  const ev = TILE_TYPES.deck.onLand({ pos: 3, mult: 1, bs: 1 });
-  ok(ev.some(e => e.pack), "a deck landing is a box");
+  const ev = TILE_TYPES.premiere.onLand({ pos: 0, mult: 1, bs: 1 });
+  ok(ev.some(e => e.pack), "the free pack (GDD 3.4)");
   eq(ev.filter(e => e.pack).length, 1, "exactly one");
   ok(Boxes.tier(ev.find(e => e.pack).pack.tier.key), "and the tier is a real one");
+});
+
+test("a card drawn off a tile goes through the same banking as one out of a box", () => {
+  freshRun();
+  const before = Collection.unlockSnapshot();
+  const ev = drawCardEvents("test", "🃏");
+  eq(Collection.collected(), 1, "banked before a single event is returned");
+  deepEq(Collection.claimUnlocked(before), [], "one card cannot complete a page of five");
+  eq(ev.filter(e => e.pack).length, 0, "and it is NOT the box ceremony");
+});
+
+test("a card that completes a page unlocks its episode, wherever it came from", () => {
+  freshRun();
+  const page = Collection.pages()[0];
+  page.needs.slice(0, page.needs.length - 1).forEach(id => Collection.add(id, 1));
+  const last = page.needs[page.needs.length - 1];
+  /* Force the pool down to the one card still missing, then draw it off a tile. */
+  const real = Collection.poolOf;
+  Collection.poolOf = () => [last];
+  try {
+    const ev = drawCardEvents("test", "🃏");
+    const un = ev.find(e => e.unlock);
+    ok(un, "the page filled, so the episode has to unlock");
+    deepEq(un.unlock.ids, [page.ep]);
+  } finally { Collection.poolOf = real; }
 });
 
 suite("status: points, ranks and buying");

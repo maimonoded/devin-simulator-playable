@@ -40,12 +40,16 @@ index.html          markup + ordered <link>/<script> tags
                     ?view=mobile → the player's-eye view (see css/mobile.css)
 serve.py            dev server (Range + no-store) — the way to run the project
 vendor/             three.module.js (r169), vendored; no npm, no build step
+assets/board/       WHAT THE RING IS MADE OF: board.js, one entry per Season → assets/board/README.md
+assets/pools/       WHAT A LANDING CAN TURN UP: pools.js, one weighted table per pool
+                                                        → assets/pools/README.md
 assets/tiles/       optional per-tile art: models/N.glb (3D) or N.png (flat, legacy CSS board)
 assets/env/         the world around the board: scene.js manifest + models/  → assets/env/README.md
 assets/dice/        the die: models/die.glb, built not reconstructed    → assets/dice/README.md
 assets/npcs/        the series' characters, to stand on tiles           → assets/npcs/README.md
 assets/cards/       WHAT THERE IS TO COLLECT: cards.js + the card art   → assets/cards/README.md
 assets/status/      the status track and its ten items                  → assets/status/README.md
+assets/estate/      the Status Estate, six tiers of one building         → assets/estate/README.md
 assets/boxes/       the three box tiers' art                            → assets/boxes/README.md
 minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
@@ -63,7 +67,9 @@ js/
   xlsx.js           dependency-free .xlsx reader (ZIP + SpreadsheetML), browser-only
   economy.js        the loaded economy model: segmented cost curve, series, the clue edge
   economy-import.js workbook → model, and the structural check that gates it
-  board-model.js    tile index → type and → grid cell, pathToStart
+  board-model.js    the board ENGINE: reads assets/board/board.js. Type, argument, pool and grid
+                    cell per index; generalises to any ring whose size divides by 4
+  pools.js          the draw ENGINE: reads assets/pools/pools.js. One row, weighted, per landing
   env-model.js      environment geometry: datums, what's on screen, the height budget
   dice-model.js     which turn puts a rolled number on top, and where a throw lands
   state.js          the run state object
@@ -73,7 +79,7 @@ js/
   collection.js     THE PROGRESSION ENGINE: the pool, the albums, what unlocks an episode
   status.js         the status track: points, ranks, buying, milestone sweep
   boxes.js          the three box tiers, the drop tables, and openBoxEvents()
-  tiles/            one file per tile type                                   → js/tiles/README.md
+  tiles/            ONE class for the four pooled types, plus the four corners → js/tiles/README.md
   game.js           rolling, landing dispatch, prediction, session time
   ui/               everything that touches the DOM                          → js/ui/README.md
     fx.js           floats, log, toasts, confetti, dice, blocking overlays
@@ -116,12 +122,47 @@ roll()  →  resolveLandingEvents()  →  [{float}, {log}, {move}, {pack}, {unlo
                                    →  playEvents() animates them
 ```
 
-The collectible loop rides the same rail. Landing on a deck tile calls `openBoxEvents()`
-(`js/boxes.js`), which **banks the cards, coins, energy and status first** and then returns
-`{pack}` for the popup, `{unlock}` for any episode the cards just completed, and `{boardDone}`
-when that was the last page of the set. The store calls the same function, so a box bought is
-exactly a box landed on: one code path, so the odds, the unlock and the set-complete check
-cannot drift apart between them.
+The collectible loop rides the same rail. Everything that banks cards goes through
+`bankedEvents()` (`js/boxes.js`), which **banks first** and then returns `{unlock}` for any
+episode the cards just completed, `{statusUp}` for a status item, and `{boardDone}` when that was
+the last page of the set. Its two callers are `openBoxEvents()` (a whole box, with the popup) and
+`drawCardEvents()` (one card off a pool row, or the Gala's guaranteed one). The store calls
+`openBoxEvents()` too, so a box bought is exactly a box landed on — one code path, so the odds,
+the unlock and the set-complete check cannot drift apart between them.
+
+The unlock snapshot has to be taken **before** anything is banked, which is why `bankedEvents()`
+takes a callback rather than a result: "unlocked" is derived from the albums, so the only way to
+know what changed is to look before and compare after.
+
+### One draw system, many pools
+
+**Every landing draws one row from the weighted pool its tile points at.** That is the whole tile
+system (GDD §3.2), and it replaced eight bespoke `onLand()` behaviours. Four of the board's eight
+types are one class — `PoolTile` — told apart only by which table they read; the four corners are
+the only tiles left that do something a table cannot describe (§3.4).
+
+Two content files and two engines:
+
+```
+assets/board/board.js   the ring, per Season   →  js/board-model.js   type · argument · pool · cell
+assets/pools/pools.js   the tables             →  js/pools.js         one row, weighted
+```
+
+The point is not tidiness. **A new tile type, a seasonal board or a live-ops variant is content,
+not code** — a row in `pools.js` and an entry in `board.js`. Nothing assumes 40 tiles either: a
+ring of N is drawn on a grid of side `N/4 + 1`, and N must divide by 4 so the four sides are equal.
+
+Three rules hold it up:
+
+1. **No pool is pure.** The money pool carries cards and the odd clue; the clue pool pays money.
+   A pure pool would make twenty of the forty tiles dead air, and it is the first thing that gets
+   quietly broken while tuning.
+2. **A pool needs somewhere for "nothing happened" to live.** That is what the `event` kind is,
+   and why it pays nothing on purpose. Without it every landing has to hand something over and
+   the economy inflates to fill the space.
+3. **Content fails loudly.** `validateBoard()` and `Pools.validate()` each report *every* problem
+   at once, and both run at boot and in the tuning drawer — not only in the tests. A mis-authored
+   pool does not throw; it looks exactly like bad luck, and it can survive a whole balancing run.
 
 Event vocabulary and the tile contract are documented in
 [js/tiles/README.md](js/tiles/README.md). `Tile` extends `BoardActor` (`js/board-actor.js`),
@@ -133,13 +174,15 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 
 | System | Where | Notes |
 |---|---|---|
-| Board layout | `js/board-model.js` | Fixed 40 tiles. Start sits at the **bottom** point of the diamond; indices run clockwise on screen (Start → Spa → VIP → Premiere). |
+| Board layout | `assets/board/board.js` `js/board-model.js` | **Data, per Season.** Start sits at the **bottom** point of the diamond; indices run clockwise on screen (Premiere → Spa → Gala → Scoop). Season 1 is 40 tiles — 4 corners, 20 standard, 6 NPC, 4 arrivals, 6 twists — but nothing assumes 40. → [README](assets/board/README.md) |
 | Board rendering | `js/ui/board3d.js` | three.js scene: orthographic camera at 45° azimuth / 38° elevation, which reproduces the old CSS projection exactly (`sin 38° = cos 52°`). Tile labels stay DOM over the canvas so text is crisp. `cfg.board3d = 0` falls back to the legacy CSS-3D board, as does a missing WebGL context. |
-| Tile behavior | `js/tiles/` | One file per type, self-registering. → [README](js/tiles/README.md) |
+| The draw | `assets/pools/pools.js` `js/pools.js` | Four weighted tables — money, clue, bonus, mixed. Outcome kinds: `money` (negative allowed — it feeds the Gala) · `card` · `clue` · `move` · `energy` · `event`. → [README](assets/pools/README.md) |
+| Tile behavior | `js/tiles/` | **One class for the four pooled types**, plus the four corners. → [README](js/tiles/README.md) |
+| The corners | `js/tiles/{premiere,spa,gala,scoop}-tile.js` | The four behaviours a table cannot describe (GDD §3.4). The Premiere pays on pass and hands a free pack on landing; Spa Day is energy and **never** a penalty; the Gala collects everything the twists took, plus a guaranteed card; the Scoop teleports to a random NPC tile **and triggers it**. |
 | Environment | `js/env-model.js` `js/ui/env3d.js` | The island the board stands on, the sea, and the props in it. Several worlds live in `assets/env/scene.js` and `cfg.envScene` picks one live from the tuning drawer. Placement is data and the engine measures nothing: assets are conformed to a stated contract by `tools/normalize-env.py`, so a new environment needs no code change. `cfg.envMargin` sets how much ground is in frame — it costs board size. → [README](assets/env/README.md) |
 | Tile artwork | `assets/tiles/` | Drop `models/N.glb` to skin tile N-1 in 3D (1-based, so `1.glb` is Start); `N.png` does the same on the legacy CSS board. Absent files change nothing. Models are normalized **on load** — any scale/origin/up-axis drops in. → [README](assets/tiles/README.md) |
 | Dice | `js/dice-model.js` `js/ui/dice3d.js` | Thrown in from the bottom-left of the view and landing wherever the camera is aimed — the middle of the board is off-screen much of the time with `camFollow` on. `cfg.diceRevealMs` is the throw's length and the promise resolves at exactly that mark, `cfg.diceToMoveMs` still gates the token. Falls back to the DOM pair in `js/ui/fx.js` when `cfg.dice3d` is off or `die.glb` never loaded. |
-| Bonus mini-games | `minigames/` `js/ui/minigame.js` | The four train tiles pay one of **two** bonuses (small / large) and each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
+| Bonus mini-games | `minigames/` `js/ui/minigame.js` | A **pool row may name a game** — the two that do sit in the `bonus` table the arrivals draw from, so a mini-game is a property of the outcome rather than of the ground you are standing on. Each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | **The collection** | `js/collection.js` `assets/cards/` | The progression. A **set** is `cfg.episodesPerBoard` episodes, each unlocked by `cfg.collectiblesPerEpisode` named cards — 5 × 5, so 25 distinct cards a set. Three things are derived rather than stored: the **pool** (the union of the episodes' requirements, so a card that can drop but is never wanted is a validation error), **which episodes are unlocked** (read off the albums, which are kept per set forever), and **which set an episode belongs to** (its position in `Episodes.ids()`). → [README](assets/cards/README.md) |
 | **Boxes** | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | The only way anything is collected. Three tiers, each `items` draws against its own weighted table. Opened the moment they are won — and **not in a dialog**: the box is the same GLB the board used to stand on a tile, it arrives over the middle of the board, and you tap the mesh. It bursts where it stood and the cards fly out and hang in the air. The only DOM is a caption and the countdown bar (`js/ui/pack.js`), which also holds the modal fallback for when there is no WebGL. Every empty case falls forward, so a box always pays. → [README](assets/boxes/README.md) |
@@ -155,9 +198,11 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 ### The loop, in one pass
 
 ```
-roll  →  land on 🎁  →  a BOX          (js/tiles/deck-tile.js → js/boxes.js)
-                      →  tap it, or it opens itself after 5s   (js/ui/pack.js)
-                      →  a CARD lands in the album             (js/collection.js)
+roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
+                     →  money · a CARD · a clue · energy · a move · flavour
+      →  a card      →  banked, and held on screen if it is new  (js/boxes.js drawCardEvents)
+      →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
+                        (the Premiere's free pack, and the store)
    five cards on one page  →  that EPISODE unlocks  →  predict & watch, IN STORY ORDER
    all five WATCHED        →  the SET is done       →  a fresh 25 on the next five episodes
 ```
@@ -270,8 +315,8 @@ Two layers, deliberately separate:
 - **`cfg`** is the *live tuning surface* — flat scalars the drawer edits by hand.
 
 They meet in `Economy.apply()`, which projects the model's flat values onto `cfg` and rebuilds
-`deck`/`boxTable`. So tile code still just reads `cfg.stdBase` and nothing downstream had to
-learn about the model. `Economy.OWNED_CFG_KEYS` is the list `apply()` writes.
+`deck`/`boxTable`. So tile code still just reads the flat `cfg` scalars and nothing downstream
+had to learn about the model. `Economy.OWNED_CFG_KEYS` is the list `apply()` writes.
 
 **The cost curve is a list of segments and the last one must have no `to`.** A bounded final
 rule would leave builders past it unpriced and deadlock the game; `Economy.validateCurve()`
@@ -418,6 +463,16 @@ inside DOM-building functions.
 - The activity log keeps the last 60 entries; older lines are trimmed.
 
 ## Known dead config
+
+**`stdBase` and `stdWeights` are gone from the game.** A standard tile drew its printed value
+from them; it draws from a pool now, and a number printed on a tile that draws would be a lie —
+so `valueLabel()` returns `""` for every type and the position weights were deleted outright.
+`cfg.stdBase` survives only because the economy model still projects it.
+
+**`trainSmall` / `trainLarge` / `trainLargeChance` are half-live.** The train tile is gone; its
+two mini-games moved into the `bonus` pool as rows carrying a `game` key, and their money is the
+row's `amount` rather than the model's number. `Economy.trainLadder()` is still what builds the
+three-rung reveal, so the ladder is live and the two payout scalars are not.
 
 `secPerRoll` is in the tuning drawer but read by nothing. It is still used by the economy
 spreadsheet (seconds-per-roll derives its "active minutes per session"), so wiring it up is
