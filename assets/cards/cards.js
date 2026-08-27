@@ -67,20 +67,20 @@ const CARD_SEASONS = [
     art: "assets/cards/s1/",
     sets: [
       { key: "the-street", name: "The Street", cards: [
-        { id: "folded-blanket",    name: "A Folded Blanket",           rarity: C },
-        { id: "shelter-queue",     name: "The Shelter Queue",          rarity: C },
-        { id: "cold-coffee",       name: "Cold Coffee",                rarity: C },
-        { id: "borrowed-coat",     name: "A Borrowed Coat",            rarity: C },
+        { id: "folded-blanket",    name: "A Folded Blanket",           rarity: C, art: "folded-blanket.webp"  },
+        { id: "shelter-queue",     name: "The Shelter Queue",          rarity: C, art: "shelter-queue.webp"  },
+        { id: "cold-coffee",       name: "Cold Coffee",                rarity: C, art: "cold-coffee.webp"  },
+        { id: "borrowed-coat",     name: "A Borrowed Coat",            rarity: C, art: "borrowed-coat.webp"  },
         { id: "dock-bench",        name: "The Bench by the Docks",     rarity: C, art: "clue-bench.webp" },
-        { id: "yesterdays-paper",  name: "Yesterday's Paper",          rarity: C },
-        { id: "locked-garage",     name: "The Locked Garage",          rarity: R },
+        { id: "yesterdays-paper",  name: "Yesterday's Paper",          rarity: C, art: "yesterdays-paper.webp"  },
+        { id: "locked-garage",     name: "The Locked Garage",          rarity: R, art: "locked-garage.webp"  },
         { id: "cash-envelope",     name: "A Cash Envelope",            rarity: R, art: "clue-cash.webp" },
         { id: "through-the-glass", name: "The Photograph Through the Glass", rarity: E, art: "clue-photo.webp" },
         { id: "six-months",        name: "Six Months on the Street",   rarity: L, art: "six-months.webp"  },
       ] },
 
       { key: "the-family", name: "The Family", cards: [
-        { id: "sunday-lunch",      name: "Sunday Lunch",               rarity: C },
+        { id: "sunday-lunch",      name: "Sunday Lunch",               rarity: C, art: "sunday-lunch.webp"  },
         { id: "good-tablecloth",   name: "The Good Tablecloth",        rarity: C },
         { id: "address-book",      name: "Mum's Address Book",         rarity: C },
         { id: "fridge-calendar",   name: "A Fridge Calendar",          rarity: C },

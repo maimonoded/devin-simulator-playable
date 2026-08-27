@@ -124,12 +124,25 @@ const DEFAULTS={
      linearly from statusFirst and are solved so they sum to exactly statusTotal, so moving the
      total moves how long a Season takes and nothing else has to be re-derived.
 
+     THE TOTAL IS SCALED TO THE CONTENT THAT ACTUALLY EXISTS, not to the doc's number. 5.4's
+     30,000 is calibrated for its full Season of 60 episodes; this build has 18. Simulated over
+     400 runs of 30 days at 40 rolls a day, a median player earns about 7,500 — every episode
+     unlocked and watched, ~134 of 150 cards seen, ~48 converted, ~14 predictions called right.
+     So 7,500 is a Season that a median player finishes in a month, a slow one in about five
+     weeks and a lucky one in under four. At 30,000 the ceiling on this content was 15,200 and
+     the gate was simply unreachable.
+
+     statusFirst came down with it. The two are not independent: 29 climbs summing to 7,500
+     average 259 apiece, so a 200 opener would have forced a nearly flat ramp. At 45 the ramp
+     runs 45 -> ~470, which is the ~10x escalation 5.4 asks for at this Season's scale. Re-run
+     the simulation if either the content or the pool weights change.
+
      statusPriceScale moves every shop price at once without editing the ten of them.
      statusBarMs is how long the track takes to move when status is earned and statusUpMs how
      long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
      both belong in the drawer. */
   statusPerEpisode:50, statusPerPrediction:150,
-  statusLevels:30, statusFirst:200, statusTotal:30000,
+  statusLevels:30, statusFirst:45, statusTotal:7500,
   statusPriceScale:1, statusBarMs:900, statusUpMs:1500,
   /* What a box's `coins` outcome pays when its table row does not name an amount. */
   boxCoins:60,
