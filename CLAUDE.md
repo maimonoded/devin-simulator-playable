@@ -321,18 +321,28 @@ A card face reads two independent fields and never lets one decide both:
 
 | axis | drives | values |
 |---|---|---|
-| **family** | the **frame** | `collection` · `clue` · `status` |
-| **rarity** | a **named, coloured badge** | Common · Rare · Epic · Legendary |
+| **family** | the **frame and the ground** | `collection` · `clue` · `status` |
+| **rarity** | a **named, coloured badge**, and the halo | Common · Rare · Epic · Legendary |
 
-The families come out of the same box seconds apart and are completely different things. A
-collection card belongs to a set and is worth Status. A **clue** is a sentence you have to read —
-so it is the one face built to be read: warm paper, sitting crooked, typewriter face, tape holding
-it down. A **status item** goes on the player's shelf and stays there, and wears a gold double
-frame with corner ticks that no collection card of any rarity ever wears.
+**Rarity does not touch the frame**, and that is not a detail. It used to: a Common wore a slate
+border and an Epic a purple one, which put four different-looking frames inside one family and
+made an ordinary card read as broken rather than as ordinary. Every collection card wears the
+same gilt now; rarity escalates the glow around it and names itself on the badge.
 
-The frame carries it, because a label can be missed and a frame cannot. And because the two axes
-are independent, an Epic collection card and a status item can never be mistaken for one another
-however good the art is.
+The families come out of the same box seconds apart and are completely different things:
+
+- **collection** — a **gilt border over a warm plum-brown ground**. Not the blue-black the rest
+  of the app uses, and the warmth does as much work as the gold: a clue is cool cream paper, a
+  collection card is a warm gilded object.
+- **clue** — a sentence you have to read, so it is the one face built to be read: **cream paper,
+  dashed edge, sitting crooked, typewriter face, tape across the top**. Four signals, because it
+  has to read as a different KIND of thing from across a row of thumbnails.
+- **status** — also gold, so it is told apart by **shape**: a heavier border, a **gold-brown**
+  ground rather than plum, and **corner ticks** nothing else wears. The ticks are the real
+  signal — brackets on a frame read as something hung on a wall, which is what a Showcase piece
+  is.
+
+The frame carries it, because a label can be missed and a frame cannot.
 
 Both halves have to move together in three places: the canvas path (`js/ui/box3d.js`,
 `js/ui/estate3d.js`), the DOM path (`js/ui/cardface.js`, `.fam-*` and `.rar-*` in

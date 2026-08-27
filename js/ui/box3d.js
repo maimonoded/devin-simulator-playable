@@ -293,11 +293,14 @@ export const Box3D = {
        dark rectangle with no art: `card.art` is a bare filename that only means something
        relative to its Season's directory, and `card.tier`/`card.kind` had stopped existing at
        all. Resolve art through Cards.artFor() and colour through the rarity, never by hand. */
-    let ornate = false, paper = false;
+    let ornate = false, paper = false, gilt = false;
     if (drop.kind === "card" && drop.card){
       const card = drop.card;
       const r = card.rarity ? Cards.rarity(card.rarity) : null;
-      edge = r ? r.color : "#5765ad";
+      /* GOLD, not the rarity's colour. The frame is the FAMILY; the rarity is the badge, and it
+         keeps its own colour there. Letting rarity paint the border made a Common look broken
+         rather than ordinary, and put two different-looking frames inside one family. */
+      edge = "#c9a24a"; gilt = true;
       label = r ? r.name.toUpperCase() : "CARD";
       name = card.name;
       sub = card.sub || (Cards.setForCard(card.id) || {}).name || "";
@@ -321,10 +324,14 @@ export const Box3D = {
       edge = "#2dd4bf"; label = "ENERGY"; name = "+" + drop.amount; plain = "⚡"; ink = "#2dd4bf";
     }
 
-    /* body */
+    /* body. A collection card is WARM under its gilt — deep plum-brown, not the blue-black the
+       rest of the app uses — because that warmth separates it from the cool cream of a clue as
+       much as the gold does. A status item is gold-brown; everything else stays navy. */
     rr(2, 2, W - 4, H - 4, 16);
     const g = x.createLinearGradient(0, 0, 0, H);
     if (paper){ g.addColorStop(0, "#f4ead0"); g.addColorStop(1, "#e2d3ac"); }
+    else if (gilt){ g.addColorStop(0, "#3a2140"); g.addColorStop(1, "#120a18"); }
+    else if (ornate){ g.addColorStop(0, "#3d2f10"); g.addColorStop(1, "#1d1607"); }
     else { g.addColorStop(0, "#1a1f47"); g.addColorStop(1, "#0e1230"); }
     x.fillStyle = g; x.fill();
 
@@ -415,7 +422,16 @@ export const Box3D = {
 
     /* edge — and, for a status item, a frame rather than a border */
     rr(2, 2, W - 4, H - 4, 16);
-    x.lineWidth = ornate ? 7 : 4; x.strokeStyle = edge; x.stroke();
+    x.lineWidth = ornate ? 9 : 5; x.strokeStyle = edge; x.stroke();
+    if (gilt){
+      /* The fine inner rule, set just inside the gilt. Brighter once the card has converted:
+         that is the moment it stops being progress and becomes a thing you own. */
+      const conv = !!drop.converted;
+      rr(13, 13, W - 26, H - 26, 9);
+      x.lineWidth = conv ? 2.5 : 1.5;
+      x.strokeStyle = conv ? "rgba(255,203,92,.9)" : "rgba(255,203,92,.42)";
+      x.stroke();
+    }
     if (ornate){
       /* An inner rule set in from the outer one, and a tick across each corner: the language of
          something framed and hung rather than something dealt. */

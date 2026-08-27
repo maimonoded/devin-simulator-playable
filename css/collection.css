@@ -60,13 +60,18 @@
 .size-lg .ccPlain{font-size:28px}
 
 /* ---------- rarity, on the card itself ----------
-   Border colour and glow, escalating. Legendary also gets a slow shimmer, because the rarest
-   thing on screen should be the one that moves. */
-.ccard.rar-common{border-color:#5d6a8c}
-.ccard.rar-rare{border-color:#4f9dff;box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 12px rgba(79,157,255,.26)}
-.ccard.rar-epic{border-color:#b06bff;box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 18px rgba(176,107,255,.34)}
-.ccard.rar-legendary{border-color:var(--gold);
-  box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 26px rgba(255,203,92,.45)}
+   A GLOW, and nothing else. Rarity used to set the border colour too, which quietly broke the
+   rule this file is built on — the frame is the FAMILY and the badge is the rarity. A Common
+   with a slate border and an Epic with a purple one were two different-looking frames inside one
+   family, and the drab one made an ordinary card look broken rather than ordinary.
+
+   So every collection card wears the same gold frame, and rarity escalates the halo around it.
+   Legendary also gets a slow shimmer, because the rarest thing on screen should be the one that
+   moves. */
+.ccard.rar-common{box-shadow:0 6px 16px rgba(0,0,0,.45)}
+.ccard.rar-rare{box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 14px rgba(79,157,255,.30)}
+.ccard.rar-epic{box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 20px rgba(176,107,255,.40)}
+.ccard.rar-legendary{box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 28px rgba(255,203,92,.55)}
 .ccard.rar-legendary.got .ccSheen{
   background:linear-gradient(115deg,rgba(255,255,255,.22) 0%,rgba(255,203,92,.12) 30%,
                              rgba(255,255,255,0) 55%,rgba(255,255,255,.16) 100%);
@@ -80,11 +85,21 @@
    frame cannot — and it is independent of the rarity badge above, so an Epic card and a status
    item can never be mistaken for one another however good the art is. */
 
-/* collection — the default. A thin inner rule, lit once the card has converted. */
-.ccard.fam-collection .ccFrame{position:absolute;inset:6px;z-index:2;pointer-events:none;
-  border-radius:6px;border:1px solid rgba(255,255,255,.10)}
-.ccard.fam-collection.conv{box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 16px rgba(255,203,92,.30)}
-.ccard.fam-collection.conv .ccFrame{border-color:rgba(255,203,92,.5)}
+/* collection — GOLD, and warm underneath. A gilt border with a fine inner rule set just inside
+   it, over a deep plum-brown ground rather than the blue-black everything else in the app uses.
+   That warmth is doing as much work as the gold: a clue is cool cream paper and a collection card
+   is a warm gilded object, so the two are unmistakable at a glance even in a row of thumbnails. */
+.ccard.fam-collection{border-color:#c9a24a;border-width:2px;
+  background:radial-gradient(120% 90% at 50% 18%,#3a2140,#1c1026 60%,#120a18)}
+.size-sm.fam-collection{border-width:1.5px}
+.ccard.fam-collection .ccFrame{position:absolute;inset:5px;z-index:2;pointer-events:none;
+  border-radius:6px;border:1px solid rgba(255,203,92,.42);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+/* Converted: the gilt lights up and the halo warms. The card stops being progress and becomes a
+   thing you own, so the frame is where that is said. */
+.ccard.fam-collection.conv{border-color:var(--gold)}
+.ccard.fam-collection.conv .ccFrame{border-color:rgba(255,203,92,.9);
+  box-shadow:inset 0 0 14px rgba(255,203,92,.25),inset 0 0 0 1px rgba(0,0,0,.35)}
 
 /* clue — an evidence tag. Warm paper edge, sits crooked, typewriter face, and tape holding it
    down. Three signals, so it reads as a different KIND of thing from across the room. */
@@ -109,10 +124,14 @@
   transform:rotate(1.6deg)}
 .size-sm.fam-clue::after{height:11px;top:-5px}
 
-/* status — a gold double frame with corner ticks, which no collection card of any rarity ever
-   wears. (The same frame is painted into the canvas for the in-scene card: js/ui/box3d.js.) */
-.ccard.fam-status{border-color:var(--gold);border-width:3px;
-  box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 22px rgba(255,203,92,.45)}
+/* status — gold too, now that collection cards are, so it has to be told apart by SHAPE rather
+   than by colour: a heavier border, a gold-brown ground instead of plum, and corner ticks that
+   nothing else wears. The ticks are the real signal — a frame with brackets on it reads as
+   something hung on a wall, which is exactly what a Showcase piece is.
+   (The same frame is painted into the canvas for the in-scene card: js/ui/box3d.js.) */
+.ccard.fam-status{border-color:var(--gold);border-width:4px;
+  background:linear-gradient(180deg,#3d2f10,#1d1607);
+  box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 26px rgba(255,203,92,.55)}
 .ccard.fam-status .ccFrame{position:absolute;inset:7px;z-index:2;pointer-events:none;
   border-radius:6px;border:1.5px solid rgba(255,203,92,.55)}
 .ccard.fam-status .ccFrame::before,.ccard.fam-status .ccFrame::after{content:"";position:absolute;
@@ -416,8 +435,11 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    aspect-ratio and no intrinsic width — .playcard used to supply that and cardFace() does not —
    so without this the card collapses to a dark rounded dot. Loaded after overlay.css, so this
    wins over `.centerfx.card{width:auto}` without inflating the selector. */
-.centerfx.card .ccard{width:200px;margin:0 auto}
+/* Sized against the SHORTER viewport axis, not a fixed pixel width: this is the reward beat, it
+   should own the screen for the few seconds it is up, and it has to do that on a phone frame and
+   a desktop board alike. The cap stops it going silly on a very tall window. */
+.centerfx.card .ccard{width:min(56vmin,400px);margin:0 auto}
 .centerfx.card.win .ccard{animation:revealPop .45s cubic-bezier(.2,1.5,.4,1)}
 /* The line under a converted card: what the third copy just bought. */
-.ccWon{margin-top:8px;text-align:center;font-size:13px;font-weight:800;color:var(--gold);
+.ccWon{margin-top:10px;text-align:center;font-size:15px;font-weight:800;color:var(--gold);
   text-shadow:0 2px 8px rgba(0,0,0,.6)}
