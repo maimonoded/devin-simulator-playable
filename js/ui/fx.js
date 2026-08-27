@@ -143,8 +143,7 @@ function clearOverlayFx(){
   if(typeof use3d==="function"&&use3d()&&window.Board3D&&Board3D.available&&Board3D.cancelPack)
     Board3D.cancelPack();
 }
-/* Drawn deck card, flipped onto the board centre and held for cfg.deckCardMs. */
-/* A card, held on screen for cfg.deckCardMs.
+/* A card, held on the board's centre.
 
    `collectible` is a card from the collection, and when it is there the card's OWN face is
    drawn — the same cardFace() the album and the box popup use. A card that looked like two
@@ -164,7 +163,11 @@ function showCard(c){
     </div>`;
   if(c.positive) confetti();
   if(c.energy) diceConfetti();
-  return sleep(cfg.deckCardMs).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
+  /* The converting copy holds longer: it is the moment three pulls were spent buying, and
+     giving it the same beat as an ordinary new card would flatten the one payoff the
+     collection has. */
+  const ms=c.converted?(+cfg.cardConvertMs||0):(+cfg.cardHoldMs||0);
+  return sleep(Math.max(200,ms)).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
 /* Blocking Collect popup (train tiles). Resolves on click, or automatically after a
    random cfg.collectMinSec–collectMaxSec so an idle session keeps moving.

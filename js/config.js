@@ -3,7 +3,15 @@
 const DEFAULTS={
   energyCap:30, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
-  deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
+  /* How long a card is held on the board's centre. Two values, because the two beats are not
+     the same size: a card you did not have is news, and the THIRD copy — the one that converts
+     it into its Collectible (GDD 4.3) — is the payoff the whole collection is aimed at, so it
+     is allowed to sit there longer.
+
+     Both are worth being careful with. A card lands on roughly a quarter of all rolls, so every
+     100ms here is 25ms on the average roll: generous is good, indulgent is a slow game. */
+  cardHoldMs:2600, cardConvertMs:3800,
+  vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
   scoopStepMs:260,
@@ -298,7 +306,8 @@ const TUNING=[
    ["bonusGames","Bonus mini-games (0/1)",1],
    ["bonusLoadMs","Bonus game: opening animation (ms)",100],
    ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
-   ["deckCardMs","Deck: card on screen (ms)",100],
+   ["cardHoldMs","Card held on screen (ms)",100],
+   ["cardConvertMs","…and when it CONVERTS (ms)",100],
    ["vipRevealMs","Gala: dwell before moving on (ms)",100],
    ["scoopStepMs","Scoop: teleport (ms)",20],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],

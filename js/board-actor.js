@@ -54,7 +54,7 @@ class BoardActor {
     return {minigame:Object.assign({},o,{game,amount,outcome:o.outcome||"win",label:o.label||"",
                                          big:"+"+fmt(amount),sub:o.label||""})};
   }
-  /* Drawn card held on screen for cfg.deckCardMs. opts: {positive, energy} */
+  /* Drawn card held on screen for cfg.cardHoldMs. opts: {positive, energy} */
   card(name,big,opts){
     const o=opts||{};
     return {card:{name,big,positive:!!o.positive,energy:!!o.energy}};
