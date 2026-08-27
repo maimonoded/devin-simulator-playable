@@ -8,9 +8,11 @@ const DEFAULTS={
      it into its Collectible (GDD 4.3) — is the payoff the whole collection is aimed at, so it
      is allowed to sit there longer.
 
-     Both are worth being careful with. A card lands on roughly a quarter of all rolls, so every
-     100ms here is 25ms on the average roll: generous is good, indulgent is a slow game. */
-  cardHoldMs:2600, cardConvertMs:3800,
+     A card lands on roughly a quarter of all rolls, so every 100ms here is about 25ms on the
+     average roll. These are set deliberately long — the card IS the reward, and a reward that
+     is gone before it has been read is not one. Turn them down here if the board starts to feel
+     like it is waiting for you. */
+  cardHoldMs:5000, cardConvertMs:7000,
   vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
