@@ -38,12 +38,19 @@ function openAlbum(){
 function renderAlbum(){
   const host = $("#sheetHost");
   const sets = Cards.sets(), season = Cards.season();
+  /* Cards this build's catalogue cannot explain get a page of their own AFTER the sets. They are
+     kept rather than deleted (js/cards.js), and a card that is kept but appears nowhere is
+     indistinguishable from one that was thrown away — so if there are any, they are shown. */
+  const lost = Cards.lostCards();
+  const pages = sets.length + (lost.length ? 1 : 0);
+  const onLost = lost.length && albumSet >= sets.length;
   const set = sets[albumSet] || sets[0];
   const owned = Cards.owned(), pool = Cards.poolSize();
   const pct = pool ? Math.round(owned / pool * 100) : 0;
 
-  const body = set ? albumSetHtml(set) :
-    `<div class="hint" style="margin:20px 0;text-align:center">No cards are authored for this Season.</div>`;
+  const body = onLost ? albumLostHtml(lost)
+    : set ? albumSetHtml(set)
+    : `<div class="hint" style="margin:20px 0;text-align:center">No cards are authored for this Season.</div>`;
 
   host.innerHTML = `<div class="modal albumModal"><div class="top">
       <button class="sheetX" id="albumX" title="Close">✕</button>
@@ -61,8 +68,10 @@ function renderAlbum(){
           const done = Cards.setComplete(s.key);
           return `<button class="albDot${i === albumSet ? " sel" : ""}${done ? " done" : ""}"
              data-p="${i}" title="${s.name}"></button>`;
-        }).join("")}</div>
-        <button class="btn ghost albArrow" id="albNext" ${albumSet >= sets.length - 1 ? "disabled" : ""}>›</button>
+        }).join("") + (lost.length
+          ? `<button class="albDot kept${onLost ? " sel" : ""}" data-p="${sets.length}"
+               title="Kept from other content"></button>` : "")}</div>
+        <button class="btn ghost albArrow" id="albNext" ${albumSet >= pages - 1 ? "disabled" : ""}>›</button>
       </div>
       <button class="btn ghost wide" id="albumClose" style="margin-top:10px">Close</button>
     </div></div>`;
@@ -73,7 +82,7 @@ function renderAlbum(){
   $("#albumX").onclick = close;
   host.onclick = (e) => { if (e.target === host) close(); };
 
-  const go = (i) => { albumSet = Math.max(0, Math.min(sets.length - 1, i)); renderAlbum(); };
+  const go = (i) => { albumSet = Math.max(0, Math.min(pages - 1, i)); renderAlbum(); };
   $("#albPrev").onclick = () => go(albumSet - 1);
   $("#albNext").onclick = () => go(albumSet + 1);
   host.querySelectorAll(".albDot").forEach(b => b.onclick = () => go(+b.dataset.p));
@@ -103,6 +112,27 @@ function albumSetHtml(set){
       </div>
       <div class="albGrid ten">${slots}</div>
       <div class="albFoot">${foot}</div>
+    </div>`;
+}
+
+/* Cards held from content this build no longer defines. They keep their name, their rarity and
+   everything they are worth (js/cards.js remembers it when they are banked) — they are simply
+   not part of THIS Season's 150, so they sit apart rather than inflating it. */
+function albumLostHtml(lost){
+  const slots = lost.map(c =>
+    `<div class="albSlot">${cardFace(c, { owned: true, count: Cards.count(c.id),
+                                          converted: Cards.converted(c.id), size: "sm" })}</div>`
+  ).join("");
+  return `<div class="albPage">
+      <div class="albHead">
+        <span class="albEp">Kept</span>
+        <span class="albTitle">From other content</span>
+        <span class="albCount">${lost.length}</span>
+      </div>
+      <div class="albGrid ten">${slots}</div>
+      <div class="albFoot"><div class="albNeed">These are not part of this Season's ${Cards.poolSize()},
+        so they do not count toward it — but they are yours, they still pay their status, and they
+        come back the moment their content does.</div></div>
     </div>`;
 }
 

@@ -443,3 +443,7 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 /* The line under a converted card: what the third copy just bought. */
 .ccWon{margin-top:10px;text-align:center;font-size:15px;font-weight:800;color:var(--gold);
   text-shadow:0 2px 8px rgba(0,0,0,.6)}
+
+/* The page of cards kept from content this build no longer defines (js/ui/album.js). */
+.albDot.kept{border-color:rgba(255,203,92,.55)}
+.albDot.kept.sel{background:var(--gold)}

@@ -111,10 +111,42 @@ Coins, energy, and the unknown-card slot share the card silhouette so a box's co
 **one row of things** rather than as cards plus a paragraph. Plain navy ground, a big glyph, no
 frame.
 
-The **unknown card** is what an id this build cannot explain renders as — a dashed empty slot
-with a `?`. It exists because a save is allowed to hold cards from content that has since been
-rewritten: throwing them away would quietly delete a collection, so they are kept and drawn as
-nothing until the content comes back.
+The **unknown card** — a dashed slot with a `?` — is a **defensive fallback, not a screen you
+should reach in normal play**. Every live call site passes a card straight out of the catalogue or
+out of the save's own record, so it renders only if something hands `cardFace()` a null. It exists
+so that a content bug draws as a labelled empty slot instead of throwing mid-roll and leaving
+`state.animating` stuck with Roll dead.
+
+---
+
+## Nothing is lost when the content changes
+
+A save is a bag of id strings — `{"folded-blanket": 3}` — and it outlives any particular version
+of the catalogue. Rename a card, re-cut a set, ship a Season that reshuffles an older one, and a
+held id stops resolving.
+
+Deleting it is not an option: it would silently destroy pulls the player earned. But **keeping it
+without knowing what it was is nearly as bad**, because everything a card is worth — its Status on
+conversion, its trickle, its duplicate coins — is read off its rarity. An unresolvable card would
+fall back to Common, and a converted Legendary would go from 400 points to 10 without a word.
+
+So the save carries a record. `state.cardMeta` remembers each card's **rarity, name and set** at
+the moment it was banked:
+
+| | |
+|---|---|
+| **The catalogue always wins** while it can answer | this is a fallback, not a second source of truth, so "derive, don't store" still holds on every normal path |
+| **Value is preserved** | a forgotten Legendary is still a Legendary: 400 on conversion, 80 a copy after |
+| **Identity is preserved** | it keeps its name and its rarity badge, and is flagged `lost` so a caller can say so rather than let it pass as ordinary |
+| **It does not inflate the Season** | `Cards.owned()` counts the catalogue, so a kept card never pads your `x/150` |
+| **It is visible** | the collection gets a final **"Kept · from other content"** page. A card that is kept but appears nowhere is indistinguishable from one that was thrown away |
+| **Old saves are covered** | a save written before the record existed has it re-derived on load, so a collection is protected before the next card is banked, not after |
+| **It degrades** | an unreadable record falls back to the commonest rarity rather than being dropped — a card remembered by name is worth more than one not remembered at all |
+
+The asymmetry with the rest of the save is deliberate. **Status items and completed sets *are*
+filtered** against the current build: a card is a *held object* whose value is that you have it,
+so keeping it costs nothing. An item and a set are *scores*, and a score nothing can account for
+is corruption.
 
 ---
 

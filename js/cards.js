@@ -41,15 +41,44 @@ const Cards = {
   setOf(key, n) { return this.sets(n).find(s => s.key === key) || null; },
   /* Every card in the Season, in authored order. */
   all(n) { return this.sets(n).reduce((a, s) => a.concat(s.cards), []); },
-  /* A card by id, anywhere in any Season — ownership outlives a Season, so a lookup has to
-     too, or last Season's collection would render as a wall of "Unknown card". */
+  /* A card by id, anywhere in any Season — ownership outlives a Season, so a lookup has to too.
+
+     ---- AND THEN THE SAVE, IF THE CATALOGUE CANNOT ANSWER ----
+
+     A save is a bag of id strings and it outlives any particular version of
+     assets/cards/cards.js. Rename a card, re-cut a set, ship a Season that reshuffles an older
+     one, and a held id stops resolving. Dropping it would silently delete pulls the player
+     earned; keeping it but not knowing what it WAS is nearly as bad, because everything a card
+     is worth — its Status on conversion, its trickle, its duplicate coins — is read off its
+     rarity, and an unresolvable card would quietly fall back to Common. A converted Legendary
+     would go from 400 points to 10 without a word.
+
+     So `state.cardMeta` remembers what the catalogue said at the moment each card was banked.
+     THE CATALOGUE ALWAYS WINS while it can answer — this is a fallback, not a second source of
+     truth, so "derive, don't store" still holds for every normal path. It is consulted only
+     when the content is gone, which is exactly when there is nothing left to derive from. */
   get(id) {
     for (let n = 0; n < CARD_SEASONS.length; n++) {
       const hit = this.all(n).find(c => c.id === id);
       if (hit) return hit;
     }
-    return null;
+    return this.remembered(id);
   },
+  /* What the save knows about a card the catalogue no longer defines. `lost` marks it so a
+     caller can say so rather than pretending it is ordinary. */
+  remembered(id) {
+    const m = (state.cardMeta || {})[id];
+    if (!m) return null;
+    return { id, name: m.name || id, rarity: m.r || CARD_RARITIES[0].key, sub: m.set || "", lost: true };
+  },
+  /* Everything held that this build's catalogue cannot explain. Nothing in the game loop needs
+     it; the collection shows them so the player can see they were kept, not lost. */
+  lostIds() {
+    const known = new Set();
+    CARD_SEASONS.forEach((s, n) => this.all(n).forEach(c => known.add(c.id)));
+    return Object.keys(state.cards || {}).filter(id => !known.has(id));
+  },
+  lostCards() { return this.lostIds().map(id => this.remembered(id)).filter(Boolean); },
   /* Which set a card belongs to, and which Season — both derived, neither stored on the card,
      so moving a card between sets is a one-line edit in the catalogue. */
   setForCard(id) {
@@ -92,6 +121,8 @@ const Cards = {
   add(id, n) {
     const many = Math.max(1, Math.round(n || 1));
     if (!state.cards) state.cards = {};
+    /* Remember what this card WAS, once, while the catalogue can still say. See get(). */
+    this.remember(id);
     const before = this.count(id);
     state.cards[id] = before + many;
     const after = state.cards[id];
@@ -111,6 +142,19 @@ const Cards = {
     if (paying > 0) coins = Math.round(paying * (+cfg.dupCoins || 0) * r.dup * (+cfg.boardScale || 1));
     state.coins += coins;
     return { id, card: this.get(id), isNew, converted, count: after, coins, status, rarity: r };
+  },
+
+  /* Write the fallback record. Only for a card the catalogue currently defines — there is
+     nothing to remember about one it cannot describe, and overwriting a good record with a
+     guess would defeat the point. Idempotent, so calling it on every add costs nothing. */
+  remember(id) {
+    if (!state.cardMeta) state.cardMeta = {};
+    let card = null;
+    for (let n = 0; n < CARD_SEASONS.length && !card; n++) card = this.all(n).find(c => c.id === id) || null;
+    if (!card) return null;
+    const set = this.setForCard(id);
+    state.cardMeta[id] = { r: card.rarity, name: card.name, set: set ? set.name : "" };
+    return state.cardMeta[id];
   },
 
   /* ---------------- drawing ----------------

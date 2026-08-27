@@ -104,7 +104,7 @@ function serializeState(){
     /* The collection, the finished sets and the shelf. All plain objects keyed by id, so they
        serialise as they stand — no Map to spread, and a card or item the content no longer
        defines simply sits there harmlessly until it is defined again. */
-    cards:state.cards, setsDone:state.setsDone, status:state.status,
+    cards:state.cards, cardMeta:state.cardMeta, setsDone:state.setsDone, status:state.status,
     seasonFrom:state.seasonFrom, seasonsDone:state.seasonsDone, statusMilestones:state.statusMilestones,
     trophies:state.trophies, insiderBought:state.insiderBought,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
@@ -143,6 +143,21 @@ function loadState(){
     state.cards={};
     const rawCards=(d.cards&&typeof d.cards==="object")?d.cards:{};
     Object.keys(rawCards).forEach(id=>{ const c=Math.floor(+rawCards[id]||0); if(c>0) state.cards[id]=c; });
+    /* WHAT EACH CARD WAS. Sanitised but NEVER filtered against the catalogue — the whole point
+       of it is to answer for cards the catalogue no longer defines. An unknown rarity falls back
+       to the commonest rather than dropping the record, because a card remembered by name is
+       still worth more than one remembered not at all. */
+    state.cardMeta={};
+    const rawMeta=(d.cardMeta&&typeof d.cardMeta==="object")?d.cardMeta:{};
+    Object.keys(rawMeta).forEach(id=>{
+      const m=rawMeta[id]; if(!m||typeof m!=="object") return;
+      const r=CARD_RARITIES.some(x=>x.key===m.r)?m.r:CARD_RARITIES[0].key;
+      state.cardMeta[id]={r,name:String(m.name||id),set:String(m.set||"")};
+    });
+    /* A save from before the record existed still has its cards. Re-derive what can be derived,
+       so an old collection is covered the moment it is loaded rather than only from the next
+       card banked. */
+    Object.keys(state.cards).forEach(id=>{ if(!state.cardMeta[id]) Cards.remember(id); });
     /* Finished sets: only keys this build's catalogue still defines. Unlike a card, a set that
        no longer exists is a bonus nothing can explain and a row the collection cannot draw. */
     state.setsDone={};

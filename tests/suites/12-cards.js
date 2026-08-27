@@ -209,3 +209,106 @@ test("banking the last card of a set pays for it, through whatever banked it", (
     ok(Cards.setClaimed(set.key));
   } finally { Cards.draw = real; }
 });
+
+suite("cards: nothing is lost when the content changes");
+
+/* Run `fn` with the catalogue pretending a card was never authored, always restored. This is
+   what a rename, a re-cut set or a reshuffled Season looks like from a save's point of view. */
+function withCardRemoved(id, fn) {
+  const set = Cards.setForCard(id);
+  const real = set.cards.slice();
+  set.cards = real.filter(c => c.id !== id);
+  try { return fn(); } finally { set.cards = real; }
+}
+
+test("banking a card remembers what it was", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "legendary");
+  Cards.add(c.id, 1);
+  const m = state.cardMeta[c.id];
+  ok(m, "the record is written on the first copy");
+  eq(m.r, "legendary");
+  eq(m.name, c.name);
+  eq(m.set, Cards.setForCard(c.id).name);
+});
+
+test("a card the catalogue forgets keeps its NAME and its RARITY", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "legendary");
+  Cards.add(c.id, 3);
+  withCardRemoved(c.id, () => {
+    eq(Cards.all().some(x => x.id === c.id), false, "the catalogue really has forgotten it");
+    const got = Cards.get(c.id);
+    ok(got, "…but the save has not");
+    eq(got.name, c.name);
+    eq(got.rarity, "legendary");
+    eq(got.lost, true, "and it says so, rather than passing as ordinary");
+  });
+});
+
+test("…and therefore keeps its STATUS — the whole point of the record", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "legendary");
+  const worth = Cards.rarity("legendary").status;
+  Cards.add(c.id, 3);
+  eq(Cards.statusPoints(), worth);
+  withCardRemoved(c.id, () => {
+    eq(Cards.statusPoints(), worth,
+       "a converted Legendary must not quietly become a Common because content moved");
+    eq(Cards.rarityOf(c.id).key, "legendary");
+  });
+});
+
+test("a forgotten card is kept, counted and listed — never deleted", () => {
+  freshRun();
+  const c = Cards.all()[0];
+  Cards.add(c.id, 2);
+  withCardRemoved(c.id, () => {
+    eq(Cards.count(c.id), 2, "the copies survive");
+    deepEq(Cards.lostIds(), [c.id]);
+    eq(Cards.lostCards()[0].name, c.name);
+    /* …but it is not part of THIS Season's collection, so it cannot inflate the headline. */
+    ok(!Cards.all().some(x => x.id === c.id));
+    eq(Cards.owned(), 0, "x/150 counts the catalogue, not the bag");
+  });
+});
+
+test("the record survives a save and a reload", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "epic");
+  Cards.add(c.id, 3);
+  saveState();
+  freshRun();
+  loadState();
+  eq(state.cardMeta[c.id].r, "epic");
+  withCardRemoved(c.id, () => eq(Cards.rarityOf(c.id).key, "epic"));
+});
+
+test("a save from before the record existed is covered on load", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "epic");
+  Cards.add(c.id, 3);
+  saveState();
+  /* Hand-edit the slot back to what an older build wrote: cards, no cardMeta. */
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  delete raw.cardMeta;
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  freshRun();
+  loadState();
+  eq(state.cardMeta[c.id].r, "epic",
+     "re-derived on load, so an old collection is covered before the next card is banked");
+});
+
+test("an unreadable record degrades rather than throwing the collection away", () => {
+  freshRun();
+  const c = Cards.all()[0];
+  Cards.add(c.id, 1);
+  saveState();
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  raw.cardMeta[c.id] = { r: "mythic", name: "" };     // a rarity this build does not have
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  freshRun();
+  loadState();
+  eq(state.cardMeta[c.id].r, "common", "an unknown rarity falls back rather than dropping it");
+  ok(state.cardMeta[c.id].name, "and a card remembered by name beats one not remembered at all");
+});

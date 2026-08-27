@@ -31,6 +31,12 @@ function initState(){
        setsDone is the ONE thing about a set that has to be stored: "was this bonus already
        paid" is not derivable from a collection that only ever grows. Set key → the day. */
     cards:{}, setsDone:{},
+    /* WHAT EACH HELD CARD WAS, at the moment it was banked: {id:{r,name,set}}. A save is a bag
+       of id strings and outlives any version of the catalogue, so when content is rewritten a
+       held id can stop resolving — and everything a card is worth is read off its rarity. This
+       is what stops a converted Legendary quietly becoming a Common. The catalogue always wins
+       while it can answer; this is only consulted when it cannot (js/cards.js get/remember). */
+    cardMeta:{},
     /* Insider Packs bought since the last episode unlocked — what its price escalates on
        (GDD 6.5). Reset by Collection.claimUnlocked(). */
     insiderBought:0,
