@@ -68,9 +68,14 @@ function use3d(){ return cfg.board3d && window.Board3D && Board3D.available; }
    stays, because it is information the art cannot carry. */
 function showIcon(i,def){
   if(!def.icon) return false;
-  return !(use3d() && window.Board3D && Board3D.hasModel && Board3D.hasModel(i));
+  if(!use3d() || !window.Board3D) return true;
+  /* EITHER kind of art replaces the icon — a model on the slab, or a picture printed on it.
+     Checking only for a model left the 💬 sitting on top of the portrait tiles. */
+  const arted=(Board3D.hasModel && Board3D.hasModel(i)) || (Board3D.hasArt && Board3D.hasArt(i));
+  return !arted;
 }
-/* Models load asynchronously, so a tile can gain its art after the label was built. */
+/* Art loads asynchronously — a model or a tile PNG — so a tile can gain it after the label was
+   built. Both paths call this. */
 function onTileModelled(i){
   const ico=document.querySelector(`#boardLabels .blabel[data-i="${i}"] .ico`);
   if(ico) ico.remove();

@@ -196,19 +196,26 @@ function showPackModal(res){
 /* The line under the row — what the card that just turned over actually is. */
 function dropNote(d){
   if(d.kind==="card"&&d.card){
-    if(!d.isNew) return `<span class="dupNote">You already had it — <b>+${fmt(d.coins)}</b>🪙</span>`;
-    return d.card.kind==="clue"
-      ? `<b>${d.card.name}</b> — filed, and it lifts your next prediction`
-      : `<b>${d.card.name}</b> — ${d.card.sub||""}`;
+    /* The three card beats, in the order they matter (GDD 4.3). The converting copy is the
+       payoff and says what it earned; a plain duplicate says what it consoled. */
+    if(d.converted) return `<b>${d.card.name}</b> — <b>collected!</b> +${d.status} status`;
+    if(!d.isNew) return `<span class="dupNote">${d.card.name} ×${d.count} — <b>+${fmt(d.coins)}</b>🪙</span>`;
+    const set=Cards.setForCard(d.card.id);
+    return `<b>${d.card.name}</b> — ${set?set.name:""}`;
   }
+  if(d.kind==="clue") return d.isNew
+    ? `<b>A clue</b> on ${Episodes.titleOf(d.ep)}`
+    : `<span class="dupNote">You knew that one — <b>+${fmt(d.coins)}</b>🪙</span>`;
   if(d.kind==="status") return `<b>${d.item.name}</b> — <b>+${d.item.points}</b> status`;
   if(d.kind==="coins") return `<b>+${fmt(d.amount)}</b> coins`;
   if(d.kind==="energy") return `<b>+${d.amount}</b> energy`;
   return "";
 }
-/* The headline once every card is face up. New cards are what the player is here for, so they
-   are what the title counts. */
+/* The headline once every card is face up. A card that CONVERTED outranks one that is merely
+   new: three copies is the thing the player is actually collecting toward. */
 function packTitle(res){
+  const c=Boxes.convertedIn(res);
+  if(c) return c===1?"1 card collected":`${c} cards collected`;
   const n=Boxes.newCardsIn(res);
   if(!n) return "Nothing new this time";
   return n===1?"1 new card":`${n} new cards`;

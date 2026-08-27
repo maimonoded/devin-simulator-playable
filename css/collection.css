@@ -410,3 +410,14 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    itself reads as a bug, one that says "because you have bought two" reads as a rule. */
 .boxNote{font-size:10px;line-height:1.3;color:var(--teal);margin:2px 0 6px;text-align:center}
 .pack.cant{opacity:.45;cursor:not-allowed}
+
+/* ---------- a card held on the board's centre ----------
+   js/ui/fx.js showCard() drops a bare cardFace() into #centerFx. A .ccard has only an
+   aspect-ratio and no intrinsic width — .playcard used to supply that and cardFace() does not —
+   so without this the card collapses to a dark rounded dot. Loaded after overlay.css, so this
+   wins over `.centerfx.card{width:auto}` without inflating the selector. */
+.centerfx.card .ccard{width:200px;margin:0 auto}
+.centerfx.card.win .ccard{animation:revealPop .45s cubic-bezier(.2,1.5,.4,1)}
+/* The line under a converted card: what the third copy just bought. */
+.ccWon{margin-top:8px;text-align:center;font-size:13px;font-weight:800;color:var(--gold);
+  text-shadow:0 2px 8px rgba(0,0,0,.6)}

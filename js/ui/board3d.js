@@ -322,6 +322,7 @@ const Board3D = {
     this._tiles = [];
     this._models.forEach(m => this._scene.remove(m));
     this._models.clear();
+    if (this._arted) this._arted.clear();
 
     const geo = new THREE.BoxGeometry(TILE - GAP, TILE_H, TILE - GAP);
     for (let i = 0; i < boardSize(); i++) {
@@ -456,18 +457,43 @@ const Board3D = {
     return false;   // the PNG fallback is still wired up; whichever resolves wins
   },
 
-  /* Optional per-tile artwork. In 3D this is just the slab's top-face texture —
-     no counter-rotation, no anchor maths, which is the whole point of the port. */
+  /* Optional per-tile artwork: the slab's top-face texture.
+
+     ---- IT HAS TO BE TURNED, AND BY A CONSTANT ----
+
+     The slab is an unrotated BoxGeometry, so its top face maps u to world +X and v to world −Z.
+     The camera sits at a fixed 45° azimuth, which renders both of those world axes as screen
+     DIAGONALS — so a texture applied straight comes out rotated 45°, and a portrait laid on a
+     tile reads as a lozenge. That is not an art problem to be fixed per file; it is a property
+     of this camera, so it is corrected once, here, for every tile PNG there will ever be.
+
+     Turning the UVs by CAM_YAW puts the image upright on screen. The art then FILLS the tile:
+     no inset, because the tile renders as a diamond and the diamond is what should crop the
+     picture. Insetting it by 1/√2 to avoid that crop was the obvious first move and the wrong
+     one — it left the photo floating in a wide cream margin, a stamp on a tile rather than the
+     tile's face.
+
+     The face's own corners sample outside [0,1] and are edge-clamped. That is deliberate: those
+     corners are the diamond's four points, the picture's own edge pixels continue into them, and
+     the seam is invisible. Art for a tile therefore wants to be a full-bleed square with nothing
+     important in its corners. */
   _loadArt(i, mesh) {
     const src = tileImagePath(i);
     new THREE.TextureLoader().load(
       src,
       tex => {
         tex.colorSpace = THREE.SRGBColorSpace;
+        tex.center.set(0.5, 0.5);
+        tex.rotation = ENV_CAM.az * Math.PI / 180;
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
         const top = new THREE.MeshLambertMaterial({ map: tex, transparent: true });
         const side = mesh.material;
         /* BoxGeometry material order: +x, -x, +y(top), -y, +z, -z */
         mesh.material = [side, side, top, side, side, side];
+        /* Art arrived, so the fallback emoji is no longer wanted — the same rule a model gets. */
+        if (!this._arted) this._arted = new Set();
+        this._arted.add(i);
+        if (window.onTileModelled) window.onTileModelled(i);
       },
       undefined,
       () => {},                      // absent art is normal — leave the plain slab
@@ -666,6 +692,9 @@ const Board3D = {
   /* Did tile i end up with a 3D model? render.js asks, to decide whether the tile still
      needs its emoji. */
   hasModel(i) { return this._models.has(i); },
+  /* A tile PNG counts as art too. Without this the fallback emoji stayed on top of a
+     portrait tile, because "has art" only ever meant "has a GLB". */
+  hasArt(i) { return !!(this._arted && this._arted.has(i)); },
 
   /* Throw the dice onto the middle of the board. js/ui/fx.js calls this instead of shaking
      the DOM dice when the 3D board is up and the model actually loaded; it falls back on its

@@ -282,21 +282,35 @@ export const Box3D = {
 
     let edge = "#5765ad", label = "", ink = "#eef0ff", name = "", sub = "";
     let img = null, plain = "";
-    /* A STATUS ITEM IS NOT A COLLECTION CARD, and the frame is what says so. A card belongs to
-       an episode's page and is spent on unlocking it; a status item goes on the player's shelf
-       and stays there. They come out of the same box seconds apart, so they have to be tellable
-       apart at a glance — hence the gold double frame and corner ticks below, which no card of
-       any tier ever wears. */
-    let ornate = false;
+    /* TWO INDEPENDENT AXES, exactly as in the DOM path (js/ui/cardface.js): the FAMILY decides
+       the frame and the RARITY decides the badge. A status item and an Epic card come out of the
+       same box seconds apart and are completely different things, so the gold double frame and
+       corner ticks below — which no collection card of any rarity ever wears — are what tell
+       them apart at a glance.
+
+       BOTH HALVES HAVE TO MOVE TOGETHER. This function reads the same fields cardFace() does,
+       and when the card model changed under it and this did not, a collection card came out as a
+       dark rectangle with no art: `card.art` is a bare filename that only means something
+       relative to its Season's directory, and `card.tier`/`card.kind` had stopped existing at
+       all. Resolve art through Cards.artFor() and colour through the rarity, never by hand. */
+    let ornate = false, paper = false;
     if (drop.kind === "card" && drop.card){
       const card = drop.card;
-      const t = card.rarity ? Cards.rarity(card.rarity) : null;
-      edge = card.kind === "clue" ? "#d9cdae"
-           : card.tier === "diamond" ? "#8ef0ff"
-           : card.tier === "gold" ? "#ffcb5c" : "#c9d2e0";
-      label = t ? t.name.toUpperCase() : "CLUE";
-      name = card.name; sub = card.sub || "";
-      img = art(card.art);
+      const r = card.rarity ? Cards.rarity(card.rarity) : null;
+      edge = r ? r.color : "#5765ad";
+      label = r ? r.name.toUpperCase() : "CARD";
+      name = card.name;
+      sub = card.sub || (Cards.setForCard(card.id) || {}).name || "";
+      img = art(Cards.artFor(card));
+    }else if (drop.kind === "clue"){
+      /* A clue is not a card and never looks like one: it is the one thing in a box whose
+         content is a sentence you have to read, so it gets the paper evidence tag. Without this
+         branch it fell through to the energy case and drew "+undefined" on a teal card. */
+      edge = "#d9cdae"; paper = true;
+      label = drop.isNew ? "EVIDENCE" : "KNOWN";
+      name = drop.isNew ? drop.clue.text : "You knew that one.";
+      sub = Episodes.titleOf(drop.ep);
+      ink = "#33281a";
     }else if (drop.kind === "status"){
       edge = "#ffcb5c"; ornate = true; label = `+${drop.item.points} STATUS`;
       name = drop.item.name; sub = "For your shelf";
@@ -310,7 +324,8 @@ export const Box3D = {
     /* body */
     rr(2, 2, W - 4, H - 4, 16);
     const g = x.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#1a1f47"); g.addColorStop(1, "#0e1230");
+    if (paper){ g.addColorStop(0, "#f4ead0"); g.addColorStop(1, "#e2d3ac"); }
+    else { g.addColorStop(0, "#1a1f47"); g.addColorStop(1, "#0e1230"); }
     x.fillStyle = g; x.fill();
 
     /* art, or the big glyph for a payout that is not a card */
@@ -323,37 +338,51 @@ export const Box3D = {
       x.textAlign = "center"; x.textBaseline = "middle";
       x.fillText(plain, W / 2, H / 2 - 26);
     }
-    /* the name sits on a gradient off the bottom, so it reads over any art */
-    const f = x.createLinearGradient(0, H - 130, 0, H);
-    f.addColorStop(0, "rgba(8,10,28,0)"); f.addColorStop(0.45, "rgba(8,10,28,.9)");
-    f.addColorStop(1, "rgba(8,10,28,.98)");
-    x.fillStyle = f; x.fillRect(0, H - 130, W, 130);
+    /* the name sits on a gradient off the bottom, so it reads over any art. A paper card has no
+       art under it and a dark band would look like a hole punched in the page. */
+    if (!paper){
+      const f = x.createLinearGradient(0, H - 130, 0, H);
+      f.addColorStop(0, "rgba(8,10,28,0)"); f.addColorStop(0.45, "rgba(8,10,28,.9)");
+      f.addColorStop(1, "rgba(8,10,28,.98)");
+      x.fillStyle = f; x.fillRect(0, H - 130, W, 130);
+    }
     x.restore();
 
-    /* tier ribbon */
+    /* the rarity badge */
     if (label){
       x.font = "800 15px 'Segoe UI', system-ui, sans-serif";
       const tw = x.measureText(label).width + 20;
       rr(PAD, PAD, tw, 26, 13);
-      x.fillStyle = "rgba(8,10,28,.85)"; x.fill();
+      x.fillStyle = paper ? "rgba(51,40,26,.9)" : "rgba(8,10,28,.85)"; x.fill();
       x.lineWidth = 1.5; x.strokeStyle = edge; x.stroke();
       x.fillStyle = edge; x.textAlign = "left"; x.textBaseline = "middle";
       x.fillText(label, PAD + 10, PAD + 14);
     }
 
-    /* name and role */
+    /* name and role. A clue is a sentence and is set to be READ — typewriter, centred on the
+       page, four lines of room — where a card's name is a label under its art. */
     x.textAlign = "center";
     x.fillStyle = ink;
-    x.font = "700 24px Georgia, 'Times New Roman', serif";
-    wrap(x, name, W / 2, H - 66, W - 28, 26, 2);
-    if (sub){
-      x.fillStyle = "#9098c9";
+    if (paper){
+      x.font = "700 19px 'Courier New', ui-monospace, monospace";
+      wrap(x, name, W / 2, H * 0.42, W - 44, 25, 5);
+      x.fillStyle = "#6b5c3c";
       x.font = "400 14px 'Segoe UI', system-ui, sans-serif";
       x.fillText(sub, W / 2, H - 24, W - 28);
+    }else{
+      x.font = "700 24px Georgia, 'Times New Roman', serif";
+      wrap(x, name, W / 2, H - 66, W - 28, 26, 2);
+      if (sub){
+        x.fillStyle = "#9098c9";
+        x.font = "400 14px 'Segoe UI', system-ui, sans-serif";
+        x.fillText(sub, W / 2, H - 24, W - 28);
+      }
     }
 
-    /* the duplicate band, across the middle where it cannot be missed */
-    if (drop.kind === "card" && !drop.isNew){
+    /* The duplicate band, across the middle where it cannot be missed — but NOT for the copy
+       that converts. That one is the payoff (GDD 4.3), and stamping "DUPLICATE" across the best
+       moment the collection has would be exactly backwards. */
+    if (drop.kind === "card" && !drop.isNew && !drop.converted){
       x.save();
       x.translate(W / 2, H * 0.42); x.rotate(-0.12);
       const bg = x.createLinearGradient(-W / 2, 0, W / 2, 0);
@@ -364,6 +393,23 @@ export const Box3D = {
       x.font = "800 16px 'Segoe UI', system-ui, sans-serif";
       x.textAlign = "center"; x.textBaseline = "middle";
       x.fillText(`DUPLICATE  +${fmt(drop.coins)}`, 0, 0);
+      x.restore();
+    }
+
+    /* …and its opposite. The third copy is the one that turns a card into its Collectible, and
+       it is the single best moment the collection has — so it gets the band, in teal, saying
+       what it earned rather than what it consoled. */
+    if (drop.kind === "card" && drop.converted){
+      x.save();
+      x.translate(W / 2, H * 0.42); x.rotate(-0.12);
+      const bg = x.createLinearGradient(-W / 2, 0, W / 2, 0);
+      bg.addColorStop(0, "rgba(45,212,191,0)"); bg.addColorStop(0.14, "#2dd4bf");
+      bg.addColorStop(0.86, "#2dd4bf"); bg.addColorStop(1, "rgba(45,212,191,0)");
+      x.fillStyle = bg; x.fillRect(-W / 2, -17, W, 34);
+      x.fillStyle = "#062b26";
+      x.font = "800 16px 'Segoe UI', system-ui, sans-serif";
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(`COLLECTED  +${drop.status} STATUS`, 0, 0);
       x.restore();
     }
 

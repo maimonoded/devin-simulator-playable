@@ -154,7 +154,8 @@ function showCard(c){
   const el=$("#centerFx");
   el.className="centerfx show card "+(c.positive?"win":"lose");
   el.innerHTML=c.collectible
-    ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count})
+    ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count,converted:c.converted})+
+      (c.converted?`<div class="ccWon">Collected \u2014 that is the third copy</div>`:"")
     : `<div class="playcard">
       <div class="pcTop">${c.top||"Plot Twist"}</div>
       <div class="pcIco">🃏</div>
