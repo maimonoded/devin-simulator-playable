@@ -55,6 +55,22 @@ input{font-family:inherit}
 .pill .lb{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .pill.coins .v{color:var(--gold)}
 .pill.cards .v{color:var(--teal);font-variant-numeric:tabular-nums}
+
+/* Two of the three pills are BUTTONS (level and trophies both open the profile), so they have
+   to be talked out of looking like buttons — a pill row where one has a browser border and the
+   others do not reads as broken, not as interactive. */
+.pill.lvl,.pill.trophies{border:1px solid var(--line);font:inherit;cursor:pointer;text-align:left;
+  color:inherit;-webkit-appearance:none;appearance:none}
+.pill.lvl:hover,.pill.trophies:hover{border-color:var(--gold)}
+.pill.lvl .v{color:var(--gold);font-variant-numeric:tabular-nums}
+.pill.trophies .v{color:var(--teal);font-variant-numeric:tabular-nums}
+/* The level bar sits under the band name, narrow, because it is a hint rather than a gauge —
+   the profile is one tap away for the real number. */
+.pill.lvl .rkBar{display:block;width:100%;min-width:52px;height:3px;margin-top:3px;
+  border-radius:999px;background:rgba(0,0,0,.4);overflow:hidden}
+.pill.lvl .rkFill{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.pill.lvl.bump{animation:chipBump .5s cubic-bezier(.2,1.5,.4,1)}
 .energywrap{min-width:190px}
 .ebar{height:9px;background:#10143a;border-radius:6px;overflow:hidden;margin-top:5px;border:1px solid var(--line)}
 .efill{height:100%;background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}

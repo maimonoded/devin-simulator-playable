@@ -89,7 +89,7 @@ html.viewMobile .hud .pill { padding: 4px 8px; gap: 5px; min-width: 0; }
 html.viewMobile .hud .pill .lb { display: none; }
 html.viewMobile .hud .pill .v { font-size: 13px; }
 html.viewMobile .hud .pill .ic { font-size: 13px; }
-html.viewMobile .hud .energywrap { min-width: 0; flex: 1 1 auto; }
+/* .energywrap is gone — energy moved onto the Roll button. */
 html.viewMobile .hud .ebar { height: 5px; margin-top: 3px; }
 /* Day and clock are simulator instrumentation — a player has no session counter on screen.
    Dropping it also gives the four balance pills the whole width. */

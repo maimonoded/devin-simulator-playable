@@ -300,7 +300,8 @@ $("#albumBtn").onclick=()=>openAlbum();
 /* Both halves of the player block open the profile — the avatar and the rank beside it are one
    control as far as the player is concerned. */
 $("#avatarBtn").onclick=()=>openProfile();
-$("#hStatus").onclick=()=>openProfile();
+$("#hLevelPill").onclick=()=>openProfile();
+$("#hTrophyPill").onclick=()=>openProfile();
 $("#watchBtn").onclick=()=>openPrediction();
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;

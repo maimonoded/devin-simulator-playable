@@ -34,26 +34,35 @@
   <div class="hud">
     <div class="brand"><span class="k">Predictive Narrative</span><span class="t display">Harbour Heights</span></div>
     <div class="daychip"><span class="d" id="hDay">Day 1</span><span class="c" id="hClock">9:00 AM</span></div>
+    <!-- LEVEL, COINS, TROPHIES — in that order, and that is the whole toolbar.
+
+         Level leads because it is the thing the game is about: the Season ends when it reaches
+         30. Coins are what you spend. Trophies are the one reward a box can never contain, so
+         they are worth a permanent seat.
+
+         Energy is NOT here any more. It is a cost, not a balance — it only ever matters at the
+         instant you are deciding whether to roll — so it lives on the Roll button, where the
+         decision is. The collection counter is gone too: it duplicated the status track without
+         being the thing that ends a Season, and the album still carries it. -->
     <div class="pills">
+      <button class="pill lvl" id="hLevelPill" title="Your status — tap for the profile">
+        <span class="ic" id="hRankIco">🎬</span>
+        <div>
+          <div class="v" id="hLevel">1</div>
+          <div class="lb" id="hRank">Extra</div>
+          <span class="rkBar"><span class="rkFill" id="hRankFill"></span></span>
+        </div>
+      </button>
       <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
-      <div class="pill cards"><span class="ic">🃏</span><div><div class="v" id="hCards">0/150</div><div class="lb">Collection</div></div></div>
-      <div class="pill energywrap"><span class="ic">⚡</span><div style="flex:1">
-        <div class="v"><span id="hEnergy">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hEnergyCap">50</span></span></div>
-        <div class="ebar"><div class="efill" id="hEfill"></div></div></div></div>
+      <button class="pill trophies" id="hTrophyPill" title="Called it — tap for the profile">
+        <span class="ic">🎯</span><div><div class="v" id="hTrophies">0</div><div class="lb">Trophies</div></div>
+      </button>
     </div>
-    <!-- Player. The handle for the profile panel — the status track and the shelf of things
-         that prove it. The rank rides beside the avatar rather than in the pill row, because it
-         is a property of the PLAYER, not a balance. Pushed right so the balances read left. -->
+    <!-- Player. The handle for the profile panel. The rank chip that used to ride beside it is
+         gone: the Level pill says the same thing in the row where the player is already
+         reading. -->
     <div class="player">
       <button class="avatarBtn" id="avatarBtn" title="Player">💃</button>
-      <!-- The rank rides beside the avatar as its own control, not inside it: the avatar is a
-           40px circle and a rank name is not, so nesting them cost the circle its shape and
-           spilled the text past the HUD's right edge on a phone. Both open the profile. -->
-      <button class="statusChip" id="hStatus" title="Your status">
-        <span class="rkIco" id="hRankIco">🎬</span>
-        <span class="rkName" id="hRank">Extra</span>
-        <span class="rkBar"><span class="rkFill" id="hRankFill"></span></span>
-      </button>
     </div>
   </div>
 
@@ -98,8 +107,17 @@
         <button class="btn navb" id="episodesBtn" title="Episodes">🎬<i class="navDot" id="episodesDot">0</i></button>
         <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
         <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
-        <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
-        <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
+        <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop.
+             It also carries ENERGY, because energy is only ever a question at the moment you are
+             about to spend it. The label is its own span rather than the button's innerHTML:
+             render.js swaps the label for "Stop auto roll", and rewriting innerHTML would take
+             the energy readout with it. Children are pointer-events:none so the hold gesture
+             still lands on the button. -->
+        <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">
+          <span class="rollLabel" id="rollLabel">🎲 Roll</span>
+          <span class="rollEn">⚡<b id="rollEnergy">0</b><i id="rollEnergyCap">/30</i></span>
+          <span class="rollEbar"><span class="rollEfill" id="rollEfill"></span></span>
+        </button>
         <!-- The album: one page per episode, and the empty slots are the point. Badged while
              clue cards are banked for the next prediction, since those are about to be spent. -->
         <button class="btn album" id="albumBtn" title="Album">📔<i class="albumDot" id="albumDot"></i></button>

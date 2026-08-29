@@ -178,30 +178,45 @@ function renderHUD(){
   const ap=h<12?"AM":"PM"; let h12=h%12; if(h12===0)h12=12;
   $("#hClock").textContent=`${h12}:${String(m).padStart(2,"0")} ${ap}`;
   tweenNumber($("#hCoins"),state.lastCoins,state.coins,v=>fmt(v)); state.lastCoins=state.coins;
-  /* The card counter is the Season's collection, not a per-set total: cards stopped being tied
-     to a set of episodes when clues took over the gate (GDD 6.1), and 150 is what there is to
-     collect. What the player is working on NEXT is the story panel's job. */
-  const cards=Cards.owned(), pool=Cards.poolSize();
-  tweenNumber($("#hCards"),state.lastCards,cards,v=>`${Math.round(v)}/${pool}`);
-  state.lastCards=cards;
-  /* The Gala pot is NOT in the HUD. It still accumulates and the Gala still pays it out — but a
-     number the player can do nothing about, ticking up beside coins and energy which they can,
-     read as a fourth currency rather than as a jackpot sitting on one tile. It is announced
-     where it can be acted on: the activity log when a twist feeds it, and the reveal when the
-     Gala collects it. */
-  $("#hEnergy").textContent=Math.floor(state.energy);
-  $("#hEnergyCap").textContent=cfg.energyCap;
-  $("#hEfill").style.width=Math.max(0,Math.min(100,(state.energy/cfg.energyCap)*100))+"%";
+  /* TROPHIES — the count, not a fraction. "How many have I called right" is the question; how
+     many episodes exist is the profile's business, and a denominator here would also leak how
+     much story is left. Derived from state.trophies via Status, so it can never drift. */
+  const tro=Status.trophyIds().length;
+  tweenNumber($("#hTrophies"),state.lastTrophies,tro,v=>String(Math.round(v)));
+  state.lastTrophies=tro;
+  /* The Gala pot and the collection counter are NOT in the HUD. The pot is a number the player
+     can do nothing about, and the collection duplicated the status track without being the
+     thing that ends a Season. Both are still visible where they can be acted on — the log and
+     the reveal for the pot, the album for the collection. */
+  renderEnergy();
   renderStatusChip();
+}
+
+/* ENERGY, ON THE ROLL BUTTON.
+   It is a cost, not a balance: it only matters in the instant you are deciding whether to roll,
+   which is exactly where the button is. The bar under the label is the same fraction the HUD
+   pill used to show. Nothing here writes the button's innerHTML — the label is its own span,
+   because the auto-roll swap rewrites that and would otherwise delete the readout. */
+function renderEnergy(){
+  const v=$("#rollEnergy"); if(!v) return;
+  v.textContent=Math.floor(state.energy);
+  const cap=$("#rollEnergyCap"); if(cap) cap.textContent="/"+cfg.energyCap;
+  const f=$("#rollEfill");
+  /* Energy may legitimately EXCEED the cap — store packs are far larger than it — so the bar
+     clamps at 100% while the number keeps telling the truth. See CLAUDE.md. */
+  if(f) f.style.width=Math.max(0,Math.min(100,(state.energy/Math.max(1,cfg.energyCap))*100))+"%";
 }
 /* The status track, beside the avatar. The band's title and how far through the LEVEL — the
    profile is one tap away for the detail, so what belongs here is only "where am I and am I
    moving". The bar is the level rather than the band because a level moves several times a
    session and a band moves once every five; a bar that never visibly fills is not a bar. */
 function renderStatusChip(){
-  const el=$("#hStatus"); if(!el) return;
+  const el=$("#hLevelPill"); if(!el) return;
   const pts=Status.points(), rank=Status.rank(pts), lv=Status.level(pts);
-  $("#hRank").textContent=`${rank.name} · ${lv}`;
+  /* The LEVEL is the value and the band is its label, which is the right way round for a pill:
+     the number moves several times a session, the band once every five levels. */
+  $("#hLevel").textContent=lv;
+  $("#hRank").textContent=rank.name;
   $("#hRankIco").textContent=rank.icon;
   $("#hRankFill").style.width=Math.round(Status.levelProgress(pts)*100)+"%";
   /* Pop when the number moves, since the chip is small and easy to miss. */
@@ -279,7 +294,9 @@ function renderAll(){ renderHUD();renderNav();renderStats();renderStory();render
   const rollIsAuto=autoMode==="roll";
   const rollBtn=$("#rollBtn");
   rollBtn.disabled=rollIsAuto?false:(autoBusy||cantRoll);
-  rollBtn.innerHTML=rollIsAuto?"⏸ Stop auto roll":"🎲 Roll";
+  /* The LABEL only — the energy readout and its bar are siblings and must survive the swap. */
+  const rollLabel=$("#rollLabel");
+  if(rollLabel) rollLabel.textContent=rollIsAuto?"⏸ Stop auto roll":"🎲 Roll";
   rollBtn.classList.toggle("auto",rollIsAuto);
   // the multiplier is the stake for the roll in flight — lock it mid-spin and during auto
   $("#multBtn").disabled=state.animating||autoBusy;
