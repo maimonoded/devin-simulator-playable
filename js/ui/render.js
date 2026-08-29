@@ -184,7 +184,11 @@ function renderHUD(){
   const cards=Cards.owned(), pool=Cards.poolSize();
   tweenNumber($("#hCards"),state.lastCards,cards,v=>`${Math.round(v)}/${pool}`);
   state.lastCards=cards;
-  $("#hVip").textContent=fmt(state.vip);
+  /* The Gala pot is NOT in the HUD. It still accumulates and the Gala still pays it out — but a
+     number the player can do nothing about, ticking up beside coins and energy which they can,
+     read as a fourth currency rather than as a jackpot sitting on one tile. It is announced
+     where it can be acted on: the activity log when a twist feeds it, and the reveal when the
+     Gala collects it. */
   $("#hEnergy").textContent=Math.floor(state.energy);
   $("#hEnergyCap").textContent=cfg.energyCap;
   $("#hEfill").style.width=Math.max(0,Math.min(100,(state.energy/cfg.energyCap)*100))+"%";
