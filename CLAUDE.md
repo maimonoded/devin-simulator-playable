@@ -322,35 +322,57 @@ A card face reads two independent fields and never lets one decide both:
 | axis | drives | values |
 |---|---|---|
 | **family** | the **frame and the ground** | `collection` · `clue` · `status` |
-| **rarity** | a **named, coloured badge**, and the halo | Common · Rare · Epic · Legendary |
+| **rarity** | a **star badge**, and the halo | ★ · ★★ · ★★★ · ★★★★ |
 
 **Rarity does not touch the frame**, and that is not a detail. It used to: a Common wore a slate
 border and an Epic a purple one, which put four different-looking frames inside one family and
 made an ordinary card read as broken rather than as ordinary. Every collection card wears the
-same gilt now; rarity escalates the glow around it and names itself on the badge.
+same gilt now; rarity escalates the glow around it and counts itself out on the badge.
 
-The families come out of the same box seconds apart and are completely different things:
+**The badge is STARS, not the rarity's name.** "Is an Epic better than a Rare?" is a question you
+have to have learnt the answer to; ★★★ against ★★ is not a question at all. `rank` in
+`CARD_RARITIES` is the star count, which is why it runs 1–4 with no gaps — the number is drawn.
+`name` and `short` survive for the places that speak in prose (the drawer, the card reference,
+a `title` attribute); no card face reads them, and `short` no longer has a job on the card
+itself, since a fixed-width badge cannot collide with the copy count the way "LEGENDARY" did.
 
+**The three families are RANKED by how much the player wants them.** They are not three
+decorations on one idea, and getting the ranking backwards is a real bug — it was one:
+
+- **clue** — a **case photograph**, with the sentence typed on a cream slip laid over it, still
+  crooked and still taped at the top. This is the card the player is actually playing for: four
+  of them buy the next episode, and the episode is the point of the game. It used to be the
+  plainest object in the box — bare paper beside status plaques that glowed — which had the
+  hierarchy exactly inverted. Prose laid straight over a photograph is the one thing that
+  reliably becomes unreadable, hence the slip, tilted the other way from the card so the two
+  angles read as two pieces of paper.
 - **collection** — a **gilt border over a warm plum-brown ground**. Not the blue-black the rest
-  of the app uses, and the warmth does as much work as the gold: a clue is cool cream paper, a
-  collection card is a warm gilded object.
-- **clue** — a sentence you have to read, so it is the one face built to be read: **cream paper,
-  dashed edge, sitting crooked, typewriter face, tape across the top**. Four signals, because it
-  has to read as a different KIND of thing from across a row of thumbnails.
-- **status** — also gold, so it is told apart by **shape**: a heavier border, a **gold-brown**
-  ground rather than plum, and **corner ticks** nothing else wears. The ticks are the real
-  signal — brackets on a frame read as something hung on a wall, which is what a Showcase piece
-  is.
+  of the app uses; the art is the point and the warmth separates it from the cold grey of a clue
+  as much as the gold does.
+- **status** — a **plaque, and the number is the hero**. Nobody reads what their status items
+  are; they read what they were worth, so `+50` is set large across the middle and the picture is
+  pushed back behind it to a stamp at 34% opacity. It keeps the gold and the **corner ticks** —
+  brackets read as something hung on a wall, which is what a Showcase piece is — but the halo is
+  gone: it was the loudest thing on screen, for the card the player cares least about looking at.
 
 The frame carries it, because a label can be missed and a frame cannot.
+
+**The twelve clue photographs are shared, and chosen by hash.** 144 authored clues would need
+144 photographs; eight identical ones down an episode's evidence board would read as a bug. So
+`Cards.clueArt()` hashes the episode id plus the clue id into a library of twelve deliberately
+generic case photos (`CLUE_ART`, `assets/cards/clues/`) — the same trick, and the same reasoning,
+as the procedural faces for the Commons. Nothing is stored, so a clue keeps its photograph across
+reloads and saves; adding a thirteenth photo reshuffles every clue, which is why none of them
+illustrates a specific one.
 
 Both halves have to move together in three places: the canvas path (`js/ui/box3d.js`,
 `js/ui/estate3d.js`), the DOM path (`js/ui/cardface.js`, `.fam-*` and `.rar-*` in
 `css/collection.css`), and the profile shelf. That is the cost of a card looking the same
 everywhere, and it is the point.
 
-**A small slot abbreviates rather than clipping.** An album row is ten cards wide, and a clipped
-"LEGENDAR" reads as a bug where "Leg" reads as an abbreviation — hence `short` in `CARD_RARITIES`.
+**A small slot no longer has to abbreviate.** An album row is ten cards wide, and a clipped
+"LEGENDAR" read as a bug where "Leg" read as an abbreviation — which is what `short` was for.
+Four stars are narrower than the shortest of those words, so the badge stopped needing it.
 
 **Most Commons have no art, on purpose.** Ninety pieces of generated art would cost more to make
 than they would ever be looked at, so `cardFace()` falls back to a procedural face hashed off the

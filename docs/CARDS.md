@@ -15,7 +15,7 @@
 | axis | decides | values |
 |---|---|---|
 | **family** | the **frame and the ground** | `collection` · `clue` · `status` |
-| **rarity** | the **badge** and the **halo** | Common · Rare · Epic · Legendary |
+| **rarity** | the **star badge** and the **halo** | ★ · ★★ · ★★★ · ★★★★ |
 
 Neither ever decides the other. That is what lets an Epic collection card and a status item come
 out of the same box seconds apart and be unmistakable — and it is why a Common and a Legendary
@@ -24,6 +24,17 @@ are recognisably the *same kind of object*, differing in how loudly they announc
 **Rarity does not touch the frame.** It used to, and that was a bug in disguise: a Common wore a
 slate border and an Epic a purple one, which put four different-looking frames inside one family
 and made an ordinary card read as *broken* rather than as *ordinary*.
+
+**The badge counts stars rather than naming a rarity.** *Is an Epic better than a Rare?* is a
+question you have to have learnt the answer to; ★★★ beside ★★ is not a question at all. `rank` in
+`CARD_RARITIES` **is** the star count — which is why it runs 1–4 with no gaps — and `name` /
+`short` survive only for the places that speak in prose: the tuning drawer, this document, a
+`title` attribute for a mouse or a screen reader.
+
+**The three families are ranked by how much the player wants them.** They are not three
+decorations on one idea, and the ranking was inverted until recently: the clue — the card the
+whole game is played for — was the plainest object in the box, sitting beside status plaques that
+glowed. What follows is the corrected order.
 
 Both halves have to move together whenever a face changes — the DOM path
 ([`js/ui/cardface.js`](../js/ui/cardface.js) + `.fam-*` / `.rar-*` in
@@ -37,16 +48,16 @@ collection.
 ## Family 1 · Collection — 150 a Season
 
 **Gilt border, fine inner rule, warm plum-brown ground.** Not the blue-black the rest of the app
-uses. That warmth does as much work as the gold: a clue is *cool cream paper*, a collection card
-is a *warm gilded object*, and that separates them in a row of thumbnails where a border is two
-pixels wide.
+uses. That warmth does as much work as the gold: a clue is a *cold grey photograph*, a collection
+card is a *warm gilded object*, and that separates them in a row of thumbnails where a border is
+two pixels wide.
 
 | rarity | in a Season | drop weight | converts for | each copy after | duplicate coins | badge |
 |---|---|---|---|---|---|---|
-| Common | 90 | 60% | 10 | 2 | ×1 | `#8fa3c9` slate |
-| Rare | 38 | 25% | 30 | 6 | ×3 | `#4f9dff` blue |
-| Epic | 18 | 12% | 100 | 20 | ×8 | `#b06bff` violet |
-| Legendary | 4 | 3% | 400 | 80 | ×25 | `#ffcb5c` gold |
+| ★ Common | 90 | 60% | 10 | 2 | ×1 | `#8fa3c9` slate |
+| ★★ Rare | 38 | 25% | 30 | 6 | ×3 | `#4f9dff` blue |
+| ★★★ Epic | 18 | 12% | 100 | 20 | ×8 | `#b06bff` violet |
+| ★★★★ Legendary | 4 | 3% | 400 | 80 | ×25 | `#ffcb5c` gold |
 
 Legendary also gets a slow shimmer across the sheen, because the rarest thing on screen should be
 the one that moves.
@@ -62,10 +73,9 @@ the one that moves.
 
 ### Most cards have no painted art, on purpose
 
-**119 of 150.** All 18 Epics and all 4 Legendaries are painted; so are 9 lower-rarity cards that
-reuse the evidence images. The rest fall back to a **procedural face** — a two-stop gradient
-hashed off the card id, so the same card is the same colours every time and different from its
-neighbours.
+**57 of 150 are still unpainted, and all of them are Commons.** Every Rare, Epic and Legendary
+has real art. The rest fall back to a **procedural face** — a two-stop gradient hashed off the
+card id, so the same card is the same colours every time and different from its neighbours.
 
 §4.2 calls an Epic *"the pull that makes a pack memorable"*. Painted art earns its place there,
 not across ninety Commons that exist to be converted.
@@ -74,16 +84,33 @@ not across ninety Commons that exist to be converted.
 
 ## Family 2 · Clue — 8 per episode
 
-**The one face built to be READ.** Everything else on a card is looked at; a clue is a sentence
-you have to reason from before betting, so it gets four signals at once rather than one:
+**A case photograph, and the card the player is actually playing for.** Four clues buy the next
+episode, and the episode is the point of the game — so this is the face that has to look like
+something worth having.
 
-1. **Cream paper ground** (`#f2e8d0`) — no art at all
-2. **Dashed warm border**, and the card **sits crooked** (−1.1°)
-3. **Typewriter face** (Courier), dark ink on paper
-4. **A strip of tape** across the top edge
+1. **A black-and-white case photograph**, full bleed, grain over the top
+2. **The sentence on a cream slip** laid over it — typewriter, dark ink on paper
+3. The card **sits crooked** (−1.1°) and the slip is tilted *the other way* (+0.9°), so the two
+   angles read as two pieces of paper rather than one crooked one
+4. **A strip of tape** across the top edge, holding it to the board
+
+The slip is not decoration. A clue is the only face in the game carrying a line of prose, and
+prose laid straight over a photograph is the one thing that reliably becomes unreadable.
 
 Its badge slot carries a *state*, not a rarity: teal **EVIDENCE** when it is new, **KNOWN** when
 you already held it (and then it pays coins instead).
+
+### Twelve photographs, shared, chosen by hash
+
+144 authored clues would need 144 photographs — more than they would ever be looked at. Eight
+identical photographs down one episode's evidence board would read as a bug. So `Cards.clueArt()`
+hashes the episode id plus the clue id into a library of **twelve** deliberately generic case
+photos in [`assets/cards/clues/`](../assets/cards/clues), listed as `CLUE_ART` in the catalogue.
+
+Same trick as the procedural card faces, and for the same reason. Two consequences worth knowing:
+nothing is stored, so a clue keeps its photograph across reloads and across saves; and adding a
+thirteenth photograph reshuffles which clue shows what, which is exactly why none of them
+illustrates a specific clue.
 
 **Clues have no rarity.** A clue is `{id, text}` in `episodes/NNN.js` — there is no tier to show.
 
@@ -91,15 +118,21 @@ you already held it (and then it pays coins instead).
 
 ## Family 3 · Status — the Showcase
 
-Gold too, now that collection cards are — so it is told apart by **shape**, not colour:
+**A plaque, and the number is the hero.** Nobody reads what their status items *are*; they read
+what they were *worth*. So `+50` is set large across the middle in gold, and the picture is pushed
+back behind it to a stamp at 34% opacity.
 
-- a **heavier border** (4px against 2px)
-- a **gold-brown ground** rather than plum
-- **corner ticks** on the inner frame, which nothing else in the game wears
+That also settles the confusion that mattered: a face built around a number cannot be mistaken
+for a photograph (a clue) or for art in a set (a collection card), whichever way the light falls.
 
-The ticks are the real signal. Brackets on a frame read as *something hung on a wall*, which is
-exactly what a Showcase piece is. Its badge carries a point value — **STATUS +10** — because a
-status item is granted whole rather than converted.
+It keeps two things from the old treatment:
+
+- a **heavier border** (4px against 2px), gold, over a **gold-brown ground**
+- **corner ticks** on the inner frame, which nothing else in the game wears — brackets read as
+  *something hung on a wall*, which is exactly what a Showcase piece is
+
+And it loses one: the **halo is gone**. It was the loudest thing on screen, and it was shouting
+for the card the player cares least about looking at.
 
 **Status items have no rarity either.** They carry `points`, not a tier.
 

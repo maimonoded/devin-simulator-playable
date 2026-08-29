@@ -293,7 +293,7 @@ export const Box3D = {
        dark rectangle with no art: `card.art` is a bare filename that only means something
        relative to its Season's directory, and `card.tier`/`card.kind` had stopped existing at
        all. Resolve art through Cards.artFor() and colour through the rarity, never by hand. */
-    let ornate = false, paper = false, gilt = false;
+    let ornate = false, slip = false, gilt = false, hero = "";
     if (drop.kind === "card" && drop.card){
       const card = drop.card;
       const r = card.rarity ? Cards.rarity(card.rarity) : null;
@@ -301,21 +301,31 @@ export const Box3D = {
          keeps its own colour there. Letting rarity paint the border made a Common look broken
          rather than ordinary, and put two different-looking frames inside one family. */
       edge = "#c9a24a"; gilt = true;
-      label = r ? r.name.toUpperCase() : "CARD";
+      /* STARS, exactly as in the DOM path — one to four, and never the rarity's name. */
+      label = r ? Cards.stars(r) : "";
       name = card.name;
       sub = card.sub || (Cards.setForCard(card.id) || {}).name || "";
       img = art(Cards.artFor(card));
     }else if (drop.kind === "clue"){
-      /* A clue is not a card and never looks like one: it is the one thing in a box whose
-         content is a sentence you have to read, so it gets the paper evidence tag. Without this
-         branch it fell through to the energy case and drew "+undefined" on a teal card. */
-      edge = "#d9cdae"; paper = true;
+      /* A case PHOTOGRAPH with the line typed on a slip over it. This is the card the player is
+         playing for — four of them buy the next episode — so it is not the plainest thing in the
+         box any more. The photo is picked by hashing the clue's own id (CLUE_ART, in
+         assets/cards/cards.js), so it is the same one every time and a different one from the
+         clue beside it.
+
+         Without this branch at all it fell through to the energy case and drew "+undefined" on a
+         teal card, which is why the family is switched on explicitly here. */
+      edge = "#d9cdae"; slip = true;
       label = drop.isNew ? "EVIDENCE" : "KNOWN";
       name = drop.isNew ? drop.clue.text : "You knew that one.";
       sub = Episodes.titleOf(drop.ep);
       ink = "#33281a";
+      img = art(Cards.clueArt(String(drop.ep || "") + String((drop.clue || {}).id || "")));
     }else if (drop.kind === "status"){
-      edge = "#ffcb5c"; ornate = true; label = `+${drop.item.points} STATUS`;
+      /* The NUMBER is the hero and the picture is a stamp behind it. Nobody reads what their
+         status items are; they read what they were worth. */
+      edge = "#ffcb5c"; ornate = true; label = "STATUS";
+      hero = "+" + fmt(drop.item.points);
       name = drop.item.name; sub = "For your shelf";
       img = art(drop.item.art);
     }else if (drop.kind === "coins"){
@@ -329,7 +339,7 @@ export const Box3D = {
        much as the gold does. A status item is gold-brown; everything else stays navy. */
     rr(2, 2, W - 4, H - 4, 16);
     const g = x.createLinearGradient(0, 0, 0, H);
-    if (paper){ g.addColorStop(0, "#f4ead0"); g.addColorStop(1, "#e2d3ac"); }
+    if (slip){ g.addColorStop(0, "#2a241b"); g.addColorStop(1, "#141110"); }
     else if (gilt){ g.addColorStop(0, "#3a2140"); g.addColorStop(1, "#120a18"); }
     else if (ornate){ g.addColorStop(0, "#3d2f10"); g.addColorStop(1, "#1d1607"); }
     else { g.addColorStop(0, "#1a1f47"); g.addColorStop(1, "#0e1230"); }
@@ -338,19 +348,25 @@ export const Box3D = {
     /* art, or the big glyph for a payout that is not a card */
     x.save(); rr(2, 2, W - 4, H - 4, 16); x.clip();
     if (img){
+      /* A clue's photograph is shot cold; a status item's picture is pushed back behind its
+         number. Canvas filters are cheap here — this texture is painted once per card. */
+      if (slip) x.filter = "grayscale(1) contrast(1.16) brightness(0.92)";
+      else if (ornate) x.globalAlpha = 0.34;
       const s = Math.max(W / img.width, H / img.height);
       x.drawImage(img, (W - img.width * s) / 2, -img.height * s * 0.03, img.width * s, img.height * s);
+      x.filter = "none"; x.globalAlpha = 1;
     }else if (plain){
       x.font = "700 92px 'Segoe UI', system-ui, sans-serif";
       x.textAlign = "center"; x.textBaseline = "middle";
       x.fillText(plain, W / 2, H / 2 - 26);
     }
-    /* the name sits on a gradient off the bottom, so it reads over any art. A paper card has no
-       art under it and a dark band would look like a hole punched in the page. */
-    if (!paper){
+    /* the name sits on a gradient off the bottom, so it reads over any art — every family has
+       art under its foot now, including the clue. */
+    {
       const f = x.createLinearGradient(0, H - 130, 0, H);
-      f.addColorStop(0, "rgba(8,10,28,0)"); f.addColorStop(0.45, "rgba(8,10,28,.9)");
-      f.addColorStop(1, "rgba(8,10,28,.98)");
+      const base = slip ? "20,17,12" : "8,10,28";
+      f.addColorStop(0, `rgba(${base},0)`); f.addColorStop(0.45, `rgba(${base},.9)`);
+      f.addColorStop(1, `rgba(${base},.98)`);
       x.fillStyle = f; x.fillRect(0, H - 130, W, 130);
     }
     x.restore();
@@ -360,22 +376,46 @@ export const Box3D = {
       x.font = "800 15px 'Segoe UI', system-ui, sans-serif";
       const tw = x.measureText(label).width + 20;
       rr(PAD, PAD, tw, 26, 13);
-      x.fillStyle = paper ? "rgba(51,40,26,.9)" : "rgba(8,10,28,.85)"; x.fill();
+      x.fillStyle = "rgba(8,10,28,.85)"; x.fill();
       x.lineWidth = 1.5; x.strokeStyle = edge; x.stroke();
       x.fillStyle = edge; x.textAlign = "left"; x.textBaseline = "middle";
       x.fillText(label, PAD + 10, PAD + 14);
+    }
+
+    /* the status hero, across the middle */
+    if (hero){
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillStyle = "#ffcb5c";
+      x.font = "700 62px Georgia, 'Times New Roman', serif";
+      x.fillText(hero, W / 2, H * 0.40);
+      x.fillStyle = "rgba(255,203,92,.72)";
+      x.font = "800 13px 'Segoe UI', system-ui, sans-serif";
+      x.fillText("S T A T U S", W / 2, H * 0.40 + 44);
     }
 
     /* name and role. A clue is a sentence and is set to be READ — typewriter, centred on the
        page, four lines of room — where a card's name is a label under its art. */
     x.textAlign = "center";
     x.fillStyle = ink;
-    if (paper){
-      x.font = "700 19px 'Courier New', ui-monospace, monospace";
-      wrap(x, name, W / 2, H * 0.42, W - 44, 25, 5);
-      x.fillStyle = "#6b5c3c";
+    if (slip){
+      /* Prose laid straight over a photograph is the one thing that reliably becomes
+         unreadable, so the sentence gets its own piece of paper — tilted the other way from the
+         card, so the two angles read as two pieces rather than one crooked one. */
+      x.save();
+      x.translate(W / 2, H * 0.56); x.rotate(0.016);
+      const sw = W - 40, sh = 116;
+      x.fillStyle = "rgba(0,0,0,.5)"; rr(-sw / 2 + 3, -sh / 2 + 5, sw, sh, 2); x.fill();
+      x.fillStyle = "#f2e8d0";       rr(-sw / 2, -sh / 2, sw, sh, 2); x.fill();
+      x.fillStyle = ink;
+      x.font = "700 15px 'Courier New', ui-monospace, monospace";
+      wrap(x, name, 0, -sh / 2 + 26, sw - 26, 19, 4);
+      x.restore();
+      x.fillStyle = "#a89a76";
       x.font = "400 14px 'Segoe UI', system-ui, sans-serif";
       x.fillText(sub, W / 2, H - 24, W - 28);
+      x.fillStyle = "#efe4c8";
+      x.font = "700 17px 'Courier New', ui-monospace, monospace";
+      x.fillText("A CLUE", W / 2, H - 48, W - 28);
     }else{
       x.font = "700 24px Georgia, 'Times New Roman', serif";
       wrap(x, name, W / 2, H - 66, W - 28, 26, 2);

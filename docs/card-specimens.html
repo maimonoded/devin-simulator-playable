@@ -32,8 +32,10 @@
 <h1>Card specimens</h1>
 <p class="lede">Every face the game can draw, rendered by the same <code>cardFace()</code> and
 <code>dropFace()</code> the board uses, under the same stylesheet. Two independent axes:
-the <b>family</b> decides the frame and the ground, the <b>rarity</b> decides the badge and the
-halo. Written up in <a href="docs/CARDS.md" style="color:#2dd4bf">CARDS.md</a>.</p>
+the <b>family</b> decides the frame and the ground, the <b>rarity</b> decides the star badge and
+the halo. The three families are ranked by how much the player wants them: a clue is a
+photograph, a collection card is gilt art, a status item is a number on a plaque. Written up in
+<a href="docs/CARDS.md" style="color:#2dd4bf">CARDS.md</a>.</p>
 <div id="out"></div>
 <script src="js/util.js"></script>
 <script src="js/config.js"></script>
@@ -68,7 +70,7 @@ function section(title,count,note,items){
 const pick=k=>Cards.all().find(c=>c.rarity===k&&c.art)||Cards.all().find(c=>c.rarity===k);
 const noArt=Cards.all().find(c=>!c.art);
 
-section("Collection · one per rarity", "150 cards a Season",
+section("Collection · one per rarity, 1★ to 4★", "150 cards a Season",
   "Same gilt frame and warm plum ground on all four. Rarity names itself on the badge and widens the halo; it never touches the border.",
   Cards.rarities().map(r=>{
     const c=pick(r.key);
@@ -82,17 +84,22 @@ section("Collection · the three states", null,
    [cardFace(pick("epic"),{owned:true,count:3,converted:true,size:"md"}),"Converted ★","<br>the gilt lights up"],
    [cardFace(pick("rare"),{owned:true,count:2,dup:120,size:"md"}),"Duplicate","<br>as it pays out of a box"]]);
 
-section("Collection · no painted art", "119 of 150",
+section("Collection · no painted art", `${Cards.all().filter(c=>!c.art).length} of ${Cards.all().length}`,
   "A procedural face hashed off the card id — same card, same colours, every time. Painted art earns its place at the top of the ladder, not across ninety Commons.",
   [[cardFace(noArt,{owned:true,count:1,size:"md"}),"Procedural","<br>"+noArt.name]]);
 
-section("Clue · the evidence tag", "8 per episode",
-  "The one face built to be READ. Cream paper, dashed edge, sitting crooked, typewriter, tape across the top — four signals, so it reads as a different kind of thing from across a row.",
-  [[dropFace({kind:"clue",isNew:true,ep:"001",clue:{text:"A city-centre lock-up in his name is still paid up, monthly, in cash."}},{size:"md"}),"New","<br>filed against its episode"],
-   [dropFace({kind:"clue",isNew:false,ep:"001",coins:150,clue:{text:""}},{size:"md"}),"Already known","<br>pays coins instead"]]);
+section("Clue · the case photograph", "8 per episode",
+  "The card the player is actually playing for — four of them buy the next episode. A photograph, picked by hashing the clue's own id from a library of twelve, with the line typed on a slip over it. The paper, the crooked angle and the tape survive from the old evidence tag; the plainness does not.",
+  ["c1","c3","c6"].map((cid,n)=>[dropFace({kind:"clue",isNew:true,ep:"001",clue:{id:cid,
+     text:["A city-centre lock-up in his name is still paid up, monthly, in cash.",
+           "There is a dictaphone in his coat, and the tapes are labelled by surname.",
+           "The shelter is holding letters for him from a law firm, unopened."][n]}},{size:"md"}),
+    "New","<br>clue "+cid+" of episode 001"])
+  .concat([[dropFace({kind:"clue",isNew:false,ep:"001",coins:150,clue:{id:"c2",text:""}},{size:"md"}),
+            "Already known","<br>pays coins instead"]]));
 
 section("Status · the Showcase", "10 items",
-  "Gold too, so it is told apart by shape: a heavier border, a gold-brown ground rather than plum, and corner ticks nothing else wears.",
+  "A plaque, and the number is the hero. Nobody reads what their status items are; they read what they were worth — so the points are set large and the picture is pushed back behind them to a stamp. Gold and corner ticks, but no halo: it was the loudest thing on screen, for the card the player cares least about looking at.",
   STATUS_ITEMS.slice(0,4).map(i=>[dropFace({kind:"status",item:i},{size:"md"}),i.name,`<br>+${i.points} status`]));
 
 section("The payouts that are not cards", null,

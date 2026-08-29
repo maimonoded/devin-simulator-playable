@@ -43,8 +43,14 @@
    CONVERTING one pays (§5.1), `trickle` what each copy past the third pays instead, and `dup`
    the multiplier on cfg.dupCoins for a duplicate that has not converted yet.
 
-   `short` is the same name for a slot too small to hold it — an album row is ten cards wide, and
-   a clipped "LEGENDAR" reads as a bug where "Leg" reads as an abbreviation.
+   ---- RANK IS THE STAR COUNT ----
+
+   A card face wears `rank` STARS, not the rarity's name. "Is an Epic better than a Rare?" is a
+   question you have to have learnt the answer to; ★★★ against ★★ is not a question at all. So
+   rank is the display, and it is why rank runs 1..4 with no gaps — the number is drawn.
+
+   `name` and `short` are still the words, for the places that need to say it in prose: the
+   tuning drawer, the card reference, an image's alt text. No card face reads them.
 
    `color` is the rarity badge, drawn on every card face in both the canvas and the DOM path.
    The FAMILY decides the frame and the RARITY decides the badge — two independent axes, so a
@@ -59,6 +65,28 @@ const CARD_RARITIES = [
 
 /* Shorthands, so a 150-row catalogue reads as a catalogue rather than as JSON. */
 const C = "common", R = "rare", E = "epic", L = "legendary";
+
+/* ---- THE CLUE PHOTOGRAPHS ----
+
+   A clue is the card the player actually wants — it is the story, and four of them buy the next
+   episode. It used to be the plainest thing in the box: cream paper with a sentence typed on it,
+   sitting next to status plaques that glowed. That had the hierarchy exactly backwards.
+
+   So a clue is a PHOTOGRAPH now, and the sentence is the caption under it. Twelve of them, and
+   a clue picks one by HASHING ITS OWN ID — the same trick the procedural card faces use, and for
+   the same reason: 144 authored clues would need 144 photographs, which would cost more to make
+   than they would ever be looked at, while eight identical photos down one episode's evidence
+   board would read as a bug.
+
+   Hashing rather than cycling matters: a clue keeps the same photograph forever, across reloads
+   and across saves, because nothing about the choice is stored. Adding a thirteenth photo
+   reshuffles which clue shows what, which is why they are deliberately generic — no photograph
+   here illustrates a specific clue, and none of them should. */
+const CLUE_ART = {
+  dir: "assets/cards/clues/",
+  files: ["phone", "letter", "keys", "car", "ledger", "door",
+          "photos", "ticket", "watch", "window", "waiting", "cash"],
+};
 
 const CARD_SEASONS = [
   {

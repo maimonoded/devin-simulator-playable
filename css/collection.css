@@ -31,18 +31,27 @@
 .size-md .ccName{font-size:13px} .size-md .ccSub{font-size:10px}
 .size-lg .ccName{font-size:17px} .size-lg .ccSub{font-size:12px}
 /* ---------- the rarity badge ----------
-   NAMED and COLOURED, and drawn on locked slots too: "Epic" is what tells you whether the gap
-   in the row is a week's play or a lucky Tuesday. The colour comes from the catalogue as
-   --rar (assets/cards/cards.js), so adding a rarity is a data change, not a stylesheet one. */
+   ONE TO FOUR STARS, coloured, and drawn on locked slots too: three stars is what tells you
+   whether the gap in the row is a week's play or a lucky Tuesday.
+
+   Stars rather than the name, because "is an Epic better than a Rare?" is a question you have to
+   have learnt the answer to and ★★★ against ★★ is not a question at all. The count also means
+   the badge no longer changes width with the rarity, so it stops colliding with the copy count
+   in a small slot -- which is what the abbreviations existed to avoid.
+
+   The colour comes from the catalogue as --rar (assets/cards/cards.js), so adding a rarity is a
+   data change, not a stylesheet one. */
 .ccRar{position:absolute;top:5px;left:5px;z-index:3;border-radius:999px;
-  padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
   background:rgba(8,10,28,.85);border:1px solid color-mix(in srgb,var(--rar) 55%,transparent);
-  color:var(--rar)}
-/* Small slots run the rarity name and the copy count along one line, so both have to shrink or
-   the longest name ("LEGENDARY") clips into the count. */
-.size-sm .ccRar{font-size:6.5px;padding:1.5px 4px;top:4px;left:4px;letter-spacing:.01em;
-  white-space:nowrap}
-.size-lg .ccRar{font-size:11px;padding:3px 9px}
+  color:var(--rar);white-space:nowrap;
+  /* The glyph is the whole badge, so it carries its own light rather than relying on the
+     card's halo -- a single Common star on dark art is otherwise nearly invisible. */
+  text-shadow:0 0 6px color-mix(in srgb,var(--rar) 70%,transparent)}
+.size-sm .ccRar{font-size:7px;padding:1.5px 4px;top:4px;left:4px;letter-spacing:.05em}
+.size-lg .ccRar{font-size:13px;padding:3px 9px}
+/* The clue and status badges are words, not stars, and a word needs the tighter tracking back. */
+.fam-clue .ccRar,.fam-status .ccRar{letter-spacing:.05em;text-shadow:none}
 .ccCount{position:absolute;top:5px;right:5px;z-index:3;border-radius:999px;padding:2px 7px;
   font-size:9px;font-weight:800;background:rgba(8,10,28,.82);border:1px solid var(--line);color:var(--muted)}
 .size-sm .ccCount{font-size:6.5px;padding:1.5px 4px;top:4px;right:4px}
@@ -101,37 +110,66 @@
 .ccard.fam-collection.conv .ccFrame{border-color:rgba(255,203,92,.9);
   box-shadow:inset 0 0 14px rgba(255,203,92,.25),inset 0 0 0 1px rgba(0,0,0,.35)}
 
-/* clue — an evidence tag. Warm paper edge, sits crooked, typewriter face, and tape holding it
-   down. Three signals, so it reads as a different KIND of thing from across the room. */
-.ccard.fam-clue{border-color:#d9cdae;border-style:dashed;
-  box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 1px rgba(217,205,174,.18);
-  transform:rotate(-1.1deg);background:#efe4c8}
-.ccard.fam-clue .ccArt{background:#f2e8d0;display:flex;align-items:center;justify-content:center;
-  padding:16px 12px 34%}
-.ccard.fam-clue .ccArt span{font-family:"Courier New",ui-monospace,monospace;font-size:11px;
-  line-height:1.45;color:#33281a;text-align:center}
-.size-sm.fam-clue .ccArt span{font-size:7.5px;line-height:1.35}
-.size-lg.fam-clue .ccArt span{font-size:14px}
+/* clue — a CASE PHOTOGRAPH with the line typed on a slip beneath it.
+
+   This is the card the player is actually playing for: four of them buy the next episode, and
+   the episode is the whole point of the game. It used to be the plainest object in the box —
+   cream paper with a sentence on it, next to status plaques that glowed — which had the
+   hierarchy exactly backwards. So it gets the photograph.
+
+   The paper survives as the SLIP the sentence sits on, and so do the crooked angle and the tape.
+   A clue is still the one face in the game carrying a line of prose, and prose laid straight
+   over a photograph is the one thing that reliably becomes unreadable. */
+.ccard.fam-clue{border-color:#d9cdae;border-style:solid;border-width:3px;
+  box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 0 1px rgba(217,205,174,.18);
+  transform:rotate(-1.1deg);background:#241f18}
+/* The photographs are shot cold and grainy already; this deepens the contrast so a light one
+   and a dark one still read as the same kind of object. */
+.ccard.fam-clue .ccArt{filter:grayscale(1) contrast(1.16) brightness(.92)}
+.ccGrain{position:absolute;inset:0;z-index:1;pointer-events:none;mix-blend-mode:overlay;
+  opacity:.5;background-image:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,rgba(0,0,0,.05) 1px 2px)}
+/* The slip. Sits ABOVE the foot and below the frame, tilted the other way from the card so the
+   two angles read as two pieces of paper rather than as one crooked one. */
+.ccSlip{position:absolute;left:6%;right:6%;bottom:24%;z-index:3;
+  background:#f2e8d0;color:#33281a;padding:7px 8px;border-radius:1px;
+  transform:rotate(.9deg);box-shadow:0 3px 9px rgba(0,0,0,.55)}
+.ccSlip span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+  font-family:"Courier New",ui-monospace,monospace;font-size:10px;line-height:1.35;text-align:center}
+.size-sm .ccSlip{left:4%;right:4%;bottom:26%;padding:3px 4px}
+.size-sm .ccSlip span{font-size:6.5px;line-height:1.25;-webkit-line-clamp:3}
+.size-lg .ccSlip span{font-size:13px;line-height:1.4}
 .ccard.fam-clue .ccFoot{
-  background:linear-gradient(180deg,rgba(242,232,208,0),rgba(228,216,186,.95) 40%,rgba(224,211,178,1))}
+  background:linear-gradient(180deg,rgba(20,17,12,0),rgba(20,17,12,.92) 42%,rgba(20,17,12,.99))}
 .ccard.fam-clue .ccName{font-family:"Courier New",ui-monospace,monospace;font-weight:700;
-  color:#33281a;letter-spacing:.06em;text-transform:uppercase}
-.ccard.fam-clue .ccSub{color:#6b5c3c}
-.ccard.fam-clue .ccRar{background:#33281a;border-radius:3px;letter-spacing:.08em}
+  color:#efe4c8;letter-spacing:.08em;text-transform:uppercase}
+.ccard.fam-clue .ccSub{color:#a89a76}
+.ccard.fam-clue .ccFrame{position:absolute;inset:4px;z-index:2;pointer-events:none;
+  border:1px solid rgba(242,232,208,.22)}
+/* tape, still holding it to the board */
 .ccard.fam-clue::after{content:"";position:absolute;top:-7px;left:50%;translate:-50% 0;z-index:4;
   width:38%;height:15px;background:rgba(242,232,208,.5);
   border-left:1px solid rgba(120,105,70,.2);border-right:1px solid rgba(120,105,70,.2);
   transform:rotate(1.6deg)}
 .size-sm.fam-clue::after{height:11px;top:-5px}
 
-/* status — gold too, now that collection cards are, so it has to be told apart by SHAPE rather
-   than by colour: a heavier border, a gold-brown ground instead of plum, and corner ticks that
-   nothing else wears. The ticks are the real signal — a frame with brackets on it reads as
-   something hung on a wall, which is exactly what a Showcase piece is.
+/* status — a PLAQUE, and the NUMBER is the hero.
+
+   Nobody reads what their status items are; they read what they were worth. A status item is
+   banked, not admired — so the points are set large across the middle and the picture is pushed
+   back behind them to a stamp. That also settles the one confusion that mattered: a face built
+   around a number cannot be mistaken for a photograph (a clue) or for art in a set (a card),
+   whichever way the light falls on it.
+
+   It keeps the gold and the corner ticks — brackets on a frame read as something hung on a
+   wall, which is what a Showcase piece is — but the halo is gone. It was the loudest thing on
+   screen, and it was shouting for the card the player cares least about looking at.
    (The same frame is painted into the canvas for the in-scene card: js/ui/box3d.js.) */
 .ccard.fam-status{border-color:var(--gold);border-width:4px;
   background:linear-gradient(180deg,#3d2f10,#1d1607);
-  box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 26px rgba(255,203,92,.55)}
+  box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 12px rgba(255,203,92,.22)}
+/* Pushed back and dimmed: present, but never competing with the number. */
+.ccard.fam-status .ccArt{opacity:.34;filter:sepia(.5) contrast(.9)}
 .ccard.fam-status .ccFrame{position:absolute;inset:7px;z-index:2;pointer-events:none;
   border-radius:6px;border:1.5px solid rgba(255,203,92,.55)}
 .ccard.fam-status .ccFrame::before,.ccard.fam-status .ccFrame::after{content:"";position:absolute;
@@ -140,6 +178,15 @@
 .ccard.fam-status .ccFrame::after{bottom:-4px;right:-4px;border-left:0;border-top:0;border-radius:0 0 4px 0}
 .size-sm .ccFrame{inset:5px}
 .size-sm.fam-status .ccFrame::before,.size-sm.fam-status .ccFrame::after{width:11px;height:11px}
+/* the hero */
+.ccBig{position:absolute;left:0;right:0;top:0;bottom:26%;z-index:3;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.ccBig b{font-family:Georgia,serif;font-weight:700;font-size:34px;line-height:1;color:var(--gold);
+  text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.ccBig i{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.22em;
+  text-transform:uppercase;color:rgba(255,203,92,.72)}
+.size-sm .ccBig b{font-size:19px} .size-sm .ccBig i{font-size:6px;letter-spacing:.14em}
+.size-lg .ccBig b{font-size:48px} .size-lg .ccBig i{font-size:12px}
 
 .ccard.fam-coins,.ccard.fam-energy{border-color:var(--line);background:linear-gradient(180deg,#232a63,#141838)}
 .ccard.fam-energy .ccPlain{color:var(--teal)}

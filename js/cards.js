@@ -91,6 +91,22 @@ const Cards = {
   rarities() { return CARD_RARITIES; },
   rarity(key) { return CARD_RARITIES.find(r => r.key === key) || CARD_RARITIES[0]; },
   rarityOf(id) { const c = this.get(id); return c ? this.rarity(c.rarity) : CARD_RARITIES[0]; },
+  /* The badge every card face wears. Stars, not the rarity's name: ★★★ against ★★ needs no
+     prior knowledge of which of "Epic" and "Rare" is the better word. Takes a rarity object or
+     a key, so both paths can call it with whatever they are already holding. */
+  stars(r) {
+    const rr = (r && r.key) ? r : this.rarity(r);
+    return "\u2605".repeat(Math.max(1, Math.min(9, rr.rank | 0)));
+  },
+  /* One of the twelve case photographs, chosen by hashing the seed — an episode id plus a clue
+     id. Nothing is stored, so a clue keeps its photograph across reloads and across saves; see
+     the note on CLUE_ART in assets/cards/cards.js for why they are generic. */
+  clueArt(seed) {
+    const f = CLUE_ART.files;
+    let h = 0; const s = String(seed || "");
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return CLUE_ART.dir + f[h % f.length] + ".webp";
+  },
   /* Painted art, or null for the procedural face. Absent art is the NORM, not a gap: ninety
      Commons of generated art would cost more to make than they would ever be looked at. */
   artFor(card) {

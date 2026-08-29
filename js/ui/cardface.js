@@ -13,13 +13,28 @@
    one field to decide two things:
 
      FAMILY  decides the FRAME.   collection · status · clue
-     RARITY  decides the BADGE.   Common · Rare · Epic · Legendary, named and coloured
+     RARITY  decides the BADGE.   one to four STARS, coloured
 
    A status item and an Epic collection card come out of the same box seconds apart and are
    completely different things — one goes on the player's shelf and stays there, the other is a
    card in a set. The frame is what carries that, because a label can be missed and a frame
-   cannot. The badge is orthogonal: it says how hard this was to get, in words and in colour,
+   cannot. The badge is orthogonal: it says how hard this was to get, in STARS and in colour,
    and it is drawn on every card that has a rarity whatever family it belongs to.
+
+   ---- WHY THE THREE FAMILIES LOOK THE WAY THEY DO ----
+
+   They are not three decorations on one idea. They are three different things the player wants
+   differently, and the faces are ranked to match:
+
+     clue        A PHOTOGRAPH with the line typed under it. This is the one the player is
+                 actually playing for — four of them buy the next episode — so it is the one
+                 that looks like something worth having. It used to be the plainest object in
+                 the box, which had the hierarchy backwards.
+     collection  Gilt over warm plum. A thing you collect and complete; the art is the point.
+     status      A PLAQUE, and the number is the hero. Nobody reads what their status items
+                 are; they read what they were worth. So the points are set large and the
+                 picture is reduced to a stamp beside them — which also means a status item can
+                 never be mistaken for a photograph or for a card in a set.
 
    ---- THREE STATES, one element ----
      owned     full art, the family frame, name and rarity
@@ -73,13 +88,14 @@ function cardFace(card, opts){
   const cls=["ccard","size-"+size,"fam-"+fam,
              r?("rar-"+r.key):"", owned?"got":"locked", converted?"conv":"",
              o.flip?"flip":""].filter(Boolean).join(" ");
-  /* Drawn for locked slots too: "Epic" is what tells you whether the gap in the row is a
-     week's play or a lucky Tuesday. */
-  const badge=r?`<div class="ccRar" style="--rar:${r.color}">${size==="sm"?(r.short||r.name):r.name}</div>`:"";
+  /* Drawn for locked slots too: three stars is what tells you whether the gap in the row is a
+     week's play or a lucky Tuesday. `title` keeps the word for anyone hovering, and for a
+     screen reader — the stars are the display, not the whole truth. */
+  const badge=r?`<div class="ccRar" style="--rar:${r.color}" title="${r.name}">${Cards.stars(r)}</div>`:"";
   const dup=o.dup?`<div class="ccDup">DUPLICATE · +${fmt(o.dup)}🪙</div>`:"";
   const need=Cards.copiesToConvert();
-  /* A small slot runs the rarity name and the copy count along one line, and "LEGENDARY 2/3"
-     does not fit in ninety pixels. The small form drops the denominator — the card already
+  /* A small slot runs the badge and the copy count along one line, and "2/3" does not fit
+     beside four stars in ninety pixels. The small form drops the denominator — the card already
      lights up when it converts, so how many are still wanted is the album's job, not the slot's. */
   const held=o.count||1;
   const count=(owned&&!converted&&need>1)
@@ -108,23 +124,35 @@ function dropFace(drop, opts){
                                                    dup:(drop.isNew||drop.converted)?0:drop.coins,
                                                    flip:o.flip});
   if(drop.kind==="clue"){
-    /* The evidence tag: paper, not a portrait. A clue is the one thing in a box whose content
-       is a sentence you have to read, so it is the one face built to be read. */
+    /* A case photograph with the line typed under it. The photo is picked by hashing the clue's
+       own id, so it is the same one every time this clue is drawn and a different one from the
+       clue above it in the evidence board — see CLUE_ART in assets/cards/cards.js.
+
+       The sentence still has to be READ, which is why it sits on paper over the photograph
+       rather than on the gradient a card name gets: this is the only face in the game carrying
+       a line of prose, and prose over a photograph is the one thing that reliably becomes
+       unreadable. */
+    const clueId=drop.clue&&drop.clue.id;
+    const shot=Cards.clueArt(String(drop.ep||"")+String(clueId||""));
     return `<div class="ccard size-${size} fam-clue got${o.flip?" flip":""}">
-        <div class="ccArt clueArt"><span>${drop.isNew?drop.clue.text:"You knew that one."}</span></div>
+        <div class="ccArt" style="${cardArtCss(shot)}"></div>
+        <div class="ccGrain"></div>
         <div class="ccFrame"></div>
         <div class="ccRar" style="--rar:var(--teal)">${drop.isNew?"Evidence":"Known"}</div>
         ${drop.isNew?"":`<div class="ccDup">+${fmt(drop.coins)}🪙</div>`}
+        <div class="ccSlip"><span>${drop.isNew?drop.clue.text:"You knew that one."}</span></div>
         <div class="ccFoot"><div class="ccName">A clue</div>
           <div class="ccSub">${Episodes.titleOf(drop.ep)}</div></div>
       </div>`;
   }
   if(drop.kind==="status"){
+    /* The points are the hero and the picture is a stamp behind them. A status item is a thing
+       the player banks rather than looks at, so what it was WORTH is the headline — and a face
+       built around a number can never be confused with a photograph or with a card in a set. */
     return `<div class="ccard size-${size} fam-status got${o.flip?" flip":""}">
         <div class="ccArt" style="${cardArtCss(drop.item.art)}"></div>
-        <div class="ccSheen"></div>
         <div class="ccFrame"></div>
-        <div class="ccRar" style="--rar:var(--gold)">Status +${drop.item.points}</div>
+        <div class="ccBig"><b>+${fmt(drop.item.points)}</b><i>status</i></div>
         <div class="ccFoot"><div class="ccName">${drop.item.name}</div>
           <div class="ccSub">For your shelf</div></div>
       </div>`;
