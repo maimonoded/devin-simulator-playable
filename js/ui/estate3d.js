@@ -62,7 +62,7 @@ const CAM_YAW = Math.PI / 4;
 
 /* The painted face, in canvas pixels. Portrait, because the art is: a building is taller than
    it is wide, and a plaque under it carries the name. */
-const F = { w: 300, h: 400, plaque: 62, pad: 10 };
+const F = { w: 300, h: 400, plaque: 84, pad: 10 };
 
 function roundRect(x, a, b, w, h, rad){
   if (x.roundRect){ x.beginPath(); x.roundRect(a, b, w, h, rad); return; }
@@ -105,6 +105,24 @@ export const Estate3D = {
     return t;
   },
   tierIndex(level){ return ESTATE_TIERS.indexOf(this.tierFor(level)); },
+
+  /* WHERE INSIDE THE TIER THIS LEVEL SITS — {step, span}, step counting from 0.
+
+     The estate changes a LITTLE every level and a LOT every fifth, and this is what the little
+     change is derived from. It has to be derived rather than authored: six tiers of art exist
+     and thirty are not going to be painted, so the per-level difference is something the canvas
+     does to the art it already has.
+
+     The span is measured to the NEXT tier rather than assumed to be five, so re-cutting the
+     bands re-cuts the ramp with them. The last tier runs to the top of the track. */
+  tierStep(level){
+    const lv = level == null ? Status.level() : level;
+    const t = this.tierFor(lv);
+    const i = ESTATE_TIERS.indexOf(t);
+    const next = ESTATE_TIERS[i + 1];
+    const end = next ? next.at : (Status.maxLevel() + 1);
+    return { step: Math.max(0, lv - t.at), span: Math.max(1, end - t.at) };
+  },
 
   /* Rebuilt only when what it shows changes. renderAll() runs on every float and every log line,
      and each rebuild paints a canvas and uploads a texture — enough to stall the roll loop. */
@@ -167,14 +185,42 @@ export const Estate3D = {
       x.fillStyle = "rgba(35,42,99,.55)";
       x.fillRect(fx, fy, fw, fh);
     }
-    /* A vignette, so the frame's edge is a fade rather than a cut. */
+    /* THE LIGHTS COME ON, ONE LEVEL AT A TIME. `warm` runs 0..1 across the tier and lifts a
+       golden wash over the scene, so the same painting reads as colder and emptier at the start
+       of a tier than at the end of it. It is the cheapest per-level change that is actually
+       VISIBLE at the size this is drawn — a prop moved by four pixels would not be.
+
+       soft-light rather than a flat overlay: it warms the lit parts and leaves the shadows,
+       which is what a building filling with light does. A plain alpha fill just greys it. */
+    const { step, span } = this.tierStep(level);
+    const warm = span > 1 ? step / (span - 1) : 1;
+    if (warm > 0){
+      x.save();
+      x.globalCompositeOperation = "soft-light";
+      x.globalAlpha = 0.18 + warm * 0.42;
+      x.fillStyle = "#ffb04a";
+      x.fillRect(fx, fy, fw, fh);
+      x.restore();
+      /* and a little more exposure, so it brightens as well as warms */
+      x.save();
+      x.globalCompositeOperation = "lighter";
+      x.globalAlpha = warm * 0.10;
+      x.fillStyle = "#ffd9a0";
+      x.fillRect(fx, fy, fw, fh);
+      x.restore();
+    }
+    /* A vignette, so the frame's edge is a fade rather than a cut. It lifts as the tier is
+       climbed — the place stops looking like somewhere the light does not reach. */
     const vig = x.createLinearGradient(0, fy + fh * 0.55, 0, fy + fh);
     vig.addColorStop(0, "rgba(8,10,28,0)");
-    vig.addColorStop(1, "rgba(8,10,28,.55)");
+    vig.addColorStop(1, `rgba(8,10,28,${(0.55 - warm * 0.22).toFixed(3)})`);
     x.fillStyle = vig; x.fillRect(fx, fy, fw, fh);
     x.restore();
+    /* The gilt gains weight with the level too, so the FRAME says it as well as the picture. */
     roundRect(x, fx, fy, fw, fh, 14);
-    x.lineWidth = 2; x.strokeStyle = "rgba(255,203,92,.30)"; x.stroke();
+    x.lineWidth = 2 + warm * 1.6;
+    x.strokeStyle = `rgba(255,203,92,${(0.30 + warm * 0.42).toFixed(3)})`;
+    x.stroke();
 
     /* the plaque — overlapping the frame's foot by a few pixels so the two read as one object */
     const py = F.h - F.plaque;
@@ -194,14 +240,50 @@ export const Estate3D = {
     x.font = "800 14px 'Segoe UI', system-ui, -apple-system, sans-serif";
     x.fillText(`LV ${Status.level()}`, F.w - F.pad - 10, py + 17);
 
+    /* PIPS — one per level in this tier, filled up to where you are. The warmth ramp is felt
+       rather than read; this is the half that can be READ, so "something changed" is never a
+       question. Drawn on the plaque beside the level, where the eye already goes. */
+    const pipR = 2.6, pipGap = 8;
+    const pipW = (span - 1) * pipGap;
+    let pxs = F.w - F.pad - 10 - pipW;
+    for (let i = 0; i < span; i++){
+      x.beginPath();
+      x.arc(pxs + i * pipGap, py + 34, pipR, 0, Math.PI * 2);
+      x.fillStyle = i <= step ? "rgba(255,203,92,.95)" : "rgba(255,255,255,.20)";
+      x.fill();
+    }
+
     /* the level bar — the one thing on the board that moves every few rolls */
-    const bx = F.pad + 10, bw = F.w - F.pad * 2 - 20, by = py + 33, bh = 7;
+    const bx = F.pad + 10, bw = F.w - F.pad * 2 - 20, by = py + 44, bh = 7;
     roundRect(x, bx, by, bw, bh, 4);
     x.fillStyle = "rgba(255,255,255,.13)"; x.fill();
     const p = Math.max(0, Math.min(1, Status.levelProgress()));
     if (p > 0){
       roundRect(x, bx, by, Math.max(4, bw * p), bh, 4);
       x.fillStyle = "#2dd4bf"; x.fill();
+    }
+
+    /* HAVE / NEEDED, under the bar. A bar on its own says "some of the way"; the numbers say
+       how much more, which is the question actually being asked. Both are drawn because they
+       answer it at different distances — the bar from across the board, the number when you
+       look at it.
+
+       Measured WITHIN the level, not against the Season: points banked since this level began,
+       over what this level costs. At the top there is no next level, so it says so rather than
+       printing a fraction of a span that does not exist. */
+    const lvNow = Status.level();
+    x.textBaseline = "middle";
+    x.textAlign = "center";
+    x.font = "800 13px 'Segoe UI', system-ui, -apple-system, sans-serif";
+    if (lvNow >= Status.maxLevel()){
+      x.fillStyle = "#ffcb5c";
+      x.fillText("SEASON COMPLETE", F.w / 2, by + 20);
+    } else {
+      const here = Status.levelAt(lvNow), next = Status.levelAt(lvNow + 1);
+      const have = Math.max(0, Math.round(Status.points() - here));
+      const need = Math.max(1, Math.round(next - here));
+      x.fillStyle = "rgba(232,236,255,.92)";
+      x.fillText(`${fmt(have)} / ${fmt(need)}`, F.w / 2, by + 20);
     }
 
     const map = new THREE.CanvasTexture(c);
