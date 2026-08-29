@@ -225,12 +225,12 @@ const CARD_SEASONS = [
       ] },
 
       { key: "the-press", name: "The Press", cards: [
-        { id: "a-press-badge",     name: "A Press Badge",              rarity: C },
-        { id: "camera-flash",      name: "A Camera Flash",             rarity: C },
-        { id: "front-page",        name: "Yesterday's Front Page",     rarity: C },
-        { id: "voice-recorder",    name: "A Voice Recorder",           rarity: C },
-        { id: "the-doorstep",      name: "The Doorstep",               rarity: C },
-        { id: "a-notebook",        name: "A Notebook",                 rarity: C },
+        { id: "a-press-badge",     name: "A Press Badge",              rarity: C, art: "a-press-badge.webp"  },
+        { id: "camera-flash",      name: "A Camera Flash",             rarity: C, art: "camera-flash.webp"  },
+        { id: "front-page",        name: "Yesterday's Front Page",     rarity: C, art: "front-page.webp"  },
+        { id: "voice-recorder",    name: "A Voice Recorder",           rarity: C, art: "voice-recorder.webp"  },
+        { id: "the-doorstep",      name: "The Doorstep",               rarity: C, art: "the-doorstep.webp"  },
+        { id: "a-notebook",        name: "A Notebook",                 rarity: C, art: "a-notebook.webp"  },
         { id: "it-circulated",     name: "The Photograph That Circulated", rarity: R, art: "it-circulated.webp"  },
         { id: "press-office",      name: "The Press Office's Silence", rarity: R, art: "press-office.webp"  },
         { id: "share-price",       name: "A Share-Price Story",        rarity: R, art: "share-price.webp"  },
@@ -238,7 +238,7 @@ const CARD_SEASONS = [
       ] },
 
       { key: "the-boardroom", name: "The Boardroom", cards: [
-        { id: "a-long-table",      name: "A Long Table",               rarity: C },
+        { id: "a-long-table",      name: "A Long Table",               rarity: C, art: "a-long-table.webp"  },
         { id: "water-glasses",     name: "Water Glasses",              rarity: C },
         { id: "chair-at-the-head", name: "The Chair at the Head",      rarity: C },
         { id: "a-bound-report",    name: "A Bound Report",             rarity: C },
