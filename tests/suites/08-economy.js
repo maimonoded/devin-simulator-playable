@@ -247,16 +247,30 @@ test("apply pushes the model's numbers onto the live tuning surface", () => {
   resetCfg();
 });
 
-test("the shipped config defaults already match the built-in model", () => {
+/* EVERY owned key, not a hand-picked seven.
+
+   This used to name seven keys and check those. It missed statusTotal, and so it sat green
+   while the shipped default said 7,500 and the model said 30,000 — which meant the Season gate
+   the game actually ran was four times the one anybody had balanced, because Economy.apply()
+   overwrites the default at every boot. A whole afternoon of tuning went into a number that was
+   discarded on the next page load.
+
+   The invariant is exactly this: for every key the model OWNS, the shipped default must already
+   be what apply() would write. Enumerating OWNED_CFG_KEYS rather than listing keys by hand
+   means a new owned value cannot be added without this noticing. */
+test("the shipped config defaults already match the built-in model, for EVERY owned key", () => {
+  resetCfg();
+  Economy.apply();
+  const mismatched = Economy.OWNED_CFG_KEYS.filter(k =>
+    JSON.stringify(DEFAULTS[k]) !== JSON.stringify(cfg[k]));
+  eq(mismatched.length, 0,
+     mismatched.map(k => `${k}: ships ${JSON.stringify(DEFAULTS[k])}, model says ${JSON.stringify(cfg[k])}`)
+               .join(" · ") || "all owned keys agree");
+});
+
+test("the model's own tables ship as the defaults", () => {
   resetCfg();
   const e = ECONOMY_DEFAULT;
-  eq(DEFAULTS.energyCap, e.energy.cap);
-  eq(DEFAULTS.stdBase, e.tiles.stdBase);
-  eq(DEFAULTS.vipSeed, e.tiles.vipSeed);
-  eq(DEFAULTS.boxCoins, e.box.item1Coins);
-  eq(DEFAULTS.accuracy, e.prediction.baseAccuracy);
-  eq(DEFAULTS.accuracyPerClue, e.prediction.accuracyPerClue);
-  eq(DEFAULTS.accuracyMax, e.prediction.maxAccuracy);
   eq(defBox.length, e.box.item2.length, "the box table ships as the model's item 2");
   eq(defDeck.filter(c => c.clues > 0).length, 0, "and the deck ships with no clue card");
 });

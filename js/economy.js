@@ -147,8 +147,18 @@ const ECONOMY_DEFAULT = {
      SOLVED from the two (Economy.statusStep). The four per-source values are 5.1's inflows:
      the two card ones live on the rarity table and setBonusStatus, and these are the two the
      collection cannot pay for you. */
+  /* THE SEASON GATE, and for this build a DEMO gate. 30,000 over 30 days was the real economy;
+     a three-session demo earns about 4,100, measured through the real tile code over fifteen
+     full runs, so the track would have died around level 22 and never turned over. 4,000 puts
+     level 23 at the end of session one, 28 at session two and 30 at session three — without
+     the player having to spend a coin, so anything bought is headroom rather than a
+     requirement.
+
+     first is the LEVEL 2 climb and it is not independent of the total: 29 climbs summing to
+     4,000 average 138, so an opening of 25 gives a ramp of roughly 10x across the Season, which
+     is the shape §5.4 asks for. */
   status: {
-    levels: 30, first: 200, total: 30000,
+    levels: 30, first: 25, total: 4000,
     perEpisode: 50, perPrediction: 150, perTrophy: 120,
   },
 

@@ -19,16 +19,23 @@ test("status starts at zero and every inflow moves it", () => {
   eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction);
   /* 3 · converting a card — the THIRD copy, not the first */
   const id = Cards.all()[0].id, r = Cards.rarityOf(id);
+  const first = Cards.firstCopyStatus(r);
   Cards.add(id, 2);
-  eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction,
+  /* Holding it pays the first-copy value, once. That is not the Collectible — conversion still
+     is — and this checks the two are counted separately rather than the second copy silently
+     converting anything. */
+  eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first,
      "two copies is progress, not a Collectible");
   Cards.add(id, 1);
-  eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + r.status);
+  /* The third copy converts. The first-copy value does NOT go away when it does — you still
+     hold the card — so the two stack. */
+  eq(Status.points(),
+     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status);
   /* 4 · the Showcase */
   const item = Status.item("mug");
   Status.grant("mug", "found");
   eq(Status.points(),
-     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + r.status + item.points);
+     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status + item.points);
 });
 
 test("completing a set pays too, through the collection", () => {
@@ -88,8 +95,13 @@ test("the level is read off the points, and the top one holds", () => {
 test("progress reads through the level, and the top level reads as full", () => {
   freshRun();
   eq(Status.levelProgress(0), 0);
-  const mid = Math.round((Status.levelAt(1) + Status.levelAt(2)) / 2);
-  near(Status.levelProgress(mid), 0.5, 0.02);
+  /* The tolerance is DERIVED from the span, not a flat 0.02. Points are whole numbers, so
+     rounding the midpoint of a span moves the fraction by up to half a point — on a 25-point
+     opening climb that is 0.02 on its own, and a fixed tolerance turns a correct curve into a
+     failing test the moment the curve is retuned. */
+  const lo = Status.levelAt(1), hi = Status.levelAt(2), span = Math.max(1, hi - lo);
+  const mid = Math.round((lo + hi) / 2);
+  near(Status.levelProgress(mid), 0.5, 0.5 / span + 1e-9);
   eq(Status.levelProgress(Economy.statusGate()), 1,
      "the top reads as full, not as a fraction of a span that does not exist");
   eq(Status.toNextLevel(Economy.statusGate()), 0);

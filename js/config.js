@@ -148,13 +148,13 @@ const DEFAULTS={
      long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
      both belong in the drawer. */
   statusPerEpisode:50, statusPerPrediction:150,
-  statusLevels:30, statusFirst:45, statusTotal:7500,
+  statusLevels:30, statusFirst:25, statusTotal:4000,
   statusPriceScale:1, statusBarMs:900, statusUpMs:1500,
   /* What a box's `coins` outcome pays when its table row does not name an amount. */
   boxCoins:60,
   /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
      its episode count. Nothing in the game reads these; they are the model's bookkeeping. */
-  buildings:12, tiers:5, boxesPerUpgrade:1,
+  buildings:18, tiers:5, boxesPerUpgrade:1,   /* the model's value; see OWNED_CFG_KEYS */
   /* ---- opening a box ----
      Every box is opened the moment it is won (js/boxes.js, js/ui/pack.js) — none of them sit on
      a tile any more, so there is no throw to tune and no gold box to pick out from across the
@@ -203,6 +203,11 @@ const DEFAULTS={
      the same episode the requirement decays by one a day, so an unlucky run of duplicate
      clues cannot wall a player out of the story. dupClueCoins is what a duplicate pays,
      because a draw that pays nothing reads as the game misfiring. */
+  /* A new card pays this FRACTION of what converting it pays, so the track moves on every pull
+     and a Legendary still lands harder than a Common. cardCoins is what every copy pays in
+     money, before the roll stake multiplies it. Neither is economy-owned — no workbook has a
+     column for them. */
+  statusFirstCopy:0.25, cardCoins:25,
   cluesPerEpisode:4, clueSeasonStep:0, clueStuckDays:3, dupClueCoins:150,
 };
 let cfg=Object.assign({},DEFAULTS);
@@ -429,6 +434,8 @@ const TUNING=[
    ["clueSeasonStep","…and how many more each Season",1,{min:0}],
    ["clueStuckDays","Catch-up valve: days before it eases",1,{min:0}],
    ["dupClueCoins","Duplicate clue: coins",10,{min:0}],
+   ["statusFirstCopy","New card: share of convert value",0.05,{min:0,max:1}],
+   ["cardCoins","Any card: coins (x stake)",5,{min:0}],
    ["startEnergy","First session: energy granted",5,{min:0}],
    ["avgOdds","Payout multiplier (flat)",0.1],
    ["trophyStatus","Called-It trophy: status",10,{min:0}]]},

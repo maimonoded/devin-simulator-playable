@@ -91,6 +91,23 @@ const Cards = {
   rarities() { return CARD_RARITIES; },
   rarity(key) { return CARD_RARITIES.find(r => r.key === key) || CARD_RARITIES[0]; },
   rarityOf(id) { const c = this.get(id); return c ? this.rarity(c.rarity) : CARD_RARITIES[0]; },
+  /* What a card pays the FIRST time you see it — a fraction of what converting it pays, so a
+     Legendary still feels like a Legendary on the way in.
+
+     This exists as its own function because TWO places must agree on it and they are far apart:
+     add() reports it so the beat can show it, and statusPoints() DERIVES it so the track
+     actually holds it. Status is never accumulated, only derived (CLAUDE.md), so a value that
+     only add() knew about would flash on screen and then vanish on the next render. */
+  firstCopyStatus(r) {
+    const rr = (r && r.key) ? r : this.rarity(r);
+    return Math.round((rr.status || 0) * Math.max(0, +cfg.statusFirstCopy || 0));
+  },
+  /* Coins every copy pays, scaled by the roll stake. state.mult is the multiplier the player is
+     playing at; it persists between rolls, so it is still the right answer for a box opened in
+     the store where no roll happened. Clamped at 1 so a corrupt save cannot zero it. */
+  cardCoins() {
+    return Math.round((+cfg.cardCoins || 0) * Math.max(1, +state.mult || 1) * (+cfg.boardScale || 1));
+  },
   /* The badge every card face wears. Stars, not the rarity's name: ★★★ against ★★ needs no
      prior knowledge of which of "Epic" and "Rare" is the better word. Takes a rarity object or
      a key, so both paths can call it with whatever they are already holding. */
@@ -152,10 +169,18 @@ const Cards = {
     let coins = 0, status = 0;
     if (converted) status += r.status;
     if (extra > 0) status += extra * r.trickle;
+    /* THE FIRST COPY MOVES THE TRACK. Before this, a card you had never seen paid nothing at
+       all — you could collect for an entire session and watch the status bar sit still, which
+       is exactly backwards for the thing the bar is meant to reward. Conversion is still the
+       payoff; this is the nudge that says the pull mattered. */
+    if (isNew) status += this.firstCopyStatus(r);
     /* A copy that neither started the collection nor converted it still pays. That is the whole
        of §12's first rule: a duplicate always converts to something. */
     const paying = many - (isNew ? 1 : 0) - (converted ? 1 : 0);
     if (paying > 0) coins = Math.round(paying * (+cfg.dupCoins || 0) * r.dup * (+cfg.boardScale || 1));
+    /* And EVERY copy pays a little money on top, at the stake the player is rolling at — so a
+       x3 roll is worth three times as much on the cards it turns up, not only on the money. */
+    coins += many * this.cardCoins();
     state.coins += coins;
     return { id, card: this.get(id), isNew, converted, count: after, coins, status, rarity: r };
   },
@@ -244,6 +269,9 @@ const Cards = {
       const c = this.count(id);
       if (c <= 0) return;
       const r = this.rarityOf(id);
+      /* Holding it at all pays the first-copy value — the same number add() reported when it
+         landed. Derived from the count, so it survives a reload with nothing stored. */
+      pts += this.firstCopyStatus(r);
       if (c >= need) pts += r.status + (c - need) * r.trickle;
     });
     Object.keys(state.setsDone || {}).forEach(() => { pts += Math.round(+cfg.setBonusStatus || 0); });

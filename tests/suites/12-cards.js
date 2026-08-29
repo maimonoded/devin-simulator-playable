@@ -71,15 +71,21 @@ test("three copies convert, and the third is the one that pays the status", () =
   freshRun();
   const id = Cards.all()[0].id, r = Cards.rarityOf(id);
   const a = Cards.add(id, 1);
-  eq(a.isNew, true); eq(a.converted, false); eq(a.coins, 0); eq(a.status, 0);
+  eq(a.isNew, true); eq(a.converted, false);
+  /* A card you have never seen now pays BOTH — a share of the conversion value, so the status
+     track moves on the pull, and the flat per-copy coins every copy pays. It used to pay
+     nothing at all, which meant a whole session of new cards left the bar sitting still. */
+  eq(a.status, Cards.firstCopyStatus(r), "a new card moves the track");
+  eq(a.coins, Cards.cardCoins(), "and every copy pays a little money");
   eq(Cards.converted(id), false);
   const b = Cards.add(id, 1);
   eq(b.converted, false);
-  ok(b.coins > 0, "a plain duplicate always converts to something");
+  eq(b.status, 0, "a plain duplicate is not a new card and pays no status");
+  ok(b.coins > Cards.cardCoins(), "a plain duplicate always converts to something");
   const c = Cards.add(id, 1);
   eq(c.converted, true, "the third copy is the Collectible");
-  eq(c.status, r.status);
-  eq(c.coins, 0, "and it pays in status rather than in consolation");
+  eq(c.status, r.status, "and conversion is still the payoff, undiluted");
+  eq(c.coins, Cards.cardCoins(), "it pays in status rather than in consolation");
   ok(Cards.converted(id));
 });
 
@@ -117,12 +123,17 @@ test("what the collection is worth is derived from the copies and nothing else",
   freshRun();
   eq(Cards.statusPoints(), 0);
   const id = Cards.all()[0].id, r = Cards.rarityOf(id);
+  const first = Cards.firstCopyStatus(r);
   Cards.add(id, 2);
-  eq(Cards.statusPoints(), 0, "two copies is progress, not a Collectible");
+  /* Holding it pays the first-copy value ONCE however many copies are held — two copies is
+     still progress rather than a Collectible, and that is the invariant this guards. The
+     derived total and what add() reported must agree, or the bar would move and then snap back
+     on the next render. */
+  eq(Cards.statusPoints(), first, "two copies is progress, not a Collectible");
   Cards.add(id, 1);
-  eq(Cards.statusPoints(), r.status);
+  eq(Cards.statusPoints(), first + r.status);
   Cards.add(id, 2);
-  eq(Cards.statusPoints(), r.status + 2 * r.trickle);
+  eq(Cards.statusPoints(), first + r.status + 2 * r.trickle);
 });
 
 suite("cards: drawing");
@@ -249,7 +260,8 @@ test("a card the catalogue forgets keeps its NAME and its RARITY", () => {
 test("…and therefore keeps its STATUS — the whole point of the record", () => {
   freshRun();
   const c = Cards.all().find(x => x.rarity === "legendary");
-  const worth = Cards.rarity("legendary").status;
+  const lr = Cards.rarity("legendary");
+  const worth = lr.status + Cards.firstCopyStatus(lr);   // conversion, plus holding it at all
   Cards.add(c.id, 3);
   eq(Cards.statusPoints(), worth);
   withCardRemoved(c.id, () => {

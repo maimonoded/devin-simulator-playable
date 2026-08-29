@@ -65,7 +65,11 @@ test("a correct pick wins and pays the FLAT multiplier, whatever was passed", ()
   eq(r.won, true);
   eq(r.odds, flat, "the multiplier is the model's, not the answer's");
   eq(r.payout, Math.round(1000 * flat));
-  eq(state.coins, before - 1000 + r.payout, "stake out, payout in");
+  /* EVERY prediction also pays a Collectible (GDD 7.4), and every card now pays a little money
+     on top of the wager — so the balance is stake out, payout in, PLUS the card's coins. The
+     reward card is why this is not just the wager arithmetic. */
+  const cardCoins = r.reward.card ? r.reward.card.coins : 0;
+  eq(state.coins, before - 1000 + r.payout + cardCoins, "stake out, payout in, plus the card");
   eq(state.predWins, 1);
   eq(state.streak, 1);
 });
@@ -112,9 +116,14 @@ test("a trophy is unique to its episode and can only be won once", () => {
   ok(Status.hasTrophy("001"));
   const pts = Status.points();
   state.epQueue.push("001");
-  eq(resolvePrediction({ wager: 0, sel: 0, correct: 0, auto: false, id: "001" }).reward.trophy, null,
-     "already won");
-  eq(Status.points(), pts + cfg.statusPerEpisode + cfg.statusPerPrediction,
+  const second = resolvePrediction({ wager: 0, sel: 0, correct: 0, auto: false, id: "001" });
+  eq(second.reward.trophy, null, "already won");
+  /* The second call pays the episode and the win, and NOT the trophy. It also pays another
+     Collectible, and a card you have not seen before now moves the track — so the reward card's
+     own status is counted here, or this reads as the trophy paying twice when it has not. */
+  eq(Status.points(),
+     pts + cfg.statusPerEpisode + cfg.statusPerPrediction
+         + (second.reward.card ? second.reward.card.status : 0),
      "the trophy is not paid twice");
 });
 
