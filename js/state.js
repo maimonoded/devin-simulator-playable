@@ -4,7 +4,7 @@ let state={};
 function initState(){
   state={
     day:1, clock:9*60, sessionsToday:1,
-    energy:cfg.energyCap, coins:0, vip:0,
+    energy:Math.max(cfg.energyCap,+cfg.startEnergy||0), coins:0, vip:0,
     /* THE EVIDENCE. Episode id → the clue ids held for it: {"005": ["c3","c7"]}. Which clues,
        for which episode — not how many in total. The requirement (cfg.cluesPerEpisode) sits
        well below the eight each episode authors, so two players reach the same prediction

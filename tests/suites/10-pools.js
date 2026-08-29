@@ -86,12 +86,17 @@ test("shareOf and boardShareOf agree with the tables", () => {
   ok(Pools.boardShareOf("clue") < Pools.shareOf("clue", "clue"), "the corners and the money tiles dilute it");
 });
 
-test("the board's card and clue rates land near GDD 4.6 and 6.6", () => {
+test("the board's card and clue rates hit the DEMO pacing target", () => {
   const rolls = 40;                                   // an engaged player's day (GDD 6.6)
   const cards = Pools.boardShareOf("card") * rolls;
   const clues = Pools.boardShareOf("clue") * rolls;
-  near(cards, 12, 3, `${cards.toFixed(1)} cards a day against a target of about 12`);
-  near(clues, 3.5, 1.5, `${clues.toFixed(1)} clues a day against a target of about 3.5`);
+  near(cards, 11, 3, `${cards.toFixed(1)} cards a day against a target of about 11`);
+  /* RETUNED. GDD 6.6's 3.5 clues a day is the real economy; this build is a demo that has to
+     put eight earned episodes inside a first session, which is about 87 rolls at ~25% a roll.
+     A clue ROW also pays two now (the `n` field), so the story moves at roughly four times the
+     rate the shipped game will. Change this number when the demo target changes — do not widen
+     the tolerance to make a drift pass. */
+  near(clues, 10, 2, `${clues.toFixed(1)} clues a day against the demo target of about 10`);
 });
 
 suite("pools: validate catches mis-authored content");

@@ -41,22 +41,33 @@ const POOLS = {
   /* 20 tiles — half of every lap. The bulk of the game's money, and by volume the biggest
      single source of cards. */
   money: [
-    { name: "Loose change",     weight: 28, kind: "money",  amount: 30 },
-    { name: "A good day",       weight: 22, kind: "money",  amount: 70 },
+    { name: "Loose change",     weight: 20, kind: "money",  amount: 30 },
+    { name: "A good day",       weight: 18, kind: "money",  amount: 70 },
     { name: "Payday",           weight:  8, kind: "money",  amount: 170 },
     { name: "A find",           weight: 30, kind: "card" },
-    { name: "Overheard",        weight:  3, kind: "clue" },
-    { name: "Nothing doing",    weight:  9, kind: "event",  flavour: "Quiet street." },
+    { name: "Overheard",        weight: 18, kind: "clue",   n: 2 },
+    { name: "Nothing doing",    weight:  6, kind: "event",  flavour: "Quiet street." },
   ],
 
   /* 6 NPC tiles — the primary clue source and therefore the critical path for the whole
      narrative track (§3.3). The clue weight here is one of the three knobs that set story
-     pacing; the other two are the NPC tile count and the clue cost per episode. */
+     pacing; the other two are the NPC tile count and the clue cost per episode.
+
+     RETUNED FOR THE DEMO BUILD. The clue rate across the whole board was 11.8% a roll, which
+     put ten episodes about 345 rolls away — sixteen minutes of tapping for the first session
+     alone. The target is eight earned episodes in a first session of roughly ninety rolls.
+
+     Two changes get there, and the split between them is deliberate. Clue weight went up in
+     ALL FOUR tables rather than only this one: making the NPC tiles a clue faucet would have
+     hit the same number while turning the other thirty-four tiles into scenery, and CLAUDE.md's
+     first rule about pools is that no pool is pure and none may become dead air. And a clue row
+     now pays `n: 2`, which does most of the work — it makes the landing meatier instead of
+     making clues more frequent and more forgettable. */
   clue: [
-    { name: "A word in private", weight: 52, kind: "clue" },
-    { name: "A keepsake",        weight: 24, kind: "card" },
-    { name: "A tip-off",         weight: 15, kind: "money",  amount: 60 },
-    { name: "Just passing",      weight:  9, kind: "event",  flavour: "They had nothing new." },
+    { name: "A word in private", weight: 60, kind: "clue",   n: 2 },
+    { name: "A keepsake",        weight: 22, kind: "card" },
+    { name: "A tip-off",         weight: 12, kind: "money",  amount: 60 },
+    { name: "Just passing",      weight:  6, kind: "event",  flavour: "They had nothing new." },
   ],
 
   /* 4 arrivals, at the side midpoints. "Large Money, occasional Collectible" (§3.1) — the
@@ -67,25 +78,25 @@ const POOLS = {
        is worth a full-frame moment" is a property of the outcome, not of the ground you are
        standing on. `ladder` makes the amount a ceiling and the game a three-rung reveal —
        see drawBonusGame() in js/tiles/pool-tile.js. */
-    { name: "A generous night",  weight: 44, kind: "money",  amount: 240, game: "train-small" },
+    { name: "A generous night",  weight: 36, kind: "money",  amount: 240, game: "train-small" },
     { name: "The good table",    weight: 18, kind: "money",  amount: 690, game: "train-large", ladder: true },
-    { name: "Someone's gift",    weight: 30, kind: "card" },
-    { name: "A whisper",         weight:  3, kind: "clue" },
+    { name: "Someone's gift",    weight: 26, kind: "card" },
+    { name: "A whisper",         weight: 15, kind: "clue",   n: 2 },
     { name: "A moment to rest",  weight:  5, kind: "energy", amount: 3 },
   ],
 
   /* 6 plot twists — the only pool that can take money away, and the one that fills the Gala.
      Good and bad in the same table is the point: it is the tile you cannot read. */
   mixed: [
-    { name: "A windfall",        weight: 20, kind: "money",  amount: 200 },
-    { name: "Small mercy",       weight: 10, kind: "money",  amount: 60 },
-    { name: "Paparazzi",         weight: 13, kind: "money",  amount: -90 },
+    { name: "A windfall",        weight: 14, kind: "money",  amount: 200 },
+    { name: "Small mercy",       weight:  8, kind: "money",  amount: 60 },
+    { name: "Paparazzi",         weight: 11, kind: "money",  amount: -90 },
     { name: "A bad review",      weight:  7, kind: "money",  amount: -180 },
-    { name: "Left on a table",   weight: 28, kind: "card" },
-    { name: "A loose thread",    weight:  6, kind: "clue" },
-    { name: "Called to the set", weight:  6, kind: "move",   to: "start" },
-    { name: "A long lunch",      weight:  6, kind: "energy", amount: 4 },
-    { name: "Slow news day",     weight:  4, kind: "event",  flavour: "Nothing in the papers." },
+    { name: "Left on a table",   weight: 22, kind: "card" },
+    { name: "A loose thread",    weight: 28, kind: "clue",   n: 2 },
+    { name: "Called to the set", weight:  4, kind: "move",   to: "start" },
+    { name: "A long lunch",      weight:  4, kind: "energy", amount: 4 },
+    { name: "Slow news day",     weight:  2, kind: "event",  flavour: "Nothing in the papers." },
   ],
 };
 

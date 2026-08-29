@@ -1,7 +1,13 @@
 "use strict";
 /* Economy configuration — every value here is editable live via the tuning drawer. */
 const DEFAULTS={
-  energyCap:30, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
+  energyCap:40,
+  /* THE FIRST SESSION IS BIGGER THAN THE CAP, and that is allowed: CLAUDE.md's rule is that
+     energy may exceed cfg.energyCap and nothing may clamp it downward. A new player starts with
+     this much, which is about the hundred rolls that puts eight earned episodes inside session
+     one; every session after that refills to the cap and the pace settles. Not economy-owned —
+     no workbook describes it. */
+  startEnergy:100, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
   /* How long a card is held on the board's centre. Two values, because the two beats are not
      the same size: a card you did not have is news, and the THIRD copy — the one that converts
@@ -423,6 +429,7 @@ const TUNING=[
    ["clueSeasonStep","…and how many more each Season",1,{min:0}],
    ["clueStuckDays","Catch-up valve: days before it eases",1,{min:0}],
    ["dupClueCoins","Duplicate clue: coins",10,{min:0}],
+   ["startEnergy","First session: energy granted",5,{min:0}],
    ["avgOdds","Payout multiplier (flat)",0.1],
    ["trophyStatus","Called-It trophy: status",10,{min:0}]]},
 ];

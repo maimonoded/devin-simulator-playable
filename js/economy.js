@@ -58,11 +58,23 @@ const ECONOMY_DEFAULT = {
      (js/storage.js). Bump it whenever an owned value changes, or a save from before the
      change quietly outvotes the new number — which is exactly how the Status track spent an
      afternoon paying 2 points an episode instead of 50. */
-  version: "Economy Model v3.14 - segmented cost curve, the Status track, flat odds",
+  version: "Economy Model v3.15 - demo pacing: energy cap 40 + first-session grant, clue rate retuned",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
-  energy: { cap: 30, regenMin: 3, sessionsPerDay: 2.5, dailyAllowance: 240, secPerRoll: 5 },
+  /* cap 40 for the DEMO build, and the FIRST session is a grant on top of it (cfg.startEnergy).
+     The two pacing targets pull against each other at any single cap: eight earned episodes
+     inside session one wants a big tank (a hundred rolls covers it in 88% of runs), while
+     finishing all sixteen in three or four sessions wants a small one. A generous first sitting
+     and a normal cap afterwards satisfies both, and it is where an FTUE puts its generosity
+     anyway. Measured over 25 full runs through the real tile code: 78 rolls to eight episodes,
+     155 to sixteen.
+
+     energyCap is economy-OWNED (OWNED_CFG_KEYS below), so it moves HERE, not on cfg — setting
+     it on cfg alone is silently reverted by Economy.apply() at every boot, which is exactly
+     what the config test catches. startEnergy is deliberately NOT owned: no workbook describes
+     it, so it survives a model change the way the camera settings do. */
+  energy: { cap: 40, regenMin: 3, sessionsPerDay: 2.5, dailyAllowance: 240, secPerRoll: 5 },
 
   structure: { totalBuilders: 240, levelsPerBuilder: 5, episodesPerSeries: 60 },
 

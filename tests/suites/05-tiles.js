@@ -122,11 +122,21 @@ test("a landing draws from ITS pool, not from any other", () => {
     forcePool("money", r => r.kind === "money", () => {
       state.coins = 0;
       landOn("npc");
-      eq(Clues.total(), 1, "an NPC tile draws the clue pool");
-      eq(state.coins, 0);
+      /* A clue row pays `n` of them (assets/pools/pools.js), so this counts AT LEAST one rather
+         than exactly one — the assertion is about which TABLE was read, not about the row's
+         payout, and pinning the count here would break every time pacing is retuned. */
+      const first = Clues.total();
+      ok(first >= 1, "an NPC tile draws the clue pool");
+      /* Coins may be non-zero and still prove the point: when a row pays two clues the second
+         can repeat the first, and a duplicate clue pays dupClueCoins by design (GDD 12). What
+         must NOT appear is money-pool money, so this checks the amount is only ever clue
+         change. */
+      ok(state.coins % Math.round(cfg.dupClueCoins * cfg.boardScale) === 0,
+         `${state.coins} coins is not a whole number of duplicate clues — the money pool leaked in`);
+      const afterNpc = state.coins;
       landOn("std");
-      ok(state.coins > 0, "a standard tile draws the money pool");
-      eq(Clues.total(), 1);
+      ok(state.coins > afterNpc, "a standard tile draws the money pool");
+      eq(Clues.total(), first, "and a standard tile pays no clues");
     }));
 });
 
@@ -297,11 +307,16 @@ test("The Scoop teleports to an NPC tile and triggers it", () => {
       state.pos = 30; state.clues = {}; state.coins = 0;
       const ev = TILE_TYPES.scoop.onLand({ pos: 30, mult: 1, bs: 1 });
       ok(npcs.includes(state.pos), `landed on ${state.pos}, which is not an NPC tile`);
-      eq(Clues.total(), 1, "and the tile it lands on actually fires");
+      ok(Clues.total() >= 1, "and the tile it lands on actually fires");
       const move = ev.find(e => e.move).move;
+      /* THE ONE-STEP PATH IS THE PROOF that no lap bonus is paid: a path of length one cannot
+         cross Start, and the bonus is paid by walking past it. Coins used to stand in for that
+         and no longer can — a clue row pays two now, the second may repeat the first, and a
+         duplicate clue legitimately pays coins. */
       eq(move.path.length, 1, "a teleport is one step — walking it would pay a lap bonus");
       eq(move.path[0], state.pos);
-      eq(state.coins, 0, "so no lap bonus is paid");
+      ok(state.coins % Math.round(cfg.dupClueCoins * cfg.boardScale) === 0,
+         `${state.coins} coins is not duplicate-clue change, so something paid a lap bonus`);
     }
   });
 });

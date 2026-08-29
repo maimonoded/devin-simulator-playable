@@ -90,16 +90,43 @@ class PoolTile extends Tile {
   /* A clue lands on the episode currently being worked on, and a duplicate pays coins — both
      rules live in Clues.grant(), because every future source of clues (a milestone cache, an
      Insider pack) owes exactly the same behaviour. */
+  /* A clue row may pay MORE THAN ONE, via `n` on the row (assets/pools/pools.js). That is the
+     lever that sets story pacing in the demo build: two clues on a landing gets eight episodes
+     into a first session without making clues so frequent that finding one stops meaning
+     anything.
+
+     Each is a separate Clues.grant(), not one draw counted twice, so the second can repeat the
+     first — the pool of eight is what makes two players hold different evidence, and collapsing
+     that would quietly undo it. If the first grant completes an episode the second goes to the
+     NEXT one, because grant() always reads the first episode still locked. That falls out of
+     the derivation rather than needing a case here.
+
+     One float for the landing and one log LINE PER CLUE: the float is the beat, but the text of
+     a clue is the thing worth reading, and summarising two into "+2" would throw it away. */
   drawClue(row,ctx){
-    const got=Clues.grant();
-    if(!got) return [{float:{text:"🔍 —",color:"var(--muted)"},
-                      log:{icon:"🔍",msg:`${row.name} · nothing left to work out`}}];
-    if(!got.isNew)
-      return [{float:{text:"+"+fmt(got.coins),color:"var(--gold)"},
-               log:{icon:"🔍",msg:`${row.name} · you knew that one · +<b>${fmt(got.coins)}</b> coins`}}];
-    const [have,need]=Clues.progressFor(got.id);
-    return [{float:{text:"+1🔍",color:"var(--teal)"},
-             log:{icon:"🔍",msg:`${row.name} · <i>${got.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(got.id)}`}}];
+    const n=Math.max(1,Math.round(+row.n||1));
+    const got=[];
+    for(let i=0;i<n;i++){ const g=Clues.grant(); if(!g) break; got.push(g); }
+    if(!got.length) return [{float:{text:"🔍 —",color:"var(--muted)"},
+                             log:{icon:"🔍",msg:`${row.name} · nothing left to work out`}}];
+
+    const fresh=got.filter(g=>g.isNew);
+    const dupCoins=got.reduce((a,g)=>a+(g.isNew?0:g.coins),0);
+    const ev=[];
+    /* The float says what the landing was worth as a whole. Clues lead when there are any,
+       because that is what the player is here for; coins only speak when nothing was new. */
+    if(fresh.length) ev.push({float:{text:"+"+fresh.length+"🔍",color:"var(--teal)"}});
+    else ev.push({float:{text:"+"+fmt(dupCoins),color:"var(--gold)"}});
+
+    got.forEach(g=>{
+      if(!g.isNew){
+        ev.push({log:{icon:"🔍",msg:`${row.name} · you knew that one · +<b>${fmt(g.coins)}</b> coins`}});
+        return;
+      }
+      const [have,need]=Clues.progressFor(g.id);
+      ev.push({log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
+    });
+    return ev;
   }
 
   drawEnergy(row,ctx){
