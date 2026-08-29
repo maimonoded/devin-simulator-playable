@@ -55,7 +55,10 @@ function showStatusUp(up){
         <span class="suIco" id="suIco">${rankFrom.icon}</span>
         <span class="suName" id="suName">Level ${lvFrom}</span>
         <span class="suBar"><span class="suFill" id="suFill"></span></span>
-        <span class="suNext" id="suNext">${owed?`${fmt(owed)} to ${lvTo+1}`:"Season complete"}</span>
+        <!-- "35 to LV 4", not "35 to 4" — which read as a range counting DOWNWARD, or as a
+             score. The slot is narrow so this was written terse, and terse went past compact
+             into meaningless. "LV n" is the vocabulary the estate plaque already uses. -->
+        <span class="suNext" id="suNext">${owed?`${fmt(owed)} to LV ${lvTo+1}`:"Season complete"}</span>
       </div>
       ${levelled?`<div class="suNew" id="suNew">Level ${lvTo}${
           rankTo.name!==rankFrom.name?` · ${rankTo.icon} ${rankTo.name}`:""}</div>`:""}`;
