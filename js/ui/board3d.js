@@ -702,9 +702,21 @@ const Board3D = {
   /* _camTarget is where the camera is looking right now — the board centre when nothing is
      following, the token when it is, wherever the player dragged to otherwise. Handing it
      over is what makes the dice land in view rather than at the middle of the board, which
-     with camFollow on is often off-screen entirely. */
+     with camFollow on is often off-screen entirely.
+
+     THEN THROWN SHORT OF IT, into the lower half of the frame. Landing on the aim point means
+     landing in the middle of the screen, which is where the Status Estate stands and where the
+     HUD reaches down to — so the dice came to rest behind the one or under the other, and on a
+     phone the number was not readable at all. cfg.diceDrop is a fraction of the visible
+     half-height, so this holds at any zoom and on any pane; diceDrop() does the
+     divide-by-sin(elevation) that turns a screen distance into a ground distance. */
   throwDice(values) {
-    return Dice3D.throwDice(values, { x: this._camTarget.x, z: this._camTarget.z });
+    const c = this._camera;
+    const off = diceDrop((c.top - c.bottom) / 2, cfg.diceDrop, ENV_CAM.el);
+    return Dice3D.throwDice(values, {
+      x: this._camTarget.x + off.x,
+      z: this._camTarget.z + off.z,
+    });
   },
   diceReady() { return Dice3D.available(); },
   /* Definitively failed, as opposed to merely not downloaded yet. */

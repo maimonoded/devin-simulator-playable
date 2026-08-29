@@ -83,6 +83,11 @@ const DEFAULTS={
      Reset config, or the toggle itself, is the way back for an existing player. */
   npcs:0, npcHeight:0.75, npcStepMs:900, npcPauseMinMs:400, npcPauseMaxMs:2600,
   npcLane:0.3, npcBob:0.05,
+  /* How far SHORT of the camera's aim point the dice land, as a fraction of the visible
+     half-height. 0 lands dead centre, which is where the Estate stands and where the HUD
+     reaches — on a phone the number was unreadable. A fraction rather than a distance so it
+     holds at any zoom and on any pane. */
+  diceDrop:0.35,
   diceRevealMs:500, diceToMoveMs:30,
   /* 3D dice. diceRevealMs doubles as the length of the throw, so the pacing knob that already
      existed keeps meaning the same thing: click to numbers-on-screen. The rest is the throw's
@@ -399,6 +404,7 @@ const TUNING=[
       "click → numbers" window the DOM dice used, so it stays where it always was. */
    ["dice3d","Throw them on the board (0/1)",1],
    ["diceSize","Size — edge in tiles",0.05,{min:0.3,max:2}],
+   ["diceDrop","Land below centre (0..1 of half-height)",0.05,{min:0,max:0.9}],
    ["diceSpread","How far apart they land",0.1,{min:0,max:5}],
    ["diceThrowFrom","Thrown from (tiles toward camera)",0.25,{min:0,max:10}],
    ["diceArc","Throw height",0.1,{min:0,max:8}]]},
