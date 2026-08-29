@@ -68,7 +68,12 @@ function section(title,count,note,items){
 }
 
 const pick=k=>Cards.all().find(c=>c.rarity===k&&c.art)||Cards.all().find(c=>c.rarity===k);
-const noArt=Cards.all().find(c=>!c.art);
+/* The procedural face has no card left to demonstrate — all 150 are painted — so this fakes
+   one by stripping the art off a real card. The fallback still matters: a new Season starts
+   with an unpainted catalogue, and this is what it looks like until the art lands. */
+const painted=Cards.all().filter(c=>c.art).length;
+const anyNoArt=Cards.all().find(c=>!c.art);
+const noArt=anyNoArt||Object.assign({},Cards.all()[0],{art:null});
 
 section("Collection · one per rarity, 1★ to 4★", "150 cards a Season",
   "Same gilt frame and warm plum ground on all four. Rarity names itself on the badge and widens the halo; it never touches the border.",
@@ -84,8 +89,11 @@ section("Collection · the three states", null,
    [cardFace(pick("epic"),{owned:true,count:3,converted:true,size:"md"}),"Converted ★","<br>the gilt lights up"],
    [cardFace(pick("rare"),{owned:true,count:2,dup:120,size:"md"}),"Duplicate","<br>as it pays out of a box"]]);
 
-section("Collection · no painted art", `${Cards.all().filter(c=>!c.art).length} of ${Cards.all().length}`,
-  "A procedural face hashed off the card id — same card, same colours, every time. Painted art earns its place at the top of the ladder, not across ninety Commons.",
+section("Collection · the procedural fallback",
+  anyNoArt ? `${Cards.all().length-painted} of ${Cards.all().length} unpainted` : "all 150 painted",
+  anyNoArt
+    ? "A procedural face hashed off the card id — same card, same colours, every time."
+    : "Every card in Season 1 is painted, so this is a REAL card with its art stripped off. The fallback still matters: a new Season opens with an unpainted catalogue and looks like this until the art lands.",
   [[cardFace(noArt,{owned:true,count:1,size:"md"}),"Procedural","<br>"+noArt.name]]);
 
 section("Clue · the case photograph", "8 per episode",

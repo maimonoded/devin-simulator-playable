@@ -45,10 +45,18 @@ test("a card knows its set and its Season without storing either", () => {
 
 test("art is optional, and where it exists it resolves under the Season's directory", () => {
   const withArt = Cards.all().filter(c => c.art);
-  ok(withArt.length > 0 && withArt.length < Cards.all().length,
-     "most Commons are procedural on purpose; the top of the ladder is not");
+  ok(withArt.length > 0, "the Season has painted art");
   withArt.forEach(c => ok(Cards.artFor(c).startsWith(Cards.season().art), c.id));
-  eq(Cards.artFor(Cards.all().find(c => !c.art)), null, "no art is a normal state, not a gap");
+  /* NO ART IS A NORMAL STATE, not a gap — and this asserts it against a card BUILT without art
+     rather than one found in the catalogue. Season 1 is now fully painted, so searching for an
+     unpainted card finds nothing and the assertion would quietly go vacuous; the next Season
+     opens unpainted and would be relying on a check that had stopped checking.
+
+     This used to also assert that SOME cards were unpainted, which was a fact about how far the
+     art had got rather than anything about the code. It failed the moment the last Common was
+     painted, which is the wrong direction for a test to fire in. */
+  eq(Cards.artFor({ id: "no-such-card", name: "?", rarity: "common" }), null);
+  eq(Cards.artFor(null), null, "and a missing card is not a crash");
 });
 
 test("validate catches a reused id, a bad rarity and weights that no longer sum to 100", () => {

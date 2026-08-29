@@ -73,9 +73,14 @@ the one that moves.
 
 ### Most cards have no painted art, on purpose
 
-**57 of 150 are still unpainted, and all of them are Commons.** Every Rare, Epic and Legendary
-has real art. The rest fall back to a **procedural face** — a two-stop gradient hashed off the
-card id, so the same card is the same colours every time and different from its neighbours.
+**All 150 are painted.** Every card in Season 1 has real art — no card in this build falls back
+to a gradient.
+
+The **procedural face** is still there and still matters: a two-stop gradient hashed off the card
+id, so the same card is the same colours every time and different from its neighbours. A new
+Season opens with an unpainted catalogue, and that is what it looks like until the art lands —
+which is the whole reason `art` is optional. The game is never broken by a card that has not been
+drawn yet, it is only plainer.
 
 §4.2 calls an Epic *"the pull that makes a pack memorable"*. Painted art earns its place there,
 not across ninety Commons that exist to be converted.

@@ -374,11 +374,11 @@ everywhere, and it is the point.
 "LEGENDAR" read as a bug where "Leg" read as an abbreviation — which is what `short` was for.
 Four stars are narrower than the shortest of those words, so the badge stopped needing it.
 
-**Most Commons have no art, on purpose.** Ninety pieces of generated art would cost more to make
-than they would ever be looked at, so `cardFace()` falls back to a procedural face hashed off the
-card id — same card, same colours, every time. Painted art earns its place at the top of the
-ladder, where §4.2 says an Epic is "the pull that makes a pack memorable"; all 18 Epics and all
-4 Legendaries have it.
+**All 150 cards are painted** in Season 1 — nothing in this build shows a gradient. The
+procedural fallback in `cardFace()` survives and still earns its place: `art` is OPTIONAL, so a
+new Season can open with an unpainted catalogue and be plainer rather than broken. It hashes the
+card id into two hues, so the same card is the same colours every time.
+`tools/card-art/` is how the art gets made; `audit.js` there reports what is missing.
 
 **Earning a status item plays a beat** (`js/ui/statusup.js`): the item in its frame, the points
 gained, and the track moving from where it was to where it is. When the points cross a rank
