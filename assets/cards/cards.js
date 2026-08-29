@@ -81,10 +81,10 @@ const CARD_SEASONS = [
 
       { key: "the-family", name: "The Family", cards: [
         { id: "sunday-lunch",      name: "Sunday Lunch",               rarity: C, art: "sunday-lunch.webp"  },
-        { id: "good-tablecloth",   name: "The Good Tablecloth",        rarity: C },
-        { id: "address-book",      name: "Mum's Address Book",         rarity: C },
-        { id: "fridge-calendar",   name: "A Fridge Calendar",          rarity: C },
-        { id: "spare-room",        name: "The Spare Room",             rarity: C },
+        { id: "good-tablecloth",   name: "The Good Tablecloth",        rarity: C, art: "good-tablecloth.webp"  },
+        { id: "address-book",      name: "Mum's Address Book",         rarity: C, art: "address-book.webp"  },
+        { id: "fridge-calendar",   name: "A Fridge Calendar",          rarity: C, art: "fridge-calendar.webp"  },
+        { id: "spare-room",        name: "The Spare Room",             rarity: C, art: "spare-room.webp"  },
         { id: "empty-chair",       name: "The Empty Chair",            rarity: C, art: "clue-chair.webp" },
         { id: "front-door-key",    name: "The Front Door Key",         rarity: R, art: "front-door-key.webp"  },
         { id: "argument-in-hall",  name: "An Argument in the Hall",    rarity: R, art: "argument-in-hall.webp"  },
@@ -93,12 +93,12 @@ const CARD_SEASONS = [
       ] },
 
       { key: "carls-circle", name: "Carl's Circle", cards: [
-        { id: "returned-ring",     name: "A Returned Ring",            rarity: C },
-        { id: "cousins-bracelet",  name: "The Cousin's Bracelet",      rarity: C },
+        { id: "returned-ring",     name: "A Returned Ring",            rarity: C, art: "returned-ring.webp"  },
+        { id: "cousins-bracelet",  name: "The Cousin's Bracelet",      rarity: C, art: "cousins-bracelet.webp"  },
         { id: "unread-message",    name: "An Unread Message",          rarity: C, art: "clue-phone.webp" },
-        { id: "carls-watch",       name: "Carl's Watch",               rarity: C },
+        { id: "carls-watch",       name: "Carl's Watch",               rarity: C, art: "carls-watch.webp"  },
         { id: "business-card",     name: "The Firm's Business Card",   rarity: C, art: "clue-card.webp" },
-        { id: "blocked-number",    name: "A Blocked Number",           rarity: C },
+        { id: "blocked-number",    name: "A Blocked Number",           rarity: C, art: "blocked-number.webp"  },
         { id: "coldest-thing",     name: "The Coldest Thing He Said",  rarity: R, art: "coldest-thing.webp"  },
         { id: "his-new-job",       name: "His New Job",                rarity: R, art: "his-new-job.webp"  },
         { id: "the-cousin",        name: "The Cousin",                 rarity: R, art: "the-cousin.webp"  },
@@ -106,11 +106,11 @@ const CARD_SEASONS = [
       ] },
 
       { key: "the-registry", name: "The Registry Office", cards: [
-        { id: "numbered-ticket",   name: "A Numbered Ticket",          rarity: C },
-        { id: "waiting-bench",     name: "The Waiting Bench",          rarity: C },
-        { id: "cheap-biro",        name: "A Cheap Biro",               rarity: C },
-        { id: "registrars-desk",   name: "The Registrar's Desk",       rarity: C },
-        { id: "witness-form",      name: "A Witness Form",             rarity: C },
+        { id: "numbered-ticket",   name: "A Numbered Ticket",          rarity: C, art: "numbered-ticket.webp"  },
+        { id: "waiting-bench",     name: "The Waiting Bench",          rarity: C, art: "waiting-bench.webp"  },
+        { id: "cheap-biro",        name: "A Cheap Biro",               rarity: C, art: "cheap-biro.webp"  },
+        { id: "registrars-desk",   name: "The Registrar's Desk",       rarity: C, art: "registrars-desk.webp"  },
+        { id: "witness-form",      name: "A Witness Form",             rarity: C, art: "witness-form.webp"  },
         { id: "two-signatures",    name: "Two Signatures",             rarity: C, art: "clue-signature.webp" },
         { id: "the-long-pause",    name: "The Long Pause",             rarity: R, art: "the-long-pause.webp"  },
         { id: "identification",    name: "Identification",             rarity: R, art: "identification.webp"  },
@@ -119,7 +119,7 @@ const CARD_SEASONS = [
       ] },
 
       { key: "harbour-heights", name: "Harbour Heights", cards: [
-        { id: "harbour-wall",      name: "The Harbour Wall",           rarity: C },
+        { id: "harbour-wall",      name: "The Harbour Wall",           rarity: C, art: "harbour-wall.webp"  },
         { id: "gulls-on-the-rail", name: "Gulls on the Rail",          rarity: C },
         { id: "chip-shop-window",  name: "A Chip Shop Window",         rarity: C },
         { id: "the-bus-stop",      name: "The Bus Stop",               rarity: C },
