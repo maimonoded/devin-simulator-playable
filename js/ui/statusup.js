@@ -42,13 +42,30 @@ function showStatusUp(up){
     const items=up.items.map(i=>
       `<span class="suItem" style="${cardArtCss(i.art)}" title="${i.name.replace(/"/g,"&quot;")}"></span>`).join("");
     const names=up.items.map(i=>i.name).join(" · ");
+
+    /* WHY THIS APPEARED. Without it the beat named a mug, said +5, and left the player to work
+       out what a mug has to do with anything — which is the one question a reward popup exists
+       to answer. The information was always there: the caller knows whether it came out of a
+       box or was earned, and the item knows its own condition.
+
+       Only for a single item: two arriving together have two different reasons and one line
+       cannot carry both, so the plural case says what they have in common instead. */
+    const one=up.items.length===1?up.items[0]:null;
+    const why=up.items.length>1
+      ? `${up.items.length} pieces for your Showcase`
+      : up.source==="box"
+        ? "Found in the pack"
+        : one&&Status.earnWords(one)
+          ? `Earned for ${Status.earnWords(one)}`
+          : "Earned";
     const owed=Status.toNextLevel(to);
     el.innerHTML=`
       <div class="suRow">
         <span class="suArt">${items}</span>
         <span class="suWords">
           <span class="suWhat">${names}</span>
-          <span class="suGain">+${fmt(to-from)} status</span>
+          <span class="suWhy">${why}</span>
+          <span class="suGain">+${fmt(to-from)} status · on your shelf</span>
         </span>
       </div>
       <div class="suTrack">

@@ -67,7 +67,7 @@ async function afterCollect(){
     /* The same beat a box's status drop gets — an item earned by playing is the same kind of
        thing as one found in a box, so it is shown the same way rather than as a toast that
        scrolls past. */
-    await showStatusUp({items:got,from:before,to:Status.points()});
+    await showStatusUp({items:got,from:before,to:Status.points(),source:"earned"});
   }
   /* …and every LEVEL milestone the points just crossed (GDD 5.3). After the item sweep, because
      an item is worth points and can be the thing that crosses the level. */

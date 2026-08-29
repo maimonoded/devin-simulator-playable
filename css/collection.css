@@ -470,6 +470,9 @@ html.viewMobile .packHud{bottom:calc(104px + var(--safeB,0px))}
 .suName{grid-area:n;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
   color:var(--gold)}
 .suNext{grid-area:x;justify-self:end;font-size:10.5px;color:#b9ad8c}
+/* Why the beat is on screen at all — the line that turns "a mug, +5" into a sentence. Sits
+   between the name and the payout, quieter than both: it is context, not the reward. */
+.suWhy{display:block;font-size:11px;color:#b9ad8c;margin-top:1px}
 .suBar{grid-area:b;display:block;height:7px;border-radius:999px;overflow:hidden;
   background:rgba(0,0,0,.5);border:1px solid rgba(255,203,92,.28)}
 .suFill{display:block;height:100%;width:0;border-radius:999px;

@@ -253,6 +253,28 @@ const Status = {
     if (!key) return null;
     return { key, have: m[key] || 0, need: item.earn[key] };
   },
+  /* The earn condition, IN ENGLISH — "collecting 5 cards", "watching 3 episodes".
+
+     Every surface that shows a status item has to explain why the player has it or how they
+     would get it, and until now none of them could: the condition was a {cards:5} object and
+     each caller would have had to invent its own phrasing. One function so the reward beat and
+     the profile say the same words about the same item.
+
+     The plural is handled here rather than by a caller remembering to: "1 cards" is the kind of
+     thing that survives review and then reads as a bug in a screenshot. */
+  earnWords(item) {
+    const key = Object.keys((item && item.earn) || {})[0];
+    if (!key) return "";
+    const n = item.earn[key];
+    const one = n === 1;
+    switch (key) {
+      case "cards":    return `collecting ${n} card${one ? "" : "s"}`;
+      case "episodes": return `watching ${n} episode${one ? "" : "s"}`;
+      case "rolls":    return `${n} rolls`;
+      case "boards":   return `finishing ${n} set${one ? "" : "s"}`;
+      default:         return `${n} ${key}`;
+    }
+  },
   earnMet(item) {
     const m = this.metrics();
     return Object.keys(item.earn || {}).every(k => (m[k] || 0) >= item.earn[k]);

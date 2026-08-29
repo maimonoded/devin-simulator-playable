@@ -173,7 +173,7 @@ function bankedEvents(draw){
      count toward the same jump, which is why this reads the whole delta rather than the item's
      own points. */
   const shelved=res.drops.filter(d=>d.kind==="status").map(d=>d.item);
-  if(shelved.length) after.push({statusUp:{items:shelved,from:statusBefore,to:Status.points()}});
+  if(shelved.length) after.push({statusUp:{items:shelved,from:statusBefore,to:Status.points(),source:"box"}});
   /* A card set finished by whatever just landed. Swept rather than checked at the call site,
      because five different things bank cards and every one of them owes the same payment — and
      because it is IDEMPOTENT: an unclaimed set stays unclaimed, so a missed sweep is a delayed

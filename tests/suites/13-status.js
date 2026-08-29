@@ -255,3 +255,32 @@ test("validate catches a band outside the Season and a milestone that pays nothi
     ok(errs.some(e => /which is not a thing/.test(e)), "the impossible milestone");
   } finally { STATUS_RANKS[1].from = realFrom; STATUS_MILESTONES[0].kind = realKind; }
 });
+
+/* ---- the earn condition, in English -------------------------------------------------------
+   Every surface that shows a status item owes the player an explanation of why they have it,
+   or how they would get it. The condition is a {cards:5} object, so without this each caller
+   invents its own phrasing and they drift. */
+test("earnWords turns a condition into a sentence, with the plural right", () => {
+  const w = i => Status.earnWords(i);
+  eq(w({ earn: { cards: 5 } }), "collecting 5 cards");
+  eq(w({ earn: { cards: 1 } }), "collecting 1 card", "not '1 cards'");
+  eq(w({ earn: { episodes: 1 } }), "watching 1 episode");
+  eq(w({ earn: { episodes: 3 } }), "watching 3 episodes");
+  eq(w({ earn: { boards: 1 } }), "finishing 1 set");
+  eq(w({ earn: { boards: 2 } }), "finishing 2 sets");
+  eq(w({ earn: { rolls: 60 } }), "60 rolls");
+  eq(w({}), "", "an item with no condition says nothing rather than something wrong");
+  eq(w(null), "");
+});
+
+test("every shipped item can explain itself", () => {
+  /* A new item with an unhandled condition key would fall through to a raw "{n} {key}" — which
+     is legible but not English. This catches one being added without a phrasing. */
+  const known = ["cards", "episodes", "rolls", "boards"];
+  Status.items().forEach(i => {
+    const key = Object.keys(i.earn || {})[0];
+    ok(key, `${i.id} has no earn condition`);
+    ok(known.includes(key), `${i.id} earns on "${key}", which earnWords has no phrasing for`);
+    ok(Status.earnWords(i).length > 3, `${i.id} produced no words`);
+  });
+});
