@@ -307,11 +307,14 @@ export const Box3D = {
       sub = card.sub || (Cards.setForCard(card.id) || {}).name || "";
       img = art(Cards.artFor(card));
     }else if (drop.kind === "clue"){
-      /* A case PHOTOGRAPH with the line typed on a slip over it. This is the card the player is
-         playing for — four of them buy the next episode — so it is not the plainest thing in the
-         box any more. The photo is picked by hashing the clue's own id (CLUE_ART, in
-         assets/cards/cards.js), so it is the same one every time and a different one from the
-         clue beside it.
+      /* A CONTACT SHEET: a strip of film, the frame ringed in grease pencil, the line typed in
+         the margin under it. This is the card the player is playing for — four of them buy the
+         next episode — so it is not the plainest thing in the box any more. The photo is picked
+         by hashing the clue's own id (CLUE_ART, in assets/cards/cards.js), so it is the same one
+         every time and a different one from the clue beside it.
+
+         The sprockets are what identify it: this family is dark like a collection card, so it
+         cannot separate itself by ground colour and does it by SILHOUETTE instead.
 
          Without this branch at all it fell through to the energy case and drew "+undefined" on a
          teal card, which is why the family is switched on explicitly here. */
@@ -339,7 +342,7 @@ export const Box3D = {
        much as the gold does. A status item is gold-brown; everything else stays navy. */
     rr(2, 2, W - 4, H - 4, 16);
     const g = x.createLinearGradient(0, 0, 0, H);
-    if (slip){ g.addColorStop(0, "#2a241b"); g.addColorStop(1, "#141110"); }
+    if (slip){ g.addColorStop(0, "#191a1f"); g.addColorStop(1, "#121316"); }
     else if (gilt){ g.addColorStop(0, "#3a2140"); g.addColorStop(1, "#120a18"); }
     else if (ornate){ g.addColorStop(0, "#3d2f10"); g.addColorStop(1, "#1d1607"); }
     else { g.addColorStop(0, "#1a1f47"); g.addColorStop(1, "#0e1230"); }
@@ -348,13 +351,30 @@ export const Box3D = {
     /* art, or the big glyph for a payout that is not a card */
     x.save(); rr(2, 2, W - 4, H - 4, 16); x.clip();
     if (img){
-      /* A clue's photograph is shot cold; a status item's picture is pushed back behind its
-         number. Canvas filters are cheap here — this texture is painted once per card. */
-      if (slip) x.filter = "grayscale(1) contrast(1.16) brightness(0.92)";
-      else if (ornate) x.globalAlpha = 0.34;
-      const s = Math.max(W / img.width, H / img.height);
-      x.drawImage(img, (W - img.width * s) / 2, -img.height * s * 0.03, img.width * s, img.height * s);
-      x.filter = "none"; x.globalAlpha = 1;
+      /* A clue's photograph is shot cold and sits INSET, as a frame punched into film; a status
+         item's picture is pushed back behind its number. Canvas filters are cheap here — this
+         texture is painted once per card. */
+      if (slip){
+        x.filter = "grayscale(1) contrast(1.3) brightness(0.86)";
+        const fx = 22, fy = 20, fw = W - 44, fh = H * 0.46;
+        const s = Math.max(fw / img.width, fh / img.height);
+        x.save(); x.beginPath(); x.rect(fx, fy, fw, fh); x.clip();
+        x.drawImage(img, fx + (fw - img.width * s) / 2, fy + (fh - img.height * s) / 2,
+                    img.width * s, img.height * s);
+        x.restore();
+        x.filter = "none";
+        /* the grease-pencil ring, the way a picture editor marks a keeper */
+        x.save();
+        x.translate(fx + fw / 2, fy + fh / 2); x.rotate(-0.105);
+        x.strokeStyle = "rgba(226,58,48,.85)"; x.lineWidth = 5;
+        x.beginPath(); x.ellipse(0, 0, fw * 0.37, fh * 0.37, 0, 0, Math.PI * 2); x.stroke();
+        x.restore();
+      }else{
+        if (ornate) x.globalAlpha = 0.34;
+        const s = Math.max(W / img.width, H / img.height);
+        x.drawImage(img, (W - img.width * s) / 2, -img.height * s * 0.03, img.width * s, img.height * s);
+        x.globalAlpha = 1;
+      }
     }else if (plain){
       x.font = "700 92px 'Segoe UI', system-ui, sans-serif";
       x.textAlign = "center"; x.textBaseline = "middle";
@@ -362,14 +382,23 @@ export const Box3D = {
     }
     /* the name sits on a gradient off the bottom, so it reads over any art — every family has
        art under its foot now, including the clue. */
-    {
+    if (!slip){
       const f = x.createLinearGradient(0, H - 130, 0, H);
-      const base = slip ? "20,17,12" : "8,10,28";
-      f.addColorStop(0, `rgba(${base},0)`); f.addColorStop(0.45, `rgba(${base},.9)`);
-      f.addColorStop(1, `rgba(${base},.98)`);
+      f.addColorStop(0, "rgba(8,10,28,0)"); f.addColorStop(0.45, "rgba(8,10,28,.9)");
+      f.addColorStop(1, "rgba(8,10,28,.98)");
       x.fillStyle = f; x.fillRect(0, H - 130, W, 130);
     }
     x.restore();
+
+    /* THE SPROCKETS, drawn last of the art so they sit over the frame like real film. Both
+       strips, top to bottom, at the same pitch the DOM uses. */
+    if (slip){
+      x.fillStyle = "rgba(232,230,223,.92)";
+      for (let y = 8; y < H - 12; y += 26){
+        x.fillRect(4, y, 11, 12);
+        x.fillRect(W - 15, y, 11, 12);
+      }
+    }
 
     /* the rarity badge */
     if (label){
@@ -402,24 +431,19 @@ export const Box3D = {
     x.textAlign = "center";
     x.fillStyle = ink;
     if (slip){
-      /* Prose laid straight over a photograph is the one thing that reliably becomes
-         unreadable, so the sentence gets its own piece of paper — tilted the other way from the
-         card, so the two angles read as two pieces rather than one crooked one. */
-      x.save();
-      x.translate(W / 2, H * 0.56); x.rotate(0.016);
-      const sw = W - 40, sh = 116;
-      x.fillStyle = "rgba(0,0,0,.5)"; rr(-sw / 2 + 3, -sh / 2 + 5, sw, sh, 2); x.fill();
-      x.fillStyle = "#f2e8d0";       rr(-sw / 2, -sh / 2, sw, sh, 2); x.fill();
-      x.fillStyle = ink;
+      /* Annotated in the MARGIN, the way a contact sheet is — not on a slip laid over the
+         picture. The frame above already ends at 0.46H, so there is clear film to write on. */
+      x.textAlign = "left";
+      x.fillStyle = "#d6d2c6";
       x.font = "700 15px 'Courier New', ui-monospace, monospace";
-      wrap(x, name, 0, -sh / 2 + 26, sw - 26, 19, 4);
-      x.restore();
-      x.fillStyle = "#a89a76";
+      wrap(x, name, 22, H * 0.66, W - 44, 19, 3);
+      x.textAlign = "center";
+      x.fillStyle = "#7c7a72";
       x.font = "400 14px 'Segoe UI', system-ui, sans-serif";
-      x.fillText(sub, W / 2, H - 24, W - 28);
-      x.fillStyle = "#efe4c8";
+      x.fillText(sub, W / 2, H - 24, W - 44);
+      x.fillStyle = "#f0ede3";
       x.font = "700 17px 'Courier New', ui-monospace, monospace";
-      x.fillText("A CLUE", W / 2, H - 48, W - 28);
+      x.fillText("A CLUE", W / 2, H - 48, W - 44);
     }else{
       x.font = "700 24px Georgia, 'Times New Roman', serif";
       wrap(x, name, W / 2, H - 66, W - 28, 26, 2);
@@ -561,7 +585,11 @@ export const Box3D = {
   },
 };
 
-/* Centred, wrapped, and capped at `max` lines so a long clue line cannot walk off the card. */
+/* Wrapped, and capped at `max` lines so a long clue line cannot walk off the card.
+
+   Alignment is the CALLER'S: this only ever calls fillText(line, cx, y), so cx is whatever the
+   current textAlign makes it — a centre for a card name, a left margin for a contact sheet's
+   annotation. `cy` is the baseline of the LAST line, so text grows upward from it. */
 function wrap(x, text, cx, cy, maxW, lh, max){
   const words = String(text || "").split(/\s+/);
   const lines = [];

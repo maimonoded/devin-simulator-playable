@@ -121,48 +121,81 @@
 .ccard.fam-collection.conv .ccFrame{border-color:rgba(255,203,92,.9);
   box-shadow:inset 0 0 14px rgba(255,203,92,.25),inset 0 0 0 1px rgba(0,0,0,.35)}
 
-/* clue — a CASE PHOTOGRAPH with the line typed on a slip beneath it.
+/* clue — a CONTACT SHEET. A strip of film, and the frame ringed in grease pencil.
 
    This is the card the player is actually playing for: four of them buy the next episode, and
    the episode is the whole point of the game. It used to be the plainest object in the box —
    cream paper with a sentence on it, next to status plaques that glowed — which had the
-   hierarchy exactly backwards. So it gets the photograph.
+   hierarchy exactly backwards.
 
-   The paper survives as the SLIP the sentence sits on, and so do the crooked angle and the tape.
-   A clue is still the one face in the game carrying a line of prose, and prose laid straight
-   over a photograph is the one thing that reliably becomes unreadable. */
-.ccard.fam-clue{border-color:#d9cdae;border-style:solid;border-width:3px;
-  box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 0 1px rgba(217,205,174,.18);
-  transform:rotate(-1.1deg);background:#241f18}
-/* The photographs are shot cold and grainy already; this deepens the contrast so a light one
-   and a dark one still read as the same kind of object. */
-.ccard.fam-clue .ccArt{filter:grayscale(1) contrast(1.16) brightness(.92)}
-.ccGrain{position:absolute;inset:0;z-index:1;pointer-events:none;mix-blend-mode:overlay;
-  opacity:.5;background-image:
-    repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,rgba(0,0,0,.05) 1px 2px)}
-/* The slip. Sits ABOVE the foot and below the frame, tilted the other way from the card so the
-   two angles read as two pieces of paper rather than as one crooked one. */
-.ccSlip{position:absolute;left:6%;right:6%;bottom:24%;z-index:3;
-  background:#f2e8d0;color:#33281a;padding:7px 8px;border-radius:1px;
-  transform:rotate(.9deg);box-shadow:0 3px 9px rgba(0,0,0,.55)}
-.ccSlip span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
-  font-family:"Courier New",ui-monospace,monospace;font-size:10px;line-height:1.35;text-align:center}
-.size-sm .ccSlip{left:4%;right:4%;bottom:26%;padding:3px 4px}
-.size-sm .ccSlip span{font-size:6.5px;line-height:1.25;-webkit-line-clamp:3}
-.size-lg .ccSlip span{font-size:13px;line-height:1.4}
-.ccard.fam-clue .ccFoot{
-  background:linear-gradient(180deg,rgba(20,17,12,0),rgba(20,17,12,.92) 42%,rgba(20,17,12,.99))}
+   The film strip fixes that with SILHOUETTE rather than colour. Sprocketed edges are a shape
+   nothing else in the game has, so a clue is identifiable before any of its content is read —
+   which matters more than it sounds, because this family is dark like a collection card and
+   cannot rely on ground colour to separate itself the way cream paper did.
+
+   The RED RING is the second half of that. It is the only saturated red in the card system, it
+   marks the frame the way a picture editor marks a keeper, and it gives the eye somewhere to
+   land on a face that is otherwise grey.
+
+   The sentence sits UNDER the frame in typewriter, not on a slip: a contact sheet is annotated
+   in the margin, and prose over a photograph is the thing that reliably becomes unreadable. */
+.ccard.fam-clue{border-color:#2b2d33;border-style:solid;border-width:1px;background:#15161a;
+  box-shadow:0 8px 20px rgba(0,0,0,.55);border-radius:3px}
+/* The sprocket strips. Two pseudo-elements rather than a background on the card, so they sit
+   ABOVE the photograph and read as the film the frame is punched into. */
+.ccard.fam-clue::before,.ccard.fam-clue::after{content:"";position:absolute;top:0;bottom:0;
+  width:15px;z-index:4;pointer-events:none;opacity:.92;
+  background:repeating-linear-gradient(180deg,transparent 0 7px,#e8e6df 7px 15px,transparent 15px 22px)}
+.ccard.fam-clue::before{left:0}
+.ccard.fam-clue::after{right:0}
+/* At album size the strip has to shrink or it eats the picture: 15px of 86px is a sixth of the
+   card, twice. Smaller holes, spaced to match. */
+.size-sm.fam-clue::before,.size-sm.fam-clue::after{width:8px;
+  background:repeating-linear-gradient(180deg,transparent 0 4px,#e8e6df 4px 8px,transparent 8px 12px)}
+.size-lg.fam-clue::before,.size-lg.fam-clue::after{width:21px;
+  background:repeating-linear-gradient(180deg,transparent 0 10px,#e8e6df 10px 21px,transparent 21px 31px)}
+
+/* The frame itself, inset far enough to clear both strips. */
+.ccard.fam-clue .ccArt{inset:16px 19px 32%;filter:grayscale(1) contrast(1.3) brightness(.86)}
+.size-sm.fam-clue .ccArt{inset:8px 10px 34%}
+.size-lg.fam-clue .ccArt{inset:22px 26px 31%}
+
+/* ccGrain is the grease-pencil RING on this family — the same element that carries film grain
+   on any other. Reusing it keeps dropFace() from needing a per-family element list. */
+.ccard.fam-clue .ccGrain{inset:16px 19px 32%;z-index:2;mix-blend-mode:normal;opacity:1;
+  background:none;border:3px solid rgba(226,58,48,.85);border-radius:50%;
+  transform:scale(.72) rotate(-6deg)}
+.size-sm.fam-clue .ccGrain{inset:8px 10px 34%;border-width:1.5px}
+.size-lg.fam-clue .ccGrain{inset:22px 26px 31%;border-width:4px}
+
+/* The annotation, in the margin under the frame. */
+.ccard.fam-clue .ccSlip{left:19px;right:19px;bottom:15%;background:none;box-shadow:none;
+  transform:none;padding:0;border-radius:0}
+.ccard.fam-clue .ccSlip span{color:#d6d2c6;text-align:left;-webkit-line-clamp:3}
+.size-sm.fam-clue .ccSlip{left:10px;right:10px;bottom:17%}
+/* The large sprockets are 21px, so 19px of margin runs the text under them. Every size clears
+   its own strip by a couple of pixels; this is the one place the three have to be kept in step. */
+.size-lg.fam-clue .ccSlip{left:27px;right:27px}
+.ccard.fam-clue .ccFoot{background:none;padding:7px 19px 8px}
+.size-sm.fam-clue .ccFoot{padding:4px 10px 5px}
+.size-lg.fam-clue .ccFoot{padding:9px 27px 10px}
 .ccard.fam-clue .ccName{font-family:"Courier New",ui-monospace,monospace;font-weight:700;
-  color:#efe4c8;letter-spacing:.08em;text-transform:uppercase}
-.ccard.fam-clue .ccSub{color:#a89a76}
-.ccard.fam-clue .ccFrame{position:absolute;inset:4px;z-index:2;pointer-events:none;
-  border:1px solid rgba(242,232,208,.22)}
-/* tape, still holding it to the board */
-.ccard.fam-clue::after{content:"";position:absolute;top:-7px;left:50%;translate:-50% 0;z-index:4;
-  width:38%;height:15px;background:rgba(242,232,208,.5);
-  border-left:1px solid rgba(120,105,70,.2);border-right:1px solid rgba(120,105,70,.2);
-  transform:rotate(1.6deg)}
-.size-sm.fam-clue::after{height:11px;top:-5px}
+  color:#f0ede3;letter-spacing:.1em;text-transform:uppercase}
+.ccard.fam-clue .ccSub{color:#7c7a72}
+.ccard.fam-clue .ccFrame{display:none}
+/* The badge moves inboard of the left sprocket strip, and takes the ring's red. */
+.ccard.fam-clue .ccRar{top:20px;left:24px;background:rgba(0,0,0,.8);border-color:#e23a30;
+  color:#ff8a80}
+.size-sm.fam-clue .ccRar{top:11px;left:13px}
+
+/* Shared slip geometry, still used by nothing else but kept general — a family that wants a
+   paper slip back can have one without re-deriving the type sizes. */
+.ccSlip{position:absolute;z-index:3}
+.ccSlip span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+  font-family:"Courier New",ui-monospace,monospace;font-size:9px;line-height:1.35}
+.size-sm .ccSlip span{font-size:6px;line-height:1.25;-webkit-line-clamp:3}
+.size-lg .ccSlip span{font-size:12px;line-height:1.4}
+.ccGrain{position:absolute;inset:0;z-index:1;pointer-events:none}
 
 /* status — a PLAQUE, and the NUMBER is the hero.
 
