@@ -1,12 +1,50 @@
-/* What is painted and what is not.
+/* What is painted, what is not, and whether this machine can do the work.
  *
  *     node tools/card-art/audit.js
  *
  * Two checks that matter more than the count: a row tagged with art that is not
  * on disk (a broken card, silent in the console), and a file on disk that no row
- * points at (generated, paid for, invisible). Both have happened. */
+ * points at (generated, paid for, invisible). Both have happened.
+ *
+ * And one that matters more than either, which is why it runs FIRST and prints
+ * before anything else: can this machine encode a WebP at all?
+ *
+ * Generating an image COSTS MONEY and happens BEFORE finish-card.sh touches it.
+ * So a box without cwebp or ImageMagick does not fail cheaply -- it fails after
+ * seven paid images are already sitting in a CDN behind signed URLs that expire.
+ * Discovering the gap at step 4 of 6 is the expensive way to discover it. This is
+ * the cheap way, and it is in the one command the operator already runs before
+ * every batch. */
 "use strict";
 const fs = require("fs"), vm = require("vm"), path = require("path");
+const { execFileSync } = require("child_process");
+/* ---- can this machine finish a card? ---- */
+const have = cmd => {
+  try { execFileSync("command", ["-v", cmd], { shell: true, stdio: "ignore" }); return true; }
+  catch { return false; }
+};
+const encoder =
+  have("cwebp")  ? "cwebp (libwebp-tools)" :
+  have("magick")  ? "ImageMagick (magick)" :
+  have("convert") ? "ImageMagick (convert)" : null;
+
+console.log(encoder ? `  toolchain   ${encoder}` : "  toolchain   NONE — cannot encode WebP");
+if (!encoder) {
+  console.log(`
+  finish-card.sh cannot run on this machine, so generating images would spend
+  credits on files it cannot process. Install one of these FIRST:
+
+      Debian/Ubuntu   apt-get install -y webp
+      Alpine          apk add libwebp-tools
+      Fedora/RHEL     dnf install -y libwebp-tools
+      macOS           brew install webp
+
+  Then run this again. Everything below is still accurate; it is the encoding
+  step that is missing, not the catalogue.
+`);
+}
+console.log("");
+
 const ctx = vm.createContext({ console });
 vm.runInContext(fs.readFileSync("assets/cards/cards.js", "utf8"), ctx, { filename: "cards.js" });
 
@@ -26,4 +64,8 @@ vm.runInContext("CARD_RARITIES", ctx).forEach(r => {
 console.log(`  ${"TOTAL".padEnd(10)} ${String(all.filter(c => c.art).length).padStart(3)}/${String(all.length).padStart(3)}`);
 if (broken.length) console.log("\nTAGGED BUT NO FILE:", broken.join(" "));
 if (orphan.length) console.log("\nON DISK BUT UNTAGGED:", orphan.join(" "));
-process.exit(broken.length || orphan.length ? 1 : 0);
+
+/* A missing encoder is a non-zero exit like any other problem. It is not a
+   catalogue error, but it does mean "do not start a batch", which is the only
+   thing the exit code is asked to say. */
+process.exit(broken.length || orphan.length || !encoder ? 1 : 0);

@@ -6,8 +6,13 @@ right answer for most Commons, and it is why this can be done in batches over ti
 game ever looking broken in between.
 
 ```bash
-node tools/card-art/audit.js      # what is painted, and what is inconsistent
+node tools/card-art/audit.js      # run this FIRST, and after every batch
 ```
+
+It answers two questions: **can this machine do the work**, and **what is left**. Take the first
+one seriously — generating an image costs money and happens *before* anything downscales it, so a
+box without `cwebp` or ImageMagick does not fail cheaply. It fails with seven paid images sitting
+behind signed URLs. `audit.js` exits non-zero and names the package to install.
 
 ## The pipeline, per card
 
@@ -19,9 +24,9 @@ node tools/card-art/audit.js      # what is painted, and what is inconsistent
    ~35 KB. A card is drawn about 200px across; the full-size render is forty times the file for
    no visible gain.
 
-   **It needs `cwebp` (libwebp-tools) or ImageMagick, and runs anywhere either does.** Override
-   the defaults with environment variables when you need to: `OUT_DIR` (default
-   `assets/cards/s1`), `WIDTH` (420), `QUALITY` (82).
+   **It needs `cwebp` (libwebp-tools) or ImageMagick, and runs anywhere either does** — that is
+   what `audit.js` checks up front. Override the defaults with environment variables when you
+   need to: `OUT_DIR` (default `assets/cards/s1`), `WIDTH` (420), `QUALITY` (82).
 4. **Tag** — `python3 tools/card-art/tag-card.py <id> …` writes `art:` onto the catalogue rows,
    and refuses any card whose file is not on disk.
 

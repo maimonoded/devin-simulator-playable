@@ -161,11 +161,11 @@ const CARD_SEASONS = [
 
       { key: "the-wedding", name: "The Wedding", cards: [
         { id: "an-invitation",     name: "An Invitation",              rarity: C, art: "an-invitation.webp"  },
-        { id: "rush-job",          name: "A Rush Job at the Printers", rarity: C },
-        { id: "white-ribbon",      name: "White Ribbon",               rarity: C },
-        { id: "caterers-quote",    name: "The Caterer's Quote",        rarity: C },
+        { id: "rush-job",          name: "A Rush Job at the Printers", rarity: C, art: "rush-job.webp"  },
+        { id: "white-ribbon",      name: "White Ribbon",               rarity: C, art: "white-ribbon.webp"  },
+        { id: "caterers-quote",    name: "The Caterer's Quote",        rarity: C, art: "caterers-quote.webp"  },
         { id: "size-sevens",       name: "A Pair of Size Sevens",      rarity: C, art: "clue-shoes.webp" },
-        { id: "folding-chairs",    name: "Folding Chairs",             rarity: C },
+        { id: "folding-chairs",    name: "Folding Chairs",             rarity: C, art: "folding-chairs.webp"  },
         { id: "the-church-slot",   name: "The Church Slot",            rarity: R, art: "the-church-slot.webp"  },
         { id: "grandmas-blessing", name: "Grandma's Blessing",         rarity: R, art: "grandmas-blessing.webp"  },
         { id: "christmas-day",     name: "Christmas Day",              rarity: E, art: "christmas-day.webp"  },
@@ -173,9 +173,9 @@ const CARD_SEASONS = [
       ] },
 
       { key: "the-rose", name: "The Rose Hotel", cards: [
-        { id: "brass-key-fob",     name: "A Brass Key Fob",            rarity: C },
-        { id: "lobby-carpet",      name: "The Lobby Carpet",           rarity: C },
-        { id: "bell-on-the-desk",  name: "A Bell on the Desk",         rarity: C },
+        { id: "brass-key-fob",     name: "A Brass Key Fob",            rarity: C, art: "brass-key-fob.webp"  },
+        { id: "lobby-carpet",      name: "The Lobby Carpet",           rarity: C, art: "lobby-carpet.webp"  },
+        { id: "bell-on-the-desk",  name: "A Bell on the Desk",         rarity: C, art: "bell-on-the-desk.webp"  },
         { id: "rose-wallpaper",    name: "Rose Wallpaper",             rarity: C },
         { id: "ballroom-doors",    name: "The Ballroom Doors",         rarity: C },
         { id: "silver-tray",       name: "A Silver Tray",              rarity: C },
