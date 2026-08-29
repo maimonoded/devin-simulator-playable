@@ -18,6 +18,10 @@ node tools/card-art/audit.js      # what is painted, and what is inconsistent
 3. **Finish** — `tools/card-art/finish-card.sh <id> <url>` downscales to 420px and re-encodes to
    ~35 KB. A card is drawn about 200px across; the full-size render is forty times the file for
    no visible gain.
+
+   **It needs `cwebp` (libwebp-tools) or ImageMagick, and runs anywhere either does.** Override
+   the defaults with environment variables when you need to: `OUT_DIR` (default
+   `assets/cards/s1`), `WIDTH` (420), `QUALITY` (82).
 4. **Tag** — `python3 tools/card-art/tag-card.py <id> …` writes `art:` onto the catalogue rows,
    and refuses any card whose file is not on disk.
 
@@ -50,7 +54,9 @@ Both have happened, and neither shows up in the browser console.
 ## The clue photographs
 
 Separate, and much smaller: **twelve** case photographs under `assets/cards/clues/`, shared by
-all 144 clues, which pick one by hashing their own id. Same generate/finish steps, but they are
-black-and-white surveillance stills rather than painted illustrations, and they are named by
-subject (`phone.webp`, `letter.webp`) rather than by card id — see `CLUE_ART` in
-`assets/cards/cards.js`.
+all 144 clues, which pick one by hashing their own id. Same generate/finish steps — pass
+`OUT_DIR=assets/cards/clues` — but they are black-and-white surveillance stills rather than
+painted illustrations, and they are named by subject (`phone.webp`, `letter.webp`) rather than by
+card id. See `CLUE_ART` in `assets/cards/cards.js`.
+
+They are **done**, all twelve. Nothing further is needed there.
