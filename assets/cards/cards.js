@@ -253,10 +253,10 @@ const CARD_SEASONS = [
       { key: "grandmas-things", name: "Grandma's Things", cards: [
         { id: "tin-of-buttons",    name: "A Tin of Buttons",           rarity: C, art: "tin-of-buttons.webp"  },
         { id: "lavender",          name: "Lavender",                   rarity: C, art: "lavender.webp"  },
-        { id: "reading-glasses",   name: "Her Reading Glasses",        rarity: C },
-        { id: "crocheted-blanket", name: "A Crocheted Blanket",        rarity: C },
-        { id: "the-good-china",    name: "The Good China",             rarity: C },
-        { id: "wind-up-clock",     name: "A Wind-Up Clock",            rarity: C },
+        { id: "reading-glasses",   name: "Her Reading Glasses",        rarity: C, art: "reading-glasses.webp"  },
+        { id: "crocheted-blanket", name: "A Crocheted Blanket",        rarity: C, art: "crocheted-blanket.webp"  },
+        { id: "the-good-china",    name: "The Good China",             rarity: C, art: "the-good-china.webp"  },
+        { id: "wind-up-clock",     name: "A Wind-Up Clock",            rarity: C, art: "wind-up-clock.webp"  },
         { id: "consultants-letter",name: "The Consultant's Letter",    rarity: R, art: "consultants-letter.webp"  },
         { id: "photo-from-1962",   name: "A Photograph from 1962",     rarity: R, art: "photo-from-1962.webp"  },
         { id: "her-wedding-ring",  name: "Her Wedding Ring",           rarity: R, art: "her-wedding-ring.webp"  },
@@ -264,9 +264,9 @@ const CARD_SEASONS = [
       ] },
 
       { key: "the-suite", name: "The Honeymoon Suite", cards: [
-        { id: "rose-petals",       name: "Rose Petals",                rarity: C },
-        { id: "one-blanket",       name: "One Blanket",                rarity: C },
-        { id: "bare-floorboards",  name: "Bare Floorboards",           rarity: C },
+        { id: "rose-petals",       name: "Rose Petals",                rarity: C, art: "rose-petals.webp"  },
+        { id: "one-blanket",       name: "One Blanket",                rarity: C, art: "one-blanket.webp"  },
+        { id: "bare-floorboards",  name: "Bare Floorboards",           rarity: C, art: "bare-floorboards.webp"  },
         { id: "turned-down-bed",   name: "A Turned-Down Bed",          rarity: C },
         { id: "a-cold-radiator",   name: "A Cold Radiator",            rarity: C },
         { id: "two-in-the-morning",name: "Two in the Morning",         rarity: C },
