@@ -22,6 +22,17 @@
   .pair .cell{width:150px}
   .verdict{font-size:12px;color:#7f88bb;margin-top:8px;max-width:74ch}
   .verdict b{color:#2dd4bf}
+  /* NOWRAP, deliberately. The status card wrapping to a second line is the one layout that
+   defeats the page: the whole question is whether a clue can be mistaken for it, and that is
+   answered by having them side by side. A narrow window scrolls instead. */
+  .allfive{display:flex;gap:16px;align-items:flex-start;flex-wrap:nowrap;overflow-x:auto;
+    padding:22px 18px;background:#111634;border:1px solid #232a63;border-radius:12px}
+  .allfive .cell{flex:0 0 168px}
+  .allfive .cell{width:168px}
+  .allfive a{display:block;text-decoration:none}
+  .allfive .divider{border-left:1px dashed #3a4180;padding-left:16px}
+  .allfive .cap{margin-top:18px}
+  h2{scroll-margin-top:14px}
 
   /* ============================================================
      Each option restyles ONE card. The base .ccard silhouette,
@@ -171,8 +182,19 @@ const OPTS = [
    "The stamp does the work: it is the one motif here that no reward card could ever wear, and it says EVIDENCE without a badge."],
 ];
 
-document.getElementById("out").innerHTML = OPTS.map(([cls, title, note, verdict]) => `
-  <h2>${title}</h2>
+/* All five at a glance FIRST, because the decision is a comparison and nobody makes it by
+   scrolling between five sections. The per-option detail follows underneath. */
+const glance = `
+  <div class="allfive">
+    ${OPTS.map(([cls, title]) => `
+      <div class="cell"><a href="#${cls}">${clue(cls)}</a>
+        <div class="cap"><b>${title}</b></div></div>`).join("")}
+    <div class="cell divider">${status()}
+      <div class="cap"><b>Status</b>what it must not resemble</div></div>
+  </div>`;
+
+document.getElementById("out").innerHTML = glance + OPTS.map(([cls, title, note, verdict]) => `
+  <h2 id="${cls}">${title}</h2>
   <p class="note">${note}</p>
   <div class="pair">
     <div class="cell">${clue(cls)}<div class="cap"><b>Clue</b>the option</div></div>
