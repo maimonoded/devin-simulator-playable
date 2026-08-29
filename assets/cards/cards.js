@@ -239,11 +239,11 @@ const CARD_SEASONS = [
 
       { key: "the-boardroom", name: "The Boardroom", cards: [
         { id: "a-long-table",      name: "A Long Table",               rarity: C, art: "a-long-table.webp"  },
-        { id: "water-glasses",     name: "Water Glasses",              rarity: C },
-        { id: "chair-at-the-head", name: "The Chair at the Head",      rarity: C },
-        { id: "a-bound-report",    name: "A Bound Report",             rarity: C },
-        { id: "the-company-seal",  name: "The Company Seal",           rarity: C },
-        { id: "a-nameplate",       name: "A Nameplate",                rarity: C },
+        { id: "water-glasses",     name: "Water Glasses",              rarity: C, art: "water-glasses.webp"  },
+        { id: "chair-at-the-head", name: "The Chair at the Head",      rarity: C, art: "chair-at-the-head.webp"  },
+        { id: "a-bound-report",    name: "A Bound Report",             rarity: C, art: "a-bound-report.webp"  },
+        { id: "the-company-seal",  name: "The Company Seal",           rarity: C, art: "the-company-seal.webp"  },
+        { id: "a-nameplate",       name: "A Nameplate",                rarity: C, art: "a-nameplate.webp"  },
         { id: "the-search",        name: "The Search Nobody Called Off", rarity: R, art: "the-search.webp"  },
         { id: "vote-postponed",    name: "A Vote Postponed",           rarity: R, art: "vote-postponed.webp"  },
         { id: "the-board",         name: "The Board",                  rarity: E, art: "the-board.webp"  },
@@ -251,8 +251,8 @@ const CARD_SEASONS = [
       ] },
 
       { key: "grandmas-things", name: "Grandma's Things", cards: [
-        { id: "tin-of-buttons",    name: "A Tin of Buttons",           rarity: C },
-        { id: "lavender",          name: "Lavender",                   rarity: C },
+        { id: "tin-of-buttons",    name: "A Tin of Buttons",           rarity: C, art: "tin-of-buttons.webp"  },
+        { id: "lavender",          name: "Lavender",                   rarity: C, art: "lavender.webp"  },
         { id: "reading-glasses",   name: "Her Reading Glasses",        rarity: C },
         { id: "crocheted-blanket", name: "A Crocheted Blanket",        rarity: C },
         { id: "the-good-china",    name: "The Good China",             rarity: C },
