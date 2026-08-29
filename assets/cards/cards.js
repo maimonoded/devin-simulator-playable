@@ -120,11 +120,11 @@ const CARD_SEASONS = [
 
       { key: "harbour-heights", name: "Harbour Heights", cards: [
         { id: "harbour-wall",      name: "The Harbour Wall",           rarity: C, art: "harbour-wall.webp"  },
-        { id: "gulls-on-the-rail", name: "Gulls on the Rail",          rarity: C },
-        { id: "chip-shop-window",  name: "A Chip Shop Window",         rarity: C },
-        { id: "the-bus-stop",      name: "The Bus Stop",               rarity: C },
-        { id: "boats-at-dawn",     name: "Fishing Boats at Dawn",      rarity: C },
-        { id: "church-spire",      name: "The Church Spire",           rarity: C },
+        { id: "gulls-on-the-rail", name: "Gulls on the Rail",          rarity: C, art: "gulls-on-the-rail.webp"  },
+        { id: "chip-shop-window",  name: "A Chip Shop Window",         rarity: C, art: "chip-shop-window.webp"  },
+        { id: "the-bus-stop",      name: "The Bus Stop",               rarity: C, art: "the-bus-stop.webp"  },
+        { id: "boats-at-dawn",     name: "Fishing Boats at Dawn",      rarity: C, art: "boats-at-dawn.webp"  },
+        { id: "church-spire",      name: "The Church Spire",           rarity: C, art: "church-spire.webp"  },
         { id: "notice-board",      name: "The Town Notice Board",      rarity: R, art: "clue-sign.webp" },
         { id: "rumour-at-bakers",  name: "A Rumour at the Baker's",    rarity: R, art: "rumour-at-bakers.webp"  },
         { id: "the-long-pier",     name: "The Long Pier",              rarity: R, art: "the-long-pier.webp"  },
@@ -132,7 +132,7 @@ const CARD_SEASONS = [
       ] },
 
       { key: "the-wedding", name: "The Wedding", cards: [
-        { id: "an-invitation",     name: "An Invitation",              rarity: C },
+        { id: "an-invitation",     name: "An Invitation",              rarity: C, art: "an-invitation.webp"  },
         { id: "rush-job",          name: "A Rush Job at the Printers", rarity: C },
         { id: "white-ribbon",      name: "White Ribbon",               rarity: C },
         { id: "caterers-quote",    name: "The Caterer's Quote",        rarity: C },
