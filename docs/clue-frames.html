@@ -1,0 +1,183 @@
+<base href="../">
+<meta charset="utf-8">
+<title>Harbour Heights — clue frame options</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/collection.css">
+<style>
+  body{background:#0b0f24;color:#e8ecff;font:400 14px/1.5 system-ui,-apple-system,sans-serif;
+       margin:0;padding:26px 30px 80px;max-width:1180px}
+  h1{font:700 26px Georgia,serif;margin:0 0 6px}
+  .lede{color:#9098c9;max-width:70ch;margin:0 0 26px}
+  h2{font:800 13px system-ui;letter-spacing:.16em;text-transform:uppercase;color:#ffcb5c;
+     margin:34px 0 3px;border-top:1px solid #232a63;padding-top:16px}
+  h2 em{font-style:normal;color:#6f78ab;letter-spacing:.02em;text-transform:none;font-weight:600}
+  .note{color:#9098c9;max-width:74ch;margin:0 0 16px;font-size:13px}
+  .row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+  .cell{width:210px}
+  .cap{margin-top:10px;font-size:12px;color:#9098c9;text-align:center}
+  .cap b{display:block;color:#e8ecff;font-size:13px;margin-bottom:2px}
+  .pair{display:flex;gap:14px;align-items:flex-start;padding:14px;border-radius:12px;
+        background:#111634;border:1px solid #232a63}
+  .pair .cell{width:150px}
+  .verdict{font-size:12px;color:#7f88bb;margin-top:8px;max-width:74ch}
+  .verdict b{color:#2dd4bf}
+
+  /* ============================================================
+     Each option restyles ONE card. The base .ccard silhouette,
+     the photo and the badge all stay shared, so what is being
+     compared is the FRAME and nothing else.
+
+     Every selector is `.ccard.opt-x`, never a bare `.opt-x`. The
+     rule being overridden is `.ccard.fam-clue`, which is two
+     classes; a single class loses to it and the option silently
+     renders as the shipped card with a few details moved. That
+     is exactly what happened on the first pass -- three of the
+     five looked almost identical and the reason was specificity,
+     not the design.
+     ============================================================ */
+
+  /* ---- A · case folder ---------------------------------------
+     A buff folder with a cut tab. Card stock, not paper. ------- */
+  .ccard.opt-a{overflow:visible;background:#cdbb92;border:1px solid #9c8a63;border-radius:2px;
+         box-shadow:0 8px 20px rgba(0,0,0,.55)}
+  .ccard.opt-a::before{content:"";position:absolute;top:-13px;left:0;width:44%;height:14px;
+    background:#cdbb92;border:1px solid #9c8a63;border-bottom:0;border-radius:3px 8px 0 0}
+  .ccard.opt-a .ccArt{inset:15px 13px 30%;filter:grayscale(1) contrast(1.18);
+    border:4px solid #fbf7ec;box-shadow:0 2px 7px rgba(0,0,0,.45);transform:rotate(-1.2deg)}
+  .ccard.opt-a .ccSlip{left:13px;right:13px;bottom:16%;background:none;box-shadow:none;transform:none;padding:0}
+  .ccard.opt-a .ccSlip span{color:#3a3020;font-size:9.5px;text-align:left;-webkit-line-clamp:3}
+  .ccard.opt-a .ccFoot{background:none;padding:8px 13px 9px}
+  .ccard.opt-a .ccName{color:#2e2718;font-family:"Courier New",monospace;font-size:11px;letter-spacing:.1em}
+  .ccard.opt-a .ccSub{color:#7d6f4e}
+  .ccard.opt-a .ccRar{background:#8c2f24;border-color:#8c2f24;color:#fdf3e2;border-radius:2px;
+    top:auto;bottom:9px;right:11px;left:auto;text-shadow:none}
+
+  /* ---- B · polaroid ------------------------------------------
+     White plastic, deep bottom lip, written on by hand. -------- */
+  .ccard.opt-b{background:#f6f4ee;border:1px solid #d8d4c8;border-radius:3px;
+         box-shadow:0 10px 24px rgba(0,0,0,.6);transform:rotate(1.4deg)}
+  .ccard.opt-b .ccArt{inset:11px 11px 30%;filter:grayscale(.85) contrast(1.1) sepia(.15);
+    box-shadow:inset 0 0 22px rgba(0,0,0,.5)}
+  .ccard.opt-b .ccSlip{left:12px;right:12px;bottom:8%;background:none;box-shadow:none;transform:none;padding:0}
+  .ccard.opt-b .ccSlip span{font-family:"Bradley Hand","Segoe Script","Comic Sans MS",cursive;
+    color:#2b3a63;font-size:11px;line-height:1.25;text-align:center;-webkit-line-clamp:3}
+  .ccard.opt-b .ccFoot{background:none;padding:0;left:12px;right:12px;bottom:3%}
+  .ccard.opt-b .ccName{display:none}
+  .ccard.opt-b .ccSub{color:#9a927e;font-size:9px;text-align:center}
+  .ccard.opt-b .ccRar{top:16px;left:16px;background:rgba(20,22,30,.72);border-color:rgba(255,255,255,.4);
+    color:#fff;text-shadow:none}
+
+  /* ---- C · contact sheet -------------------------------------
+     Film. Sprocketed edges, and a grease-pencil ring. ---------- */
+  .ccard.opt-c{background:#15161a;border:1px solid #2b2d33;border-radius:3px}
+  .ccard.opt-c::before,.ccard.opt-c::after{content:"";position:absolute;top:0;bottom:0;width:15px;z-index:3;
+    background:repeating-linear-gradient(180deg,transparent 0 7px,#e8e6df 7px 15px,transparent 15px 22px);
+    opacity:.92}
+  .ccard.opt-c::before{left:0} .ccard.opt-c::after{right:0}
+  .ccard.opt-c .ccArt{inset:16px 19px 32%;filter:grayscale(1) contrast(1.3) brightness(.86)}
+  .ccard.opt-c .ccSlip{left:19px;right:19px;bottom:15%;background:none;box-shadow:none;transform:none;padding:0}
+  .ccard.opt-c .ccSlip span{color:#d6d2c6;font-size:9px;text-align:left;-webkit-line-clamp:3;
+    font-family:"Courier New",monospace}
+  .ccard.opt-c .ccFoot{background:none;padding:7px 19px 8px}
+  .ccard.opt-c .ccName{color:#f0ede3;font-family:"Courier New",monospace;font-size:11px;letter-spacing:.1em}
+  .ccard.opt-c .ccSub{color:#7c7a72}
+  /* the ring, drawn over the frame the way a picture editor marks a keeper */
+  .ccard.opt-c .ccGrain{inset:16px 19px 32%;mix-blend-mode:normal;opacity:1;background:none;
+    border:3px solid rgba(226,58,48,.85);border-radius:50%;transform:scale(.72) rotate(-6deg)}
+  .ccard.opt-c .ccRar{top:20px;left:24px;background:rgba(0,0,0,.8);border-color:#e23a30;color:#ff8a80;
+    text-shadow:none}
+
+  /* ---- D · pinned to the board -------------------------------
+     The current card, with the tape swapped for a pin. --------- */
+  .ccard.opt-d{background:#241f18;border:3px solid #d9cdae;border-radius:4px;
+         transform:rotate(-1.6deg);overflow:visible;
+         box-shadow:0 10px 22px rgba(0,0,0,.6)}
+  .ccard.opt-d .ccArt{filter:grayscale(1) contrast(1.16) brightness(.92)}
+  .ccard.opt-d::after{content:"";position:absolute;top:-9px;left:50%;translate:-50% 0;z-index:6;
+    width:17px;height:17px;border-radius:50%;
+    background:radial-gradient(circle at 34% 30%,#ff7a70,#c62828 62%,#7d1414);
+    box-shadow:0 3px 6px rgba(0,0,0,.7)}
+  .ccard.opt-d .ccSlip{bottom:23%}
+  .ccard.opt-d .ccName{color:#efe4c8;font-family:"Courier New",monospace;letter-spacing:.09em}
+  .ccard.opt-d .ccSub{color:#a89a76}
+  .ccard.opt-d .ccFoot{background:linear-gradient(180deg,rgba(20,17,12,0),rgba(20,17,12,.93) 42%,rgba(20,17,12,.99))}
+
+  /* ---- E · stamped dossier -----------------------------------
+     Buff paper under a rubber stamp, struck across the corner. - */
+  .ccard.opt-e{background:#e4d8b8;border:1px solid #b3a179;border-radius:2px;
+         box-shadow:0 8px 20px rgba(0,0,0,.55)}
+  .ccard.opt-e .ccArt{inset:14px 14px 34%;filter:grayscale(1) contrast(1.22) brightness(.95);
+    border:1px solid #a9976f}
+  .ccard.opt-e .ccSlip{left:14px;right:14px;bottom:17%;background:none;box-shadow:none;transform:none;padding:0}
+  .ccard.opt-e .ccSlip span{color:#332b1c;font-size:9.5px;text-align:left;-webkit-line-clamp:3}
+  .ccard.opt-e .ccFoot{background:none;padding:8px 14px 9px}
+  .ccard.opt-e .ccName{color:#2c2416;font-family:"Courier New",monospace;font-size:11px;letter-spacing:.1em}
+  .ccard.opt-e .ccSub{color:#7a6c4b}
+  .ccard.opt-e .ccRar{display:none}
+  /* the stamp: outlined, struck at an angle, never quite square to the card */
+  .ccard.opt-e::after{content:"EVIDENCE";position:absolute;z-index:5;top:24%;left:50%;
+    translate:-50% 0;transform:rotate(-13deg);
+    font:800 19px/1 "Courier New",monospace;letter-spacing:.14em;
+    color:rgba(178,40,32,.78);border:3px double rgba(178,40,32,.78);
+    border-radius:4px;padding:5px 11px;opacity:.9}
+</style>
+
+<h1>Clue frames — five options</h1>
+<p class="lede">The clue is the card the player is playing for: four of them buy the next episode.
+It has to read as <b>evidence</b> — and never as a <b>status plaque</b>, which is the gold thing
+you bank without looking at. Each option below is shown beside a status card, because the pair is
+what matters, not the card alone.</p>
+
+<div id="out"></div>
+
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/content.js"></script>
+<script src="assets/cards/cards.js"></script>
+<script src="assets/status/status.js"></script>
+<script src="js/state.js"></script>
+<script src="js/cards.js"></script>
+<script src="js/episodes.js"></script>
+<script src="episodes/001.js"></script>
+<script src="js/ui/cardface.js"></script>
+<script>
+const CLUE = {kind:"clue", isNew:true, ep:"001",
+  clue:{id:"c3", text:"There is a dictaphone in his coat, and the tapes are labelled by surname."}};
+
+/* The same clue, re-framed. Only the wrapper class differs. */
+function clue(opt){
+  const html = dropFace(CLUE, {size:"md"});
+  return html.replace('class="ccard size-md fam-clue got"',
+                      `class="ccard size-md fam-clue got ${opt}"`);
+}
+const status = () => dropFace({kind:"status", item:STATUS_ITEMS[2]}, {size:"md"});
+
+const OPTS = [
+  ["opt-a", "A · Case folder",
+   "Buff card stock with a cut tab, the photo taped in behind a white border, the line typed underneath. Reads as a physical file — the thing a clue literally is.",
+   "Furthest from a plaque: matte card, square corners, no glow, and the only colour is the red of an index label."],
+  ["opt-b", "B · Polaroid",
+   "White plastic with the deep bottom lip, tilted, written on by hand. The most immediately readable as a photograph.",
+   "The one that looks least like anything else in the game — nothing else is white. Handwriting also separates it from every typeset card."],
+  ["opt-c", "C · Contact sheet",
+   "A strip of film with sprocketed edges, the frame ringed in grease pencil the way a picture editor marks a keeper.",
+   "The most 'investigation' of the five, and the red ring gives the eye somewhere to land. Darkest, so it sits closest to the collection cards."],
+  ["opt-d", "D · Pinned to the board",
+   "The current treatment with the tape swapped for a pushpin — photo, cream slip, cork-board pin.",
+   "Smallest change from what is shipped. The pin reads at a glance where the tape did not."],
+  ["opt-e", "E · Stamped dossier",
+   "Buff paper under a double-ruled rubber stamp, struck at an angle across the upper third.",
+   "The stamp does the work: it is the one motif here that no reward card could ever wear, and it says EVIDENCE without a badge."],
+];
+
+document.getElementById("out").innerHTML = OPTS.map(([cls, title, note, verdict]) => `
+  <h2>${title}</h2>
+  <p class="note">${note}</p>
+  <div class="pair">
+    <div class="cell">${clue(cls)}<div class="cap"><b>Clue</b>the option</div></div>
+    <div class="cell">${status()}<div class="cap"><b>Status</b>unchanged, for contrast</div></div>
+  </div>
+  <p class="verdict"><b>Why it works:</b> ${verdict}</p>
+`).join("");
+</script>

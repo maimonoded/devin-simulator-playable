@@ -42,19 +42,30 @@
    The colour comes from the catalogue as --rar (assets/cards/cards.js), so adding a rarity is a
    data change, not a stylesheet one. */
 .ccRar{position:absolute;top:5px;left:5px;z-index:3;border-radius:999px;
-  padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  padding:1px 7px;font-size:18px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
   background:rgba(8,10,28,.85);border:1px solid color-mix(in srgb,var(--rar) 55%,transparent);
-  color:var(--rar);white-space:nowrap;
+  color:var(--rar);white-space:nowrap;line-height:1.1;
   /* The glyph is the whole badge, so it carries its own light rather than relying on the
      card's halo -- a single Common star on dark art is otherwise nearly invisible. */
   text-shadow:0 0 6px color-mix(in srgb,var(--rar) 70%,transparent)}
-.size-sm .ccRar{font-size:7px;padding:1.5px 4px;top:4px;left:4px;letter-spacing:.05em}
-.size-lg .ccRar{font-size:13px;padding:3px 9px}
-/* The clue and status badges are words, not stars, and a word needs the tighter tracking back. */
-.fam-clue .ccRar,.fam-status .ccRar{letter-spacing:.05em;text-shadow:none}
+.size-sm .ccRar{font-size:14px;padding:0 4px;top:3px;left:3px;letter-spacing:0}
+.size-lg .ccRar{font-size:26px;padding:2px 9px}
+/* The clue and status badges are WORDS, not stars. Doubling the star size would have set
+   "EVIDENCE" at 18px across a card 200px wide, so the word keeps the size the badge had. */
+.fam-clue .ccRar,.fam-status .ccRar{font-size:9px;letter-spacing:.05em;text-shadow:none;
+  padding:2px 7px;line-height:1.4}
+.size-sm.fam-clue .ccRar,.size-sm.fam-status .ccRar{font-size:6.5px;padding:1.5px 4px}
+.size-lg.fam-clue .ccRar,.size-lg.fam-status .ccRar{font-size:11px;padding:3px 9px}
 .ccCount{position:absolute;top:5px;right:5px;z-index:3;border-radius:999px;padding:2px 7px;
   font-size:9px;font-weight:800;background:rgba(8,10,28,.82);border:1px solid var(--line);color:var(--muted)}
-.size-sm .ccCount{font-size:6.5px;padding:1.5px 4px;top:4px;right:4px}
+/* At album size the count DROPS to the bottom corner, because four stars and a count no longer
+   fit on one line: the badge is 68px of an 86px card, and they overlapped by 7px.
+
+   This is the same collision the rarity abbreviations were invented to avoid ("LEGENDARY 2/3"
+   in ninety pixels). Stars made it survivable, not impossible -- at twice the size it came
+   straight back. Moving the count is the fix that keeps working whatever the badge does next;
+   shrinking the stars until they just fit is the one that breaks again. */
+.size-sm .ccCount{font-size:6.5px;padding:1.5px 4px;top:auto;bottom:31%;right:3px}
 .ccCount.conv{color:var(--gold);border-color:rgba(255,203,92,.5)}
 .ccDup{position:absolute;left:0;right:0;bottom:34%;z-index:3;text-align:center;
   font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--gold);

@@ -373,13 +373,17 @@ export const Box3D = {
 
     /* the rarity badge */
     if (label){
-      x.font = "800 15px 'Segoe UI', system-ui, sans-serif";
+      /* The stars are set twice the size of a word badge, matching the DOM path -- they are the
+         thing being read at a glance, and "EVIDENCE" at that size would swamp the card. */
+      const stars = gilt;
+      x.font = stars ? "800 30px 'Segoe UI', system-ui, sans-serif"
+                     : "800 15px 'Segoe UI', system-ui, sans-serif";
       const tw = x.measureText(label).width + 20;
-      rr(PAD, PAD, tw, 26, 13);
+      rr(PAD, PAD, tw, stars ? 40 : 26, stars ? 20 : 13);
       x.fillStyle = "rgba(8,10,28,.85)"; x.fill();
       x.lineWidth = 1.5; x.strokeStyle = edge; x.stroke();
       x.fillStyle = edge; x.textAlign = "left"; x.textBaseline = "middle";
-      x.fillText(label, PAD + 10, PAD + 14);
+      x.fillText(label, PAD + 10, PAD + (stars ? 21 : 14));
     }
 
     /* the status hero, across the middle */
