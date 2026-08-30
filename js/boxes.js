@@ -269,12 +269,22 @@ function drawCardEvents(label,icon,floor){
                log:{icon:ico,msg:`${label} · ${name} \u00d7${d.count} · +<b>${fmt(d.coins)}</b> coins`}};
     return trophy?[dup,beat,...after]:[dup,...after];
   }
+  /* THE CONVERTING COPY HAS NO CARD BEAT OF ITS OWN, because the statusUp in `after` opens ON
+     that card and then turns it into the plaque (js/ui/statusup.js). Playing both meant the loud
+     beat announced a CARD and the quiet one carried the actual event — a card becoming a
+     Collectible — so the payoff of three pulls arrived as a notification after the party had
+     finished. One moment, one beat.
+
+     Conditioned on the statusUp actually being there rather than on `converted` alone: if
+     Cards.collectibleOf ever fails to describe the card, the beat is what the player gets
+     instead of nothing at all. */
+  const converts=d.converted&&after.some(e=>e.statusUp);
   return [
     {float:{text:(d.converted?"\u2b50 ":"\ud83c\udccf ")+name,color:"var(--teal)"},
      log:{icon:ico,msg:d.converted
        ? `${label} · <b>${name}</b> collected \u2014 +${d.status} status`
        : `${label} · <b>${name}</b> found`}},
-    beat,
+    ...(converts?[]:[beat]),
     ...after,
   ];
 }

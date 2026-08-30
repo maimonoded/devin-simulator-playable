@@ -516,8 +516,10 @@ html.viewMobile .packHud{bottom:calc(104px + var(--safeB,0px))}
    stays visible and live behind it. It blocks the roll loop the way every other reward beat
    does, and a tap takes it away early. js/ui/statusup.js. */
 .statusUp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.94);
-  z-index:46;display:none;flex-direction:column;gap:9px;width:min(340px,84%);
-  padding:14px 16px;border-radius:16px;text-align:left;cursor:pointer;
+  z-index:46;display:none;flex-direction:column;gap:9px;width:min(340px,88%);
+  /* CENTRED, not left-aligned. The panel is built around the object now rather than around a
+     line of text with a picture stuck to it. */
+  padding:18px 16px 16px;border-radius:18px;text-align:center;cursor:pointer;
   background:linear-gradient(180deg,rgba(20,16,6,.94),rgba(12,10,4,.96));
   border:2px solid var(--gold);
   box-shadow:0 20px 50px rgba(0,0,0,.6),0 0 34px rgba(255,203,92,.32),
@@ -525,15 +527,29 @@ html.viewMobile .packHud{bottom:calc(104px + var(--safeB,0px))}
   opacity:0;transition:opacity .22s ease,transform .22s cubic-bezier(.2,1.4,.4,1)}
 .statusUp.show{display:flex;opacity:1;transform:translate(-50%,-50%) scale(1)}
 
+/* THE COLLECTIBLE IS THE HERO. This was a 52px thumbnail in a row of text — a notification for
+   the loudest moment the collection has. The object fills the beat now and the words sit under
+   it, because what the player earned is a THING and the points are what it was worth.
+
+   perspective on the container, transform on the face: the turn has to have depth or it reads as
+   a horizontal squash rather than a card being turned over. */
+.suHero{perspective:1100px;display:flex;justify-content:center;margin-bottom:12px}
+.suFace{transform-style:preserve-3d;will-change:transform}
+.suHero .ccard{width:min(58vw,38vh,260px)}
+/* Several at once (a box converting more than one) arrive as plaques already, side by side —
+   half a dozen cards turning over in sequence is a cutscene, not a beat. */
+.suMany{gap:9px;flex-wrap:wrap}
+.suMany .ccard{width:min(30vw,20vh,130px)}
 .suRow{display:flex;align-items:center;gap:11px}
 .suArt{display:flex;gap:6px;flex-shrink:0}
 /* The item, in the frame it arrived in. */
 .suItem{display:block;width:52px;height:52px;border-radius:9px;background-size:cover;
   background-position:center;border:2px solid var(--gold);
   box-shadow:0 0 14px rgba(255,203,92,.4)}
-.suWords{display:flex;flex-direction:column;gap:2px;min-width:0}
-.suWhat{font-family:Georgia,serif;font-size:13.5px;font-weight:700;color:#f7eed6;line-height:1.25}
-.suGain{font-size:12px;font-weight:800;color:var(--gold)}
+.suWords{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:center;align-items:center}
+.suWhat{font-family:Georgia,serif;font-size:19px;font-weight:700;color:#f7eed6;line-height:1.2}
+.suGain{font-size:20px;font-weight:800;color:var(--gold);font-family:Georgia,serif;margin-top:2px;
+  text-shadow:0 2px 12px rgba(255,203,92,.35)}
 
 /* The track itself, moving. This is the point of the beat. */
 .suTrack{display:grid;grid-template-columns:auto auto 1fr;grid-template-areas:"i n x" "b b b";

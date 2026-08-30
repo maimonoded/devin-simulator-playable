@@ -19,6 +19,10 @@ const DEFAULTS={
      is gone before it has been read is not one. Turn them down here if the board starts to feel
      like it is waiting for you. */
   cardHoldMs:2000, statusHoldMs:5000, cardConvertMs:5000, clueHoldMs:2500,
+  /* The conversion beat, in three moves: the card is held as a card, it turns edge-on and comes
+     back as the plaque, and only then does the track run. Staged, because two things moving at
+     once means neither is watched. */
+  statusCardMs:620, statusFlipMs:460,
   vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
@@ -364,6 +368,8 @@ const TUNING=[
    ["statusHoldMs","Status card held (ms)",100],
    ["cardConvertMs","…a status card's THIRD copy (ms)",100],
    ["clueHoldMs","Clue card held — tap it to hold (ms)",100],
+   ["statusCardMs","Convert: card held before the turn (ms)",20],
+   ["statusFlipMs","Convert: the turn itself (ms)",20],
    ["vipRevealMs","Gala: dwell before moving on (ms)",100],
    ["scoopStepMs","Scoop: teleport (ms)",20],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],

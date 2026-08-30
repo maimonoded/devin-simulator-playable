@@ -229,7 +229,14 @@ test("three copies materialise that card's Collectible, and nothing else does", 
   const col = Cards.collectibleOf(c.id);
   eq(col.id, c.id);
   eq(col.name, c.name, "it IS that card — not a separate thing with its own name");
-  eq(col.points, Cards.rarity("epic").status, "and it carries the rarity's Status value (§5.1)");
+  /* What the three copies ACTUALLY PAID, not the rarity's headline number. The two agree to
+     within a rounding point — three Epic copies of 33 make 99 against a status of 100 — but only
+     one of them is what the track received, and the plaque is read side by side with the copy
+     that just paid it. Two numbers for one event is worse than a number one lower. */
+  eq(col.points, Cards.copiesToConvert() * Cards.copyStatus("epic"),
+     "and it carries what collecting it was worth (\u00a75.1)");
+  ok(Math.abs(col.points - Cards.rarity("epic").status) <= Cards.copiesToConvert(),
+     "which is the rarity's value, give or take the rounding of a third");
 });
 
 test("the Collectible list is derived, ordered by the catalogue, and stores nothing", () => {

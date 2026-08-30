@@ -335,7 +335,10 @@ test("a card drawn off a tile goes through the same banking as one out of a box"
   eq(ev.filter(e => e.card).length, 1, "a card you did not have holds the screen");
 });
 
-test("the three card beats: new holds, a plain copy floats, the converting copy holds", () => {
+test("the three card beats: new holds, a plain copy floats, the converting copy turns over", () => {
+  /* The converting copy has NO {card} beat of its own. Its beat is the {statusUp}, which opens
+     on that very card and then turns it into the plaque (js/ui/statusup.js) — one moment instead
+     of a loud card beat followed by a quiet notification carrying the actual event. */
   freshRun();
   const id = Cards.all()[0].id;
   const real = Cards.draw;
@@ -347,9 +350,12 @@ test("the three card beats: new holds, a plain copy floats, the converting copy 
     eq(two.filter(e => e.card).length, 0, "copy 2 does not stop the roll");
     ok(state.coins > 0, "…but it always pays");
     const three = drawCardEvents("t");
-    const beat = three.find(e => e.card);
-    ok(beat, "copy 3 CONVERTS, and that is the payoff worth stopping for");
-    eq(beat.card.converted, true);
+    eq(three.filter(e => e.card).length, 0, "copy 3 has no card beat…");
+    const up = three.find(e => e.statusUp);
+    ok(up, "…because the conversion beat is what carries it");
+    eq(up.statusUp.source, "converted");
+    eq(up.statusUp.items.length, 1, "naming the Collectible it just made");
+    eq(up.statusUp.items[0].id, id);
     ok(Cards.converted(id));
   } finally { Cards.draw = real; }
 });
@@ -429,26 +435,27 @@ test("a trophy stops the board on every copy, so the counter can read 2 of 3", (
   const tro = Cards.all().find(c => Cards.isStatusCard(c.id));
   const need = Cards.copiesToConvert();
   const counts = [];
-  for (let i = 0; i < need; i++) {
+  for (let i = 0; i < need - 1; i++) {
     const beat = drawOf(tro.id).find(e => e.card);
     ok(beat, `copy ${i + 1} is held on screen`);
     counts.push(beat.card.count);
     eq(beat.card.statusCard, true, "and knows it is a trophy");
     eq(beat.card.need, need, "and what it is counting to");
   }
-  eq(counts.join(","), [1, 2, 3].slice(0, need).join(","),
-     "1 of 3, 2 of 3, 3 of 3 — the middle one is the point of this test");
+  eq(counts.join(","), [1, 2].slice(0, need - 1).join(","),
+     "1 of 3 and 2 of 3 — the middle one is the point of this test");
+  /* The last copy is held too, but by the conversion beat: it opens on this card and turns it
+     into the plaque, so a {card} beat as well would be the same card twice. */
+  const last = drawOf(tro.id);
+  eq(last.filter(e => e.card).length, 0, "the converting copy has no card beat…");
+  ok(last.some(e => e.statusUp), "…it has the conversion beat instead");
 });
 
 test("only the third copy celebrates", () => {
   freshRun();
   const tro = Cards.all().find(c => Cards.isStatusCard(c.id));
   const need = Cards.copiesToConvert();
-  const flags = [];
-  for (let i = 0; i < need + 1; i++) {
-    const beat = drawOf(tro.id).find(e => e.card);
-    if (beat) flags.push(!!beat.card.converted);
-  }
-  eq(flags.filter(Boolean).length, 1, "the celebration fires exactly once");
-  eq(flags[need - 1], true, "on the copy that converts");
+  let ups = 0;
+  for (let i = 0; i < need + 1; i++) if (drawOf(tro.id).some(e => e.statusUp)) ups++;
+  eq(ups, 1, "the conversion beat fires exactly once, on the copy that converts");
 });

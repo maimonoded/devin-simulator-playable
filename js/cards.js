@@ -274,7 +274,12 @@ const Cards = {
       id,
       name: card.name,
       art: this.artFor(card),
-      points: Math.round(r.status || 0),
+      /* WHAT THE COLLECTIBLE IS WORTH — the three copies added up, not the rarity's headline
+         number. They are the same figure to within a rounding point (a Common's three 3s make 9
+         against a status of 10), but only one of them is what the track actually received, and
+         the plaque is read side by side with the copy that just paid. Two numbers for one event
+         is worse than a number one lower. */
+      points: this.copiesToConvert() * this.copyStatus(r),
       rarity: r,
       setKey: set ? set.key : "",
       setName: set ? set.name : (card.sub || ""),
