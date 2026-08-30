@@ -134,8 +134,26 @@
    TEMPERATURE and not a different colour — the gilt border, the star badge and the rarity halo
    all still mean exactly what they mean on a memory, and none of them is being asked to carry
    a second job. */
-.ccard.kind-trophy{border-color:#e0b155;
-  background:radial-gradient(120% 90% at 50% 18%,#4a3320,#241608 60%,#170e06)}
+.ccard.kind-trophy{border-color:#ffcb5c;border-width:3px;
+  background:radial-gradient(120% 90% at 50% 18%,#5a3d1c,#2a1808 58%,#160d04);
+  /* THE HALO IS ALWAYS ON, AND IT IS THE LOUDEST THING ON THE CARD. Rarity's glow is a whisper
+     that escalates (rar-* below); this is a constant, warmer and wider than any of them, so a
+     trophy is identifiable across a room and across a row of memories. That does mean a trophy's
+     glow no longer reports its rarity — which is why the badge stopped being stars and became
+     CUPS: the count moved to the one place that can still carry it. */
+  box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 26px rgba(255,180,60,.55),
+             inset 0 0 22px rgba(255,190,90,.14)}
+.size-sm.kind-trophy{border-width:2px}
+.size-lg.kind-trophy{border-width:4px}
+/* A SECOND FRAME INSIDE THE FIRST — the difference a glance catches before any of the rest.
+   A memory has one gilt line; a trophy is mounted, which is what the object it becomes is. */
+.ccard.kind-trophy .ccFrame{border-color:rgba(255,203,92,.75);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.55),0 0 0 1px rgba(255,203,92,.35)}
+/* The cups need less room than four stars: an emoji is wider than a glyph, and four of them at
+   star size would run half the width of an album card. */
+.ccard.kind-trophy .ccRar{font-size:11px;letter-spacing:-1px;padding:2px 6px}
+.size-sm.kind-trophy .ccRar{font-size:7px;letter-spacing:-1.5px;padding:1px 3px}
+.size-lg.kind-trophy .ccRar{font-size:17px;letter-spacing:-1px;padding:3px 8px}
 .ccard.kind-trophy .ccFrame::before,.ccard.kind-trophy .ccFrame::after{content:"";
   position:absolute;width:15px;height:15px;border:2px solid rgba(255,203,92,.85);pointer-events:none}
 .ccard.kind-trophy .ccFrame::before{top:-4px;left:-4px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}

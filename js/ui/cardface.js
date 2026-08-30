@@ -98,7 +98,8 @@ function cardFace(card, opts){
   /* Drawn for locked slots too: three stars is what tells you whether the gap in the row is a
      week's play or a lucky Tuesday. `title` keeps the word for anyone hovering, and for a
      screen reader — the stars are the display, not the whole truth. */
-  const badge=r?`<div class="ccRar" style="--rar:${r.color}" title="${r.name}">${Cards.stars(r)}</div>`:"";
+  const badge=r?`<div class="ccRar" style="--rar:${trophy?"#ffcb5c":r.color}" title="${
+    trophy?r.name+" trophy":r.name}">${trophy?Cards.cups(r):Cards.stars(r)}</div>`:"";
   const dup=o.dup?`<div class="ccDup">DUPLICATE · +${fmt(o.dup)}🪙</div>`:"";
   const need=Cards.copiesToConvert();
   /* A small slot runs the badge and the copy count along one line, and "2/3" does not fit

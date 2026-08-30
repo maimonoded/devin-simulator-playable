@@ -141,6 +141,15 @@ const Cards = {
     const rr = (r && r.key) ? r : this.rarity(r);
     return "\u2605".repeat(Math.max(1, Math.min(9, rr.rank | 0)));
   },
+  /* THE SAME COUNT, IN A DIFFERENT GLYPH. A trophy card wears cups where a memory wears stars,
+     so the badge says WHICH KIND at a glance and still says how hard it was to get — one mark
+     doing both jobs rather than a kind-label bolted next to a rarity-label. Counting is why the
+     stars work at all ("is an Epic better than a Rare" is a question; three against two is not),
+     and the count survives the swap. */
+  cups(r) {
+    const rr = (r && r.key) ? r : this.rarity(r);
+    return "\ud83c\udfc6".repeat(Math.max(1, Math.min(9, rr.rank | 0)));
+  },
   /* One of the twelve case photographs, chosen by hashing the seed — an episode id plus a clue
      id. Nothing is stored, so a clue keeps its photograph across reloads and across saves; see
      the note on CLUE_ART in assets/cards/cards.js for why they are generic. */
