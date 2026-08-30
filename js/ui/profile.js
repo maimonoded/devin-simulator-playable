@@ -61,8 +61,13 @@ function renderProfile(){
                 next?` · ${next.icon} ${next.name} at ${next.from}`:""}</span>`
                 :`<span class="rankNext">Season complete</span>`}</div>
         <div class="albumBar"><div class="albumFill" style="width:${pct}%"></div></div>
+        <!-- THE UNIT HAS TO BE ON IT. This read "183 collectibles" — the number is POINTS and
+             the label is the SOURCE, so it announced a hundred and eighty-three Collectibles to
+             a player holding three. "0 episodes watched" sitting beside it made it worse, since
+             that one IS a plausible count and there was nothing to tell the reader the row above
+             was not. The tile below is where the actual count lives. -->
         <div class="rankWhy">${Status.breakdown().map(b=>
-          `<span>${BREAKDOWN_ICON[b.key]||"⭐"} ${fmt(b.points)} ${b.name.toLowerCase()}</span>`).join("")}</div>
+          `<span>${BREAKDOWN_ICON[b.key]||"⭐"} ${b.name.toLowerCase()} · <b>${fmt(b.points)}</b> pts</span>`).join("")}</div>
       </div>
 
       <div class="profileGrid">
