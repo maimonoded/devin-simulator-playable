@@ -273,6 +273,23 @@ test("earnWords turns a condition into a sentence, with the plural right", () =>
   eq(w(null), "");
 });
 
+test("the deed and the unit come from ONE table and cannot drift", () => {
+  /* The reward beat says what you DID; the profile's locked slot counts the UNIT. Same
+     condition, two shapes — and they lived in two separate tables that had already drifted to
+     "collecting" vs "collected" for the same mug. Both now key off Status.EARN. */
+  const mug = { earn: { cards: 5 } };
+  eq(Status.earnWords(mug), "collecting 5 cards", "the deed, for something owned");
+  eq(Status.earnUnit(mug), "cards collected", "the unit, for counting progress");
+  eq(Status.earnKey(mug), "cards");
+  /* Every key that produces a deed must also produce a unit, or one screen goes blank. */
+  Object.keys(Status.EARN).forEach(k => {
+    const fake = { earn: { [k]: 2 } };
+    ok(Status.earnWords(fake).length > 2, `${k} has no deed`);
+    ok(Status.earnUnit(fake).length > 2, `${k} has no unit`);
+  });
+  eq(Status.earnUnit({}), "", "no condition, no unit — not a broken string");
+});
+
 test("every shipped item can explain itself", () => {
   /* A new item with an unhandled condition key would fall through to a raw "{n} {key}" — which
      is legible but not English. This catches one being added without a phrasing. */
@@ -280,7 +297,7 @@ test("every shipped item can explain itself", () => {
   Status.items().forEach(i => {
     const key = Object.keys(i.earn || {})[0];
     ok(key, `${i.id} has no earn condition`);
-    ok(known.includes(key), `${i.id} earns on "${key}", which earnWords has no phrasing for`);
+    ok(Status.EARN[key], `${i.id} earns on "${key}", which Status.EARN has no phrasing for`);
     ok(Status.earnWords(i).length > 3, `${i.id} produced no words`);
   });
 });

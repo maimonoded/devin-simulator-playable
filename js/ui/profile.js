@@ -133,9 +133,19 @@ function statusItemHtml(item){
   const price=Status.priceOf(item);
   const can=Status.canBuy(item);
   const earn=Status.earnProgress(item);
-  const earnLbl={episodes:"episodes watched",cards:"cards collected",
-                 boards:"sets finished",rolls:"rolls"}[earn?earn.key:""]||"";
-  const how={bought:"Bought",earned:"Earned",found:"Found in a box"}[Status.howGot(item.id)]||"Owned";
+  /* The unit comes from Status now. This function used to keep its own copy of the phrasing,
+     which said "cards collected" while the reward beat said "collecting 5 cards" about the
+     same mug — two tables describing one condition, already drifted. */
+  const earnLbl=Status.earnUnit(item);
+  /* HOW IT WAS GOT, and for an earned one, WHAT FOR. "✓ Earned" answers a question the player
+     did not ask; "how did I get this?" is answered by the condition that paid it out, which the
+     item has been carrying all along. Bought and Found are already complete answers. */
+  const got=Status.howGot(item.id);
+  const deed=Status.earnWords(item);
+  const how=got==="bought" ? "Bought"
+          : got==="found"  ? "Found in a box"
+          : got==="earned" ? (deed?`Earned for ${deed}`:"Earned")
+          : "Owned";
   return `<div class="stItem${owned?" got":""}">
       <div class="stArt" style="${cardArtCss(item.art)}"></div>
       <div class="stName">${item.name}</div>

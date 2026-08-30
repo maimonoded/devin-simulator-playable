@@ -253,27 +253,36 @@ const Status = {
     if (!key) return null;
     return { key, have: m[key] || 0, need: item.earn[key] };
   },
-  /* The earn condition, IN ENGLISH — "collecting 5 cards", "watching 3 episodes".
+  /* THE EARN CONDITIONS, IN ENGLISH — one table, two shapes.
 
-     Every surface that shows a status item has to explain why the player has it or how they
-     would get it, and until now none of them could: the condition was a {cards:5} object and
-     each caller would have had to invent its own phrasing. One function so the reward beat and
-     the profile say the same words about the same item.
+     Every surface that shows a status item owes the player an explanation, and they need the
+     same fact worded two ways: the reward beat says what you DID ("Earned for collecting 5
+     cards"), the profile's locked slot counts what is LEFT ("3/5 cards collected"). Those are
+     the same condition and they must not drift.
 
-     The plural is handled here rather than by a caller remembering to: "1 cards" is the kind of
-     thing that survives review and then reads as a bug in a screenshot. */
+     They already had. The profile carried its own {cards:"cards collected"} table while the
+     beat carried {cards:"collecting N cards"}, so one screen said "collected" and the other
+     "collecting" about the same mug. Two tables is one table with a bug in it waiting.
+
+     The plural lives here rather than at the call sites: "1 cards" survives review and then
+     reads as a bug in a screenshot. */
+  EARN: {
+    cards:    { did: n => `collecting ${n} card${n === 1 ? "" : "s"}`,  unit: "cards collected" },
+    episodes: { did: n => `watching ${n} episode${n === 1 ? "" : "s"}`, unit: "episodes watched" },
+    boards:   { did: n => `finishing ${n} set${n === 1 ? "" : "s"}`,    unit: "sets finished" },
+    rolls:    { did: n => `${n} roll${n === 1 ? "" : "s"}`,             unit: "rolls" },
+  },
+  earnKey(item) { return Object.keys((item && item.earn) || {})[0] || ""; },
+  /* "collecting 5 cards" — the deed, for something already owned or being awarded. */
   earnWords(item) {
-    const key = Object.keys((item && item.earn) || {})[0];
-    if (!key) return "";
-    const n = item.earn[key];
-    const one = n === 1;
-    switch (key) {
-      case "cards":    return `collecting ${n} card${one ? "" : "s"}`;
-      case "episodes": return `watching ${n} episode${one ? "" : "s"}`;
-      case "rolls":    return `${n} rolls`;
-      case "boards":   return `finishing ${n} set${one ? "" : "s"}`;
-      default:         return `${n} ${key}`;
-    }
+    const key = this.earnKey(item);
+    const e = this.EARN[key];
+    return e ? e.did(item.earn[key]) : "";
+  },
+  /* "cards collected" — the unit, for counting progress toward something not yet owned. */
+  earnUnit(item) {
+    const e = this.EARN[this.earnKey(item)];
+    return e ? e.unit : "";
   },
   earnMet(item) {
     const m = this.metrics();
