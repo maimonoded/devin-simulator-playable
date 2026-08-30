@@ -281,7 +281,7 @@ let boxTable=[
    since the last unlock and reset when one lands — which is what caps sprint speed by design
    rather than by a cooldown. */
 let boxTiers=[
-  { key:"standard", name:"Standard Pack", icon:"\ud83c\udf81", rank:1, items:1,
+  { key:"standard", name:"Standard Pack", icon:"\ud83c\udf81", rank:1, items:1, skin:"silver",
     art:"assets/boxes/silver.webp", coins:2500,
     table:[
       {name:"A card",       kind:"card",                 weight:53},
@@ -290,7 +290,7 @@ let boxTiers=[
       {name:"Coins",        kind:"coins",  amount:120,   weight:12},
       {name:"Energy",       kind:"energy", amount:3,     weight:8},
     ]},
-  { key:"premium", name:"Premium Pack", icon:"\ud83c\udf81", rank:2, items:3,
+  { key:"premium", name:"Premium Pack", icon:"\ud83c\udf81", rank:2, items:3, skin:"gold",
     art:"assets/boxes/gold.webp", coins:12000,
     table:[
       {name:"A card",       kind:"card",                  weight:32},
@@ -300,7 +300,7 @@ let boxTiers=[
       {name:"Coins",        kind:"coins",  amount:400,    weight:10},
       {name:"Energy",       kind:"energy", amount:6,      weight:6},
     ]},
-  { key:"insider", name:"Insider Pack", icon:"\ud83d\uddc2", rank:3, items:3,
+  { key:"insider", name:"Insider Pack", icon:"\ud83d\uddc2", rank:3, items:3, skin:"diamond",
     art:"assets/boxes/insider.webp", coins:20000, clue:"fresh", escalates:true,
     table:[
       {name:"A card",       kind:"card",                     weight:10},

@@ -581,11 +581,28 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .cbStat i{display:block;margin-top:2px;font-style:normal;font-family:inherit;font-size:11px;
      font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text);opacity:.8;
      text-shadow:0 2px 8px rgba(0,0,0,.8)}
-/* n of 3. Only a trophy counts itself out — the whole reason to want another copy, said on the
-   card instead of left for the player to remember. */
-.cbProg{margin-top:8px;font-size:13px;color:var(--text);opacity:.9;
-     text-shadow:0 2px 8px rgba(0,0,0,.85)}
-.cbProg b{color:var(--teal);font-weight:800}
+/* THREE SLOTS, FANNED, filled left to right — how many of the three you hold. Only a trophy
+   counts itself out; a memory card has no counter to show.
+
+   Fanned rather than in a row because a hand of cards is a thing you recognise, and the GAP is
+   the message: two filled and one empty says "one more" without a sentence. They overlap by a
+   third and lean like a dealt hand, so the empty one reads as the next place in the fan rather
+   than as a card that failed to load — which is also why it is a dashed outline over nothing
+   and not a grey rectangle. */
+.cbSlots{margin-top:11px;display:flex;justify-content:center;align-items:flex-end;
+     height:52px;pointer-events:none}
+.cbSlot{width:38px;height:50px;border-radius:5px;flex:0 0 auto;
+     background-size:cover;background-position:center top;
+     border:1.5px dashed rgba(190,205,255,.34);background-color:rgba(10,14,38,.4);
+     box-shadow:0 3px 10px rgba(0,0,0,.5);transition:.2s}
+.cbSlot+.cbSlot{margin-left:-12px}
+/* The lean: outer cards tip away from the middle, like a hand being fanned. */
+.cbSlots .cbSlot:first-child{transform:rotate(-11deg) translateY(3px)}
+.cbSlots .cbSlot:last-child{transform:rotate(11deg) translateY(3px)}
+.cbSlot.on{border-style:solid;border-color:var(--gold);background-color:transparent;
+     box-shadow:0 3px 12px rgba(0,0,0,.6),0 0 14px rgba(255,203,92,.3)}
+/* A single slot is not a fan — no lean, no overlap. */
+.cbSlots .cbSlot:only-child{transform:none;margin-left:0}
 .cbDone{margin-top:9px;font-size:14px;font-weight:800;color:var(--gold);
      text-shadow:0 2px 10px rgba(0,0,0,.85)}
 /* TWO CLUES FROM ONE LANDING, side by side. They give up their slips: at half width the

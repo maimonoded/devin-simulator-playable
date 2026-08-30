@@ -153,6 +153,24 @@ function bigConfetti(){
   setTimeout(confetti, 480);
 }
 
+/* HOW MANY OF THE THREE YOU HAVE, AS THREE CARDS — a fan of slots, filled left to right.
+
+   It used to read "2 of 3 collected". A sentence is something you parse; a hand of cards with a
+   gap in it is something you SEE, and the gap is the whole point — it is the shape of what is
+   still missing. Two filled and one empty says "one more" without using the word.
+
+   The filled slots wear the card's own art, because that is literally what a second copy is:
+   the same object again. Empty ones are a dashed outline over nothing, so they read as a place
+   rather than as a card that failed to load. */
+function cbSlots(card,have,need){
+  const art=card?Cards.artFor(card):null;
+  const fill=art?`style="${cardArtCss(art)}"`:"";
+  let out="";
+  for(let i=0;i<need;i++)
+    out+=`<span class="cbSlot${i<have?" on":""}" ${i<have?fill:""}></span>`;
+  return `<div class="cbSlots" title="${have} of ${need} collected">${out}</div>`;
+}
+
 /* A card, held on the board's centre.
 
    THREE FACES, in order of how much the drop knows about itself:
@@ -231,7 +249,7 @@ function showCard(c){
        <div class="cbHint" id="cbHint">Tap to keep ${pair?"them":"it"} open</div>`
     : `<div class="cbCap">
         ${pts>0?`<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`:""}
-        ${trophy?`<div class="cbProg"><b>${Math.min(c.count,need)}</b> of <b>${need}</b> collected</div>`:""}
+        ${trophy?cbSlots(c.collectible,Math.min(c.count,need),need):""}
         ${celebrate?`<div class="cbDone">⭐ Collected! It goes on your shelf</div>`
           :converted?`<div class="ccWon">Collected — that is the third copy</div>`:""}
       </div>`;

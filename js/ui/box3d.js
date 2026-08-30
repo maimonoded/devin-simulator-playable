@@ -135,7 +135,11 @@ export const Box3D = {
   tap(){ if (this._tapped) this._tapped(); },
 
   _make(tier){
-    const skin = SKIN[tier && tier.key] || SKIN.silver;
+    /* tier.skin FIRST, because the tier KEYS are standard/premium/insider and this table is
+       keyed silver/gold/diamond — so SKIN[tier.key] matched nothing and every box in the game
+       quietly wore the plain silver mesh, including the two that have gold art in the store.
+       The fallback on tier.key is kept for a caller that names a skin directly. */
+    const skin = SKIN[(tier && tier.skin) || (tier && tier.key)] || SKIN.silver;
     const src = skin.model === "gold" ? this._gold : this._plain;
     const holder = new THREE.Group();
     const size = Math.max(0.2, +cfg.packBoxSize || 1.6);
