@@ -45,12 +45,29 @@ const STATUS_ZONES = [
    Six bands over thirty levels puts a new name on the profile every five levels, which is also
    where the milestones land. That is not a coincidence: a milestone and a new title arriving
    together is one beat instead of two. */
+/* THE LADDER IS ABOUT ACCESS, so the icons have to be about access too.
+
+   They used to be 🎬 💗 🎟 ⭐ 🌟 👑, and two of those were wrong in different ways.
+
+   The HEART was wrong in meaning: a heart says affection, and this track is not how much you
+   like the show — it is where you STAND in relation to it. Worse, it is the badge the HUD wears
+   through levels 6 to 10, so it was most players' first impression of the whole track.
+
+   The TWO STARS were wrong in kind, and that is the sharper bug: ⭐ and 🌟 are adjacent bands
+   AND near-identical glyphs at 13px in a pill. An icon ladder exists so the rungs can be told
+   apart at a glance, and those two could not be told apart at all.
+
+   Now it reads as one escalating idea — on set, watching, let in, invited, recognised, running
+   it — with six silhouettes no two of which can be confused:
+
+     🎬 on the set as nobody · 🍿 in the audience · 🎟 through the door
+     🥂 at the party · 🕶 recognised at it · 👑 running it */
 const STATUS_RANKS = [
   { from:  1, name: "Extra",     icon: "🎬" },
-  { from:  6, name: "Fan",       icon: "💗" },
+  { from:  6, name: "Fan",       icon: "🍿" },
   { from: 11, name: "Insider",   icon: "🎟" },
-  { from: 16, name: "Regular",   icon: "⭐" },
-  { from: 21, name: "VIP",       icon: "🌟" },
+  { from: 16, name: "Regular",   icon: "🥂" },
+  { from: 21, name: "VIP",       icon: "🕶" },
   { from: 26, name: "Producer",  icon: "👑" },
 ];
 
