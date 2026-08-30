@@ -641,44 +641,49 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .pcaseSub{margin-top:3px;font-size:12px;color:var(--muted)}
 
 /* ---------- the objective tracker (js/ui/render.js renderEpTrack) ----------
-   Sits on the board under the HUD, in BOTH views: the side panel that used to answer "what am I
-   chasing" is development chrome and ?view=mobile hides it, which left the player's-eye view
-   silent about the only thing the clues are for. */
-.epTrack{position:absolute;left:10px;right:10px;top:calc(74px + var(--safeT,0px));z-index:38;
-  display:flex;align-items:center;gap:10px;text-align:left;
-  padding:7px 12px 8px;border-radius:13px;border:1px solid rgba(120,140,210,.45);
-  /* Nearly opaque, not a tint. The board underneath is a sunlit street — a translucent strip
-     over it was unreadable at exactly the moment it matters, which is mid-roll. */
+   ONE ROW, AND IT HANGS OFF THE TOOLBAR. It was a two-line band 47px tall and full width — ninety
+   per cent of the HUD's own height, spent permanently on a state ("still collecting") that is
+   ambient nearly all the time.
+
+   It reads as a drawer pulled out from under the toolbar rather than a second bar floating below
+   one: its top edge slides UNDER the HUD and its top corners are square, so there is no seam and
+   no gap to misjudge. That is done by overlap and z-index rather than by squaring the HUD's own
+   corners, which would change how the toolbar looks on its own. */
+.epTrack{position:absolute;left:10px;right:10px;z-index:37;
+  display:flex;align-items:center;gap:9px;text-align:left;
+  padding:calc(var(--etTuck) + 5px) 12px 7px;border-radius:0 0 13px 13px;
+  border:1px solid rgba(120,140,210,.4);border-top:0;
   background:rgba(11,15,36,.95);backdrop-filter:blur(8px);
-  box-shadow:0 8px 22px rgba(0,0,0,.45);transition:.18s}
+  box-shadow:0 8px 20px rgba(0,0,0,.4);transition:.18s;
+  --etTuck:10px}
 /* DISABLED HERE MEANS "NOTHING TO TAP", NOT "UNAVAILABLE". base.css dims every disabled button
    to 40% — correct for an action you cannot take, and exactly wrong for a strip whose whole job
-   is to be read. It rendered as grey haze over a sunlit board, which is how a tracker nobody can
-   read looks. The attribute stays, because it is what keeps the tap handler honest. */
+   is to be read. The attribute stays, because it is what keeps the tap handler honest. */
 .epTrack:disabled{cursor:default;opacity:1}
-/* THE NUMBER LEADS. A title is a name; "EP 4" is a position, and position is what says where you
-   are in eighteen. */
-.etNum{flex:0 0 auto;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--gold);
+/* THE NUMBER LEADS, and it is the one part that never shrinks. A title is a name; "EP 4" is a
+   position, and position is what says where you are in eighteen. */
+.etNum{flex:0 0 auto;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--gold);
   background:rgba(255,203,92,.12);border:1px solid rgba(255,203,92,.35);
-  border-radius:7px;padding:4px 7px;line-height:1}
-.etBody{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto}
-.etTitle{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis}
-.etState{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  border-radius:6px;padding:3px 6px;line-height:1}
+/* The title takes whatever is left and ellipses — a second line is the thing being removed. */
+.etTitle{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:700;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etState{flex:0 0 auto;font-size:11px;color:var(--muted)}
 .etState b{color:var(--teal);font-weight:800}
-/* A segment per clue the episode wants — NOT four blank card slots, which said "collect four of
+.etCount{flex:0 0 auto;font-size:11px;color:var(--muted)}
+.etCount b{color:var(--teal);font-weight:800}
+/* A segment per clue the episode wants — not four blank card slots, which said "collect four of
    the same thing" about four different pieces of evidence. */
 .etBar{display:flex;gap:3px;flex:0 0 auto}
-.etBar i{display:block;width:13px;height:5px;border-radius:999px;background:rgba(255,255,255,.16)}
+.etBar i{display:block;width:12px;height:5px;border-radius:999px;background:rgba(255,255,255,.16)}
 .etBar i.on{background:linear-gradient(90deg,var(--teal),#7ef0dd);box-shadow:0 0 7px rgba(45,212,191,.5)}
 /* Ready is the one state worth acting on, so it is the one state that looks like a button. */
-.epTrack.ready{border-color:var(--pink);background:rgba(60,18,50,.86);cursor:pointer;
-  box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 20px rgba(255,111,165,.28)}
+.epTrack.ready{border-color:var(--pink);background:rgba(60,18,50,.9);cursor:pointer;
+  box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 18px rgba(255,111,165,.26)}
 .epTrack.ready .etNum{color:var(--pink);background:rgba(255,111,165,.14);border-color:rgba(255,111,165,.45)}
 .epTrack.ready .etState b{color:var(--pink)}
 .epTrack.ready:active{transform:translateY(2px)}
 .epTrack.done{opacity:.72}
-
 
 /* ---------- the caption under a held card ----------
    The status number is the headline (js/ui/fx.js showCard). A card's face says what it IS; this

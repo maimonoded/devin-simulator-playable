@@ -101,8 +101,12 @@ html.viewMobile .daychip { display: none; }
 /* The objective tracker takes the strip under the HUD (css/collection.css .epTrack), so the
    store button moves below it rather than sitting on top of the episode title. Both are absolute
    in the same frame; if the HUD or the tracker ever grows a row, these are the two numbers. */
-html.viewMobile .epTrack { top: calc(74px + var(--safeT)); }
-html.viewMobile .storeBtn { top: calc(132px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
+/* FLUSH TO THE TOOLBAR, by tucking under it. The HUD sits at top:10 and runs ~52px, so the
+   tracker starts 10px INSIDE that and hides the overlap behind the HUD's own z-index — no gap to
+   misjudge and no seam where two rounded corners would otherwise meet. Its padding-top carries
+   the same 10px so the text lands where it would have anyway. */
+html.viewMobile .epTrack { top: calc(52px + var(--safeT)); }
+html.viewMobile .storeBtn { top: calc(104px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
 
 /* ---- notch and home indicator ----
    The frame runs edge to edge (viewport-fit=cover in index.html), which is what we want for the

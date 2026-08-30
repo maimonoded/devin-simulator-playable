@@ -310,8 +310,7 @@ function renderEpTrack(){
   const id=ready||Clues.currentId();
   if(!id){
     el.className="epTrack done";
-    el.innerHTML=`<span class="etBody"><span class="etTitle">Every episode watched</span>
-        <span class="etState">The Season's story is finished</span></span>`;
+    el.innerHTML=`<span class="etTitle">Every episode watched — the Season's story is finished</span>`;
     el.disabled=true;
     return;
   }
@@ -321,8 +320,8 @@ function renderEpTrack(){
   if(ready){
     el.className="epTrack ready";
     el.innerHTML=`<span class="etNum">EP ${num}</span>
-      <span class="etBody"><span class="etTitle">${title}</span>
-        <span class="etState"><b>Ready</b> — tap to watch</span></span>`;
+      <span class="etTitle">${title}</span>
+      <span class="etState"><b>Ready</b> — tap to watch</span>`;
     return;
   }
   const [have,need]=Clues.progressFor(id);
@@ -331,11 +330,15 @@ function renderEpTrack(){
      of the same thing" about four different pieces of evidence. */
   let bar="";
   for(let i=0;i<need;i++) bar+=`<i class="${i<have?"on":""}"></i>`;
+  /* ONE ROW. Two rows and a full-width band cost 47px of a 812px phone — ninety per cent of the
+     HUD's own height — for a state that is ambient nearly all the time. The title takes whatever
+     room is left after the parts that cannot shrink: the episode NUMBER, the meter and the count.
+     It ellipses rather than wraps, because a second line is the thing being removed. */
   el.className="epTrack";
   el.innerHTML=`<span class="etNum">EP ${num}</span>
-    <span class="etBody"><span class="etTitle">${title}</span>
-      <span class="etState"><span class="etBar">${bar}</span>
-        <b>${have}/${need}</b> clues · ${short} more to unlock</span></span>`;
+    <span class="etTitle">${title}</span>
+    <span class="etBar">${bar}</span>
+    <span class="etCount"><b>${have}/${need}</b></span>`;
 }
 
 function renderAll(){ renderHUD();renderNav();renderStats();renderStory();renderEpTrack();renderCaseBoard();
