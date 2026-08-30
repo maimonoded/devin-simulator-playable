@@ -346,3 +346,46 @@ them from `ECONOMY_DEFAULT`.
 An imported model lives only in `localStorage` (`pmdrama.econ.v1`), so it is per-browser and
 per-machine, and clearing site data loses it. The slot keeps the version string and the source
 filename so at least it is identifiable. Revisit when there is a backend.
+
+---
+
+## Status & the Season
+
+### The Season gate is unreachable from the interface
+
+GDD §5.2 gives the Status Level exactly one job — *"Gates the next Season"* — and §5.4 calls the
+gate **"the single most important value in the game"**. `js/status.js` implements it correctly:
+`seasonReady()` at the cap, and `advanceSeason()` moves `state.seasonFrom` so Status reads zero
+while the collection, the Showcase and the lifetime record all persist (§5.3).
+
+**Nothing in `js/ui/` ever calls it.** `grep -rn "seasonReady\|advanceSeason\|hasNextSeason"
+js/ui/` returns nothing. Reaching level 30 shows "Season complete" on the profile and the run
+simply stops there.
+
+It is dormant rather than broken, for a legitimate reason: **only one Season is authored**
+(`CARD_SEASONS.length === 1`, `BOARD_SEASONS.length === 1`), so `hasNextSeason()` is false and
+`advanceSeason()` would refuse anyway. The profile now says so in as many words rather than
+implying something waits behind the gate.
+
+**Done looks like:** a second Season's content exists (a board entry, a card catalogue, a cast,
+episodes), and reaching the cap plays a turnover beat — the Season's report card (§9's Season
+Report Card is the obvious shape), then the new board. The engine side needs nothing; this is
+content plus one screen.
+
+**Worth knowing before starting:** the turnover is the one moment where "Status resets" and
+"nothing is deleted" have to be visibly true at the same time. `state.seasonFrom` is what makes
+that honest — the line moves, the record does not. A turnover screen that reads as *losing* the
+Season is the failure mode.
+
+### Episode 60 and the gate are supposed to land together
+
+§8.2: *"Season gate and episode 60 land within a few days of each other for the engaged
+archetype."* §8.3 names the failure it prevents: a player who runs out of episodes long before
+the gate is *"left staring at a wall she cannot influence, which is the worst churn moment the
+design can produce."*
+
+This build satisfies it — measured, at 18 episodes and `statusTotal: 5800`, the last episode and
+level 30 both land around session 6. **It is not self-maintaining.** Any change to the clue rate,
+the episode count or the per-copy Status value moves the two independently, and the sim in
+`tools/` is the only thing that will notice. Re-measure both numbers together after any of them
+moves, not just the one that changed.

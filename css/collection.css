@@ -640,6 +640,12 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .pcaseName{margin-top:8px;font-weight:800;font-size:15px;color:var(--gold)}
 .pcaseSub{margin-top:3px;font-size:12px;color:var(--muted)}
 
+/* What the Status climb is actually FOR, on the screen that shows the climb. Muted, because it
+   is a horizon rather than a task — the player does nothing about it directly, she just plays. */
+.rankGate{margin-top:9px;padding-top:9px;border-top:1px solid rgba(120,140,210,.22);
+  font-size:12px;color:var(--muted);line-height:1.45}
+.rankGate b{color:var(--gold)}
+
 /* ---------- the objective tracker (js/ui/render.js renderEpTrack) ----------
    ONE ROW, AND IT HANGS OFF THE TOOLBAR. It was a two-line band 47px tall and full width — ninety
    per cent of the HUD's own height, spent permanently on a state ("still collecting") that is

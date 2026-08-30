@@ -108,6 +108,19 @@ function renderProfile(){
           ${lv<maxLv?`<span class="rankNext">${fmt(Status.toNextLevel(pts))} to level ${lv+1}${
                 next?` · ${next.icon} ${next.name} at ${next.from}`:""}</span>`
                 :`<span class="rankNext">Season complete</span>`}</div>
+        <!-- WHAT THE CLIMB IS FOR. The screen said "level 5 of 30" and never what 30 was — the
+             cap was implied and its meaning was nowhere, for the number GDD 5.4 calls the single
+             most important value in the game. 5.2 gives the Status Level exactly one job:
+             "Gates the next Season". So it says so.
+
+             And it tells the truth at the top. Only one Season is authored, so hasNextSeason()
+             is false and advanceSeason() would refuse — printing "Season complete" and implying
+             something waits behind it would be a promise the build cannot keep. -->
+        <div class="rankGate">${lv<maxLv
+          ? `\ud83c\udfc1 <b>Level ${maxLv}</b> opens the next Season`
+          : Status.hasNextSeason()
+            ? `\ud83c\udfc1 <b>Season ${(state.season|0)+2}</b> is ready \u2014 a new board, cast and card set`
+            : `\ud83c\udfc1 You have topped the track. The next Season is not written yet \u2014 your collection and record carry over when it is`}</div>
         <div class="albumBar"><div class="albumFill" style="width:${pct}%"></div></div>
         <!-- THE UNIT HAS TO BE ON IT. This read "183 collectibles" — the number is POINTS and
              the label is the SOURCE, so it announced a hundred and eighty-three Collectibles to
