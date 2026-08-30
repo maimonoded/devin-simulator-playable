@@ -205,9 +205,13 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 ```
 roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
                      →  money · a CARD · a clue · energy · a move · flavour
-      →  a clue      →  filed against the episode being worked on  (js/clues.js)
-      →  a card      →  banked. New → held on screen. Third copy → becomes that card's
-                        COLLECTIBLE, and says so. Any other copy → coins    (js/cards.js)
+      →  a clue      →  filed against the episode. Held on screen as its own CARD — the contact
+                        sheet — for 7s, or until you tap it and press Collect   (js/clues.js)
+      →  a MEMORY    →  banked. New → held 2s, headlining the status it paid. Third copy →
+                        becomes that card's COLLECTIBLE. Any other copy → coins  (js/cards.js)
+      →  a TROPHY    →  the same, but held 5s on EVERY copy and counting itself "n of 3" —
+                        the counter is what makes you want the next one, and it can only say
+                        "2 of 3" if the second copy stops the board. Third → celebration
       →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
                         (the Premiere's free pack, and the store)
    four of an episode's eight clues  →  it UNLOCKS  →  predict & watch, IN STORY ORDER

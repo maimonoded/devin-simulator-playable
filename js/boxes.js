@@ -241,27 +241,40 @@ function drawCardEvents(label,icon,floor){
     return [{float:{text:"+"+fmt(d.amount),color:"var(--gold)"},
              log:{icon:ico,msg:`${label} · +<b>${fmt(d.amount)}</b> coins`}},...after];
   const name=d.card?d.card.name:d.id;
-  /* THREE BEATS, and the gap between them is the design (GDD 4.3):
-       a card you did not have  →  held on screen
-       the copy that CONVERTS   →  held on screen, and says so — this is the payoff
-       any other copy           →  a coin float, and the board keeps moving */
-  if(!d.isNew&&!d.converted)
-    return [{float:{text:"+"+fmt(d.coins),color:"var(--gold)"},
-             log:{icon:ico,msg:`${label} · ${name} \u00d7${d.count} · +<b>${fmt(d.coins)}</b> coins`}},...after];
+  const trophy=Cards.isStatusCard(d.id);
+  /* The card's own face, not a generic panel — the collection and the box popup already share
+     cardFace(), and a card drawn off a tile is the same card.
+
+     `status` is what THIS copy just paid, already banked by Cards.add — the beat reports it, it
+     does not compute it. `need` and `statusCard` are what let the beat tell the two kinds of
+     card apart (§4.1): a trophy holds longer and counts itself out of three, a memory does
+     not. Both are read from the catalogue rather than guessed at from the id. */
+  const beat={card:{name,collectible:d.card,count:d.count,converted:d.converted,positive:true,
+                    status:d.status,need:Cards.copiesToConvert(),statusCard:trophy}};
+
+  /* WHICH COPIES STOP THE BOARD, and why a trophy is not a memory here.
+
+     A MEMORY has three beats and the gap between them is the design (GDD §4.3): the copy you
+     did not have is held on screen, the copy that CONVERTS is held and says so, and any other
+     copy is a coin float while the board keeps moving. A duplicate memory is a consolation, and
+     five seconds is too much to pay for one.
+
+     A TROPHY is held on EVERY copy, because a trophy's card carries a counter and the counter
+     is the thing that makes you want another. Skipping the second copy meant it could only ever
+     read "1 of 3" or "3 of 3" — never "2 of 3", which is the state that does the work. The
+     middle copy of an aspirational object is exactly the moment worth stopping for, and it is
+     the one the memory rhythm was silently eating. */
+  if(!d.isNew&&!d.converted){
+    const dup={float:{text:"+"+fmt(d.coins),color:"var(--gold)"},
+               log:{icon:ico,msg:`${label} · ${name} \u00d7${d.count} · +<b>${fmt(d.coins)}</b> coins`}};
+    return trophy?[dup,beat,...after]:[dup,...after];
+  }
   return [
     {float:{text:(d.converted?"\u2b50 ":"\ud83c\udccf ")+name,color:"var(--teal)"},
      log:{icon:ico,msg:d.converted
        ? `${label} · <b>${name}</b> collected \u2014 +${d.status} status`
        : `${label} · <b>${name}</b> found`}},
-    /* The card's own face, not a generic panel — the collection and the box popup already
-       share cardFace(), and a card drawn off a tile is the same card.
-
-       `status` is what THIS copy just paid, already banked by Cards.add — the beat reports it,
-       it does not compute it. `need` and `statusCard` are what let the beat tell the two kinds
-       of card apart (§4.1): a trophy holds longer and counts itself out of three, a memory does
-       not. Both are read from the catalogue rather than guessed at from the id. */
-    {card:{name,collectible:d.card,count:d.count,converted:d.converted,positive:true,
-           status:d.status,need:Cards.copiesToConvert(),statusCard:Cards.isStatusCard(d.id)}},
+    beat,
     ...after,
   ];
 }

@@ -400,3 +400,55 @@ test("the order runs across sets, not just within one", () => {
   eq(Collection.nextStoryId(), pages[0].ep, "set 2 starts at its own first episode");
   eq(Collection.blockedBy(), pages[0].ep);
 });
+
+suite("cards: which copies stop the board");
+
+/* A MEMORY's duplicate is a consolation — a coin float, and the board keeps moving. A TROPHY is
+   held on EVERY copy, because its card carries the n-of-3 counter and the counter is what makes
+   you want another one. Skipping the second copy meant it could only ever read "1 of 3" or
+   "3 of 3" and never "2 of 3", which is the state that does the work. */
+function drawOf(id) {
+  /* Force the draw to this exact card, then take the events a landing would produce. */
+  const real = Boxes.dropCard;
+  Boxes.dropCard = () => Object.assign({ kind: "card" }, Cards.add(id));
+  try { return drawCardEvents("Test", "🃏", null); }
+  finally { Boxes.dropCard = real; }
+}
+
+test("a memory's duplicate does NOT stop the board", () => {
+  freshRun();
+  const mem = Cards.all().find(c => !Cards.isStatusCard(c.id));
+  drawOf(mem.id);                                  // 1st copy
+  const ev = drawOf(mem.id);                       // 2nd — a plain duplicate
+  eq(ev.filter(e => e.card).length, 0, "no card is held");
+  ok(ev.some(e => e.float), "just the coin float");
+});
+
+test("a trophy stops the board on every copy, so the counter can read 2 of 3", () => {
+  freshRun();
+  const tro = Cards.all().find(c => Cards.isStatusCard(c.id));
+  const need = Cards.copiesToConvert();
+  const counts = [];
+  for (let i = 0; i < need; i++) {
+    const beat = drawOf(tro.id).find(e => e.card);
+    ok(beat, `copy ${i + 1} is held on screen`);
+    counts.push(beat.card.count);
+    eq(beat.card.statusCard, true, "and knows it is a trophy");
+    eq(beat.card.need, need, "and what it is counting to");
+  }
+  eq(counts.join(","), [1, 2, 3].slice(0, need).join(","),
+     "1 of 3, 2 of 3, 3 of 3 — the middle one is the point of this test");
+});
+
+test("only the third copy celebrates", () => {
+  freshRun();
+  const tro = Cards.all().find(c => Cards.isStatusCard(c.id));
+  const need = Cards.copiesToConvert();
+  const flags = [];
+  for (let i = 0; i < need + 1; i++) {
+    const beat = drawOf(tro.id).find(e => e.card);
+    if (beat) flags.push(!!beat.card.converted);
+  }
+  eq(flags.filter(Boolean).length, 1, "the celebration fires exactly once");
+  eq(flags[need - 1], true, "on the copy that converts");
+});
