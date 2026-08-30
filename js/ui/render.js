@@ -314,12 +314,21 @@ function renderEpTrack(){
   if(!id){
     el.className="epTrack done";
     el.innerHTML=`<span class="etTitle">Every episode watched — the Season's story is finished</span>`;
-    el.disabled=true;
+    el.disabled=true;                       // nothing left to open
+    delete el.dataset.ep;
     return;
   }
   const num=Episodes.numberOf(id);
   const title=Episodes.titleOf(id);
-  el.disabled=!ready;
+  /* ALWAYS TAPPABLE NOW, and what it opens depends on what it is showing: the episode you can
+     watch, or the case file for the one the clues are buying. It was disabled while collecting —
+     which made the row a sign rather than a control, and left the evidence with no way in at all
+     outside the wager screen (openEvidence had no caller: it was written for this and orphaned
+     when the case panels were replaced). `ep` rides on the element so the handler does not have
+     to recompute which episode the row was about. */
+  el.disabled=false;
+  el.dataset.ep=id;
+  el.dataset.mode=ready?"watch":"evidence";
 
   /* THE METER FOR WHAT IS STILL BEING COLLECTED, whether or not something is ready to watch.
 

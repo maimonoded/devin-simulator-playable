@@ -16,6 +16,11 @@
    to being a collection. What the story costs is shown on the case board in the ring, and
    tapping a panel there opens the EVIDENCE (openEvidence below), not this.
 
+   openEvidence had NO CALLER for a while — it was written for the case panels in the ring, and
+   was orphaned when the Status Estate replaced them. So the only place a player could read their
+   own evidence was the wager screen, which is exactly the screen where it is too late to go and
+   look. The objective tracker on the board opens it now (js/ui/render.js renderEpTrack).
+
    Nothing here writes state. Opening it can never change a run. */
 
 /* Which set is on screen. Deliberately NOT persisted: it is where you are looking, not where
@@ -156,8 +161,17 @@ function openEvidence(ep){
   const unlocked = Clues.isUnlocked(ep);
   const unwatched = state.epQueue.includes(ep);
   const blocked = unlocked && unwatched && !Collection.canWatch(ep) ? Collection.blockedBy() : null;
+  /* THE SAME ROW THE WAGER SCREEN USES: the clue's own contact-sheet card beside its sentence,
+     and tapping it opens the card full size. A clue is a card (js/ui/cardface.js .fam-clue), and
+     a card that looks like two different things in the two places it appears is not a collection
+     — this screen listed them as bullet points while the wager screen listed them as evidence.
+     Clues.dropFor is the one builder both call. */
   const rows = held.length
-    ? `<ul class="evList">${held.map(c => `<li>${c.text}</li>`).join("")}</ul>`
+    ? `<div class="evList">${held.map((c, k) => `
+         <button class="evRow" data-clue="${k}">
+           <span class="evThumb">${dropFace(Clues.dropFor(ep, c), { size: "sm" })}</span>
+           <span class="evText">${c.text}</span>
+         </button>`).join("")}</div>`
     : `<p class="hint" style="margin:0">Nothing on file yet. Clues come off the cast's tiles.</p>`;
   /* The gaps are drawn, not just counted: an empty slot is what makes a collection legible, and
      the evidence board is a collection too. */
@@ -172,7 +186,7 @@ function openEvidence(ep){
 
   host.innerHTML = `<div class="modal albumModal"><div class="top">
       <button class="sheetX" id="evX" title="Close">✕</button>
-      <div class="eyebrow">Episode ${ep} · the evidence</div>
+      <div class="eyebrow">EP ${Episodes.numberOf(ep)} · the case file</div>
       <h2>${Episodes.titleOf(ep)}</h2></div>
     <div class="mbody">
       <div class="albumBar"><div class="albumFill" style="width:${need ? Math.round(got / need * 100) : 0}%"></div></div>
@@ -190,4 +204,17 @@ function openEvidence(ep){
   host.onclick = (e) => { if (e.target === host) close(); };
   const w = $("#evWatch");
   if (w) w.onclick = () => { close(); openPrediction(ep); };
+  /* Tap a piece of evidence to look at it properly — the same zoom the wager screen offers, and
+     the same reason: at row size the card's own slip is six pixels, so the thumbnail says WHAT
+     it is and the text says what it SAYS. The layer lives inside the host, so `close()` takes it
+     with everything else. */
+  host.querySelectorAll(".evRow").forEach(row => row.onclick = () => {
+    const c = held[+row.dataset.clue];
+    if (!c) return;
+    const zoom = document.createElement("div");
+    zoom.className = "evZoom";
+    zoom.innerHTML = dropFace(Clues.dropFor(ep, c), { size: "lg" });
+    zoom.onclick = (e) => { e.stopPropagation(); zoom.remove(); };
+    host.appendChild(zoom);
+  });
 }

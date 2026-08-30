@@ -286,7 +286,15 @@ $("#episodesBtn").onclick=()=>{
   /* The tracker is a button only in its READY state — renderEpTrack disables it otherwise, so
      this never fires on the collecting state. openPrediction() owns the story-order rule, so
      tapping cannot skip ahead however tempting the strip looks. */
-  $("#epTrack").onclick=()=>{ if(Collection.firstUnwatchedId()) openPrediction(); };
+  /* The row opens what it is showing. Watch when something is ready; otherwise the CASE FILE for
+     the episode the clues are going toward — which is the only way to read your evidence outside
+     the wager screen, and the wager screen is exactly where it is too late to go and look. */
+  $("#epTrack").onclick=(e)=>{
+    const el=e.currentTarget, ep=el.dataset.ep;
+    if(!ep) return;
+    if(el.dataset.mode==="watch") openPrediction();
+    else openEvidence(ep);
+  };
 $("#albumBtn").onclick=()=>openAlbum();
 /* Both halves of the player block open the profile — the avatar and the rank beside it are one
    control as far as the player is concerned. */
