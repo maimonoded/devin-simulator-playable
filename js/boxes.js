@@ -254,8 +254,14 @@ function drawCardEvents(label,icon,floor){
        ? `${label} · <b>${name}</b> collected \u2014 +${d.status} status`
        : `${label} · <b>${name}</b> found`}},
     /* The card's own face, not a generic panel — the collection and the box popup already
-       share cardFace(), and a card drawn off a tile is the same card. */
-    {card:{name,collectible:d.card,count:d.count,converted:d.converted,positive:true}},
+       share cardFace(), and a card drawn off a tile is the same card.
+
+       `status` is what THIS copy just paid, already banked by Cards.add — the beat reports it,
+       it does not compute it. `need` and `statusCard` are what let the beat tell the two kinds
+       of card apart (§4.1): a trophy holds longer and counts itself out of three, a memory does
+       not. Both are read from the catalogue rather than guessed at from the id. */
+    {card:{name,collectible:d.card,count:d.count,converted:d.converted,positive:true,
+           status:d.status,need:Cards.copiesToConvert(),statusCard:Cards.isStatusCard(d.id)}},
     ...after,
   ];
 }

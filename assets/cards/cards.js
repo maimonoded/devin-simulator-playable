@@ -15,14 +15,22 @@
 
    ---- the shape (§4.6) ----
 
-   150 cards a Season: 90 Common, 38 Rare, 18 Epic, 4 Legendary, in 15 SETS OF TEN. A set is a
-   collection target and NEVER a gate (§4.4) — completing one pays a bonus and a display piece,
-   and a player who completes none is only poorer, never stuck.
+   48 cards a Season: 29 Common, 12 Rare, 6 Epic, 1 Legendary, in 4 SETS OF TWELVE — one set per
+   four-episode arc (§4.4). A set is a collection target and NEVER a gate: completing one pays a
+   bonus and a display piece, and a player who completes none is only poorer, never stuck.
 
-   Per set that works out at six Commons and a tail: eight sets carry three Rares and an Epic,
-   three carry two Rares and two Epics, and four carry two Rares, an Epic and the Season's one
-   Legendary apiece. Cards.validate() checks the totals, because "90/38/18/4" is a balance
-   decision and a typo in it is invisible in play.
+   It was 150 in 15 sets of ten. That did not survive contact with conversion: a Collectible
+   needs THREE copies of one specific card, and across 150 cards a given Common turns up 0.67
+   times in a demo run — so the thing the collection is FOR almost never happened. The catalogue
+   is sized to the eighteen episodes that exist.
+
+   ---- two kinds, interleaved (§4.1) ----
+
+   Each set carries seven MEMORIES — moments from the episodes — and five TROPHIES, the
+   aspirational objects: the watch, the necklace, the villa. Twenty of the forty-eight are
+   trophies, marked `kind: "status"`; absent means a memory, so the annotation stays rare enough
+   to mean something. Cards.validate() refuses any other kind, because a typo there is invisible
+   in play — the card simply stops being a trophy and looks like an ordinary memory.
 
    ---- ids ----
 
@@ -103,11 +111,11 @@ const CARD_SEASONS = [
         { id: "locked-garage",         name: "The Locked Garage",                    rarity: R, art: "locked-garage.webp" },
         { id: "cash-envelope",         name: "A Cash Envelope",                      rarity: R, art: "clue-cash.webp" },
         { id: "six-months",            name: "Six Months on the Street",             rarity: L, art: "six-months.webp" },
-        { id: "silk-scarf",            name: "A Silk Scarf",                         rarity: C, art: "silk-scarf.webp"  },
-        { id: "gold-cufflinks",        name: "Gold Cufflinks",                       rarity: C, art: "gold-cufflinks.webp"  },
-        { id: "cashmere-coat",         name: "A Cashmere Coat",                      rarity: C, art: "cashmere-coat.webp"  },
-        { id: "swiss-watch",           name: "A Swiss Watch",                        rarity: R, art: "swiss-watch.webp"  },
-        { id: "penthouse-key",         name: "The Penthouse Key",                    rarity: E, art: "penthouse-key.webp"  },
+        { id: "silk-scarf",            name: "A Silk Scarf",                         rarity: C, art: "silk-scarf.webp", kind: "status"  },
+        { id: "gold-cufflinks",        name: "Gold Cufflinks",                       rarity: C, art: "gold-cufflinks.webp", kind: "status"  },
+        { id: "cashmere-coat",         name: "A Cashmere Coat",                      rarity: C, art: "cashmere-coat.webp", kind: "status"  },
+        { id: "swiss-watch",           name: "A Swiss Watch",                        rarity: R, art: "swiss-watch.webp", kind: "status"  },
+        { id: "penthouse-key",         name: "The Penthouse Key",                    rarity: E, art: "penthouse-key.webp", kind: "status"  },
       ]},
       /* Episodes 6-10 — the certificate, the reveal, the airline */
       { key: "the-name", name: "The Name", cards: [
@@ -118,11 +126,11 @@ const CARD_SEASONS = [
         { id: "the-long-pause",        name: "The Long Pause",                       rarity: R, art: "the-long-pause.webp" },
         { id: "identification",        name: "Identification",                       rarity: R, art: "identification.webp" },
         { id: "registrars-face",       name: "The Registrar's Face",                 rarity: E, art: "registrars-face.webp" },
-        { id: "monogrammed-shirt",     name: "A Monogrammed Shirt",                  rarity: C, art: "monogrammed-shirt.webp"  },
-        { id: "leather-gloves",        name: "Leather Driving Gloves",               rarity: C, art: "leather-gloves.webp"  },
-        { id: "crystal-decanter",      name: "A Crystal Decanter",                   rarity: C, art: "crystal-decanter.webp"  },
-        { id: "diamond-studs",         name: "Diamond Studs",                        rarity: R, art: "diamond-studs.webp"  },
-        { id: "private-jet",           name: "The Private Jet",                      rarity: E, art: "private-jet.webp"  },
+        { id: "monogrammed-shirt",     name: "A Monogrammed Shirt",                  rarity: C, art: "monogrammed-shirt.webp", kind: "status"  },
+        { id: "leather-gloves",        name: "Leather Driving Gloves",               rarity: C, art: "leather-gloves.webp", kind: "status"  },
+        { id: "crystal-decanter",      name: "A Crystal Decanter",                   rarity: C, art: "crystal-decanter.webp", kind: "status"  },
+        { id: "diamond-studs",         name: "Diamond Studs",                        rarity: R, art: "diamond-studs.webp", kind: "status"  },
+        { id: "private-jet",           name: "The Private Jet",                      rarity: E, art: "private-jet.webp", kind: "status"  },
       ]},
       /* Episodes 11-14 — Texas, the hotel, the diamond */
       { key: "the-rose", name: "The Rose Hotel", cards: [
@@ -133,11 +141,11 @@ const CARD_SEASONS = [
         { id: "the-cancellation",      name: "The Cancellation",                     rarity: R, art: "the-cancellation.webp" },
         { id: "managers-slip",         name: "The Manager's Correction",             rarity: R, art: "managers-slip.webp" },
         { id: "the-rose-hotel",        name: "The Rose Hotel",                       rarity: E, art: "the-rose-hotel.webp" },
-        { id: "velvet-heels",          name: "Velvet Heels",                         rarity: C, art: "velvet-heels.webp"  },
-        { id: "pearl-earrings",        name: "Pearl Earrings",                       rarity: C, art: "pearl-earrings.webp"  },
-        { id: "perfume-bottle",        name: "A Cut-Glass Perfume Bottle",           rarity: C, art: "perfume-bottle.webp"  },
-        { id: "emerald-necklace",      name: "An Emerald Necklace",                  rarity: R, art: "emerald-necklace.webp"  },
-        { id: "vintage-roadster",      name: "The Vintage Roadster",                 rarity: E, art: "vintage-roadster.webp"  },
+        { id: "velvet-heels",          name: "Velvet Heels",                         rarity: C, art: "velvet-heels.webp", kind: "status"  },
+        { id: "pearl-earrings",        name: "Pearl Earrings",                       rarity: C, art: "pearl-earrings.webp", kind: "status"  },
+        { id: "perfume-bottle",        name: "A Cut-Glass Perfume Bottle",           rarity: C, art: "perfume-bottle.webp", kind: "status"  },
+        { id: "emerald-necklace",      name: "An Emerald Necklace",                  rarity: R, art: "emerald-necklace.webp", kind: "status"  },
+        { id: "vintage-roadster",      name: "The Vintage Roadster",                 rarity: E, art: "vintage-roadster.webp", kind: "status"  },
       ]},
       /* Episodes 15-18 — the wedding night, Grandma, showing him off */
       { key: "the-suite", name: "The Suite", cards: [
@@ -148,11 +156,11 @@ const CARD_SEASONS = [
         { id: "the-good-china",        name: "The Good China",                       rarity: C, art: "the-good-china.webp" },
         { id: "crocheted-blanket",     name: "A Crocheted Blanket",                  rarity: C, art: "crocheted-blanket.webp" },
         { id: "grandmas-blessing",     name: "Grandma's Blessing",                   rarity: R, art: "grandmas-blessing.webp" },
-        { id: "silver-case",           name: "A Silver Cigarette Case",              rarity: C, art: "silver-case.webp"  },
-        { id: "designer-luggage",      name: "Designer Luggage",                     rarity: C, art: "designer-luggage.webp"  },
-        { id: "couture-gown",          name: "The Couture Gown",                     rarity: R, art: "couture-gown.webp"  },
-        { id: "sapphire-ring",         name: "A Sapphire Ring",                      rarity: R, art: "sapphire-ring.webp"  },
-        { id: "the-villa",             name: "The Villa on the Hill",                rarity: E, art: "the-villa.webp"  },
+        { id: "silver-case",           name: "A Silver Cigarette Case",              rarity: C, art: "silver-case.webp", kind: "status"  },
+        { id: "designer-luggage",      name: "Designer Luggage",                     rarity: C, art: "designer-luggage.webp", kind: "status"  },
+        { id: "couture-gown",          name: "The Couture Gown",                     rarity: R, art: "couture-gown.webp", kind: "status"  },
+        { id: "sapphire-ring",         name: "A Sapphire Ring",                      rarity: R, art: "sapphire-ring.webp", kind: "status"  },
+        { id: "the-villa",             name: "The Villa on the Hill",                rarity: E, art: "the-villa.webp", kind: "status"  },
       ]},
     ],
   },

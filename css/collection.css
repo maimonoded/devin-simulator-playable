@@ -570,6 +570,32 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    moves on the view this was originally tuned against. */
 .centerfx.card .ccard{width:min(78vw,56vh,400px);margin:0 auto}
 .centerfx.card.win .ccard{animation:revealPop .45s cubic-bezier(.2,1.5,.4,1)}
+/* ---------- the caption under a held card ----------
+   The status number is the headline (js/ui/fx.js showCard). A card's face says what it IS; this
+   says what it was WORTH, which is the thing the player is actually accumulating and which used
+   to be a word in a log line they could not see on a phone. */
+.centerfx.card .cbCap{margin-top:11px;pointer-events:none}
+.cbStat{font-family:Georgia,serif;line-height:1}
+.cbStat b{font-size:40px;font-weight:800;color:var(--gold);
+     text-shadow:0 3px 14px rgba(0,0,0,.75),0 0 26px rgba(255,203,92,.35)}
+.cbStat i{display:block;margin-top:2px;font-style:normal;font-family:inherit;font-size:11px;
+     font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text);opacity:.8;
+     text-shadow:0 2px 8px rgba(0,0,0,.8)}
+/* n of 3. Only a trophy counts itself out — the whole reason to want another copy, said on the
+   card instead of left for the player to remember. */
+.cbProg{margin-top:8px;font-size:13px;color:var(--text);opacity:.9;
+     text-shadow:0 2px 8px rgba(0,0,0,.85)}
+.cbProg b{color:var(--teal);font-weight:800}
+.cbDone{margin-top:9px;font-size:14px;font-weight:800;color:var(--gold);
+     text-shadow:0 2px 10px rgba(0,0,0,.85)}
+/* A clue can be HELD. The hint has to be visible without competing with the sentence on the
+   card, hence muted and small; it is replaced by the Collect button the moment it is used. */
+.cbHint{margin-top:10px;font-size:12px;color:var(--muted);pointer-events:none;
+     text-shadow:0 2px 8px rgba(0,0,0,.85);animation:cbHintIn .3s ease .9s both}
+@keyframes cbHintIn{from{opacity:0}to{opacity:1}}
+.centerfx.holdable .ccard{pointer-events:auto;cursor:pointer}
+.cbCollect{pointer-events:auto;margin-top:12px;min-width:150px}
+
 /* The line under a converted card: what the third copy just bought. */
 .ccWon{margin-top:10px;text-align:center;font-size:15px;font-weight:800;color:var(--gold);
   text-shadow:0 2px 8px rgba(0,0,0,.6)}

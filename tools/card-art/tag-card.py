@@ -23,8 +23,16 @@ tagged, missing, miss = [], [], []
 for cid in sys.argv[1:]:
     if not os.path.exists(os.path.join(ART, cid + ".webp")):
         missing.append(cid); continue
-    pat = re.compile(r'(\{ id: "%s",\s*name: "[^"]*",\s*rarity: [CREL])( \})' % re.escape(cid))
-    s, n = pat.subn(r'\1, art: "%s.webp" \2' % cid, s)
+    # Insert `art` immediately after `rarity`, whatever else the row carries.
+    #
+    # This used to anchor on the row ENDING at " }" right after the rarity, which quietly made
+    # the catalogue's field list part of the tool's contract: the day a row grew a second field
+    # — `kind: "status"` did it — every untagged card of that kind reported NO CATALOGUE ROW
+    # MATCHED, with the art sitting on disk and nothing saying why. The negative lookahead is
+    # what makes re-tagging a no-op instead, which is the only thing the old anchor was doing.
+    pat = re.compile(r'(\{ id: "%s",\s*name: "[^"]*",\s*rarity: [CREL])(?!\s*,\s*art:)'
+                     % re.escape(cid))
+    s, n = pat.subn(r'\1, art: "%s.webp"' % cid, s)
     (tagged if n == 1 else miss).append(cid)
 
 io.open(CAT, "w", encoding="utf-8").write(s)

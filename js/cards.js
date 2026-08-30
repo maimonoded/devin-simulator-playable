@@ -138,6 +138,18 @@ const Cards = {
 
   /* ---------------- ownership ---------------- */
   copiesToConvert() { return Math.max(1, Math.round(+cfg.cardCopiesToConvert || 1)); },
+  /* THE TWO KINDS IN ONE CATALOGUE (§4.1). A set interleaves the MEMORY — a moment from the
+     episodes — with the TROPHY, an aspirational object: the watch, the necklace, the villa.
+     Twenty of the forty-eight are trophies, and they are marked in the catalogue rather than
+     derived, because which kind a card is is an authoring decision and nothing about a silk
+     scarf's id, rarity or set can be read to work it out.
+
+     Absent means memory, so the field only appears on the twenty. That is deliberate: it keeps
+     the common case unannotated and makes the annotation mean something. */
+  isStatusCard(id) {
+    const c = this.get(id);
+    return !!(c && c.kind === "status");
+  },
   count(id) { return Math.max(0, (state.cards || {})[id] | 0); },
   has(id) { return this.count(id) > 0; },
   converted(id) { return this.count(id) >= this.copiesToConvert(); },
@@ -379,6 +391,11 @@ const Cards = {
              would merge two different cards into one pile. */
           if (seen.has(c.id)) errs.push(`${w} reuses an id already used by ${seen.get(c.id)}.`);
           else seen.set(c.id, where);
+          /* A typo'd kind is invisible in play: the card simply stops being a trophy, loses its
+             longer beat and its n-of-3 counter, and looks like an ordinary memory card. Nothing
+             throws and nothing is missing — exactly the failure this validator exists for. */
+          if (c.kind !== undefined && c.kind !== "status")
+            errs.push(`${w} has kind "${c.kind}"; the only kind is "status" (absent means a memory card).`);
         });
       });
     });

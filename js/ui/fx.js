@@ -143,6 +143,16 @@ function clearOverlayFx(){
   if(typeof use3d==="function"&&use3d()&&window.Board3D&&Board3D.available&&Board3D.cancelPack)
     Board3D.cancelPack();
 }
+/* A BIGGER CONFETTI, for the beat that earns one. confetti() is 40 pieces in one wave, which is
+   right for an ordinary win and reads as a shrug when the moment is the third copy of a trophy.
+   Three staggered waves from a wider spread, so it is still falling while the player reads the
+   card rather than finishing before they have looked up. */
+function bigConfetti(){
+  confetti();
+  setTimeout(confetti, 220);
+  setTimeout(confetti, 480);
+}
+
 /* A card, held on the board's centre.
 
    THREE FACES, in order of how much the drop knows about itself:
@@ -157,33 +167,102 @@ function clearOverlayFx(){
      neither       — the generic panel, which is what a pool row's flavour outcome gets.
 
    dropFace() and cardFace() both live in js/ui/cardface.js, which loads AFTER this file. That
-   is fine and already relied on: these are called at roll time, not at parse time. */
+   is fine and already relied on: these are called at roll time, not at parse time.
+
+   ---- WHAT THE CAPTION SAYS, AND HOW LONG IT SAYS IT FOR ----
+
+   THE STATUS NUMBER IS THE HEADLINE. A card's face says what it is; the caption says what it
+   was WORTH, because status is the thing the player is actually accumulating and it used to be
+   a word in a log line. It is the number Cards.add already banked, not one computed here.
+
+   The three beats differ because the three things differ (§4.1, §4.3):
+
+     memory card   cfg.cardHoldMs      the moment is the picture; two seconds is enough
+     status card   cfg.statusHoldMs    a trophy, so it also counts itself out of three — the
+                                       whole reason to want another copy is legible on the card
+     …its third    cfg.cardConvertMs   the copy that converts it into a Collectible. This is
+                                       what a trophy was collected FOR, so it gets the big
+                                       celebration
+     a clue        cfg.clueHoldMs      the only face carrying a SENTENCE, and a sentence has to
+                                       be read. Longest by default, and the only one that can be
+                                       HELD: tapping it stops the clock and waits for Collect,
+                                       because seven seconds is a guess about reading speed and
+                                       the player is the one who knows
+
+   THE AUTO-PLAY SESSION TAKES THE FAST PATH, exactly as showCollect does. That mode is the
+   batch balancing tool with nobody at the keyboard, and these holds are now long enough that a
+   long run would spend most of its wall clock looking at cards it is not showing anyone. */
 function showCard(c){
   const el=$("#centerFx");
-  el.className="centerfx show card "+(c.positive?"win":"lose");
-  el.innerHTML=c.drop
+  const clue=!!(c.drop&&c.drop.kind==="clue");
+  const trophy=!!c.statusCard;
+  const converted=!!c.converted;
+  const celebrate=trophy&&converted;
+  el.className="centerfx show card "+(c.positive?"win":"lose")+(clue?" holdable":"");
+
+  const face=c.drop
     ? dropFace(c.drop,{size:"lg"})
     : c.collectible
-    ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count,converted:c.converted})+
-      (c.converted?`<div class="ccWon">Collected \u2014 that is the third copy</div>`:"")
+    ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count,converted:c.converted})
     : `<div class="playcard">
       <div class="pcTop">${c.top||"Plot Twist"}</div>
       <div class="pcIco">🃏</div>
       <div class="pcName">${c.name}</div>
       ${c.big?`<div class="pcAmt">${c.big}</div>`:""}
     </div>`;
-  if(c.positive) confetti();
+
+  /* A status of 0 draws nothing rather than "+0": the beat only fires on a first or a
+     converting copy, both of which pay, but cfg.statusFirstCopy is tunable to zero and a
+     triumphant nought is worse than silence. */
+  const pts=Math.round(+c.status||0);
+  const need=Math.max(1,Math.round(+c.need||1));
+  const caption=clue
+    ? `<div class="cbHint" id="cbHint">Tap the card to keep it open</div>`
+    : `<div class="cbCap">
+        ${pts>0?`<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`:""}
+        ${trophy?`<div class="cbProg"><b>${Math.min(c.count,need)}</b> of <b>${need}</b> collected</div>`:""}
+        ${celebrate?`<div class="cbDone">⭐ Collected! It goes on your shelf</div>`
+          :converted?`<div class="ccWon">Collected — that is the third copy</div>`:""}
+      </div>`;
+  el.innerHTML=face+caption;
+
+  if(celebrate) bigConfetti();
+  else if(c.positive) confetti();
   if(c.energy) diceConfetti();
-  /* The converting copy holds longer: it is the moment three pulls were spent buying, and
-     giving it the same beat as an ordinary new card would flatten the one payoff the
-     collection has. */
-  /* holdMs lets a beat ask for its own length. A clue is the one face carrying a SENTENCE, and
-     a sentence takes longer to read than a card's name — so it holds for cfg.clueHoldMs rather
-     than borrowing the card timing and hoping. */
-  const ms=c.holdMs!=null?(+c.holdMs||0)
-          :c.converted?(+cfg.cardConvertMs||0)
-          :(+cfg.cardHoldMs||0);
-  return sleep(Math.max(200,ms)).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
+
+  const auto=typeof autoMode!=="undefined"&&autoMode==="session";
+  const ms=auto?Math.max(50,+cfg.autoCollectMs||50)
+    :c.holdMs!=null?(+c.holdMs||0)
+    :clue?(+cfg.clueHoldMs||0)
+    :celebrate?(+cfg.cardConvertMs||0)
+    :trophy?(+cfg.statusHoldMs||0)
+    :(+cfg.cardHoldMs||0);
+
+  return new Promise(resolve=>{
+    let done=false,held=false;
+    const finish=()=>{
+      if(done) return; done=true;
+      clearTimeout(to);
+      el.className="centerfx"; el.innerHTML="";
+      resolve();
+    };
+    const to=setTimeout(finish,Math.max(200,ms));
+    /* HOLD TO READ. Only a clue, and only for a human — a batch run has nobody to click Collect
+       and would sit here forever. The card is the hit target rather than the whole overlay, so
+       a stray tap on the board behind it does not freeze the beat. */
+    if(clue&&!auto){
+      const card=el.querySelector(".ccard");
+      if(card) card.onclick=()=>{
+        if(done||held) return;
+        held=true; clearTimeout(to);
+        const hint=$("#cbHint"); if(hint) hint.remove();
+        const b=document.createElement("button");
+        b.className="btn roll cbCollect"; b.textContent="Collect";
+        b.onclick=finish;
+        el.appendChild(b);
+      };
+    }
+  });
 }
 /* Blocking Collect popup (train tiles). Resolves on click, or automatically after a
    random cfg.collectMinSec–collectMaxSec so an idle session keeps moving.

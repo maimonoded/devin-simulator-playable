@@ -368,3 +368,41 @@ test("an unreadable record degrades rather than throwing the collection away", (
   eq(state.cardMeta[c.id].r, "common", "an unknown rarity falls back rather than dropping it");
   ok(state.cardMeta[c.id].name, "and a card remembered by name beats one not remembered at all");
 });
+
+suite("cards: the two kinds in one catalogue (§4.1)");
+
+/* A set interleaves the MEMORY — a moment from the episodes — with the TROPHY, an aspirational
+   object: the watch, the necklace, the villa. The beat treats them differently (a trophy holds
+   longer and counts itself out of three), so which kind a card is has to be knowable, and it is
+   an authoring decision: nothing about a silk scarf's id, rarity or set can be read to work it
+   out. Hence a field in the catalogue rather than a derivation. */
+test("every set mixes memories and trophies — neither kind is missing from one", () => {
+  Cards.sets().forEach(s => {
+    const trophies = s.cards.filter(c => Cards.isStatusCard(c.id)).length;
+    ok(trophies > 0, `${s.name} has no trophy to aspire to`);
+    ok(trophies < s.cards.length, `${s.name} is all trophies and no memories`);
+  });
+});
+
+test("isStatusCard reads the catalogue, and absent means memory", () => {
+  const all = Cards.all();
+  const trophies = all.filter(c => Cards.isStatusCard(c.id));
+  eq(trophies.length, 20, "twenty of the forty-eight");
+  ok(trophies.every(c => c.kind === "status"), "and each says so in the catalogue");
+  ok(all.filter(c => !Cards.isStatusCard(c.id)).every(c => c.kind === undefined),
+     "a memory card carries no kind at all — the annotation only means something if it is rare");
+  eq(Cards.isStatusCard("no-such-card"), false, "an unknown id is not a trophy, and does not throw");
+});
+
+test("a trophy's third copy is what the counter counts to", () => {
+  /* The beat prints "n of 3" from Cards.add's count and copiesToConvert. Pin that the two agree
+     and that the third copy is the converting one, since the celebration hangs off `converted`. */
+  freshRun();
+  const tro = Cards.all().find(c => Cards.isStatusCard(c.id));
+  const need = Cards.copiesToConvert();
+  const seen = [];
+  for (let i = 0; i < need; i++) seen.push(Cards.add(tro.id));
+  eq(seen.map(r => r.count).join(","), [1, 2, 3].slice(0, need).join(","), "counts up one at a time");
+  eq(seen[need - 1].converted, true, "and the last of them converts");
+  ok(seen.filter(r => r.converted).length === 1, "exactly once — the celebration cannot fire twice");
+});
