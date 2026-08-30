@@ -331,16 +331,22 @@ export const Box3D = {
        dark rectangle with no art: `card.art` is a bare filename that only means something
        relative to its Season's directory, and `card.tier`/`card.kind` had stopped existing at
        all. Resolve art through Cards.artFor() and colour through the rarity, never by hand. */
-    let ornate = false, slip = false, gilt = false, hero = "";
+    let ornate = false, slip = false, gilt = false, trophy = false, hero = "";
     if (drop.kind === "card" && drop.card){
       const card = drop.card;
       const r = card.rarity ? Cards.rarity(card.rarity) : null;
       /* GOLD, not the rarity's colour. The frame is the FAMILY; the rarity is the badge, and it
          keeps its own colour there. Letting rarity paint the border made a Common look broken
          rather than ordinary, and put two different-looking frames inside one family. */
-      edge = "#c9a24a"; gilt = true;
-      /* STARS, exactly as in the DOM path — one to four, and never the rarity's name. */
-      label = r ? Cards.stars(r) : "";
+      /* A TROPHY IS A DIFFERENT OBJECT, and it has to be here too. This painter is the canvas
+         twin of cardFace(), and a card that looks like two different things in the two places it
+         appears is not a collection (CLAUDE.md) — which is exactly what a box was handing over
+         while the board was showing the heavy gold frame, the brackets and the cups. */
+      trophy = Cards.isStatusCard(card.id);
+      edge = trophy ? "#ffcb5c" : "#c9a24a"; gilt = true;
+      /* Stars for a memory, CUPS for a trophy — one to four either way, and never the rarity's
+         name. Same count, different glyph, same rule as the DOM path. */
+      label = r ? (trophy ? Cards.cups(r) : Cards.stars(r)) : "";
       name = card.name;
       sub = card.sub || (Cards.setForCard(card.id) || {}).name || "";
       img = art(Cards.artFor(card));
@@ -384,6 +390,10 @@ export const Box3D = {
     rr(2, 2, W - 4, H - 4, 16);
     const g = x.createLinearGradient(0, 0, 0, H);
     if (slip){ g.addColorStop(0, "#191a1f"); g.addColorStop(1, "#121316"); }
+    /* Plum for a memory, amber for a trophy — the same shift in TEMPERATURE the DOM makes, and
+       for the same reason: it separates the two kinds without touching the gilt, the badge or
+       the halo, none of which is being asked to carry a second job. */
+    else if (trophy){ g.addColorStop(0, "#5a3d1c"); g.addColorStop(1, "#160d04"); }
     else if (gilt){ g.addColorStop(0, "#3a2140"); g.addColorStop(1, "#120a18"); }
     else if (ornate){ g.addColorStop(0, "#3d2f10"); g.addColorStop(1, "#1d1607"); }
     else { g.addColorStop(0, "#1a1f47"); g.addColorStop(1, "#0e1230"); }
@@ -446,7 +456,10 @@ export const Box3D = {
       /* The stars are set twice the size of a word badge, matching the DOM path -- they are the
          thing being read at a glance, and "EVIDENCE" at that size would swamp the card. */
       const stars = gilt;
-      x.font = stars ? "800 30px 'Segoe UI', system-ui, sans-serif"
+      /* Cups are emoji and emoji are wider than a star glyph, so four of them at star size would
+         run half the card — the same allowance the DOM path makes. */
+      x.font = trophy ? "800 21px 'Segoe UI', system-ui, sans-serif"
+                     : stars ? "800 30px 'Segoe UI', system-ui, sans-serif"
                      : "800 15px 'Segoe UI', system-ui, sans-serif";
       const tw = x.measureText(label).width + 20;
       rr(PAD, PAD, tw, stars ? 40 : 26, stars ? 20 : 13);
@@ -454,6 +467,25 @@ export const Box3D = {
       x.lineWidth = 1.5; x.strokeStyle = edge; x.stroke();
       x.fillStyle = edge; x.textAlign = "left"; x.textBaseline = "middle";
       x.fillText(label, PAD + 10, PAD + (stars ? 21 : 14));
+    }
+
+    /* THE COPY COUNT, opposite the badge — the DOM card has carried it all along and this one
+       never did, so the same card said "2/3" off a tile and nothing at all out of a box. A
+       converted card shows the star instead: that is a state, not a count. */
+    if (gilt && drop.kind === "card"){
+      const need = Cards.copiesToConvert();
+      const conv = !!drop.converted;
+      const txt = conv ? "\u2605" : `${Math.max(1, drop.count | 0)}/${need}`;
+      x.font = "800 17px 'Segoe UI', system-ui, sans-serif";
+      const tw = x.measureText(txt).width + 18;
+      rr(W - PAD - tw, PAD, tw, 28, 14);
+      x.fillStyle = "rgba(8,10,28,.85)"; x.fill();
+      x.lineWidth = 1.5; x.strokeStyle = conv ? "#ffcb5c" : "rgba(160,175,225,.55)";
+      x.stroke();
+      x.fillStyle = conv ? "#ffcb5c" : "#c3cbe8";
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(txt, W - PAD - tw / 2, PAD + 15);
+      x.textAlign = "left";
     }
 
     /* the status hero, across the middle */
@@ -531,7 +563,7 @@ export const Box3D = {
 
     /* edge — and, for a status item, a frame rather than a border */
     rr(2, 2, W - 4, H - 4, 16);
-    x.lineWidth = ornate ? 9 : 5; x.strokeStyle = edge; x.stroke();
+    x.lineWidth = ornate ? 9 : trophy ? 8 : 5; x.strokeStyle = edge; x.stroke();
     if (gilt){
       /* The fine inner rule, set just inside the gilt. Brighter once the card has converted:
          that is the moment it stops being progress and becomes a thing you own. */
@@ -540,6 +572,19 @@ export const Box3D = {
       x.lineWidth = conv ? 2.5 : 1.5;
       x.strokeStyle = conv ? "rgba(255,203,92,.9)" : "rgba(255,203,92,.42)";
       x.stroke();
+    }
+    if (trophy){
+      /* THE PLAQUE'S BRACKETS, IN ADVANCE — top-left and bottom-right, exactly the two the DOM
+         draws. Brackets read as something hung on a wall, which is what this card becomes on its
+         third copy, so the card and the Collectible are recognisably one object at both ends. */
+      x.strokeStyle = "rgba(255,203,92,.85)"; x.lineWidth = 3.5; x.lineCap = "round";
+      const T = 24, m = 9;
+      [[m, m, 1, 1], [W - m, H - m, -1, -1]].forEach(([cx0, cy0, sx, sy]) => {
+        x.beginPath();
+        x.moveTo(cx0 + sx * T, cy0); x.lineTo(cx0, cy0); x.lineTo(cx0, cy0 + sy * T);
+        x.stroke();
+      });
+      x.lineCap = "butt";
     }
     if (ornate){
       /* An inner rule set in from the outer one, and a tick across each corner: the language of
