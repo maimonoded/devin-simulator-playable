@@ -86,7 +86,13 @@ function cardFace(card, opts){
   const converted=o.converted!=null?!!o.converted
                  :(card.id?Cards.converted(card.id):false);
   const art=Cards.artFor(card);
-  const cls=["ccard","size-"+size,"fam-"+fam,
+  /* A TROPHY LOOKS LIKE WHAT IT WILL BECOME (§4.1). A set interleaves memories with trophies —
+     the watch, the necklace, the villa — and the player wants the trophies more, so the two
+     kinds cannot be one picture apart. They are both `collection` family and always were: the
+     PLAQUE is what a trophy becomes on its third copy, not what it is. So the card wears the
+     plaque's corner brackets in advance, which is a promise rather than a second frame. */
+  const trophy=!!(card.id&&typeof Cards.isStatusCard==="function"&&Cards.isStatusCard(card.id));
+  const cls=["ccard","size-"+size,"fam-"+fam, trophy?"kind-trophy":"",
              r?("rar-"+r.key):"", owned?"got":"locked", converted?"conv":"",
              o.flip?"flip":""].filter(Boolean).join(" ");
   /* Drawn for locked slots too: three stars is what tells you whether the gap in the row is a

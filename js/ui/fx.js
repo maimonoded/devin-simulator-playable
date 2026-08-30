@@ -161,9 +161,12 @@ function bigConfetti(){
 
    The filled slots wear the card's own art, because that is literally what a second copy is:
    the same object again. Empty ones are a dashed outline over nothing, so they read as a place
-   rather than as a card that failed to load. */
-function cbSlots(card,have,need){
-  const art=card?Cards.artFor(card):null;
+   rather than as a card that failed to load.
+
+   `art` is a path or null. Clues pass null: an episode's four clues are four DIFFERENT pieces of
+   evidence, so repeating one photograph four times would say the opposite of what happened. A
+   plain gold slot says "one of these is in hand" without claiming which. */
+function cbSlots(art,have,need){
   const fill=art?`style="${cardArtCss(art)}"`:"";
   let out="";
   for(let i=0;i<need;i++)
@@ -244,12 +247,21 @@ function showCard(c){
      triumphant nought is worse than silence. */
   const pts=Math.round(+c.status||0);
   const need=Math.max(1,Math.round(+c.need||1));
+  /* HOW MANY CLUES THE NEXT EPISODE STILL WANTS — the same fan the cards use, and on a phone
+     the ONLY place this is ever said. The desktop Story panel carries it in prose, and
+     css/mobile.css hides that panel outright, so the player's-eye view had no answer to "how
+     much further" for the currency the whole game runs on. GDD §12 calls a visible progress
+     bar to the next unlock a non-negotiable; this is it, shown at the moment it changes. */
+  const clueEp=clue?drops[0].ep:null;
+  const [clueHave,clueNeed]=clueEp?Clues.progressFor(clueEp):[0,0];
   const caption=clue
     ? `${pair?`<div class="cbLines">${drops.map(d=>`<p>${d.clue.text}</p>`).join("")}</div>`:""}
+       ${clueNeed>0?cbSlots(null,clueHave,clueNeed)+
+         `<div class="cbEp">${clueHave>=clueNeed?"Unlocks":"toward"} <b>${Episodes.titleOf(clueEp)}</b></div>`:""}
        <div class="cbHint" id="cbHint">Tap to keep ${pair?"them":"it"} open</div>`
     : `<div class="cbCap">
         ${pts>0?`<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`:""}
-        ${trophy?cbSlots(c.collectible,Math.min(c.count,need),need):""}
+        ${c.collectible?cbSlots(Cards.artFor(c.collectible),Math.min(c.count,need),need):""}
         ${celebrate?`<div class="cbDone">⭐ Collected \u2014 it is a Collectible now</div>`
           :converted?`<div class="ccWon">Collected — that is the third copy</div>`:""}
       </div>`;

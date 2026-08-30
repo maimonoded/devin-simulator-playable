@@ -208,13 +208,13 @@ roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
       →  a clue      →  filed against the episode. Held on screen as its own CARD — the contact
                         sheet — for 2.5s, or until you TAP it and press Collect. Every shipped
                         row pays ONE; a row that pays more shows them in one beat (js/clues.js)
-      →  a MEMORY    →  banked. New → held 2s, headlining the status it paid. ALL THREE COPIES
-                        PAY THE SAME; the third also converts it. Beyond that → coins + a
-                        trickle                                                 (js/cards.js)
-      →  a TROPHY    →  the same, but held 5s on EVERY copy, and its counter is three card
-                        SLOTS with the gap still in it — which is what makes you want the next
-                        one, and can only show "2 of 3" if copy 2 stops the board. Third →
-                        celebration
+      →  a MEMORY    →  banked. New → held 2s, headlining the status it paid, over three card
+                        SLOTS with the gap still in them. ALL THREE COPIES PAY THE SAME; the
+                        third also converts it. Beyond that → coins + a trickle  (js/cards.js)
+      →  a TROPHY    →  the same, held 5s on EVERY copy — including the second, or the slots
+                        could never show 2 of 3, which is the state that does the work. Third →
+                        celebration. It is a `collection` card like a memory and always was, and
+                        wears the PLAQUE'S CORNER BRACKETS to say which of the two it is
       →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
                         (the Premiere's free pack, and the store)
    four of an episode's eight clues  →  it UNLOCKS  →  predict & watch, IN STORY ORDER

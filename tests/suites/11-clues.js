@@ -308,8 +308,19 @@ test("a landing pays ONE beat, however many clues it turned up", () => {
   try {
     const ev = landClues("clue", () => true, 1);
     const beats = ev.filter(e => e.card);
-    eq(beats.length, 1, "one landing, one beat");
-    eq(beats[0].card.drops.length, 2, "carrying both clues");
+    /* COUNTED AGAINST THE LOG, not against the row's `n`. A row paying two can draw the SAME
+       clue twice — Clues.grant picks uniformly from the episode's eight, so about one landing in
+       eight repeats — and the beat carries only the NEW ones, which is correct: a clue you
+       already hold is not worth stopping the board for. Asserting "two drops" therefore failed
+       roughly one run in eight, which is a flaky test about the random number generator wearing
+       the clothes of a test about batching. What is actually guaranteed is that one landing
+       produces one beat carrying exactly the clues that were new. */
+    const isDup = e => e.log && /you knew that one/.test(e.log.msg);
+    const logs = ev.filter(e => e.log);
+    const fresh = logs.filter(e => !isDup(e)).length;
+    eq(logs.length, 2, "the row paid two clues");
+    eq(beats.length, fresh ? 1 : 0, "one landing, one beat");
+    if (fresh) eq(beats[0].card.drops.length, fresh, "carrying exactly the ones that were new");
   } finally { rows.forEach((r, i) => { r.n = saved[i]; }); }
 });
 
