@@ -290,10 +290,13 @@ $("#episodesBtn").onclick=()=>{
 $("#albumBtn").onclick=()=>openAlbum();
 /* Both halves of the player block open the profile — the avatar and the rank beside it are one
    control as far as the player is concerned. */
+/* Each of these lands on the section it names — see openProfile() on why they share a screen
+   at all. The avatar, the level pill and the estate all mean "me, and how far up I am", which
+   is the top of it. */
 $("#avatarBtn").onclick=()=>openProfile();
 $("#hLevelPill").onclick=()=>openProfile();
-$("#hTrophyPill").onclick=()=>openProfile();
-$("#hCollectPill").onclick=()=>openProfile();   // both lead where both are listed
+$("#hTrophyPill").onclick=()=>openProfile("trophies");
+$("#hCollectPill").onclick=()=>openProfile("collectibles");
 $("#watchBtn").onclick=()=>openPrediction();
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;

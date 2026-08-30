@@ -22,7 +22,55 @@
    tuning drawer because the drawer is a developer surface and is hidden in ?view=mobile, where
    the avatar is the only route to it. */
 
-function openProfile(){ renderProfile(); }
+/* FIVE DOORS INTO ONE ROOM, so each one opens at the right shelf.
+
+   The level pill, the Collectibles pill, the Trophies pill, the avatar and the estate all land
+   here — correctly, because everything they name is on this screen. But every one of them
+   arrived at the top, so tapping the trophy count and tapping the level did the same thing, and
+   the pills read as four buttons that could not tell you what they were for.
+
+   `where` scrolls to the section the caller actually named. Not separate screens: they belong
+   together — this is one player, one Season — and splitting them would trade a small confusion
+   for four thin panels. */
+function openProfile(where){
+  renderProfile();
+  if(!where) return;
+  /* After render, and on a timer rather than a bare rAF: the sheet animates in, and rAF is
+     suspended in a background tab (js/util.js nextPaint has the long version of this). */
+  /* AFTER THE SHEET HAS LAID OUT, which is later than the next paint. The host is display:none
+     until .show lands, and while it is, every getBoundingClientRect is zero — so the offset
+     computed on the first frame was 0-0+0 and the scroller obediently went nowhere. Twice.
+
+     So this retries on a short ladder until the body is actually scrollable, and gives up rather
+     than looping: an un-scrollable profile is a short one, and a short one is already showing
+     the section that was asked for. */
+  const tries=[0,60,160,320];
+  const seek=(i)=>{
+    if(i>=tries.length) return;
+    setTimeout(()=>{
+      const host=$("#sheetHost"); if(!host) return;
+      const sc=host.querySelector(".mbody");
+      const zones=[...host.querySelectorAll(".stZone")];
+      if(!sc||!zones.length){ seek(i+1); return; }
+      /* RETRY, do not give up. An un-laid-out sheet has scrollHeight === clientHeight === 0, so
+         a bare "nothing to scroll" return here killed the ladder on its first rung and the
+         profile never moved — which is the bug this ladder existed to fix. */
+      if(sc.scrollHeight<=sc.clientHeight+4){ seek(i+1); return; }
+      const hasTrophies=!!host.querySelector(".stZone.trophyZone");
+      const target=where==="trophies" ? (hasTrophies?zones[0]:null)
+                 : where==="collectibles" ? zones[hasTrophies?1:0]
+                 : null;
+      if(!target) return;                                  // nothing named: leave it at the top
+      const to=target.getBoundingClientRect().top-sc.getBoundingClientRect().top+sc.scrollTop-8;
+      if(to<=0){ seek(i+1); return; }                     // not laid out yet — try again
+      /* scrollTop, NOT scrollTo({behavior:"smooth"}). The smooth form is silently ignored on this
+         element — measured: scrollTo left it at 0 while the very next scrollTop assignment moved
+         it to 440 — and a scroll that does not happen is worse than one that does not glide. */
+      sc.scrollTop=to;
+    },tries[i]);
+  };
+  seek(0);
+}
 
 function renderProfile(){
   const host=$("#sheetHost");
@@ -37,7 +85,7 @@ function renderProfile(){
      ever earned by calling an episode right. A locked slot per unwatched episode would spoil the
      running order, so only what has been won is drawn, with the count carrying the rest. */
   const won=Status.trophyIds();
-  const trophies=won.length?`<div class="stZone">
+  const trophies=won.length?`<div class="stZone trophyZone">
       <div class="stZoneHead">🎯 Called it
         <span class="stZoneCount">${won.length}/${Episodes.count()}</span></div>
       <div class="stGrid">${won.map(id=>{

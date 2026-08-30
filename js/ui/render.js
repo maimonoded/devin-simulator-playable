@@ -317,28 +317,46 @@ function renderEpTrack(){
   const num=Episodes.numberOf(id);
   const title=Episodes.titleOf(id);
   el.disabled=!ready;
+
+  /* THE METER FOR WHAT IS STILL BEING COLLECTED, whether or not something is ready to watch.
+
+     The two states used to be exclusive: ready won, and the clue progress vanished. But clues
+     keep landing while an episode sits unwatched, so the player was left with no idea how close
+     the next unlock was for as long as they had something to watch — which, once the story gets
+     going, is most of the time. Both facts are true at once and both belong on the row.
+
+     Null when everything is unlocked: there is nothing left to collect toward, and an empty
+     meter would be a promise the Season cannot keep. */
+  const nextId=Clues.currentId();
+  const meter=(()=>{
+    if(nextId==null) return "";
+    const [have,need]=Clues.progressFor(nextId);
+    let bar="";
+    for(let i=0;i<need;i++) bar+=`<i class="${i<have?"on":""}"></i>`;
+    /* When it IS the thing being tracked, the meter needs no label — the title is right there.
+       When something else is ready, it does: "EP 5" is what stops the bar reading as progress
+       toward the episode the row is offering. */
+    return ready
+      ? `<span class="etNext">EP ${Episodes.numberOf(nextId)}</span><span class="etBar">${bar}</span>`
+      : `<span class="etBar">${bar}</span><span class="etCount"><b>${have}/${need}</b></span>`;
+  })();
+
   if(ready){
+    /* ONLY ONE EPISODE IS EVER WATCHABLE. The drama is serialised, so however many are unlocked
+       the next in story order is the only one openPrediction will open — naming one is correct,
+       not a simplification. The title goes when something else needs the room: you are one tap
+       from a screen with the title on it. */
     el.className="epTrack ready";
     el.innerHTML=`<span class="etNum">EP ${num}</span>
       <span class="etTitle">${title}</span>
-      <span class="etState"><b>Ready</b> — tap to watch</span>`;
+      <span class="etState"><b>Ready</b> — tap</span>
+      ${meter}`;
     return;
   }
-  const [have,need]=Clues.progressFor(id);
-  const short=Math.max(0,need-have);
-  /* A segment per clue the episode wants — not four blank card slots, which said "collect four
-     of the same thing" about four different pieces of evidence. */
-  let bar="";
-  for(let i=0;i<need;i++) bar+=`<i class="${i<have?"on":""}"></i>`;
-  /* ONE ROW. Two rows and a full-width band cost 47px of a 812px phone — ninety per cent of the
-     HUD's own height — for a state that is ambient nearly all the time. The title takes whatever
-     room is left after the parts that cannot shrink: the episode NUMBER, the meter and the count.
-     It ellipses rather than wraps, because a second line is the thing being removed. */
   el.className="epTrack";
   el.innerHTML=`<span class="etNum">EP ${num}</span>
     <span class="etTitle">${title}</span>
-    <span class="etBar">${bar}</span>
-    <span class="etCount"><b>${have}/${need}</b></span>`;
+    ${meter}`;
 }
 
 function renderAll(){ renderHUD();renderNav();renderStats();renderStory();renderEpTrack();renderCaseBoard();

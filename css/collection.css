@@ -669,6 +669,10 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .etTitle{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:700;color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .etState{flex:0 0 auto;font-size:11px;color:var(--muted)}
+/* Which episode the meter is counting toward, when the row is offering a DIFFERENT one to
+   watch. Muted and small: it is context, not the action. */
+.etNext{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--muted);
+  margin-left:2px}
 .etState b{color:var(--teal);font-weight:800}
 .etCount{flex:0 0 auto;font-size:11px;color:var(--muted)}
 .etCount b{color:var(--teal);font-weight:800}
