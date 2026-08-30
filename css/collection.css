@@ -588,6 +588,27 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .cbProg b{color:var(--teal);font-weight:800}
 .cbDone{margin-top:9px;font-size:14px;font-weight:800;color:var(--gold);
      text-shadow:0 2px 10px rgba(0,0,0,.85)}
+/* TWO CLUES FROM ONE LANDING, side by side. They give up their slips: at half width the
+   sentence on the card is six-pixel Courier, so the cards carry the PICTURE and .cbLines below
+   carries the words at full width — the same division of labour as the evidence board on the
+   wager screen. The photo grows into the space the slip left, or the frame reads as a card with
+   a hole in it. */
+.cbPair{display:flex;gap:10px;justify-content:center;align-items:flex-start}
+.centerfx.card .cbPair .ccard{width:min(37vw,26vh,190px)}
+.cbPair .ccard.fam-clue .ccSlip{display:none}
+/* The episode caption goes too. Clues.grant always files against the same episode — the first
+   one still locked — so a pair is always two clues about ONE story, and printing its title twice
+   under two cards is noise that clips at this width into the bargain. "A CLUE" stays: that is
+   the identity, and it is what the pair is a pair OF. */
+.cbPair .ccard.fam-clue .ccSub{display:none}
+.cbPair .ccard.fam-clue .ccFoot{padding-bottom:11px}
+.cbPair .ccard.fam-clue .ccArt,
+.cbPair .ccard.fam-clue .ccGrain{inset:14px 16px 24%}
+.cbLines{margin-top:11px;text-align:left;display:flex;flex-direction:column;gap:6px}
+.cbLines p{margin:0;font-size:13px;line-height:1.45;color:var(--text);
+     text-shadow:0 2px 8px rgba(0,0,0,.85)}
+.cbLines p::before{content:"\25b8";color:var(--teal);margin-right:7px}
+
 /* A clue can be HELD. The hint has to be visible without competing with the sentence on the
    card, hence muted and small; it is replaced by the Collect button the moment it is used. */
 .cbHint{margin-top:10px;font-size:12px;color:var(--muted);pointer-events:none;

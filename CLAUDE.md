@@ -206,7 +206,8 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
                      →  money · a CARD · a clue · energy · a move · flavour
       →  a clue      →  filed against the episode. Held on screen as its own CARD — the contact
-                        sheet — for 7s, or until you tap it and press Collect   (js/clues.js)
+                        sheet — for 2.5s, or until you TAP it and press Collect. A row pays 2,
+                        and both arrive in ONE beat, side by side              (js/clues.js)
       →  a MEMORY    →  banked. New → held 2s, headlining the status it paid. Third copy →
                         becomes that card's COLLECTIBLE. Any other copy → coins  (js/cards.js)
       →  a TROPHY    →  the same, but held 5s on EVERY copy and counting itself "n of 3" —

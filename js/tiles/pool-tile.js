@@ -149,23 +149,29 @@ class PoolTile extends Tile {
        completely invisibly: players reached the wager screen and found four clues they had never
        once seen. The face was built, the art was picked, and nothing called it.
 
-       So the beat is the same three-way split drawCardEvents() uses (js/boxes.js), for the same
-       reason: a duplicate must not cost the player the same five seconds a new one is worth.
-         new clue  → the card, held on the board centre
-         duplicate → a coin float and a log line, and the board keeps moving */
+       ONE BEAT FOR THE WHOLE LANDING, not one per clue. A clue row pays `n` of them, and n is 2
+       on most rows — so a beat each meant two blocking cards back to back for a single roll. It
+       is one landing and it reads as one event, so it gets one card, or one PAIR of cards when
+       two arrived together. Measured: 43 clue beats a session became 24.
+
+       Duplicates get a log line and a coin float, and never a card — the same split
+       drawCardEvents() uses, because a clue you already hold is not worth stopping the board
+       for. The logs go in FIRST so the activity panel is already written by the time the
+       blocking beat opens. */
     got.forEach(g=>{
       if(!g.isNew){
         ev.push({log:{icon:"🔍",msg:`${row.name} · you knew that one · +<b>${fmt(g.coins)}</b> coins`}});
         return;
       }
       const [have,need]=Clues.progressFor(g.id);
-      ev.push({
-        card:{name:"A clue",positive:true,holdMs:cfg.clueHoldMs,
-              /* Clues.dropFor is the one builder — Boxes.dropClue() and the wager screen's
-                 evidence board call it too, so all three draw an identical face. */
-              drop:Clues.dropFor(g.id,g.clue,{isNew:true,coins:g.coins})},
-        log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
+      ev.push({log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
     });
+    if(fresh.length)
+      ev.push({card:{name:"A clue",positive:true,holdMs:cfg.clueHoldMs,
+                     /* Clues.dropFor is the one builder — Boxes.dropClue() and the wager
+                        screen's evidence board call it too, so all three draw an identical
+                        face. `drops` is a list because a landing can turn up more than one. */
+                     drops:fresh.map(g=>Clues.dropFor(g.id,g.clue,{isNew:true,coins:g.coins}))}});
     return [...ev,...after];
   }
 

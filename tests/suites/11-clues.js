@@ -227,7 +227,7 @@ test("a NEW clue landed on a tile returns a card beat, carrying a drop the face 
   const ev = landClues("clue", () => true, 1);
   const beat = ev.find(e => e.card);
   ok(beat, "a new clue produces a {card} beat, like every other card does");
-  const d = beat.card.drop;
+  const d = beat.card.drops && beat.card.drops[0];
   ok(d, "and it carries a drop rather than a generic panel");
   eq(d.kind, "clue");
   ok(Episodes.has(d.ep), "naming the episode it was filed against");
@@ -241,7 +241,7 @@ test("all THREE routes build the same drop — one face wherever you meet a clue
      the same clue looks like different objects depending on where you met it — which is the one
      thing a collection cannot do. Clues.dropFor() is the single builder; this pins that. */
   freshRun();
-  const tileDrop = landClues("clue", () => true, 1).find(e => e.card).card.drop;
+  const tileDrop = landClues("clue", () => true, 1).find(e => e.card).card.drops[0];
   freshRun();
   let boxDrop = null;
   for (let i = 0; i < 300 && !boxDrop; i++)
@@ -284,11 +284,29 @@ test("a DUPLICATE clue gets no card beat — it pays coins and the board keeps m
   const ev = landClues("clue", () => false, 60);
   const beats = ev.filter(e => e.card);
   ok(beats.length > 0, "new clues did land");
-  ok(beats.every(b => b.card.drop && b.card.drop.isNew === true),
+  const shown = beats.flatMap(b => b.card.drops || []);
+  ok(shown.every(d => d.isNew === true),
      "every card held on screen is a clue the player did NOT already have");
   const dups = ev.filter(e => e.log && /you knew that one/.test(e.log.msg));
   ok(dups.length > 0, "and repeats did occur, which is what makes this test mean anything");
-  eq(ev.filter(e => e.card && e.card.drop && !e.card.drop.isNew).length, 0,
-     "not one of them was held on screen");
+  eq(shown.filter(d => !d.isNew).length, 0, "not one of them was held on screen");
   ok(state.coins > before, "they converted to coins instead — GDD \u00a712's rule about variance");
+});
+
+test("a landing pays ONE beat, however many clues it turned up", () => {
+  /* A clue row pays n, and n is 2 on most rows. A beat each meant two blocking cards back to
+     back for a single roll — 43 of them a session at seven seconds apiece, which is not a beat
+     but a reading session. It is one landing, so it reads as one event. */
+  freshRun();
+  let paired = 0, beats = 0, landings = 0;
+  const ev = landClues("clue", () => false, 40);
+  ev.filter(e => e.card).forEach(b => {
+    beats++;
+    ok(b.card.drops.length >= 1, "a beat always carries at least one clue");
+    if (b.card.drops.length > 1) paired++;
+  });
+  ok(beats > 0, "beats did happen");
+  ok(paired > 0, "and some landings turned up more than one new clue at once");
+  /* The real guarantee: never more card beats than landings. */
+  eq(beats <= 40, true, "never more beats than there were landings");
 });

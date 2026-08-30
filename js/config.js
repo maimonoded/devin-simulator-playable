@@ -18,7 +18,7 @@ const DEFAULTS={
      average roll. These are set deliberately long — the card IS the reward, and a reward that
      is gone before it has been read is not one. Turn them down here if the board starts to feel
      like it is waiting for you. */
-  cardHoldMs:2000, statusHoldMs:5000, cardConvertMs:5000, clueHoldMs:7000,
+  cardHoldMs:2000, statusHoldMs:5000, cardConvertMs:5000, clueHoldMs:2500,
   vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
@@ -332,7 +332,7 @@ const TUNING=[
    ["cardHoldMs","Memory card held (ms)",100],
    ["statusHoldMs","Status card held (ms)",100],
    ["cardConvertMs","…a status card's THIRD copy (ms)",100],
-   ["clueHoldMs","Clue card held (ms)",100],
+   ["clueHoldMs","Clue card held — tap it to hold (ms)",100],
    ["vipRevealMs","Gala: dwell before moving on (ms)",100],
    ["scoopStepMs","Scoop: teleport (ms)",20],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],

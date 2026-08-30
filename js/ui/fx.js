@@ -194,14 +194,24 @@ function bigConfetti(){
    long run would spend most of its wall clock looking at cards it is not showing anyone. */
 function showCard(c){
   const el=$("#centerFx");
-  const clue=!!(c.drop&&c.drop.kind==="clue");
+  /* `drops` is the general case and `drop` the one-item shorthand every older caller uses. */
+  const drops=c.drops&&c.drops.length?c.drops:(c.drop?[c.drop]:null);
+  const clue=!!(drops&&drops[0].kind==="clue");
+  const pair=clue&&drops.length>1;
   const trophy=!!c.statusCard;
   const converted=!!c.converted;
   const celebrate=trophy&&converted;
   el.className="centerfx show card "+(c.positive?"win":"lose")+(clue?" holdable":"");
 
-  const face=c.drop
-    ? dropFace(c.drop,{size:"lg"})
+  /* TWO CLUES FROM ONE LANDING STAND SIDE BY SIDE, and give up their slips to do it. At half
+     width the sentence typed on the card is six-pixel Courier — so the cards become the
+     ARTEFACT and the prose moves underneath at full width, which is the same division of labour
+     the wager screen's evidence board already uses. One clue keeps its slip and needs none of
+     this. */
+  const face=drops
+    ? (pair
+        ? `<div class="cbPair">${drops.map(d=>dropFace(d,{size:"lg"})).join("")}</div>`
+        : dropFace(drops[0],{size:"lg"}))
     : c.collectible
     ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count,converted:c.converted})
     : `<div class="playcard">
@@ -217,7 +227,8 @@ function showCard(c){
   const pts=Math.round(+c.status||0);
   const need=Math.max(1,Math.round(+c.need||1));
   const caption=clue
-    ? `<div class="cbHint" id="cbHint">Tap the card to keep it open</div>`
+    ? `${pair?`<div class="cbLines">${drops.map(d=>`<p>${d.clue.text}</p>`).join("")}</div>`:""}
+       <div class="cbHint" id="cbHint">Tap to keep ${pair?"them":"it"} open</div>`
     : `<div class="cbCap">
         ${pts>0?`<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`:""}
         ${trophy?`<div class="cbProg"><b>${Math.min(c.count,need)}</b> of <b>${need}</b> collected</div>`:""}
@@ -251,8 +262,8 @@ function showCard(c){
        and would sit here forever. The card is the hit target rather than the whole overlay, so
        a stray tap on the board behind it does not freeze the beat. */
     if(clue&&!auto){
-      const card=el.querySelector(".ccard");
-      if(card) card.onclick=()=>{
+      /* Either card of a pair holds the beat — they arrived together and they leave together. */
+      el.querySelectorAll(".ccard").forEach(card=>card.onclick=()=>{
         if(done||held) return;
         held=true; clearTimeout(to);
         const hint=$("#cbHint"); if(hint) hint.remove();
@@ -260,7 +271,7 @@ function showCard(c){
         b.className="btn roll cbCollect"; b.textContent="Collect";
         b.onclick=finish;
         el.appendChild(b);
-      };
+      });
     }
   });
 }
