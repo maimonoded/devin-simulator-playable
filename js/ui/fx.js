@@ -163,9 +163,13 @@ function bigConfetti(){
    the same object again. Empty ones are a dashed outline over nothing, so they read as a place
    rather than as a card that failed to load.
 
-   `art` is a path or null. Clues pass null: an episode's four clues are four DIFFERENT pieces of
-   evidence, so repeating one photograph four times would say the opposite of what happened. A
-   plain gold slot says "one of these is in hand" without claiming which. */
+   NOT FOR CLUES. The fan briefly counted an episode's clues too, and it was wrong to: the slots
+   work here because they are literally the same object repeated — three Penthouse Keys, one
+   missing — and an episode's four clues are four DIFFERENT pieces of evidence. Four identical
+   blanks said "collect four of the same thing" about them, named no episode, and could not say
+   whether the episode was watchable. That job belongs to the tracker on the board
+   (renderEpTrack, js/ui/render.js), which is also there between rolls rather than for two and a
+   half seconds. */
 function cbSlots(art,have,need){
   const fill=art?`style="${cardArtCss(art)}"`:"";
   let out="";
@@ -252,15 +256,11 @@ function showCard(c){
      css/mobile.css hides that panel outright, so the player's-eye view had no answer to "how
      much further" for the currency the whole game runs on. GDD §12 calls a visible progress
      bar to the next unlock a non-negotiable; this is it, shown at the moment it changes. */
-  const clueEp=clue?drops[0].ep:null;
-  const [clueHave,clueNeed]=clueEp?Clues.progressFor(clueEp):[0,0];
   const caption=clue
     ? `${pair?`<div class="cbLines">${drops.map(d=>`<p>${d.clue.text}</p>`).join("")}</div>`:""}
-       ${clueNeed>0?cbSlots(null,clueHave,clueNeed)+
-         `<div class="cbEp">${clueHave>=clueNeed?"Unlocks":"toward"} <b>${Episodes.titleOf(clueEp)}</b></div>`:""}
        <div class="cbHint" id="cbHint">Tap to keep ${pair?"them":"it"} open</div>`
     : `<div class="cbCap">
-        ${pts>0?`<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`:""}
+        ${pts>0?`<div class="cbStat"><b>${trophy?"\ud83c\udfc6 ":""}+${fmt(pts)}</b><i>status</i></div>`:""}
         ${c.collectible?cbSlots(Cards.artFor(c.collectible),Math.min(c.count,need),need):""}
         ${celebrate?`<div class="cbDone">⭐ Collected \u2014 it is a Collectible now</div>`
           :converted?`<div class="ccWon">Collected — that is the third copy</div>`:""}

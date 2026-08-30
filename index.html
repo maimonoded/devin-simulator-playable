@@ -69,6 +69,11 @@
   <!-- stage -->
   <div class="stage">
     <button class="storeBtn" id="storeBtn">🛒 Store</button>
+    <!-- THE OBJECTIVE TRACKER. The one thing a collection game has to answer between rolls:
+         what am I chasing, how close am I, and can I do anything about it right now. It lived
+         only in the .side panel, which ?view=mobile hides outright — so on a phone the game
+         never said what the clues were FOR. js/ui/render.js renderEpTrack(). -->
+    <button class="epTrack" id="epTrack"></button>
     <div class="boardScene" id="boardScene">
       <!-- WebGL board (js/ui/board3d.js) plus a DOM layer for crisp tile labels -->
       <div class="boardHost" id="boardHost"></div>

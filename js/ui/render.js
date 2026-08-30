@@ -284,7 +284,54 @@ function renderStory(){
 }
 /* Reflect state.mult on the stake button (needed after a restore or user reset). */
 function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
-function renderAll(){ renderHUD();renderNav();renderStats();renderStory();renderCaseBoard();
+/* THE OBJECTIVE TRACKER — what the player is chasing, how close, and whether they can act.
+
+   The side panel answered this in prose and ?view=mobile hides the side panel, so on a phone the
+   game never said what the clues were FOR. A clue landed, a card flashed, and the reason was
+   nowhere. This is the between-rolls glance every collection game needs.
+
+   TWO STATES, and the actionable one wins. If an episode can be watched right now that is the
+   only thing worth saying, and the strip becomes a button that opens it. Otherwise it tracks the
+   episode the clues are actually buying — Clues.currentId(), the first one still locked, which
+   is where every clue goes by rule (js/clues.js) — with a segment per clue the episode wants.
+
+   THE EPISODE NUMBER LEADS. "Six Months on the Street" is a name; "EP 4" is a position, and
+   position is what tells you where you are in eighteen. */
+function renderEpTrack(){
+  const el=$("#epTrack"); if(!el) return;
+  const ready=Collection.firstUnwatchedId();
+  const id=ready||Clues.currentId();
+  if(!id){
+    el.className="epTrack done";
+    el.innerHTML=`<span class="etBody"><span class="etTitle">Every episode watched</span>
+        <span class="etState">The Season's story is finished</span></span>`;
+    el.disabled=true;
+    return;
+  }
+  const num=Episodes.numberOf(id);
+  const title=Episodes.titleOf(id);
+  el.disabled=!ready;
+  if(ready){
+    el.className="epTrack ready";
+    el.innerHTML=`<span class="etNum">EP ${num}</span>
+      <span class="etBody"><span class="etTitle">${title}</span>
+        <span class="etState"><b>Ready</b> — tap to watch</span></span>`;
+    return;
+  }
+  const [have,need]=Clues.progressFor(id);
+  const short=Math.max(0,need-have);
+  /* A segment per clue the episode wants — not four blank card slots, which said "collect four
+     of the same thing" about four different pieces of evidence. */
+  let bar="";
+  for(let i=0;i<need;i++) bar+=`<i class="${i<have?"on":""}"></i>`;
+  el.className="epTrack";
+  el.innerHTML=`<span class="etNum">EP ${num}</span>
+    <span class="etBody"><span class="etTitle">${title}</span>
+      <span class="etState"><span class="etBar">${bar}</span>
+        <b>${have}/${need}</b> clues · ${short} more to unlock</span></span>`;
+}
+
+function renderAll(){ renderHUD();renderNav();renderStats();renderStory();renderEpTrack();renderCaseBoard();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
   const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;
