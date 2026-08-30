@@ -15,10 +15,11 @@
      FAMILY  decides the FRAME.   collection · status · clue
      RARITY  decides the BADGE.   one to four STARS, coloured
 
-   A status item and an Epic collection card come out of the same box seconds apart and are
-   completely different things — one goes on the player's shelf and stays there, the other is a
-   card in a set. The frame is what carries that, because a label can be missed and a frame
-   cannot. The badge is orthogonal: it says how hard this was to get, in STARS and in colour,
+   The plaque and the gilt card are TWO STATES OF ONE THING, not two kinds of object. A card
+   sits in its set wearing gilt; its third copy converts it into a Collectible, and the same card
+   is then drawn as a plaque. So the frame is not decoration — it is the answer to "do I own this
+   outright yet", which a label could be missed and a frame cannot. Trophies wear the plaque too:
+   they are Collectibles that were never cards. The badge is orthogonal: it says how hard this was to get, in STARS and in colour,
    and it is drawn on every card that has a rarity whatever family it belongs to.
 
    ---- WHY THE THREE FAMILIES LOOK THE WAY THEY DO ----
@@ -154,7 +155,7 @@ function dropFace(drop, opts){
         <div class="ccFrame"></div>
         <div class="ccBig"><b>+${fmt(drop.item.points)}</b><i>status</i></div>
         <div class="ccFoot"><div class="ccName">${drop.item.name}</div>
-          <div class="ccSub">For your shelf</div></div>
+          <div class="ccSub">Collected</div></div>
       </div>`;
   }
   const big=drop.kind==="coins"?`🪙 +${fmt(drop.amount)}`:`⚡ +${drop.amount}`;

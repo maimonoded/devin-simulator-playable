@@ -1,13 +1,13 @@
 "use strict";
-/* "Your status went up" — the beat a status item earns.
+/* "Your status went up" — the beat a CONVERSION earns.
 
-   A collection card and a status item come out of the same box seconds apart and are completely
-   different things: a card is spent on unlocking an episode, an item goes on the player's shelf
-   and stays there. The gold frame says which is which (js/ui/box3d.js, css/collection.css); this
-   says what it DID — the track moving, and the rank changing when it changes.
+   GDD §4.3: the third copy of a card converts it into that card's Collectible, and that is the
+   moment a duplicate stops being a consolation and becomes the thing the player is collecting
+   toward. It is also the only inflow the player watches happen, so it gets the beat: the item,
+   what it paid, and the track moving under it.
 
-   Without it, earning an item moved a four-pixel bar in the corner of the HUD and nothing else.
-   The one number both loops feed deserves to be watched at least once.
+   Without it, converting a card moved a four-pixel bar in the corner of the HUD and nothing
+   else. The one number every loop feeds deserves to be watched at least once.
 
    ---- what it is not ----
 
@@ -39,25 +39,26 @@ function showStatusUp(up){
     const barMs=Math.max(0,cfg.statusBarMs||0);
     const holdMs=Math.max(0,cfg.statusUpMs||0);
 
+    /* Painted art if the card has any, and the procedural face if it has not — `art` is OPTIONAL
+       on a card (js/ui/cardface.js), so a Collectible can arrive with none, and url('null') is a
+       blank square with nothing in the console to explain it. */
     const items=up.items.map(i=>
-      `<span class="suItem" style="${cardArtCss(i.art)}" title="${i.name.replace(/"/g,"&quot;")}"></span>`).join("");
+      `<span class="suItem" style="${i.art?cardArtCss(i.art):cardProcCss(i)}" title="${
+        i.name.replace(/"/g,"&quot;")}"></span>`).join("");
     const names=up.items.map(i=>i.name).join(" · ");
 
-    /* WHY THIS APPEARED. Without it the beat named a mug, said +5, and left the player to work
-       out what a mug has to do with anything — which is the one question a reward popup exists
-       to answer. The information was always there: the caller knows whether it came out of a
-       box or was earned, and the item knows its own condition.
+    /* WHY THIS APPEARED. Without it the beat named a card, said +30, and left the player to work
+       out what a card they already had has to do with anything — which is the one question a
+       reward popup exists to answer. The answer is the conversion rule itself: this card is here
+       because a third copy of it just landed.
 
-       Only for a single item: two arriving together have two different reasons and one line
-       cannot carry both, so the plural case says what they have in common instead. */
-    const one=up.items.length===1?up.items[0]:null;
+       The plural case cannot name the reason twice, and several conversions in one box is the
+       common way this arrives, so it says how many rather than how each happened. */
     const why=up.items.length>1
-      ? `${up.items.length} pieces for your Showcase`
-      : up.source==="box"
-        ? "Found in the pack"
-        : one&&Status.earnWords(one)
-          ? `Earned at ${Status.earnWords(one)}`
-          : "Earned";
+      ? `${up.items.length} Collectibles`
+      : up.source==="converted"
+        ? `Collected — ${Cards.copiesToConvert()} copies`
+        : "Collected";
     const owed=Status.toNextLevel(to);
     el.innerHTML=`
       <div class="suRow">
@@ -65,7 +66,7 @@ function showStatusUp(up){
         <span class="suWords">
           <span class="suWhat">${names}</span>
           <span class="suWhy">${why}</span>
-          <span class="suGain">+${fmt(to-from)} status · on your shelf</span>
+          <span class="suGain">+${fmt(to-from)} status · in your collection</span>
         </span>
       </div>
       <div class="suTrack">

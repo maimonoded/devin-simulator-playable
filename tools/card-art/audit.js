@@ -54,7 +54,21 @@ const onDisk = new Set(fs.readdirSync(dir).filter(f => /\.webp$/.test(f)));
 
 const broken = all.filter(c => c.art && !onDisk.has(c.art)).map(c => c.id);
 const tagged = new Set(all.filter(c => c.art).map(c => c.art));
-const orphan = [...onDisk].filter(f => !tagged.has(f));
+
+/* RETIRED art is not an orphan. Season 1 was cut from 150 cards to 48, and the ~120
+   paintings that fell out are still on disk for a future Season to pick up.
+
+   Without this list every one of them reports as "generated, paid for, invisible" --
+   which is a real failure mode that has really happened, and an audit that reports it
+    120 times for reasons everyone already knows is an audit nobody reads. So the file
+   says which absences are deliberate, and anything NOT on it still fails.
+   assets/cards/retired.txt explains itself and how to bring one back. */
+const RETIRED_LIST = "assets/cards/retired.txt";
+const retired = new Set(
+  (fs.existsSync(RETIRED_LIST) ? fs.readFileSync(RETIRED_LIST, "utf8") : "")
+    .split("\n").map(l => l.trim()).filter(l => l && l[0] !== "#"));
+const orphan = [...onDisk].filter(f => !tagged.has(f) && !retired.has(f));
+const shelved = [...onDisk].filter(f => retired.has(f)).length;
 
 vm.runInContext("CARD_RARITIES", ctx).forEach(r => {
   const of = all.filter(c => c.rarity === r.key), done = of.filter(c => c.art).length;
@@ -62,8 +76,10 @@ vm.runInContext("CARD_RARITIES", ctx).forEach(r => {
               (done === of.length ? "  DONE" : ""));
 });
 console.log(`  ${"TOTAL".padEnd(10)} ${String(all.filter(c => c.art).length).padStart(3)}/${String(all.length).padStart(3)}`);
+if (shelved) console.log(`  ${"retired".padEnd(10)} ${String(shelved).padStart(3)}     kept on disk for a future Season`);
 if (broken.length) console.log("\nTAGGED BUT NO FILE:", broken.join(" "));
-if (orphan.length) console.log("\nON DISK BUT UNTAGGED:", orphan.join(" "));
+if (orphan.length) console.log("\nON DISK BUT UNTAGGED:", orphan.join(" "),
+  "\n(painted but in no catalogue row \u2014 tag it, or add it to " + RETIRED_LIST + ")");
 
 /* A missing encoder is a non-zero exit like any other problem. It is not a
    catalogue error, but it does mean "do not start a batch", which is the only

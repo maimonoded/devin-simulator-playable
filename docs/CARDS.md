@@ -17,9 +17,16 @@
 | **family** | the **frame and the ground** | `collection` · `clue` · `status` |
 | **rarity** | the **star badge** and the **halo** | ★ · ★★ · ★★★ · ★★★★ |
 
-Neither ever decides the other. That is what lets an Epic collection card and a status item come
-out of the same box seconds apart and be unmistakable — and it is why a Common and a Legendary
-are recognisably the *same kind of object*, differing in how loudly they announce themselves.
+Neither ever decides the other. That is why a Common and a Legendary are recognisably the *same
+kind of object*, differing only in how loudly they announce themselves — and why a card in the
+album and the Collectible it becomes on its third copy can share an id and still be told apart
+at a glance.
+
+**The family is a FACE, not a kind of content.** One card can wear two of them: a card is `collection`
+in the album, where it is a thing in a set with a rarity and a copy count, and `status` the
+moment it converts, where it is a thing you own outright and what matters is what it was worth.
+Getting this backwards produced a whole parallel system — ten "status items" that belonged to no
+set and converted from nothing — and it is why the ranking below is written down.
 
 **Rarity does not touch the frame.** It used to, and that was a bug in disguise: a Common wore a
 slate border and an Epic a purple one, which put four different-looking frames inside one family
@@ -45,7 +52,7 @@ collection.
 
 ---
 
-## Family 1 · Collection — 150 a Season
+## Family 1 · Collection — 48 a Season
 
 **Gilt border, fine inner rule, warm plum-brown ground.** Not the blue-black the rest of the app
 uses. That warmth does as much work as the gold: a clue is a *cold grey photograph*, a collection
@@ -54,10 +61,19 @@ two pixels wide.
 
 | rarity | in a Season | drop weight | converts for | each copy after | duplicate coins | badge |
 |---|---|---|---|---|---|---|
-| ★ Common | 90 | 60% | 10 | 2 | ×1 | `#8fa3c9` slate |
-| ★★ Rare | 38 | 25% | 30 | 6 | ×3 | `#4f9dff` blue |
-| ★★★ Epic | 18 | 12% | 100 | 20 | ×8 | `#b06bff` violet |
-| ★★★★ Legendary | 4 | 3% | 400 | 80 | ×25 | `#ffcb5c` gold |
+| ★ Common | 29 | 60% | 10 | 2 | ×1 | `#8fa3c9` slate |
+| ★★ Rare | 12 | 25% | 30 | 6 | ×3 | `#4f9dff` blue |
+| ★★★ Epic | 6 | 12% | 100 | 20 | ×8 | `#b06bff` violet |
+| ★★★★ Legendary | 1 | 3% | 400 | 80 | ×25 | `#ffcb5c` gold |
+
+**Four sets of twelve, and both kinds of card in every one** (§4.1): seven narrative cards — the
+blanket, the registrar's face — and five aspirational objects — the watch, the necklace, the
+villa. Same rarities, same drops, same conversion; the only difference is what they are a picture
+of. Finishing a set means owning both the memory and the trophy.
+
+The catalogue was 150 in fifteen sets until recently, and the count is what broke the loop rather
+than a matter of taste: against 150 cards a given Common came up **0.67 times** in a demo run, so
+the third copy — which is the whole of §4.3 — essentially never happened.
 
 Legendary also gets a slow shimmer across the sheen, because the rarest thing on screen should be
 the one that moves.
@@ -71,19 +87,18 @@ the one that moves.
 | **Converted ★** | the gilt **lights up**, chip becomes a star | the third copy turns the card into its Collectible (GDD §4.3). It stops being progress and becomes a thing you own, so the frame is where that is said |
 | **Duplicate** | gold band across the middle: `DUPLICATE +120` | only on a copy that did *not* convert. The converting copy gets a **teal** band instead, saying what it earned — stamping DUPLICATE across the best moment the collection has would be exactly backwards |
 
-### Most cards have no painted art, on purpose
+### Every card is painted, and `art` is optional anyway
 
-**All 150 are painted.** Every card in Season 1 has real art — no card in this build falls back
-to a gradient.
+**All 48 are painted**, the twenty aspirational objects included — drawn at card proportions
+rather than inherited from the old shelf's 320 × 320 squares.
 
 The **procedural face** is still there and still matters: a two-stop gradient hashed off the card
-id, so the same card is the same colours every time and different from its neighbours. A new
-Season opens with an unpainted catalogue, and that is what it looks like until the art lands —
-which is the whole reason `art` is optional. The game is never broken by a card that has not been
-drawn yet, it is only plainer.
+id, so the same card is the same colours every time and different from its neighbours. It is what
+a Season looks like between being authored and being drawn, which is the order those two jobs
+happen in — the game is never broken by a card nobody has painted yet, only plainer.
 
-§4.2 calls an Epic *"the pull that makes a pack memorable"*. Painted art earns its place there,
-not across ninety Commons that exist to be converted.
+§4.2 calls an Epic *"the pull that makes a pack memorable"*, and that is where painted art earns
+its place first when the two do come apart.
 
 ---
 
@@ -121,11 +136,13 @@ illustrates a specific clue.
 
 ---
 
-## Family 3 · Status — the Showcase
+## Family 3 · Status — a Collectible, and a trophy
 
-**A plaque, and the number is the hero.** Nobody reads what their status items *are*; they read
-what they were *worth*. So `+50` is set large across the middle in gold, and the picture is pushed
-back behind it to a stamp at 34% opacity.
+**A plaque, and the number is the hero.** Two things wear it, and only two: a **Collectible** —
+what a card becomes on its third copy (§4.3) — and a **"Called it" trophy**, one per episode.
+Those are the pieces that go on the Showcase rather than into the album, and nobody reads what a
+Showcase piece *is*; they read what it was *worth*. So `+50` is set large across the middle in
+gold, and the picture is pushed back behind it to a stamp at 34% opacity.
 
 That also settles the confusion that mattered: a face built around a number cannot be mistaken
 for a photograph (a clue) or for art in a set (a collection card), whichever way the light falls.
@@ -139,7 +156,17 @@ It keeps two things from the old treatment:
 And it loses one: the **halo is gone**. It was the loudest thing on screen, and it was shouting
 for the card the player cares least about looking at.
 
-**Status items have no rarity either.** They carry `points`, not a tier.
+**The plaque wears no star badge**, and a Collectible does have a rarity — `collectibleOf()`
+carries it, and it is what set the points. It is simply not what this face is about: by the time
+a card converts, the player has seen its stars three times in the album. What is new is the
+number.
+
+**This face is a state, not a shelf.** The plaque used to belong to ten hand-authored objects
+that shared an id with no card and could be bought outright, which made it look like a second
+family of content. It is the far side of a conversion now: the same card, gilt in the album while
+it is still progress, plaqued the moment it becomes something owned. The only piece here that is
+not a card is the trophy — and that is exactly why it is worth having, since it is the one
+Showcase piece a box cannot contain (§7.4).
 
 ---
 
@@ -176,15 +203,23 @@ the moment it was banked:
 | **The catalogue always wins** while it can answer | this is a fallback, not a second source of truth, so "derive, don't store" still holds on every normal path |
 | **Value is preserved** | a forgotten Legendary is still a Legendary: 400 on conversion, 80 a copy after |
 | **Identity is preserved** | it keeps its name and its rarity badge, and is flagged `lost` so a caller can say so rather than let it pass as ordinary |
-| **It does not inflate the Season** | `Cards.owned()` counts the catalogue, so a kept card never pads your `x/150` |
+| **It does not inflate the Season** | `Cards.owned()` counts the catalogue, so a kept card never pads your `x/48` |
 | **It is visible** | the collection gets a final **"Kept · from other content"** page. A card that is kept but appears nowhere is indistinguishable from one that was thrown away |
 | **Old saves are covered** | a save written before the record existed has it re-derived on load, so a collection is protected before the next card is banked, not after |
 | **It degrades** | an unreadable record falls back to the commonest rarity rather than being dropped — a card remembered by name is worth more than one not remembered at all |
 
-The asymmetry with the rest of the save is deliberate. **Status items and completed sets *are*
-filtered** against the current build: a card is a *held object* whose value is that you have it,
-so keeping it costs nothing. An item and a set are *scores*, and a score nothing can account for
-is corruption.
+The asymmetry with the rest of the save is deliberate. **Completed sets and trophies *are*
+filtered** against the current build — a `setsDone` key no set answers to, a trophy for an
+episode that no longer ships. A card is a *held object* whose value is that you have it, so
+keeping it costs nothing. A finished set and a called episode are *scores*, and a score nothing
+can account for is corruption.
+
+The old shelf's slot is **dropped on load** rather than filtered, because there is nothing left to
+filter it against: `Status` has no items, and a Collectible is derived from a card. Nor is it
+migrated — the shelf's ids belonged to no card, so there is no card to award. The aspirational
+objects were re-authored into the catalogue as new cards with new ids, which is the honest
+outcome: a mug that was bought for coins was never a Collectible, and the ledger should not
+pretend it was one.
 
 ---
 
@@ -192,9 +227,12 @@ is corruption.
 
 | | |
 |---|---|
-| the 150 cards, rarities, art paths | [`assets/cards/cards.js`](../assets/cards/cards.js) |
+| the 48 cards, rarities, art paths | [`assets/cards/cards.js`](../assets/cards/cards.js) |
 | ownership, conversion, sets, drawing | [`js/cards.js`](../js/cards.js) |
+| a Collectible, and which are held | `Cards.collectibleOf()` / `collectibleIds()` — derived, nothing stored |
+| a set's display piece | `Cards.setCentrepiece()` — the set's rarest card's Collectible |
 | clue text, per episode | [`episodes/NNN.js`](../episodes/README.md) |
-| Showcase items | [`assets/status/status.js`](../assets/status/README.md) |
+| the trophies | `Status.trophyOf()` — derived from the episode list ([`js/status.js`](../js/status.js)) |
+| the status TRACK the plaques feed | [`assets/status/status.js`](../assets/status/README.md) — bands and milestones, no items |
 | the DOM face | [`js/ui/cardface.js`](../js/ui/cardface.js) · [`css/collection.css`](../css/collection.css) |
 | the in-scene face | [`js/ui/box3d.js`](../js/ui/box3d.js) |

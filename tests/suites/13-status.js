@@ -31,11 +31,13 @@ test("status starts at zero and every inflow moves it", () => {
      hold the card — so the two stack. */
   eq(Status.points(),
      3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status);
-  /* 4 · the Showcase */
-  const item = Status.item("mug");
-  Status.grant("mug", "found");
+  /* 4 · a trophy — the only thing left that is granted whole rather than converted. The shelf
+     of ten buyable items used to be the fourth inflow; it is gone, because §8.1 lists exactly
+     four sources for a Collectible and "bought with coins" is not one of them. */
+  const ep = Episodes.ids()[0];
+  Status.grantTrophy(ep);
   eq(Status.points(),
-     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status + item.points);
+     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status + cfg.trophyStatus);
 });
 
 test("completing a set pays too, through the collection", () => {
@@ -51,7 +53,7 @@ test("the breakdown adds up to the points, so the drawer cannot lie", () => {
   freshRun();
   state.epsWatched = 4; state.predWins = 3;
   Cards.add(Cards.all()[0].id, 3);
-  Status.grant("mug", "found");
+  Status.grantTrophy(Episodes.ids()[0]);
   const sum = Status.breakdown().reduce((a, r) => a + r.points, 0);
   eq(sum, Status.points());
   eq(Status.breakdown().length, 4, "GDD §5.1 names four");
@@ -196,53 +198,61 @@ test("a Season turn moves the baseline and DELETES nothing", () => {
   }
 });
 
-suite("status: the Showcase");
+suite("cards: the Collectible");
 
-test("every item is both buyable and earnable — that is the design, not a variant", () => {
-  STATUS_ITEMS.forEach(i => {
-    ok(i.price > 0, `${i.id} has no coin price`);
-    ok(i.earn && Object.keys(i.earn).length === 1, `${i.id} has no play milestone`);
-    ok(i.points > 0, `${i.id} is worth nothing`);
-  });
+/* §4.3: "Three copies of a card convert into THAT CARD'S Collectible item. The item is the
+   object that carries Status value and displays in the collection."
+
+   For a long time we paid the Status and never made the object, and separately kept a shelf of
+   ten hand-authored "status items" that shared no id with any card and arrived by a {cards:5}
+   threshold, a coin purchase, or a box drop — none of which the doc describes. A player asked
+   which cards they had collected to earn a mug, and there was no answer. These hold the fix. */
+
+test("three copies materialise that card's Collectible, and nothing else does", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "epic");
+  /* collectibleOf() DESCRIBES, it does not assert ownership — the same split Status.trophyOf()
+     has always had, where hasTrophy() is the predicate. So it answers "what would this card
+     become", which is what a locked slot needs to draw, and converted() answers "have I". */
+  ok(Cards.collectibleOf(c.id), "it can describe the piece before you own it");
+  eq(Cards.converted(c.id), false, "but you do not have it");
+  ok(!Cards.collectibleIds().includes(c.id), "and it is not on the shelf");
+
+  Cards.add(c.id, 2);
+  eq(Cards.converted(c.id), false, "two copies is still not a Collectible");
+  ok(!Cards.collectibleIds().includes(c.id));
+
+  Cards.add(c.id, 1);
+  eq(Cards.converted(c.id), true, "the third copy makes it yours");
+  ok(Cards.collectibleIds().includes(c.id), "and now it is on the shelf");
+  const col = Cards.collectibleOf(c.id);
+  eq(col.id, c.id);
+  eq(col.name, c.name, "it IS that card — not a separate thing with its own name");
+  eq(col.points, Cards.rarity("epic").status, "and it carries the rarity's Status value (§5.1)");
 });
 
-test("buying spends the coins once and refuses when it cannot", () => {
+test("the Collectible list is derived, ordered by the catalogue, and stores nothing", () => {
   freshRun();
-  const item = Status.item("mug"), price = Status.priceOf(item);
-  state.coins = price - 1;
-  eq(Status.buy("mug"), null, "one coin short is short");
-  state.coins = price;
-  const r = Status.buy("mug");
-  ok(r); eq(r.cost, price); eq(state.coins, 0);
-  ok(Status.owns("mug"));
-  eq(Status.howGot("mug"), "bought");
-  eq(Status.buy("mug"), null, "and it cannot be bought twice");
+  const ids = Cards.all().slice(0, 4).map(c => c.id);
+  /* Banked out of order on purpose: display order must come from the content, not from the
+     order the player happened to pull them, or a shelf reshuffles itself as you collect. */
+  [ids[2], ids[0], ids[3]].forEach(id => Cards.add(id, 3));
+  deepEq(Cards.collectibleIds(), [ids[0], ids[2], ids[3]]);
+  eq(Cards.collectibleCount(), 3);
+  eq(state.collectibles, undefined, "nothing is stored — it is read off the copies");
 });
 
-test("statusPriceScale moves every price at once", () => {
+test("a set's display piece is its centrepiece (\u00a74.4)", () => {
   freshRun();
-  const base = Status.priceOf(Status.item("mug"));
-  cfg.statusPriceScale = 2;
-  eq(Status.priceOf(Status.item("mug")), base * 2);
-  cfg.statusPriceScale = 1;
-});
-
-test("sweep grants what the play milestones have earned, and only once", () => {
-  freshRun();
-  eq(Status.sweep().length, 0, "nothing is owed at the start");
-  state.epsWatched = 1;                        // ticket-framed wants one episode
-  const got = Status.sweep();
-  ok(got.some(i => i.id === "ticket-framed"));
-  eq(Status.howGot("ticket-framed"), "earned");
-  eq(Status.sweep().filter(i => i.id === "ticket-framed").length, 0, "not granted twice");
-});
-
-test("drawUnowned only ever offers something missing", () => {
-  freshRun();
-  const first = Status.drawUnowned();
-  ok(first && !Status.owns(first.id));
-  STATUS_ITEMS.forEach(i => Status.grant(i.id, "found"));
-  eq(Status.drawUnowned(), null, "a full shelf has nothing left to give");
+  const set = Cards.sets()[0];
+  set.cards.forEach(c => Cards.add(c.id, 1));
+  const paid = Cards.claimSet(set.key);
+  ok(paid, "the set pays");
+  ok(paid.piece, "and hands over a display piece, which it never used to");
+  const best = set.cards.reduce((a, c) =>
+    Cards.rarity(c.rarity).rank > Cards.rarity(a.rarity).rank ? c : a, set.cards[0]);
+  eq(paid.piece.id, best.id, "the rarest card in the set is the centrepiece");
+  eq(paid.status, cfg.setBonusStatus, "the piece is a display object, not extra points");
 });
 
 test("validate catches a band outside the Season and a milestone that pays nothing", () => {
@@ -260,44 +270,3 @@ test("validate catches a band outside the Season and a milestone that pays nothi
    Every surface that shows a status item owes the player an explanation of why they have it,
    or how they would get it. The condition is a {cards:5} object, so without this each caller
    invents its own phrasing and they drift. */
-test("earnWords turns a condition into a sentence, with the plural right", () => {
-  const w = i => Status.earnWords(i);
-  eq(w({ earn: { cards: 5 } }), "5 cards collected");
-  eq(w({ earn: { cards: 1 } }), "1 card collected", "not '1 cards'");
-  eq(w({ earn: { episodes: 1 } }), "1 episode watched");
-  eq(w({ earn: { episodes: 3 } }), "3 episodes watched");
-  eq(w({ earn: { boards: 1 } }), "1 set finished", "singular agrees with the requirement");
-  eq(w({ earn: { boards: 2 } }), "2 sets finished");
-  eq(w({ earn: { rolls: 60 } }), "60 rolls");
-  eq(w({}), "", "an item with no condition says nothing rather than something wrong");
-  eq(w(null), "");
-});
-
-test("the deed and the unit come from ONE table and cannot drift", () => {
-  /* The reward beat says what you DID; the profile's locked slot counts the UNIT. Same
-     condition, two shapes — and they lived in two separate tables that had already drifted to
-     "collecting" vs "collected" for the same mug. Both now key off Status.EARN. */
-  const mug = { earn: { cards: 5 } };
-  eq(Status.earnWords(mug), "5 cards collected", "the whole threshold");
-  eq(Status.earnUnit(mug), "cards collected", "the unit, for counting progress");
-  eq(Status.earnKey(mug), "cards");
-  /* Every key that produces a deed must also produce a unit, or one screen goes blank. */
-  Object.keys(Status.EARN).forEach(k => {
-    const fake = { earn: { [k]: 2 } };
-    ok(Status.earnWords(fake).length > 2, `${k} has no deed`);
-    ok(Status.earnUnit(fake).length > 2, `${k} has no unit`);
-  });
-  eq(Status.earnUnit({}), "", "no condition, no unit — not a broken string");
-});
-
-test("every shipped item can explain itself", () => {
-  /* A new item with an unhandled condition key would fall through to a raw "{n} {key}" — which
-     is legible but not English. This catches one being added without a phrasing. */
-  const known = ["cards", "episodes", "rolls", "boards"];
-  Status.items().forEach(i => {
-    const key = Object.keys(i.earn || {})[0];
-    ok(key, `${i.id} has no earn condition`);
-    ok(Status.EARN[key], `${i.id} earns on "${key}", which Status.EARN has no phrasing for`);
-    ok(Status.earnWords(i).length > 3, `${i.id} produced no words`);
-  });
-});

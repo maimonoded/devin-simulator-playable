@@ -127,34 +127,24 @@ const DEFAULTS={
      Status is a LEVEL, 1 to statusLevels, and it resets every Season. The two inflows priced
      here are the two the collection cannot pay for you: an episode WATCHED and a prediction
      CALLED RIGHT. The other two — converting a card and completing a set — are priced by the
-     rarity table and setBonusStatus above.
+     rarity table and setBonusStatus above. There is no fifth: the shelf of ten buyable status
+     items is gone, because 8.1 pays a Collectible for converting a card and nothing else, and
+     its ten objects are ordinary cards now.
 
      statusLevels / statusFirst / statusTotal describe the curve, which is built in
      js/economy.js beside the cost curve because 5.4 calls the Season gate "the single most
      important value in the game". THE TOTAL IS THE AUTHORITATIVE KNOB: the per-level costs ramp
      linearly from statusFirst and are solved so they sum to exactly statusTotal, so moving the
-     total moves how long a Season takes and nothing else has to be re-derived.
+     total moves how long a Season takes and nothing else has to be re-derived. Like the rest of
+     the economy-owned values these three mirror ECONOMY_DEFAULT, and why the gate is 4,000
+     rather than 5.4's 30,000 is argued where the model holds it — js/economy.js.
 
-     THE TOTAL IS SCALED TO THE CONTENT THAT ACTUALLY EXISTS, not to the doc's number. 5.4's
-     30,000 is calibrated for its full Season of 60 episodes; this build has 18. Simulated over
-     400 runs of 30 days at 40 rolls a day, a median player earns about 7,500 — every episode
-     unlocked and watched, ~134 of 150 cards seen, ~48 converted, ~14 predictions called right.
-     So 7,500 is a Season that a median player finishes in a month, a slow one in about five
-     weeks and a lucky one in under four. At 30,000 the ceiling on this content was 15,200 and
-     the gate was simply unreachable.
-
-     statusFirst came down with it. The two are not independent: 29 climbs summing to 7,500
-     average 259 apiece, so a 200 opener would have forced a nearly flat ramp. At 45 the ramp
-     runs 45 -> ~470, which is the ~10x escalation 5.4 asks for at this Season's scale. Re-run
-     the simulation if either the content or the pool weights change.
-
-     statusPriceScale moves every shop price at once without editing the ten of them.
      statusBarMs is how long the track takes to move when status is earned and statusUpMs how
      long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
      both belong in the drawer. */
   statusPerEpisode:50, statusPerPrediction:150,
-  statusLevels:30, statusFirst:25, statusTotal:4000,
-  statusPriceScale:1, statusBarMs:900, statusUpMs:1500,
+  statusLevels:30, statusFirst:25, statusTotal:5800,
+  statusBarMs:900, statusUpMs:1500,
   /* What a box's `coins` outcome pays when its table row does not name an amount. */
   boxCoins:60,
   /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
@@ -256,9 +246,14 @@ let boxTable=[
      card    one card from the Season catalogue (js/cards.js). `floor` is a rarity GUARANTEE —
              the draw comes out at that rarity or better
      clue    one clue for the episode being worked on (js/clues.js)
-     status  a status item nobody owns yet, by its own `box` weight (assets/status/status.js)
      coins   `amount`, scaled by cfg.boardScale
      energy  `amount`, topped up toward the cap, never reducing a purchased overflow
+
+   THERE IS NO `status` ROW ANY MORE. A box used to hand over a whole status item, which made it
+   a second way to mint a Collectible — 8.1 says converting a card is the way. Each tier's status
+   weight went to that tier's CARD rows, in proportion, so the totals and each tier's character
+   are what they were: the pull that used to pay an object off the shelf now pays the card that
+   object became.
 
    `clue: "fresh"` on the tier itself is the Insider's guarantee (6.5): one clue you do not
    already hold, on top of its draws. `escalates` makes its price climb with every Insider bought
@@ -268,33 +263,30 @@ let boxTiers=[
   { key:"standard", name:"Standard Pack", icon:"\ud83c\udf81", rank:1, items:1,
     art:"assets/boxes/silver.webp", coins:2500,
     table:[
-      {name:"A card",       kind:"card",                 weight:52},
+      {name:"A card",       kind:"card",                 weight:53},
       {name:"Rare or up",   kind:"card",  floor:"rare",  weight:6},
       {name:"A clue",       kind:"clue",                 weight:21},
-      {name:"Status item",  kind:"status",               weight:1},
       {name:"Coins",        kind:"coins",  amount:120,   weight:12},
       {name:"Energy",       kind:"energy", amount:3,     weight:8},
     ]},
   { key:"premium", name:"Premium Pack", icon:"\ud83c\udf81", rank:2, items:3,
     art:"assets/boxes/gold.webp", coins:12000,
     table:[
-      {name:"A card",       kind:"card",                  weight:30},
-      {name:"Rare or up",   kind:"card",  floor:"rare",   weight:24},
+      {name:"A card",       kind:"card",                  weight:32},
+      {name:"Rare or up",   kind:"card",  floor:"rare",   weight:26},
       {name:"Epic or up",   kind:"card",  floor:"epic",   weight:4},
       {name:"A clue",       kind:"clue",                  weight:22},
-      {name:"Status item",  kind:"status",                weight:4},
       {name:"Coins",        kind:"coins",  amount:400,    weight:10},
       {name:"Energy",       kind:"energy", amount:6,      weight:6},
     ]},
   { key:"insider", name:"Insider Pack", icon:"\ud83d\uddc2", rank:3, items:3,
     art:"assets/boxes/insider.webp", coins:20000, clue:"fresh", escalates:true,
     table:[
-      {name:"A card",       kind:"card",                     weight:8},
-      {name:"Rare or up",   kind:"card",  floor:"rare",      weight:34},
-      {name:"Epic or up",   kind:"card",  floor:"epic",      weight:20},
+      {name:"A card",       kind:"card",                     weight:10},
+      {name:"Rare or up",   kind:"card",  floor:"rare",      weight:40},
+      {name:"Epic or up",   kind:"card",  floor:"epic",      weight:24},
       {name:"Legendary",    kind:"card",  floor:"legendary", weight:2},
       {name:"A clue",       kind:"clue",                     weight:14},
-      {name:"Status item",  kind:"status",                   weight:12},
       {name:"Coins",        kind:"coins",  amount:1500,      weight:6},
       {name:"Energy",       kind:"energy", amount:12,        weight:4},
     ]},
@@ -424,7 +416,6 @@ const TUNING=[
    ["statusLevels","Levels in a Season",1,{min:2,max:99}],
    ["statusFirst","Status for level 2",10,{min:1}],
    ["statusTotal","Status for the whole Season",500,{min:100}],
-   ["statusPriceScale","Shop prices ×",0.05,{min:0.05,max:20}],
    ["statusBarMs","Earned: track moves (ms)",50],
    ["statusUpMs","Earned: held afterwards (ms)",50]]},
  {group:"Prediction & wager",items:[

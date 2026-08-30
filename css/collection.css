@@ -1,4 +1,4 @@
-/* ---------- the collection: cards, the album, the box popup, the status shelf ----------
+/* ---------- the collection: cards, the album, the box popup, the profile ----------
 
    Loaded after overlay.css and before mobile.css. The card family is prefixed `cc` because
    `.card` is already the side panel's box in panels.css — see js/ui/cardface.js. */
@@ -99,11 +99,11 @@
 @keyframes ccShimmer{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 
 /* ---------- THE FRAME IS THE FAMILY ----------
-   Three families come out of the same box seconds apart and are completely different things: a
-   collection card belongs to a set, a status item goes on the shelf and stays there, and a clue
-   is a sentence you have to read. The frame carries that, because a label can be missed and a
-   frame cannot — and it is independent of the rarity badge above, so an Epic card and a status
-   item can never be mistaken for one another however good the art is. */
+   Three families are completely different things: a collection card belongs to a set, a status
+   piece is a thing you were PAID — a trophy for calling an episode right — and a clue is a
+   sentence you have to read. The frame carries that, because a label can be missed and a frame
+   cannot — and it is independent of the rarity badge above, so an Epic card and a trophy can
+   never be mistaken for one another however good the art is. */
 
 /* collection — GOLD, and warm underneath. A gilt border with a fine inner rule set just inside
    it, over a deep plum-brown ground rather than the blue-black everything else in the app uses.
@@ -199,8 +199,8 @@
 
 /* status — a PLAQUE, and the NUMBER is the hero.
 
-   Nobody reads what their status items are; they read what they were worth. A status item is
-   banked, not admired — so the points are set large across the middle and the picture is pushed
+   Nobody reads what a trophy is called; they read what it was worth. A status piece is banked,
+   not admired — so the points are set large across the middle and the picture is pushed
    back behind them to a stamp. That also settles the one confusion that mattered: a face built
    around a number cannot be mistaken for a photograph (a clue) or for art in a set (a card),
    whichever way the light falls on it.
@@ -363,7 +363,7 @@ html.viewMobile .statusChip .rkName{display:none}
 html.viewMobile .rkBar{width:30px;height:4px}
 @keyframes chipBump{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
 
-/* ---------- the profile / the room ---------- */
+/* ---------- the profile: the trophies, and the Collectibles ---------- */
 .rankBox{background:rgba(10,13,38,.5);border:1px solid var(--line);border-radius:14px;
   padding:10px 12px;margin-bottom:12px}
 .rankLine{display:flex;align-items:baseline;gap:8px;font-size:13px;margin-bottom:7px}
@@ -376,22 +376,19 @@ html.viewMobile .rkBar{width:30px;height:4px}
   color:var(--teal);margin-bottom:7px}
 .stZoneCount{margin-left:auto;color:var(--muted);letter-spacing:0}
 .stGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.stItem{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px;
-  text-align:center;position:relative}
-/* Owned, on the shelf: the same gold frame it arrived in. */
-.stItem.got{border-color:var(--gold);box-shadow:0 0 16px rgba(255,203,92,.28)}
-.stItem.got .stArt{box-shadow:inset 0 0 0 1.5px rgba(255,203,92,.5)}
+/* EVERY TILE HERE IS SOMETHING THE PLAYER HOLDS — a trophy they were paid for calling an
+   episode right, or a card they converted. So there is no silhouette state and no lit/unlit
+   pair: the gold frame is the frame, not a highlight. Both went with the shelf of ten items
+   that could be owned or not, and with the buy button under each of them — nothing on this
+   screen is for sale (GDD §2.2), so nothing on it has a price, a "how to earn it" line or an
+   unowned state to draw. */
+.stItem{background:var(--panel2);border:1px solid var(--gold);border-radius:12px;padding:8px;
+  text-align:center;position:relative;box-shadow:0 0 16px rgba(255,203,92,.28)}
 .stArt{width:100%;aspect-ratio:1;background-size:cover;background-position:center;border-radius:9px;
-  filter:grayscale(1) brightness(.34)}
-.stItem.got .stArt{filter:none}
+  box-shadow:inset 0 0 0 1.5px rgba(255,203,92,.5)}
 .stName{font-family:Georgia,serif;font-size:11.5px;font-weight:700;margin-top:5px;line-height:1.2}
 .stPts{font-size:10px;color:var(--gold);font-weight:800;margin-top:1px}
 .stHow{font-size:10px;color:var(--teal);margin-top:4px;font-weight:700}
-.stWays{margin-top:5px}
-.stBuy{width:100%;background:var(--gold);color:#241a02;border-radius:9px;padding:5px 4px;
-  font-size:11px;font-weight:800}
-.stBuy.cant{background:var(--panel);color:var(--muted);border:1px solid var(--line)}
-.stEarn{font-size:9.5px;color:var(--muted);margin-top:3px}
 .stBlurb{font-size:9.5px;color:var(--muted);margin-top:5px;line-height:1.35;font-style:italic}
 
 /* ---------- the drawer's percentage column ---------- */

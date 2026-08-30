@@ -21,7 +21,9 @@
    of three non-negotiable mitigations for a game where both tracks are random.
 
    Nothing about conversion is stored. `state.cards` is copies held, and converted is
-   `count >= cfg.cardCopiesToConvert`. One number, one derivation, nothing to drift.
+   `count >= cfg.cardCopiesToConvert`. One number, one derivation, nothing to drift. The
+   Collectible those copies convert INTO is not stored either — it is synthesised from the
+   catalogue on demand (collectibleOf, below), the way a trophy is (js/status.js).
 
    ---- ownership is Season-wide and permanent ----
 
@@ -198,6 +200,60 @@ const Cards = {
     return state.cardMeta[id];
   },
 
+  /* ---------------- the Collectible (§4.3) ----------------
+
+     "Three copies of a card convert into THAT CARD'S Collectible item. The item is the object
+     that carries Status value and displays in the collection." The item had never been an
+     object: conversion set a boolean, paid points by rarity, and left nothing to look at. So a
+     player's Collectibles — the whole point of collecting — could not be listed, shown or put on
+     a shelf, because there was nothing to put there.
+
+     SYNTHESISED, NEVER STORED, exactly like a trophy (Status.trophyOf). Everything a Collectible
+     is made of — its name, its art, what it is worth, which set it belongs to — is already in
+     the catalogue, and the one fact that is not (do you have three?) is already the copy count.
+     A stored item would be a second source of truth for something wholly derivable, and it would
+     have to be migrated into every existing save. Conversion stays `count >= copiesToConvert()`.
+
+     THE ITEM EXISTS WHETHER OR NOT IT HAS BEEN EARNED — collectibleOf() describes the card's
+     Collectible, collectibleIds() says which ones the player actually holds. That split is what
+     lets §4.4's set display piece be a piece the player has not converted, and lets a locked
+     slot show what it would be. */
+  collectibleOf(id) {
+    const card = this.get(id);
+    if (!card) return null;
+    const r = this.rarity(card.rarity);
+    /* A card the catalogue has forgotten still has a Collectible: get() falls through to the
+       save's own record (see get()), so a converted Legendary from a retired Season keeps its
+       name and its 400 points instead of quietly becoming an anonymous Common. setForCard()
+       cannot answer for it, which is what `sub` on the remembered card is for. */
+    const set = this.setForCard(id);
+    return {
+      id,
+      name: card.name,
+      art: this.artFor(card),
+      points: Math.round(r.status || 0),
+      rarity: r,
+      setKey: set ? set.key : "",
+      setName: set ? set.name : (card.sub || ""),
+    };
+  },
+  /* Every Collectible the player holds, in CATALOGUE order — iterated over the content and not
+     over state.cards, because the object of the exercise is a display and a shelf that reorders
+     itself as cards land is not a collection. Every Season, not just the current one: ownership
+     outlives a Season reset (§5.3), and so does the Showcase.
+
+     Cards the catalogue has forgotten come last, in whatever order the save holds them. There is
+     no authored position left to put them in, and dropping them would make a shelf that silently
+     shrinks when content is re-cut. */
+  collectibleIds() {
+    const need = this.copiesToConvert();
+    const out = [];
+    CARD_SEASONS.forEach((s, n) => this.all(n).forEach(c => { if (this.count(c.id) >= need) out.push(c.id); }));
+    this.lostIds().forEach(id => { if (this.count(id) >= need) out.push(id); });
+    return out;
+  },
+  collectibleCount() { return this.collectibleIds().length; },
+
   /* ---------------- drawing ----------------
      A rarity by weight (§4.2's 60/25/12/3), then uniform within it. `floor` is a pack's rarity
      guarantee: draws at that rarity or better, which is how §4.5's Premium and Insider packs
@@ -245,9 +301,31 @@ const Cards = {
   unclaimedSets(n) {
     return this.sets(n).filter(s => this.setComplete(s.key, n) && !this.setClaimed(s.key));
   },
+  /* §4.4's DISPLAY PIECE: the set's centrepiece, which is its rarest card's Collectible. It is
+     the object §5.2 means by a "set centrepiece" — the one thing on the Showcase that says you
+     finished a set rather than got lucky once, and the reason the set is worth chasing when it
+     gates nothing.
+
+     The RAREST card, not a new object of its own: a set that finished with a Legendary in it
+     should be remembered by the Legendary. Ties go to the first authored, so the piece is stable
+     the moment the catalogue is written rather than depending on which copy landed last.
+
+     Earned by COMPLETING the set, so it does not ask whether that card has converted — the
+     three-copy rule prices Status, and this is a display object, which is why claimSet() pays no
+     extra points for it. The bonus is cfg.setBonusStatus and it always was. */
+  setCentrepiece(key, n) {
+    const s = this.setOf(key, n);
+    if (!s || !s.cards.length) return null;
+    let best = s.cards[0];
+    s.cards.forEach(c => { if (this.rarity(c.rarity).rank > this.rarity(best.rarity).rank) best = c; });
+    return this.collectibleOf(best.id);
+  },
   /* Pay for one. Coins and Status, and a record that it has been paid — that record is the ONE
      thing about a set that has to be stored, because "was this bonus already given" is not
-     derivable from a collection that only ever grows. */
+     derivable from a collection that only ever grows.
+
+     `piece` rides on the result rather than being looked up again by the caller, because a set
+     is claimed once and the announcement is the only moment the piece is ever handed over. */
   claimSet(key) {
     const s = this.setOf(key);
     if (!s || !this.setComplete(key) || this.setClaimed(key)) return null;
@@ -255,7 +333,8 @@ const Cards = {
     state.setsDone[key] = state.day | 0;
     const coins = Math.round((+cfg.setBonusCoins || 0) * (+cfg.boardScale || 1));
     state.coins += coins;
-    return { key, set: s, coins, status: Math.round(+cfg.setBonusStatus || 0) };
+    return { key, set: s, coins, status: Math.round(+cfg.setBonusStatus || 0),
+             piece: this.setCentrepiece(key) };
   },
   completedSets(n) { return this.sets(n).filter(s => this.setComplete(s.key, n)); },
 

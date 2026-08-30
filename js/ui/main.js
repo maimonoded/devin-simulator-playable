@@ -55,29 +55,26 @@ async function showUnlocks(ids){
   await openEpisodeUnlock(playable);
 }
 
-/* Status milestones met by whatever just happened — a card collected, an episode watched, a
-   set finished, a roll made. Idempotent (js/status.js), so calling it after every beat costs
-   nothing and missing one only delays a toast. */
-async function afterCollect(){
-  const before=Status.points();
-  const got=Status.sweep();
-  if(got.length){
-    got.forEach(i=>log("⭐",`Status · earned <b>${i.name}</b> · +${i.points}`));
-    renderAll();
-    /* The same beat a box's status drop gets — an item earned by playing is the same kind of
-       thing as one found in a box, so it is shown the same way rather than as a toast that
-       scrolls past. */
-    await showStatusUp({items:got,from:before,to:Status.points(),source:"earned"});
-  }
-  /* …and every LEVEL milestone the points just crossed (GDD 5.3). After the item sweep, because
-     an item is worth points and can be the thing that crosses the level. */
-  await afterMilestones();
-}
+/* Every LEVEL milestone the points just crossed (GDD 5.3) — every five levels, each paid once.
+   The sweep is idempotent (js/status.js), so calling it after every beat costs nothing and a
+   missed one is a delayed reward rather than a lost one. A pack milestone opens the box for
+   real, which is why this awaits playEvents rather than announcing it.
 
-/* Status milestones, every five levels. Each pays once; the sweep is idempotent, so a missed
-   one is a delayed reward and never a lost one. A pack milestone opens the box for real, which
-   is why this awaits playEvents rather than announcing it. */
-async function afterMilestones(){
+   It used to sweep a shelf of earnable status items first. That shelf is gone (GDD 8.1): the ten
+   objects are ordinary cards now, so they arrive through the box flow like everything else and
+   there is nothing left here to hand over on a threshold. */
+/* THE SNAPSHOT COMES FIRST, before the sweep — the same rule bankedEvents() states and for the
+   same reason: "unlocked" is derived, so the only way to know what changed is to look before.
+
+   This used to reconstruct the snapshot AFTERWARDS, from the episodes that were unlocked and
+   either queued or watched. That reads as a careful filter and is in fact the identity: watched
+   is defined as unlocked MINUS queued, so "queued or watched" is every unlocked episode there
+   is. `before` was always the full set, `fresh` was always empty, and a clue cache that completed
+   an episode announced nothing — worse, it left the episode unlocked and un-queued, which
+   Collection.watchedIds() reads as ALREADY WATCHED. The milestone quietly ate the episode it
+   had just paid for. */
+async function afterCollect(){
+  const beforeMilestones=Collection.unlockSnapshot();
   const paid=Status.milestoneSweep();
   for(const p of paid){
     const m=p.milestone;
@@ -88,8 +85,7 @@ async function afterMilestones(){
       toast(`🏅 Level ${m.level} — <b>${p.clues.length} clue${p.clues.length>1?"s":""}</b>`);
       /* A clue cache can complete an episode, and the unlock owes the same beat it owes
          anywhere else — so it goes through the event list rather than round it. */
-      const fresh=Collection.claimUnlocked(Collection.unlockedEpisodeIds()
-        .filter(id=>state.epQueue.includes(id)||Collection.watchedIds().includes(id)));
+      const fresh=Collection.claimUnlocked(beforeMilestones);
       if(fresh.length) await playEvents([{unlock:{ids:fresh}}]);
     }
     if(p.energy) toast(`🏅 Level ${m.level} — <b>+${p.energy}</b> energy`);
@@ -135,9 +131,6 @@ async function roll(){
     console.error("roll failed:",e);
     log("⚠️","<b>Something went wrong mid-roll</b> — board recovered.");
     clearOverlayFx();
-    /* The sweep is idempotent, so a roll that died still hands over what was earned — just
-       without the ceremony, since the ceremony is what may have broken. */
-    Status.sweep();
   }finally{
     state.animating=false;
     renderAll();
@@ -177,8 +170,9 @@ async function runAuto(mode){
   }
 }
 /* The session loop's coin sink, and the reason it is a balancing tool rather than a fast
-   player: it converts every spare coin into progress, boxes first because those are what move
-   the collection, then the status shelf.
+   player: it converts every spare coin into progress. Boxes are the WHOLE sink now — GDD 2.2
+   has money buying packs and nothing else, so the shelf of status items this used to clear out
+   afterwards is gone with it.
 
    Packs go through Boxes.buyEvents() like every other purchase, so the batch run pays exactly
    what a human pays and draws against exactly the same tables — and showPack() takes its fast
@@ -193,13 +187,6 @@ async function autoSpend(){
     if(!ev) break;
     await playEvents(ev);
     t=Boxes.cheapest();
-  }
-  let item=Status.cheapestBuyable();
-  while(item){
-    const r=Status.buy(item.id);
-    if(!r) break;
-    log("🛍",`Bought <b>${r.item.name}</b> · −${fmt(r.cost)} coins · +${r.item.points} status`);
-    item=Status.cheapestBuyable();
   }
   await afterCollect();
 }

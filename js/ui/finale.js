@@ -72,7 +72,13 @@ function showBoardComplete(){
 }
 
 /* The story is over: every set collected, every episode unlocked. Pure celebration plus the
-   offer of a fresh run — there is no more content to continue into. */
+   offer of a fresh run — there is no more content to continue into.
+
+   The card count comes from Cards, not Status. It read Status.cardsCollected(), which counted
+   album slots and went away when the card inflow became Cards.statusPoints() — so the one screen
+   the whole run ends on threw a TypeError and never drew at all. Cards is where ownership lives,
+   and "collected" is a Collectible (§4.3): a card three copies deep. Nothing else here counts
+   cards, so there was nothing to contradict it and nothing to notice until the run ended. */
 function seriesComplete(){
   confetti(); setTimeout(confetti,300); setTimeout(confetti,600);
   const acc=(()=>{const t=state.predWins+state.predLoss;return t?Math.round(state.predWins/t*100):0})();
@@ -84,7 +90,7 @@ function seriesComplete(){
     <div class="mbody"><div class="result">
       <div class="big" style="color:var(--gold)">${Episodes.count()} episodes</div>
       <div style="margin-top:8px;color:var(--muted)">
-        ${state.boardsDone+1} sets · ${Status.cardsCollected()} cards ·
+        ${state.boardsDone+1} sets · ${Cards.collectibleCount()} collected ·
         ${state.epsWatched} watched · ${acc}% accuracy · finished as
         <b>${rank.icon} ${rank.name}</b></div></div>
     <button class="btn purple wide" id="newRun" style="margin-top:16px">Start over</button></div></div>`;

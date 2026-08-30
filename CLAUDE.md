@@ -4,9 +4,9 @@
 two are alternatives being compared, and this branch is not to be merged until one is chosen.)*
 
 A Monopoly-GO-style board game used to model a short-drama app's economy: roll dice around a
-40-tile board, land on a 🎁 tile to win a **box**, open it for a **collectible card**, and
-completing a page of five cards unlocks a story episode — which you watch by betting on what
-happens next. Coins buy more boxes and the **status** items that mark you out as a fan.
+40-tile board, land on a 🎁 tile to win a **box**, open it for a **collectible card**, and four
+clues unlock a story episode — which you watch by betting on what happens next. Coins buy more
+boxes; a third copy of a card turns it into the **Collectible** that marks you out as a fan.
 
 ## Running it
 
@@ -48,7 +48,7 @@ assets/env/         the world around the board: scene.js manifest + models/  →
 assets/dice/        the die: models/die.glb, built not reconstructed    → assets/dice/README.md
 assets/npcs/        the series' characters, to stand on tiles           → assets/npcs/README.md
 assets/cards/       WHAT THERE IS TO COLLECT: cards.js + the card art   → assets/cards/README.md
-assets/status/      the status track and its ten items                  → assets/status/README.md
+assets/status/      the status track: bands and milestones              → assets/status/README.md
 assets/estate/      THE OBJECT AT THE BOARD'S CENTRE: six tiers of one building
                                                                 → assets/estate/README.md
 assets/boxes/       the three box tiers' art                            → assets/boxes/README.md
@@ -80,7 +80,7 @@ js/
   clues.js          WHAT UNLOCKS AN EPISODE: per-episode evidence, and the edge it buys
   cards.js          THE COLLECTION: the Season catalogue, copies, conversion, sets
   collection.js     the ARC and the library — which episodes, unlocked, watched, turned over
-  status.js         the status track: points, ranks, buying, milestone sweep
+  status.js         the status track: points, levels, bands, trophies, milestone sweep
   boxes.js          the three box tiers, the drop tables, and openBoxEvents()
   tiles/            ONE class for the four pooled types, plus the four corners → js/tiles/README.md
   game.js           rolling, landing dispatch, prediction, session time
@@ -102,7 +102,7 @@ js/
     album.js        the album: one page per episode, empty slots and all
     pack.js         opening a box — tap it, or it opens itself after five seconds
     statusup.js     "your status went up" — the track moving, and the rank turning over
-    profile.js      the status track and the shelf of things that prove it
+    profile.js      the status track, the Collectibles behind it, and the trophies
     store.js        boxes, coins and energy
     finale.js       set-complete and collection-complete celebrations
     economy-panel.js  the drawer's Economy section: provenance, curve, series, .xlsx import
@@ -127,8 +127,8 @@ roll()  →  resolveLandingEvents()  →  [{float}, {log}, {move}, {pack}, {unlo
 
 The collectible loop rides the same rail. Everything that banks cards goes through
 `bankedEvents()` (`js/boxes.js`), which **banks first** and then returns `{unlock}` for any
-episode the cards just completed, `{statusUp}` for a status item, and `{boardDone}` when that was
-the last page of the set. Its two callers are `openBoxEvents()` (a whole box, with the popup) and
+episode the draw just bought, `{statusUp}` for every card that reached its third copy and became
+a Collectible, and `{boardDone}` when that was the last page of the set. Its two callers are `openBoxEvents()` (a whole box, with the popup) and
 `drawCardEvents()` (one card off a pool row, or the Gala's guaranteed one). The store calls
 `openBoxEvents()` too, so a box bought is exactly a box landed on — one code path, so the odds,
 the unlock and the set-complete check cannot drift apart between them.
@@ -188,9 +188,9 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 | Bonus mini-games | `minigames/` `js/ui/minigame.js` | A **pool row may name a game** — the two that do sit in the `bonus` table the arrivals draw from, so a mini-game is a property of the outcome rather than of the ground you are standing on. Each opens its own full-frame game over the board — Steal the Spotlight and the Premiere match-3. Each game is a standalone page in an iframe, driven by `postMessage` — the app is classic scripts sharing one global namespace, and these files bring their own `$`, `fmt`, `renderer` and a `*` reset. **The engine owns the money**: the tile banks the coins, picks the winning prize rung, and hands the game finished numbers to present — which is why the match-3 deck is resolved as cells are opened rather than shuffled. A missing or broken game degrades to the Collect popup, so it can never cost coins. Note the large bonus's ladder currently pays 2/3 of the model's number; see [TODO.md](TODO.md). → [README](minigames/README.md) |
 | Die artwork | `assets/dice/` | The one asset built rather than reconstructed: image-to-3D invents the three faces it can't see, and knows nothing of opposite-faces-sum-to-7. Scenario supplies the surface, `tools/make-dice.py` supplies the counts and the geometry. Unit cube **centred on the origin**, unlike tiles. → [README](assets/dice/README.md) |
 | **Clues** | `js/clues.js` `episodes/NNN.js` | **What unlocks an episode**, and the evidence you bet on — one object doing both jobs (GDD §6.1). Each episode authors eight; `cfg.cluesPerEpisode` of them unlocks it, so two players arrive at the same wager holding different evidence. A duplicate pays coins. The catch-up valve eases the requirement by one a day after `cfg.clueStuckDays`. |
-| **The collection** | `js/cards.js` `assets/cards/` | 150 cards a Season — 90 Common, 38 Rare, 18 Epic, 4 Legendary — in **15 sets of ten** (GDD §4.6). Three copies **convert** a card into its Collectible, which is what pays Status; copies past that trickle. A set is a target and **never a gate**. Ownership is Season-wide and survives a Season reset. → [README](assets/cards/README.md) |
+| **The collection** | `js/cards.js` `assets/cards/` | 48 cards a Season — 29 Common, 12 Rare, 6 Epic, 1 Legendary — in **4 sets of twelve**, and 20 of the 48 are **status cards**: the watch, the necklace, the villa (§4.1). Three copies **convert** a card into its Collectible — the object that carries Status and stands on the Showcase (§4.3); copies past that trickle. A set is a target and **never a gate**, and finishing one pays its **display piece** (§4.4). Ownership is Season-wide and survives a Season reset. → [README](assets/cards/README.md) |
 | **Boxes** | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | The only way anything is collected. Three tiers, each `items` draws against its own weighted table. Opened the moment they are won — and **not in a dialog**: the box is the same GLB the board used to stand on a tile, it arrives over the middle of the board, and you tap the mesh. It bursts where it stood and the cards fly out and hang in the air. The only DOM is a caption and the countdown bar (`js/ui/pack.js`), which also holds the modal fallback for when there is no WebGL. Every empty case falls forward, so a box always pays. → [README](assets/boxes/README.md) |
-| **Status** | `js/status.js` `js/ui/profile.js` `assets/status/` | **A LEVEL, 1–30, that resets every Season** (GDD §5). Four inflows, every one of them *derived*: converting a card, completing a set, watching an episode, calling a prediction right. Milestones every five levels pay a clue cache, energy or a pack. The curve lives in the economy model — §5.4 calls the Season gate "the single most important value in the game". → [README](assets/status/README.md) |
+| **Status** | `js/status.js` `js/ui/profile.js` `assets/status/` | **A LEVEL, 1–30, that resets every Season** (GDD §5). Four inflows, every one of them *derived*: converting a card, completing a set, watching an episode, calling a prediction right. **None of them is a purchase** — §8.1 gives a Collectible no route in but play, so this file is the track, the bands and the trophies, and nothing here has a price. Milestones every five levels pay a clue cache, energy or a pack. The curve lives in the economy model — §5.4 calls the Season gate "the single most important value in the game". → [README](assets/status/README.md) |
 | **The Status Estate** | `js/ui/estate3d.js` `assets/estate/` | The object at the board's centre, upgrading with the level (§3.5). One tier per status band, so the title and the house change in the same beat. → [README](assets/estate/README.md) |
 | NPCs | `assets/npcs/` `js/ui/npc3d.js` | Simon, Victoria and Carl, walking the ring clockwise on the tiles' **inner** edge — the tile centre is taken by art and the token. **Scenery, deliberately**: they own no state, are not persisted, and pay nothing, so they stay outside the event list that everything else reaches the player through. Scaled by **height** like the player piece and held under `cfg.tokenHeight`, so a figure walking in front of the token can never bury it. Who walks and which way each faces is data in `assets/npcs/npcs.js` — facing is not a convention here, since one of the three fronts −X. **`cfg.npcs` ships at 0**, and off means the models are never fetched: `NPC3D.init()` deliberately does not load, `tick()` does on the first frame it runs enabled, so the drawer toggle still works with no reload. Switching back off hides them rather than dropping them. → [README](assets/npcs/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
@@ -206,16 +206,17 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
                      →  money · a CARD · a clue · energy · a move · flavour
       →  a clue      →  filed against the episode being worked on  (js/clues.js)
-      →  a card      →  banked. New → held on screen. Third copy → CONVERTS, and says so.
-                        Any other copy → coins, and the board keeps moving  (js/cards.js)
+      →  a card      →  banked. New → held on screen. Third copy → becomes that card's
+                        COLLECTIBLE, and says so. Any other copy → coins    (js/cards.js)
       →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
                         (the Premiere's free pack, and the store)
    four of an episode's eight clues  →  it UNLOCKS  →  predict & watch, IN STORY ORDER
    the same clues are the EVIDENCE you read before betting
-   all five WATCHED  →  the SET is done  →  a fresh 25 on the next five episodes
+   all five WATCHED  →  the ARC is done  →  it turns over onto the next five episodes
+   twelve cards of one SET  →  its display piece, which is the set's rarest Collectible
 ```
 
-**Unlocking and watching are two different gates.** Which cards fall is luck, so pages fill in
+**Unlocking and watching are two different gates.** Which clues fall is luck, so pages fill in
 whatever order they fill — page 2 can complete first. Watching cannot work that way: the drama is
 serialised, and episode 2's prediction question gives away episode 1. So a page filling *unlocks*
 its episode (it is in the library, the album shows it collected), but it only becomes *playable*
@@ -225,21 +226,22 @@ holding things up so every surface can explain itself. `openPrediction()` enforc
 place, so the library, the 🎬 button, the album's Watch button and the result screen's
 "next episode" cannot disagree.
 
-**A set ends on the last WATCH, not the last card.** Collecting is the means; the episodes are the
-point, so the set holds until they have all been seen (`Collection.boardFinished()`, which also
-refuses while a reveal is still sealed). That is why the celebration lives at the end of the
+**An arc ends on the last WATCH, not the last card.** Collecting is the means; the episodes are
+the point, so the arc holds until they have all been seen (`Collection.boardFinished()`, which
+also refuses while a reveal is still sealed). That is why the celebration lives at the end of the
 prediction flow rather than in the box flow — and why the auto-play session has to watch
-(`autoWatch()` in `js/ui/main.js`), or a batch run would fill set 1 and then roll forever.
+(`autoWatch()` in `js/ui/main.js`), or a batch run would fill arc 1 and then roll forever.
 
-Coins come out of boxes and out of duplicate cards, and go back into more boxes and into the
-**status** shelf. Clue cards do double duty: they are a fifth of a page like any other card,
-*and* a new one banks a clue that raises the next prediction's modelled accuracy.
+Coins come out of boxes and out of duplicate cards, and go straight back into more boxes and into
+energy. **That is the whole shop.** A Collectible has no price anywhere in the game (§8.1), so
+there is never a screen where the track can be bought past.
 
 Three rules hold the whole thing together and are worth knowing before changing any of it:
 
-1. **The pool is derived from the requirements.** Nothing declares "25". A card that can drop
-   but is never wanted is a `Collection.validate()` error, printed in the tuning drawer and
-   logged at boot.
+1. **A card is wanted because it is missing.** Nothing derives the catalogue from a requirement
+   any more, so what `Cards.validate()` guards is what a typo would otherwise hide: an id reused
+   across Seasons, which would silently merge two different cards into one pile, and rarity
+   weights that no longer sum to a hundred. Printed in the tuning drawer, logged at boot.
 2. **"Unlocked" is derived from the albums.** There is no moment at which an episode is marked
    unlocked, so a caller that has just banked cards asks what changed by snapshotting before and
    comparing after (`unlockSnapshot` / `claimUnlocked`). No second source of truth to drift, and
@@ -281,13 +283,26 @@ Four inflows (§5.1), and not one of them is stored:
 | inflow | where it already lives |
 |---|---|
 | converting a card — the third copy | `state.cards`, priced by the rarity table |
-| completing a set of ten | `state.setsDone`, priced by `cfg.setBonusStatus` |
+| completing a set of twelve | `state.setsDone`, priced by `cfg.setBonusStatus` |
 | watching an episode | `state.epsWatched` × `cfg.statusPerEpisode` |
 | calling a prediction right | `state.predWins` × `cfg.statusPerPrediction` |
 
-The shelf items are Collectibles too — granted whole rather than converted, and the seed of the
-Showcase (§5.2). So a player who never spends a coin still climbs, and one who buys the whole
-shelf still has to watch the show and call it right to finish a Season.
+**Four, and there is no fifth — but there was.** A shelf of ten hand-authored "status items" used
+to sit beside this table, arriving by a `{cards: 5}` threshold, a coin purchase, or a box dropping
+one whole. §8.1 gives a Collectible four routes in and none of those is one of them, and the
+question that exposed it was a player asking *which cards did I collect to earn this cup*. There
+was no answer: the cup shared an id with nothing. Those aspirational objects are ordinary cards
+now — twenty of the forty-eight (§4.1) — so the answer is the card, and every route in is play.
+
+Trophies are the one thing still granted whole, and that is precisely why they are worth having:
+a "Called it" is the only Showcase piece a box cannot contain (§7.4).
+
+**The Showcase is a display, not the player-curated one §5.2 asks for.** The profile lists every
+Collectible the player has converted, grouped by its set, with the trophies above them — and that
+is all it does. The doc's Showcase is a room *other players visit*, with pieces chosen to be seen;
+choosing what to show only means something when someone can come and look, and there are no
+visits in this build. Building the curation first would be a settings screen pretending to be a
+social feature. It is deliberately absent, not missing.
 
 **The one stored thing is a baseline.** `state.seasonFrom` is the lifetime total at the moment
 this Season began; points this Season are the difference. That is what lets §5.3's reset take
@@ -349,11 +364,19 @@ decorations on one idea, and getting the ranking backwards is a real bug — it 
 - **collection** — a **gilt border over a warm plum-brown ground**. Not the blue-black the rest
   of the app uses; the art is the point and the warmth separates it from the cold grey of a clue
   as much as the gold does.
-- **status** — a **plaque, and the number is the hero**. Nobody reads what their status items
-  are; they read what they were worth, so `+50` is set large across the middle and the picture is
-  pushed back behind it to a stamp at 34% opacity. It keeps the gold and the **corner ticks** —
-  brackets read as something hung on a wall, which is what a Showcase piece is — but the halo is
-  gone: it was the loudest thing on screen, for the card the player cares least about looking at.
+- **status** — a **plaque, and the number is the hero**. Worn by a **Collectible** and by a
+  **trophy**: the two things that go on the Showcase rather than into the album. Nobody reads
+  what a Showcase piece is; they read what it was worth, so `+50` is set large across the middle
+  and the picture is pushed back behind it to a stamp at 34% opacity. It keeps the gold and the
+  **corner ticks** — brackets read as something hung on a wall, which is what a Showcase piece is
+  — but the halo is gone: it was the loudest thing on screen, for the card the player cares least
+  about looking at.
+
+  Note what this does *not* mean: the plaque is a **face**, not a family of content. The same
+  status card is a gilt collection card in the album, because that is what it is — an object in
+  a set, with a rarity and a copy count — and a plaque the moment it converts, because that is
+  when it becomes a thing you own outright. One id, two faces, and the face says which side of
+  the conversion you are looking at.
 
 The frame carries it, because a label can be missed and a frame cannot.
 
@@ -367,34 +390,44 @@ illustrates a specific one.
 
 Both halves have to move together in three places: the canvas path (`js/ui/box3d.js`,
 `js/ui/estate3d.js`), the DOM path (`js/ui/cardface.js`, `.fam-*` and `.rar-*` in
-`css/collection.css`), and the profile shelf. That is the cost of a card looking the same
+`css/collection.css`), and the profile's Showcase. That is the cost of a card looking the same
 everywhere, and it is the point.
 
-**A small slot no longer has to abbreviate.** An album row is ten cards wide, and a clipped
+**A small slot no longer has to abbreviate.** An album row is five cards wide, and a clipped
 "LEGENDAR" read as a bug where "Leg" read as an abbreviation — which is what `short` was for.
 Four stars are narrower than the shortest of those words, so the badge stopped needing it.
 
-**All 150 cards are painted** in Season 1 — nothing in this build shows a gradient. The
-procedural fallback in `cardFace()` survives and still earns its place: `art` is OPTIONAL, so a
-new Season can open with an unpainted catalogue and be plainer rather than broken. It hashes the
-card id into two hues, so the same card is the same colours every time.
-`tools/card-art/` is how the art gets made; `audit.js` there reports what is missing.
+**All 48 cards are painted** in Season 1 — the twenty status objects included, drawn at card
+proportions rather than inherited from the shelf's square crops. The procedural fallback in
+`cardFace()` survives and still earns its place: `art` is OPTIONAL, so a catalogue can grow ahead
+of its pictures and be plainer rather than broken. It hashes the card id into two hues, so the
+same card is the same colours every time. `tools/card-art/` is how the art gets made; `audit.js`
+there reports what is missing.
 
-**Earning a status item plays a beat** (`js/ui/statusup.js`): the item in its frame, the points
-gained, and the track moving from where it was to where it is. When the points cross a rank
-boundary the bar cannot simply animate to its new fraction — it would run *backwards*, because
-the new rank starts near empty. So it fills to the top of the old rank, the rank flips, and it
-fills again from the bottom of the new one: two moves, in the order the progress actually
-happened.
+**Converting a card plays a beat** (`js/ui/statusup.js`): the new Collectible in its plaque
+frame, the points gained, and the track moving from where it was to where it is. When the points
+cross a rank boundary the bar cannot simply animate to its new fraction — it would run
+*backwards*, because the new rank starts near empty. So it fills to the top of the old rank, the
+rank flips, and it fills again from the bottom of the new one: two moves, in the order the
+progress actually happened.
 
-Both routes go through it — a box's `{statusUp}` event and the milestone sweep in
-`afterCollect()` — because an item earned by playing is the same kind of thing as one found in a
-box. It blocks the roll loop like every other reward beat, and skips entirely in an auto-play
-session.
+**There is exactly one route into it now**, `bankedEvents()`'s `{statusUp}`, and that is the
+repair rather than a simplification. The ribbon used to fire for a shelf item a box had dropped
+whole — so the loudest beat in the game belonged to the reward the player had done least to earn,
+while the third copy of a card, which is what a pack is actually worked toward (§4.3), passed
+with a line in the log. The beat now belongs to the conversion. It blocks the roll loop like
+every other reward beat, and skips entirely in an auto-play session.
 
 **A completed card set gets its own, smaller beat** (`showSetComplete` in `js/ui/finale.js`). It
 is a reward, not a chapter ending, and it never gated anything — so it says what it paid and gets
 out of the way. Like every blocking beat it resolves on a timer as well as on a click.
+
+What it pays is the set's **display piece** (§4.4), and that is `Cards.setCentrepiece()`: the
+Collectible of the set's **rarest** card, not a new object authored beside it. A set that had a
+Legendary in it should be remembered by the Legendary, and a twelfth piece with an id of its own
+would be exactly the mistake the shelf was. Ties go to the first authored, so the piece is
+settled the moment the catalogue is written rather than by which copy happened to land last, and
+it is earned by *finishing the set* — it does not ask whether that particular card has converted.
 
 ### The scene's animations are driven by frames but ENDED by timers
 
@@ -569,7 +602,7 @@ the hold without rolling.
 
 |  | **Auto roll** (hold Roll) | **Auto-play session** |
 |---|---|---|
-| Spends coins | no | yes — the cheapest box first, then the cheapest status item |
+| Spends coins | no | yes — the cheapest box it can still afford, until it cannot. Boxes are the only thing there is to buy |
 | Intent | simulates a real player | internal balancing tool |
 | Opening a box | tap it, or it opens itself after five seconds | skipped entirely; the cards are banked either way |
 | Train bonus game | plays it, and picks for itself after the 10–20s window (nobody is at the keyboard) | skipped — takes the Collect popup's fast path, so no WebGL page is opened per roll |

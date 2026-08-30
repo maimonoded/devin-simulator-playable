@@ -40,9 +40,6 @@ function initState(){
     /* Insider Packs bought since the last episode unlocked — what its price escalates on
        (GDD 6.5). Reset by Collection.claimUnlocked(). */
     insiderBought:0,
-    /* THE SHELF. Status item id → {day, how} — how being "bought" | "earned" | "found".
-       js/status.js. Collectibles granted whole, and the seed of the Showcase (GDD 5.2). */
-    status:{},
     /* STATUS IS A LEVEL, and this is the only thing about it that is stored: the lifetime points
        at the moment this Season began. Points THIS Season are the difference, which is how 5.3's
        reset takes Status to zero while the collection, the Showcase and the prediction record

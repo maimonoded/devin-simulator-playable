@@ -104,7 +104,7 @@ function serializeState(){
     /* The collection, the finished sets and the shelf. All plain objects keyed by id, so they
        serialise as they stand — no Map to spread, and a card or item the content no longer
        defines simply sits there harmlessly until it is defined again. */
-    cards:state.cards, cardMeta:state.cardMeta, setsDone:state.setsDone, status:state.status,
+    cards:state.cards, cardMeta:state.cardMeta, setsDone:state.setsDone,
     seasonFrom:state.seasonFrom, seasonsDone:state.seasonsDone, statusMilestones:state.statusMilestones,
     trophies:state.trophies, insiderBought:state.insiderBought,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
@@ -204,16 +204,14 @@ function loadState(){
     state.trophies={};
     const rawT=(d.trophies&&typeof d.trophies==="object")?d.trophies:{};
     Object.keys(rawT).forEach(id=>{ if(Episodes.has(id)) state.trophies[id]=Math.max(1,Math.floor(+rawT[id]||1)); });
-    /* THE SHELF. Only items this build defines — unlike a card, a status item that no longer
-       exists is worth points nothing can explain, and the profile has nowhere to draw it. */
-    state.status={};
-    const rawStatus=(d.status&&typeof d.status==="object")?d.status:{};
-    Object.keys(rawStatus).forEach(id=>{
-      if(!Status.item(id)) return;
-      const e=rawStatus[id]||{};
-      state.status[id]={day:Math.max(1,Math.floor(+e.day||1)),
-                        how:["bought","earned","found"].includes(e.how)?e.how:"earned"};
-    });
+    /* THE SHELF IS GONE, and a save that predates its removal carries `status` we deliberately
+       do not read. Those ten items are cards now (GDD 4.1), so a Collectible is derived from
+       state.cards like everything else — there is nothing left to rehydrate, and reviving the
+       bag would pay points for objects the catalogue can no longer describe.
+
+       A pre-change save therefore loses up to 250 points while `seasonFrom` stays where it was,
+       which reads as the Status track going BACKWARDS. Reset user is the honest fix; this is a
+       demo build and no live save is worth a migration for it. */
     // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
     const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
     /* The queue is what is UNLOCKED AND UNWATCHED, so it can only ever hold episodes that are

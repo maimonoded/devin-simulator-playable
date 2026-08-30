@@ -6,10 +6,10 @@
    what was inside is shown, one card at a time.
 
    THE MONEY IS ALREADY BANKED before this runs. js/boxes.js opened the box, added the cards,
-   paid the coins and shelved the status item; the event carries a description of what happened
-   so this can present it. That is the same split the bonus mini-games use, and it is why
-   skipping the animation — an auto-play session, a mid-roll error, a closed tab — can never
-   change what the player got.
+   paid the coins and converted any card this was the third copy of; the event carries a
+   description of what happened so this can present it. That is the same split the bonus
+   mini-games use, and it is why skipping the animation — an auto-play session, a mid-roll
+   error, a closed tab — can never change what the player got.
 
    ---- IT IS NOT A DIALOG ----
 
@@ -196,9 +196,11 @@ function showPackModal(res){
 /* The line under the row — what the card that just turned over actually is. */
 function dropNote(d){
   if(d.kind==="card"&&d.card){
-    /* The three card beats, in the order they matter (GDD 4.3). The converting copy is the
-       payoff and says what it earned; a plain duplicate says what it consoled. */
-    if(d.converted) return `<b>${d.card.name}</b> — <b>collected!</b> +${d.status} status`;
+    /* The three card beats, in the order they matter (GDD §4.3). The converting copy is the
+       payoff, and it says the word the rest of the game uses for it: the third copy makes the
+       card a COLLECTIBLE, which is the object that pays Status and stands on the profile. A
+       plain duplicate says what it consoled instead. */
+    if(d.converted) return `<b>${d.card.name}</b> — <b>Collected!</b> a Collectible · +${fmt(d.status)} status`;
     if(!d.isNew) return `<span class="dupNote">${d.card.name} ×${d.count} — <b>+${fmt(d.coins)}</b>🪙</span>`;
     const set=Cards.setForCard(d.card.id);
     return `<b>${d.card.name}</b> — ${set?set.name:""}`;
@@ -206,7 +208,8 @@ function dropNote(d){
   if(d.kind==="clue") return d.isNew
     ? `<b>A clue</b> on ${Episodes.titleOf(d.ep)}`
     : `<span class="dupNote">You knew that one — <b>+${fmt(d.coins)}</b>🪙</span>`;
-  if(d.kind==="status") return `<b>${d.item.name}</b> — <b>+${d.item.points}</b> status`;
+  /* No `status` arm: a box drops cards, clues, coins and energy, and the only status a box ever
+     pays now is the conversion above. The ten-item shelf it used to hand out is gone. */
   if(d.kind==="coins") return `<b>+${fmt(d.amount)}</b> coins`;
   if(d.kind==="energy") return `<b>+${d.amount}</b> energy`;
   return "";

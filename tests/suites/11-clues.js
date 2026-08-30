@@ -154,3 +154,62 @@ test("the requirement can never exceed what an episode actually authors", () => 
          `${id} would be unlockable only in theory`));
   } finally { cfg.cluesPerEpisode = saved; }
 });
+
+suite("clues: the unlock reaches the queue");
+
+/* Land repeatedly on the first tile that draws from `pool`, with only clue rows live, until
+   `done()` or the attempts run out. Returns every event produced. */
+function landClues(pool, done, cap) {
+  let i = 0;
+  for (; i < boardSize(); i++) if (tilePool(i) === pool) break;
+  const type = tileType(i), tile = TILE_TYPES[type];
+  const seen = [];
+  forcePool(pool, r => r.kind === "clue", () => {
+    for (let k = 0; k < (cap || 300); k++) {
+      seen.push(...tile.onLand({ pos: i, mult: 1, bs: cfg.boardScale }));
+      if (done()) return;
+    }
+  });
+  return seen;
+}
+
+/* THE BUG THIS PINS was silent and total, which is why it gets four assertions rather than one.
+
+   "Unlocked" is derived from the clues. "Watched" is derived as UNLOCKED MINUS state.epQueue
+   (Collection.watchedIds), and only Collection.claimUnlocked pushes onto that queue. So a clue
+   row that completed an episode's four WITHOUT claiming did not merely fail to announce it —
+   the episode became unlocked and instantly read as ALREADY WATCHED. firstUnwatchedId() went
+   null, the 🎬 button never lit, and blockedBy() named the NEXT episode, which was not unlocked
+   at all. The story ate an episode per unlock, and nothing threw.
+
+   Clues are the primary unlock route (§6.1), so this was most of the game. */
+test("a clue row that completes an episode QUEUES it, rather than skipping past it", () => {
+  freshRun();
+  const ep = Episodes.ids()[0];
+  landClues("clue", () => Collection.unlockedEpisodeIds().includes(ep));
+
+  ok(Collection.unlockedEpisodeIds().includes(ep), "clue rows unlock the first episode");
+  ok(state.epQueue.includes(ep), "it is WAITING to be watched, not silently past");
+  eq(Collection.watchedIds().includes(ep), false, "and nobody has watched it");
+  eq(Collection.firstUnwatchedId(), ep, "so it is the one the player may watch now");
+});
+
+test("the unlock is ANNOUNCED — the landing returns an {unlock} event to play", () => {
+  /* The queue and the beat are the same claim. A version that pushed but returned nothing would
+     pass the test above and still leave the player with an episode arriving from nowhere. */
+  freshRun();
+  const ep = Episodes.ids()[0];
+  const ev = landClues("clue", () => Collection.unlockedEpisodeIds().includes(ep));
+  const unlock = ev.find(e => e.unlock);
+  ok(unlock, "the clue landing that completes an episode returns {unlock}");
+  ok(unlock.unlock.ids.includes(ep), "naming the episode it just bought");
+});
+
+test("a clue landing that unlocks NOTHING announces nothing", () => {
+  /* The other half: bankedEvents runs on every clue row now, and a snapshot compared against
+     itself must stay quiet. An {unlock} with an empty id list would block the roll loop on a
+     popup about no episodes. */
+  freshRun();
+  const ev = landClues("clue", () => false, 1);
+  eq(ev.filter(e => e.unlock).length, 0, "one clue, four short of an episode, says nothing");
+});

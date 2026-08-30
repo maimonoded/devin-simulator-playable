@@ -146,7 +146,6 @@ what matters, not the card alone.</p>
 <script src="js/config.js"></script>
 <script src="js/content.js"></script>
 <script src="assets/cards/cards.js"></script>
-<script src="assets/status/status.js"></script>
 <script src="js/state.js"></script>
 <script src="js/cards.js"></script>
 <script src="js/episodes.js"></script>
@@ -162,7 +161,13 @@ function clue(opt){
   return html.replace('class="ccard size-md fam-clue got"',
                       `class="ccard size-md fam-clue got ${opt}"`);
 }
-const status = () => dropFace({kind:"status", item:STATUS_ITEMS[2]}, {size:"md"});
+/* The gold thing a clue must not resemble. It used to be STATUS_ITEMS[2], one of ten
+   hand-authored objects that shared an id with no card; those are gone (GDD §8.1) and this line
+   threw. It is a real Collectible now — what the third copy of an Epic turns into — which
+   changes nothing about the comparison, because what a clue must never look like was always the
+   PLAQUE, not the object printed on it. */
+const PLAQUE = Cards.collectibleOf("the-rose-hotel");
+const status = () => dropFace({kind:"status", item:PLAQUE}, {size:"md"});
 
 const OPTS = [
   ["opt-a", "A · Case folder",

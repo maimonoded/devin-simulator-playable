@@ -15,9 +15,10 @@
      watching     cfg.statusPerEpisode an episode                      (state.epsWatched)
      predicting   cfg.statusPerPrediction a correct call               (state.predWins)
 
-   The shelf items are Collectibles too — granted whole rather than converted, and the seed of
-   the Showcase (§5.2). So a player who never spends a coin still climbs, and a player who buys
-   the whole shelf still has to watch the show and call it right to finish a Season.
+   FOUR, AND NOT FIVE. A shelf of ten "status items" was a fifth inflow — bought with coins,
+   dropped whole by boxes, or handed over at a play threshold. §8.1 says a Collectible comes from
+   converting a card and §2.2 says money buys packs, so the ten objects are ordinary cards now and
+   the shelf is gone. What is left of the Showcase here is the trophies, which a box cannot pay.
 
    ---- the one thing that IS stored ----
 
@@ -32,44 +33,12 @@
    Season gate "the single most important value in the game". Reaching the top level IS the
    Season gate.
 
-   ---- an item arrives one of three ways ----
-
-     bought    with coins, from the profile screen
-     earned    its `earn` milestone is met, and sweep() hands it over free
-     found     it came out of a box (js/boxes.js)
-
-   Every item has a price AND a milestone, deliberately. Which route it actually arrived by is
-   recorded, because "bought" and "earned" are different bragging rights.
-
-   sweep() is idempotent, so calling it too often costs nothing and calling it late only delays
-   a toast. So is milestoneSweep(). */
+   milestoneSweep() is idempotent, so calling it too often costs nothing and calling it late only
+   delays a toast. */
 
 const Status = {
   /* ---------------- content ---------------- */
-  items() { return STATUS_ITEMS; },
-  item(id) { return STATUS_ITEMS.find(i => i.id === id) || null; },
-  zones() { return STATUS_ZONES; },
-  itemsInZone(zone) { return STATUS_ITEMS.filter(i => i.zone === zone); },
   milestones() { return STATUS_MILESTONES; },
-
-  /* ---------------- ownership ----------------
-     state.status is { id: {day, how} } — how being "bought" | "earned" | "found". */
-  bag() {
-    if (!state.status || typeof state.status !== "object") state.status = {};
-    return state.status;
-  },
-  owns(id) { return !!this.bag()[id]; },
-  ownedIds() { return STATUS_ITEMS.filter(i => this.owns(i.id)).map(i => i.id); },
-  ownedCount() { return this.ownedIds().length; },
-  howGot(id) { const e = this.bag()[id]; return e ? e.how : null; },
-  /* Put an item on the shelf. Returns the item, or null if it was already there — so a caller
-     can announce a grant without first asking whether it landed. */
-  grant(id, how) {
-    const item = this.item(id);
-    if (!item || this.owns(id)) return null;
-    this.bag()[id] = { day: state.day, how: how || "earned" };
-    return item;
-  },
 
   /* ---------------- trophies (GDD 7.4) ----------------
      A "Called It" — one per episode, unique, and only ever earned by calling that episode right.
@@ -87,8 +56,8 @@ const Status = {
              points: Math.max(0, Math.round(+cfg.trophyStatus || 0)),
              art: "assets/status/called-it.webp" };
   },
-  /* Returns the trophy, or null if it was already won — so a caller can announce without first
-     asking whether it landed, exactly like grant(). */
+  /* Returns the trophy, or null if it was already won — so a caller can announce it without
+     first asking whether it landed. */
   grantTrophy(id) {
     if (id == null || !Episodes.has(id) || this.hasTrophy(id)) return null;
     this.trophyBag()[id] = state.day | 0;
@@ -97,13 +66,12 @@ const Status = {
   trophyPoints() { return this.trophyIds().length * Math.max(0, Math.round(+cfg.trophyStatus || 0)); },
 
   /* ---------------- the four inflows ---------------- */
-  itemPoints() { return this.ownedIds().reduce((a, id) => a + (this.item(id).points || 0), 0); },
   /* Everything ever earned, across every Season. The Showcase's number, and what the Season
      baseline is measured against. */
   lifetime() {
     return Math.round(
       Cards.statusPoints() +
-      this.itemPoints() + this.trophyPoints() +
+      this.trophyPoints() +
       (+cfg.statusPerEpisode || 0) * Math.max(0, state.epsWatched | 0) +
       (+cfg.statusPerPrediction || 0) * Math.max(0, state.predWins | 0));
   },
@@ -119,10 +87,13 @@ const Status = {
     const eps = (+cfg.statusPerEpisode || 0) * Math.max(0, state.epsWatched | 0);
     const wins = (+cfg.statusPerPrediction || 0) * Math.max(0, state.predWins | 0);
     return [
-      { key: "cards",   name: "Collectibles",   points: Math.round(Cards.statusPoints()) },
-      { key: "items",   name: "The Showcase",   points: this.itemPoints() + this.trophyPoints() },
-      { key: "watched", name: "Episodes watched", points: Math.round(eps) },
-      { key: "called",  name: "Predictions called", points: Math.round(wins) },
+      { key: "cards",    name: "Collectibles",       points: Math.round(Cards.statusPoints()) },
+      /* The trophies, which are what is left of the Showcase now the bought shelf is gone: a
+         "Called it" is the one Collectible no box can pay, so it stays its own line rather than
+         folding into the call it came from. */
+      { key: "trophies", name: "Called it",          points: this.trophyPoints() },
+      { key: "watched",  name: "Episodes watched",   points: Math.round(eps) },
+      { key: "called",   name: "Predictions called", points: Math.round(wins) },
     ];
   },
 
@@ -236,104 +207,6 @@ const Status = {
     return { season: state.season, name: (BOARD_SEASONS[state.season] || {}).name || "" };
   },
 
-  /* ---------------- earning an item ---------------- */
-  /* What the `earn` conditions are measured against. One place, so a new condition is a key
-     here and a key in status.js rather than a new branch in the check. */
-  metrics() {
-    return {
-      episodes: Math.max(0, state.epsWatched | 0),
-      cards: Object.keys(state.cards || {}).length,
-      boards: Math.max(0, state.boardsDone | 0),
-      rolls: Math.max(0, state.rolls | 0),
-    };
-  },
-  /* [have, need] for an item's milestone — what the profile shows under a locked item. */
-  earnProgress(item) {
-    const m = this.metrics(), key = Object.keys(item.earn || {})[0];
-    if (!key) return null;
-    return { key, have: m[key] || 0, need: item.earn[key] };
-  },
-  /* THE EARN CONDITIONS, IN ENGLISH.
-
-     A THRESHOLD, NOT A SET. `{cards: 5}` is measured as
-     `Object.keys(state.cards).length >= 5` — ANY five distinct cards, not five particular ones.
-     The wording has to say that, because "Earned for collecting 5 cards" reads as though five
-     named cards bought the mug and invites the reasonable question "which five?". There is no
-     answer: it is the moment the collection reached five.
-
-     So one string, "5 cards collected", used by every surface with its own preposition:
-
-         the reward beat   Earned at 5 cards collected
-         an owned item     ✓ Earned at 5 cards collected
-         a locked item     or 3/5 cards collected
-
-     One string rather than two shapes, which is also one fewer thing to drift. It briefly WAS
-     two — the profile said "cards collected" while the beat said "collecting 5 cards" — and
-     collapsing them is what exposed that neither was true.
-
-     The plural agrees with the REQUIREMENT, so "0/1 set finished" rather than "0/1 sets". */
-  EARN: {
-    cards:    { one: "card collected",  many: "cards collected" },
-    episodes: { one: "episode watched", many: "episodes watched" },
-    boards:   { one: "set finished",    many: "sets finished" },
-    rolls:    { one: "roll",            many: "rolls" },
-  },
-  earnKey(item) { return Object.keys((item && item.earn) || {})[0] || ""; },
-  /* "cards collected" / "set finished" — the unit alone, agreeing with what the item requires.
-     For the locked slot, which supplies its own "3/5" in front. */
-  earnUnit(item) {
-    const key = this.earnKey(item), e = this.EARN[key];
-    if (!e) return "";
-    return item.earn[key] === 1 ? e.one : e.many;
-  },
-  /* "5 cards collected" — the whole threshold, for anything already owned or being awarded. */
-  earnWords(item) {
-    const key = this.earnKey(item);
-    return this.EARN[key] ? `${item.earn[key]} ${this.earnUnit(item)}` : "";
-  },
-  earnMet(item) {
-    const m = this.metrics();
-    return Object.keys(item.earn || {}).every(k => (m[k] || 0) >= item.earn[k]);
-  },
-  /* Hand over every item whose milestone is now met. Returns what was granted, for the toast. */
-  sweep() {
-    const got = [];
-    STATUS_ITEMS.forEach(i => {
-      if (!this.owns(i.id) && this.earnMet(i)) { this.grant(i.id, "earned"); got.push(i); }
-    });
-    return got;
-  },
-
-  /* ---------------- buying ---------------- */
-  priceOf(item) { return Math.max(0, Math.round((item.price || 0) * (cfg.statusPriceScale || 1))); },
-  canBuy(item) { return !!item && !this.owns(item.id) && this.priceOf(item) > 0 && state.coins >= this.priceOf(item); },
-  buy(id) {
-    const item = this.item(id);
-    if (!this.canBuy(item)) return null;
-    const cost = this.priceOf(item);
-    state.coins -= cost;
-    this.grant(id, "bought");
-    return { item, cost };
-  },
-  /* The cheapest unowned item the balance covers, or null. The auto-play session's coin sink,
-     mirroring Boxes.cheapest(). */
-  cheapestBuyable() {
-    let best = null;
-    STATUS_ITEMS.forEach(i => {
-      if (!this.canBuy(i)) return;
-      const c = this.priceOf(i);
-      if (!best || c < this.priceOf(best)) best = i;
-    });
-    return best;
-  },
-  /* An item nobody owns yet, drawn by its `box` weight — what a box's status slot pays out.
-     Returns null once the shelf is full, which is the caller's cue to pay coins instead. */
-  drawUnowned() {
-    const left = STATUS_ITEMS.filter(i => !this.owns(i.id) && (i.box || 0) > 0);
-    if (!left.length) return null;
-    return weighted(left.map(i => ({ weight: i.box, item: i }))).item;
-  },
-
   /* ---------------- validation ---------------- */
   validate() {
     const errs = [];
@@ -342,12 +215,6 @@ const Status = {
     STATUS_RANKS.forEach((r, i) => {
       if (i && r.from <= STATUS_RANKS[i - 1].from) errs.push(`Status band "${r.name}" does not open above the one before it.`);
       if (r.from > this.maxLevel()) errs.push(`Status band "${r.name}" opens at level ${r.from}, past the Season's ${this.maxLevel()}.`);
-    });
-    STATUS_ITEMS.forEach(i => {
-      if (!(i.points > 0)) errs.push(`Status item "${i.id}" is worth nothing.`);
-      if (!(i.price > 0)) errs.push(`Status item "${i.id}" has no coin price — every item is buyable AND earnable.`);
-      if (!i.earn || !Object.keys(i.earn).length) errs.push(`Status item "${i.id}" has no play milestone.`);
-      if (!STATUS_ZONES.some(z => z.key === i.zone)) errs.push(`Status item "${i.id}" is in zone "${i.zone}", which does not exist.`);
     });
     STATUS_MILESTONES.forEach(m => {
       if (!(m.level >= 1 && m.level <= this.maxLevel())) errs.push(`Milestone at level ${m.level} is outside the Season.`);

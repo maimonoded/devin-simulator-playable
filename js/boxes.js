@@ -20,15 +20,22 @@
 
      card    one card from the Season catalogue, at or above `floor` (js/cards.js)
      clue    one clue for the episode being worked on (js/clues.js)
-     status  a status item nobody owns yet, by its own `box` weight (js/status.js)
      coins   `amount`, scaled by cfg.boardScale like every other payout
      energy  `amount`, topped up toward the cap and never reducing a purchased overflow
+
+   A BOX NO LONGER DROPS STATUS ITEMS. GDD §4.5 is plain that a pack contains cards, and a shelf
+   item falling out of one made the shelf the thing packs were bought for — while the Collectible
+   a pack is actually working toward, the third copy of a card (§4.3), got no beat at all. So the
+   status ribbon now belongs to conversion (bankedEvents, below) and the shelf is bought and
+   earned, which is what js/status.js already says it is. A leftover `status` row in a tier's
+   table is not an error, because a box always pays: it falls through to coins like anything else
+   the draw cannot resolve.
 
    ---- what happens when a category is empty ----
 
    Every empty case falls forward rather than paying nothing: a rarity with nothing authored at
-   it falls DOWN to a commoner one, a clue with the whole story already unlocked falls to coins,
-   and a status outcome with the shelf full falls to coins. A box always pays. */
+   it falls DOWN to a commoner one, and a clue with the whole story already unlocked falls to
+   coins. A box always pays. */
 
 const Boxes = {
   /* ---------------- tiers ---------------- */
@@ -103,8 +110,9 @@ const Boxes = {
     const pick = weighted(t.table) || { kind: "coins", amount: cfg.boxCoins };
     if (pick.kind === "card") return this.dropCard(pick.floor);
     if (pick.kind === "clue") return this.dropClue();
-    if (pick.kind === "status") return this.dropStatus() || this.dropCoins(pick);
     if (pick.kind === "energy") return this.dropEnergy(pick);
+    /* Everything else, INCLUDING a `status` row left in a tuned table, is coins. See the note at
+       the top: a box always pays, and an unresolvable row must never be the exception. */
     return this.dropCoins(pick);
   },
 
@@ -123,12 +131,6 @@ const Boxes = {
     const got = Clues.grant();
     if (!got) return this.dropCoins({ amount: cfg.boxCoins });
     return { kind: "clue", ep: got.id, clue: got.clue, isNew: got.isNew, coins: got.coins };
-  },
-  dropStatus() {
-    const item = Status.drawUnowned();
-    if (!item) return null;                                   // shelf full — caller pays coins
-    Status.grant(item.id, "found");
-    return { kind: "status", item };
   },
   dropCoins(pick) {
     const amount = Math.round((pick && pick.amount ? pick.amount : cfg.boxCoins) * (cfg.boardScale || 1));
@@ -152,9 +154,9 @@ const Boxes = {
 
 /* ---------------- cards landing, and what follows ----------------
 
-   Banking cards is never the whole story: a card can complete an episode's page, a status item
-   can move the rank, and the last watch of a set can finish the board. Every source of cards
-   owes the same three checks in the same order, and this is where they live once.
+   Banking cards is never the whole story: a card can complete an episode's page, a third copy
+   can convert and move the rank, and the last watch of a set can finish the board. Every source
+   of cards owes the same three checks in the same order, and this is where they live once.
 
    `draw` is a CALLBACK rather than a result because the unlock snapshot has to be taken BEFORE
    anything is banked — "unlocked" is derived from the albums (CLAUDE.md), so the only way to
@@ -168,12 +170,20 @@ function bankedEvents(draw){
   const res=draw();
   const fresh=Collection.claimUnlocked(before);
   const after=[];
-  /* A status item is a different kind of thing from a card and it earns its own beat: the track
-     moving, and the rank turning over when it turns over. Cards collected in the same breath
-     count toward the same jump, which is why this reads the whole delta rather than the item's
-     own points. */
-  const shelved=res.drops.filter(d=>d.kind==="status").map(d=>d.item);
-  if(shelved.length) after.push({statusUp:{items:shelved,from:statusBefore,to:Status.points(),source:"box"}});
+  /* CONVERSION IS THE BEAT (GDD §4.3). The third copy is where a card stops being a duplicate and
+     becomes that card's Collectible — the object that carries Status — and until now it said so
+     with a boolean on a generic `card` event, while a shelf item found in the same box got a
+     whole ribbon. That had it backwards: the shelf is a side dish and conversion is what the
+     collection is FOR.
+
+     THE SAME EVENT, DELIBERATELY. A Collectible is duck-typed {name, points, art} exactly like a
+     trophy, so js/ui/statusup.js, the .su* rules in the CSS and dropFace({kind:"status"}) already
+     know how to draw one; a second event name would be a second thing to keep in step for no
+     gain. Cards converted in the same breath count toward the same jump, which is why this reads
+     the whole delta rather than each item's own points. */
+  const made=(res.drops||[]).filter(d=>d.kind==="card"&&d.converted)
+                            .map(d=>Cards.collectibleOf(d.id)).filter(Boolean);
+  if(made.length) after.push({statusUp:{items:made,from:statusBefore,to:Status.points(),source:"converted"}});
   /* A card set finished by whatever just landed. Swept rather than checked at the call site,
      because five different things bank cards and every one of them owes the same payment — and
      because it is IDEMPOTENT: an unclaimed set stays unclaimed, so a missed sweep is a delayed
@@ -262,7 +272,6 @@ function boxSummary(res){
     }
     else if(d.kind==="clue") parts.push(d.isNew?`a clue on <b>${Episodes.titleOf(d.ep)}</b>`
                                                :`a clue you had (+${fmt(d.coins)})`);
-    else if(d.kind==="status") parts.push(`<b>${d.item.name}</b>`);
     else if(d.kind==="coins") parts.push(`+${fmt(d.amount)} coins`);
     else if(d.kind==="energy") parts.push(`+${d.amount}\u26a1`);
   });

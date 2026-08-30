@@ -1,5 +1,5 @@
 "use strict";
-/* Status — the player's standing as a fan of the show, and the things that prove it.
+/* Status — the player's standing as a fan of the show: the track, its bands and its milestones.
 
    Content, like assets/cards/cards.js: a classic script defining globals, read by js/status.js.
 
@@ -19,27 +19,17 @@
      watching     cfg.statusPerEpisode an episode
      predicting   cfg.statusPerPrediction a correct call
 
-   The items below are Collectibles too — granted whole rather than converted, and the seed of
-   the Showcase (5.2). So a player who never spends a coin still climbs, and a player who buys the
-   whole shelf still has to watch the show and call it right to finish a Season.
-
-   ---- how an item is obtained ----
-
-   Every item has BOTH routes, deliberately:
-
-     price   coins, bought from the profile screen
-     earn    a play milestone that awards it for free — {episodes|cards|boards|rolls: n}
-     box     its weight in a box's status slot (js/boxes.js); 0 never drops
-
-   "Buyable and earnable" is the whole design brief here, so an item with only one of the two
-   is a content bug rather than a variant. The earn milestone is always reachable by play alone;
-   the price is what shortcuts it.
+   FOUR, AND NOT FIVE. A shelf of ten "status items" used to live here — bought with coins,
+   dropped whole by boxes, or handed over when a play threshold was met. None of that is in the
+   doc: 8.1 says a Collectible comes from converting a card, and 2.2 says money buys packs. The
+   ten objects are ordinary cards now (assets/cards/cards.js), so they arrive the one way
+   everything else does, and this file is the track alone.
 
    ---- zones ----
 
-   `zone` is where the item will hang when the profile becomes the player's room rather than a
-   grid — wall, shelf, desk, wardrobe. The grid already groups by it, so authoring for the room
-   costs nothing today and the room costs no re-authoring later. */
+   The surfaces of the room the profile will one day be, rather than the grid it is. Nothing is
+   authored into one today — the Showcase's pieces are cards and trophies, which carry their own
+   set — but the room still wants somewhere to hang them. */
 
 const STATUS_ZONES = [
   { key: "wall",     name: "On the wall",  icon: "🖼" },
@@ -81,37 +71,4 @@ const STATUS_MILESTONES = [
   { level: 20, kind: "clues",  amount: 4,          blurb: "Four clues — the story owes you." },
   { level: 25, kind: "energy", amount: 50,         blurb: "Enough to finish the week." },
   { level: 30, kind: "pack",   tier: "insider",    blurb: "An Insider Pack, and the Season is yours." },
-];
-
-const STATUS_ITEMS = [
-  { id: "mug",           name: "Harbour Heights mug",    zone: "desk",     points:  5,
-    price:  1200, earn: { cards:  5 }, box: 20, art: "assets/status/items/mug.webp",
-    blurb: "Chipped on the second morning. Kept anyway." },
-  { id: "stickers",      name: "Fan sticker sheet",      zone: "desk",     points:  5,
-    price:   900, earn: { rolls: 60 }, box: 22, art: "assets/status/items/stickers.webp",
-    blurb: "Die-cut, glossy, and none of them ever used." },
-  { id: "ticket-framed", name: "Framed premiere ticket", zone: "wall",     points: 10,
-    price:  2500, earn: { episodes: 1 }, box: 16, art: "assets/status/items/ticket-framed.webp",
-    blurb: "Row F. You still have the stub." },
-  { id: "bouquet",       name: "The wedding bouquet",    zone: "shelf",    points: 10,
-    price:  3500, earn: { episodes: 3 }, box: 14, art: "assets/status/items/bouquet.webp",
-    blurb: "White roses, plum ribbon, caught on camera." },
-  { id: "card-binder",   name: "Collector's binder",     zone: "shelf",    points: 20,
-    price:  6000, earn: { cards: 15 }, box: 10, art: "assets/status/items/card-binder.webp",
-    blurb: "Nine sleeves a page. You know which are missing." },
-  { id: "sunglasses",    name: "Designer sunglasses",    zone: "wardrobe", points: 20,
-    price:  8000, earn: { episodes: 5 }, box:  8, art: "assets/status/items/sunglasses.webp",
-    blurb: "Worn indoors, as intended." },
-  { id: "poster-signed", name: "Signed premiere poster", zone: "wall",     points: 30,
-    price: 12000, earn: { boards: 1 }, box:  5, art: "assets/status/items/poster-signed.webp",
-    blurb: "Silver marker, straight across the corner." },
-  { id: "neon-heart",    name: "Cracked neon heart",     zone: "wall",     points: 30,
-    price: 18000, earn: { cards: 25 }, box:  3, art: "assets/status/items/neon-heart.webp",
-    blurb: "The show's title card, in your own hallway." },
-  { id: "gown",          name: "The premiere gown",      zone: "wardrobe", points: 50,
-    price: 26000, earn: { episodes: 9 }, box:  1.5, art: "assets/status/items/gown.webp",
-    blurb: "Emerald silk. Somewhere to wear it: pending." },
-  { id: "award",         name: "Fan-club award",         zone: "shelf",    points: 70,
-    price: 40000, earn: { boards: 2 }, box:  0.5, art: "assets/status/items/award.webp",
-    blurb: "Gold clapperboard on marble. Heavier than it looks." },
 ];

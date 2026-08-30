@@ -58,7 +58,7 @@ const ECONOMY_DEFAULT = {
      (js/storage.js). Bump it whenever an owned value changes, or a save from before the
      change quietly outvotes the new number — which is exactly how the Status track spent an
      afternoon paying 2 points an episode instead of 50. */
-  version: "Economy Model v3.15 - demo pacing: energy cap 40 + first-session grant, clue rate retuned",
+  version: "Economy Model v3.16 - Collectibles: 48-card catalogue, Season gate re-solved to 5800",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
@@ -158,7 +158,7 @@ const ECONOMY_DEFAULT = {
      4,000 average 138, so an opening of 25 gives a ramp of roughly 10x across the Season, which
      is the shape §5.4 asks for. */
   status: {
-    levels: 30, first: 25, total: 4000,
+    levels: 30, first: 25, total: 5800,
     perEpisode: 50, perPrediction: 150, perTrophy: 120,
   },
 

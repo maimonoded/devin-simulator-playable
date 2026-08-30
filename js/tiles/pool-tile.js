@@ -103,12 +103,29 @@ class PoolTile extends Tile {
 
      One float for the landing and one log LINE PER CLUE: the float is the beat, but the text of
      a clue is the thing worth reading, and summarising two into "+2" would throw it away. */
+  /* THE CLUE ROW UNLOCKS EPISODES, so it owes the same snapshot-and-claim every other source
+     does — which is why the grants happen inside bankedEvents() rather than beside it.
+
+     Getting this wrong is silent and total, which is the reason for the noise here. "Unlocked"
+     is derived from the clues, but "watched" is derived as UNLOCKED MINUS state.epQueue
+     (Collection.watchedIds) — and only claimUnlocked pushes onto that queue. So a clue that
+     completed an episode's four without claiming did not merely fail to announce it: the
+     episode became unlocked and instantly read as ALREADY WATCHED. firstUnwatchedId() returned
+     null, the 🎬 button stayed dark, and blockedBy() named the NEXT episode, which was not
+     unlocked at all. The story quietly ate an episode per unlock, and nothing threw.
+
+     bankedEvents also sweeps sets and conversions. Nothing here banks a card, so those find
+     nothing — they are idempotent by design, and paying for one shared path is cheaper than a
+     second place that has to remember the same three checks in the same order. */
   drawClue(row,ctx){
     const n=Math.max(1,Math.round(+row.n||1));
-    const got=[];
-    for(let i=0;i<n;i++){ const g=Clues.grant(); if(!g) break; got.push(g); }
+    let got=[];
+    const {after}=bankedEvents(()=>{
+      for(let i=0;i<n;i++){ const g=Clues.grant(); if(!g) break; got.push(g); }
+      return {drops:[]};
+    });
     if(!got.length) return [{float:{text:"🔍 —",color:"var(--muted)"},
-                             log:{icon:"🔍",msg:`${row.name} · nothing left to work out`}}];
+                             log:{icon:"🔍",msg:`${row.name} · nothing left to work out`}},...after];
 
     const fresh=got.filter(g=>g.isNew);
     const dupCoins=got.reduce((a,g)=>a+(g.isNew?0:g.coins),0);
@@ -126,7 +143,7 @@ class PoolTile extends Tile {
       const [have,need]=Clues.progressFor(g.id);
       ev.push({log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
     });
-    return ev;
+    return [...ev,...after];
   }
 
   drawEnergy(row,ctx){

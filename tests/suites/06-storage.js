@@ -63,7 +63,8 @@ test("serializeState captures progress and omits transient fields", () => {
   eq("lastCoins" in s, false, "tween baselines must not be persisted");
   ok(s.cards && typeof s.cards === "object", "the collection rides along");
   ok(s.setsDone && typeof s.setsDone === "object", "and so do the sets already paid for");
-  ok(s.status && typeof s.status === "object", "and so does the shelf");
+  eq(s.status, undefined,
+     "the shelf is NOT saved — the ten items are cards now, so a Collectible is derived");
 });
 
 test("save then load restores a run", () => {
@@ -73,7 +74,7 @@ test("save then load restores a run", () => {
   const held = Cards.all()[0].id;
   Cards.add(held, 2);                           // pays a duplicate consolation, so set coins after
   state.coins = 4321;
-  Status.grant("mug", "bought");
+  Status.grantTrophy(Episodes.ids()[0]);
   saveState();
 
   freshRun();                                   // wipe in-memory state
@@ -88,8 +89,7 @@ test("save then load restores a run", () => {
   eq(state.mult, 5);
   eq(state.rolls, 12);
   eq(Cards.count(held), 2, "duplicates survive — the count is the album's memory");
-  ok(Status.owns("mug"));
-  eq(Status.howGot("mug"), "bought", "and how it arrived, which the profile shows");
+  ok(Status.hasTrophy(Episodes.ids()[0]), "the trophy survives the round trip");
   eq(state.animating, false, "always restored idle");
   eq(state.lastCoins, state.coins, "tween baseline starts where we left off");
 });
@@ -142,18 +142,22 @@ test("a card this build no longer defines is kept, not deleted", () => {
   eq(Cards.get("a-card-from-a-later-season"), null, "and it draws as nothing");
 });
 
-test("a status item this build no longer defines IS dropped", () => {
+test("a pre-change save's shelf is ignored, not revived", () => {
+  /* Saves from before the shelf was deleted still carry a `status` bag. Loading it would pay
+     points for ten objects the catalogue can no longer describe, so it is read by nothing.
+
+     The cost is real and worth stating: such a save loses up to 250 points while seasonFrom
+     stays put, so the track appears to go BACKWARDS. That is a demo-build tradeoff, not a
+     migration we owe anyone — Reset user is the fix. This test pins that the bag is inert
+     rather than half-restored, which would be the genuinely bad outcome. */
   freshRun();
   saveState();
   const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1") || "{}");
-  raw.status = { "mug": { day: 2, how: "bought" }, "ghost-item": { day: 1, how: "found" },
-                 "stickers": { day: 1, how: "nonsense" } };
+  raw.status = { "mug": { day: 2, how: "bought" }, "gown": { day: 1, how: "found" } };
   localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
-  ok(loadState());
-  ok(Status.owns("mug"));
-  eq(Status.owns("ghost-item"), false,
-     "unlike a card, an item that no longer exists is points nothing can explain");
-  eq(Status.howGot("stickers"), "earned", "an unknown provenance falls back rather than sticking");
+  ok(loadState(), "an old save still loads");
+  eq(state.status, undefined, "and its shelf is simply not there");
+  eq(Status.points(), 0, "so it pays nothing");
 });
 
 test("restore keeps energy bought above the cap", () => {

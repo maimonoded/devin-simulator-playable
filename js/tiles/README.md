@@ -101,7 +101,7 @@ played in this fixed order by `playEvents()`:
 | `card: {name, collectible, count, converted, positive}` | **blocking** card held on the board centre for `cfg.cardHoldMs`, or `cfg.cardConvertMs` when this copy is the one that **converts** the card. With `collectible` it draws the card's **own face** via `cardFace()` — the same one the collection and the box popup use |
 | `minigame: {game, amount, outcome, label, tiers?, winIndex?}` | **blocking** full-frame bonus game in an iframe. `amount` is coins **already paid**. Degrades to `collect` when `cfg.bonusGames` is 0 or `game` is unregistered |
 | `pack: {tier, drops}` | **blocking** box opening: the closed box, tapped or opened by its own timer, then its cards one at a time. Everything in it was banked before the event was built |
-| `statusUp: {items, from, to}` | **blocking** status beat: the item in its gold frame, and the track moving |
+| `statusUp: {items, from, to, source}` | **blocking** status beat: the Collectible in its plaque frame, and the track moving. `source` is `"converted"` when a third copy made it — the only route a card takes to get here |
 | `unlock: {ids}` | **blocking** for a human, a toast for an auto run: the episodes the cards just completed |
 | `boardDone: {board}` | **blocking** set-complete celebration |
 | `pause: ms` | wait before the next event |

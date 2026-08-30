@@ -11,14 +11,50 @@ test("the shipped catalogue validates clean", () => {
   deepEq(Cards.validate(), []);
 });
 
-test("GDD §4.6's shape: 150 cards, fifteen sets of ten, 90/38/18/4", () => {
+test("the catalogue is sized to the CONTENT: 48 cards, four sets of twelve, 29/12/6/1", () => {
+  /* §4.6's 150 cards across 15 sets is written for a 60-episode Season. We have 18 episodes, and
+     the doc's own ratios — ~2.5 cards an episode (§4.6), one set per four-episode arc (§4.4) —
+     put that at 48 in four sets.
+
+     This is not tidiness. Conversion needs THREE COPIES OF ONE CARD, and across 150 cards a
+     given Common turned up 0.67 times in a full demo run — so the loop the whole Status track
+     hangs off almost never fired. §4.6 says its numbers are "a coherent starting shape for the
+     simulation to tune, not tuned values", and this is that tuning.
+
+     Cards.validate() deliberately does NOT check any of this — it has no idea how big a Season
+     should be, and a count is a balance decision rather than a correctness one. Which is why it
+     is asserted here instead. */
   const all = Cards.all();
-  eq(all.length, 150);
-  eq(Cards.sets().length, 15);
-  Cards.sets().forEach(s => eq(s.cards.length, 10, s.key));
+  eq(all.length, 48);
+  eq(Cards.sets().length, 4);
+  Cards.sets().forEach(s => eq(s.cards.length, 12, s.key));
   const by = {};
   all.forEach(c => { by[c.rarity] = (by[c.rarity] || 0) + 1; });
-  deepEq(by, { common: 90, rare: 38, epic: 18, legendary: 4 });
+  /* Still §4.2's 60/25/12/3 shares, to the nearest card. Asserted per rarity rather than with
+     deepEq on the whole object, because deepEq here compares key ORDER too — and the order is
+     whatever the catalogue happened to author first, which is not a fact worth failing on. */
+  eq(by.common, 29, "common"); eq(by.rare, 12, "rare");
+  eq(by.epic, 6, "epic");      eq(by.legendary, 1, "legendary");
+});
+
+test("every set mixes the memory and the trophy (§4.1)", () => {
+  /* "The two kinds are interleaved within sets so that completing a set means owning both the
+     memory and the trophy." A set that is all narrative or all Status cards would still validate
+     and still play — it would just quietly stop being the thing §4.1 describes.
+
+     Status cards are identified by the aspirational-object ids they were authored with; there is
+     deliberately no `kind` field on a card row, because the engine must not care which sort a
+     card is. That is the point of the design: they convert identically. */
+  const STATUS = new Set(["silk-scarf","gold-cufflinks","cashmere-coat","swiss-watch","penthouse-key",
+    "monogrammed-shirt","leather-gloves","crystal-decanter","diamond-studs","private-jet",
+    "velvet-heels","pearl-earrings","perfume-bottle","emerald-necklace","vintage-roadster",
+    "silver-case","designer-luggage","couture-gown","sapphire-ring","the-villa"]);
+  eq(Cards.all().filter(c => STATUS.has(c.id)).length, 20, "twenty Status cards in the Season");
+  Cards.sets().forEach(s => {
+    const status = s.cards.filter(c => STATUS.has(c.id)).length;
+    ok(status > 0, `${s.key} has no Status card — no trophy in it`);
+    ok(status < s.cards.length, `${s.key} is all Status cards — no memory in it`);
+  });
 });
 
 test("the rarity weights are §4.2's 60/25/12/3 and read as percentages", () => {

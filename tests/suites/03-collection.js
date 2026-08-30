@@ -269,15 +269,23 @@ test("coins and energy drops are banked, and energy never drains an overflow", (
   });
 });
 
-test("a status drop shelves an item, and falls back to coins once the shelf is full", () => {
+test("a box never hands over a Collectible directly — it pays cards (\u00a74.5)", () => {
+  /* Boxes used to drop a status item whole. \u00a74.5 says "each contains three cards", and \u00a78.1
+     lists the only four sources of a Collectible: card conversion, set completion, predictions,
+     episodes. A box handing one over was a fifth route nobody designed.
+
+     A tier table that still carries a `status` row must therefore FALL THROUGH rather than
+     throw — a box always pays, and a stale row is a content mistake, not a crash. */
   freshRun();
-  forceBox("insider", r => r.kind === "status", () => {
-    const d = Boxes.open("insider").drops[1];
-    eq(d.kind, "status");
-    ok(Status.owns(d.item.id), "it is on the shelf, not merely announced");
-    STATUS_ITEMS.forEach(i => Status.grant(i.id, "found"));   // fill it
-    eq(Boxes.open("insider").drops[1].kind, "coins", "a box always pays");
-  });
+  /* The tier tables no longer carry a status row at all, so the stale-row case cannot even be
+     constructed from config any more — which is the stronger outcome, and why this asserts the
+     absence rather than the fall-through. */
+  boxTiers.forEach(t => t.table.forEach(r =>
+    ok(r.kind !== "status", `${t.key} still carries a status row`)));
+  let seen = 0;
+  for (let i = 0; i < 300; i++)
+    Boxes.open("insider").drops.forEach(d => { if (d.kind === "status") seen++; });
+  eq(seen, 0, "and across three hundred boxes, not one Collectible falls out");
 });
 
 test("openBoxEvents pays a box and says nothing more when nothing completed", () => {
