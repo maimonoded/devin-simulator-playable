@@ -166,11 +166,28 @@ const DEFAULTS={
      packDupMs is the extra beat a duplicate holds while its coin consolation lands. */
   packAutoOpenMs:5000, packFlipMs:420, packRevealMs:1500, packItemGapMs:420,
   packCloseMs:600, packDupMs:900,
-  /* The box itself, as an object on the board. packBoxSize is its edge in tiles, packSwellMs the
-     strain before it bursts and packPopScale how far it inflates first. packCardSize is a
-     revealed card's height in tiles and packCardGap how far apart two of them sit — both are the
-     same units the board is measured in, because the cards hang in the world beside it. */
-  packBoxSize:2.3, packSwellMs:300, packPopScale:1.55, packCardSize:2.2, packCardGap:1.25,
+  /* The box itself, as an object on the board. packBoxSize is its edge in tiles and packSwellMs
+     the strain before it bursts, packPopScale how far it inflates first.
+
+     A REVEALED CARD IS MEASURED AGAINST THE VIEW, NOT THE BOARD. packCardScreen is its height
+     as a fraction of what the camera can see, and packCardSpacing the space between two of them
+     as a fraction of a card's width. packCardSize used to be a height in TILES, on the reasoning
+     that the cards hang in the world beside the board. True about where they are, wrong about
+     what they are — the board zooms to fit its ring, so on a phone 2.2 tiles came out around
+     sixty pixels and a card out of a box was a fifth the size of the same card off a tile
+     landing. A card is a thing you read.
+
+     BOTH ARE NEW NAMES, AND THAT IS THE POINT. The first attempt kept `packCardGap` and simply
+     changed what its number meant, tiles to a share of a card — and every save in existence
+     still held 1.25, which as a share is seven times the intended gap. loadConfig merges saved
+     values over DEFAULTS, so the old number silently won and the row came out a third of the
+     size it should have been. A key whose UNITS change has to change its name; there is no
+     version gate on presentation settings to catch it, unlike the economy-owned ones.
+
+     packCardSize survives as the fallback for a run with no WebGL board to measure.
+     packCardGap is dead and left to rot harmlessly in old saves. */
+  packBoxSize:2.3, packSwellMs:300, packPopScale:1.55,
+  packCardScreen:0.42, packCardSpacing:0.18, packCardSize:2.2,
   /* How long a completed CARD SET is held on screen. Shorter than a set of episodes
      finishing, on purpose: it is a reward, not a chapter ending. */
   setDoneMs:2600,
@@ -360,8 +377,8 @@ const TUNING=[
    ["packBoxSize","Box size (tiles)",0.05,{min:0.4,max:4}],
    ["packSwellMs","Swell before it bursts (ms)",20],
    ["packPopScale","How far it inflates (×)",0.05,{min:1,max:3}],
-   ["packCardSize","Revealed card height (tiles)",0.1,{min:0.6,max:5}],
-   ["packCardGap","Revealed cards: gap (tiles)",0.05,{min:0.2,max:4}],
+   ["packCardScreen","Revealed card height (share of view)",0.01,{min:0.05,max:0.9}],
+   ["packCardSpacing","Gap between cards (share of a card)",0.01,{min:0,max:1}],
    ["packCloseMs","4 · After the last card (ms)",50],
    ["setDoneMs","Card set complete: hold (ms)",100]]},
  {group:"Environment",items:[

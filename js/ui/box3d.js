@@ -50,6 +50,10 @@ const HOVER_Y = 2.0;
    The cards stand upright in the air for the same reason the case panels do: a quad that faces
    the camera has one depth, and one depth is what let the board's furniture hide the dice. */
 const FORESHORTEN = 1 / Math.cos(38 * Math.PI / 180);
+/* The card canvas is 260x360, and the row-fitting maths below needs that ratio before any card
+   has been painted — so it is a constant here rather than read off a texture that does not
+   exist yet. _cardTexture is the one place allowed to disagree, and it does not. */
+const CARD_ASPECT = 260 / 360;
 const CAM_YAW = Math.PI / 4;
 const ease = k => 1 - Math.pow(1 - k, 3);
 const backOut = k => { const c = 1.70158, p = k - 1; return 1 + (c + 1) * p * p * p + c * p * p; };
@@ -60,7 +64,8 @@ export const Box3D = {
   _box: null, _cards: [], _anims: [], _done: [],
   _tapped: null,                    // set while a box is waiting to be opened
 
-  init(scene){
+  init(scene, opts){
+    this._view = (opts && typeof opts.view === "function") ? opts.view : null;
     this._scene = scene;
     this._group = new THREE.Group();
     this._group.name = "boxfx";
@@ -187,6 +192,35 @@ export const Box3D = {
   /* ---------------- what was inside ----------------
      The drops fly up out of the burst and hang in a row to be read, then fade. `onShow` is
      called as each one arrives so the caption can name it. Resolves when the last one is done. */
+  /* HOW BIG A REVEALED CARD IS, in the only unit that matters: how much of the screen it fills.
+
+     It used to be cfg.packCardSize, a height in TILES — the same units the board is measured
+     in, on the reasoning that the cards hang in the world beside it. That reasoning is right
+     about where they are and wrong about what they are. The board is zoomed to fit the ring, so
+     a phone's board is small and 2.2 tiles came out around sixty pixels: the card a box paid
+     out was a fifth the size of the same card handed over by a tile landing, which is the
+     report that started this. A card is a thing you READ, so it is sized against the view.
+
+     `h` is already an on-screen height — the plane stands upright and is scaled by FORESHORTEN
+     to cancel the 38° tilt — so the conversion is exact: the camera shows `view.h` world units
+     of screen height, and a card wanting a fraction f of that gets f * view.h.
+
+     THE ROW HAS TO FIT THE WIDTH TOO. An Insider pays three cards side by side, and three cards
+     at a single card's size would run off both edges. So the height is capped by what the row
+     can afford, which is why this takes a count and not just a fraction.
+
+     No view metrics means no WebGL board to measure — fall back to the old tile-height knob. */
+  _cardHeight(n){
+    const v = this._view ? this._view() : null;
+    if (!v || !(v.h > 0) || !(v.w > 0)) return Math.max(0.4, +cfg.packCardSize || 2.2);
+    const want = v.h * Math.min(0.9, Math.max(0.05, +cfg.packCardScreen || 0.42));
+    const cards = Math.max(1, n | 0);
+    const gapF = Math.max(0, +cfg.packCardSpacing || 0.18);
+    /* n cards and n-1 gaps, across nine tenths of the view — the tenth is breathing room. */
+    const fits = (v.w * 0.9) / (cards * CARD_ASPECT + (cards - 1) * CARD_ASPECT * gapF);
+    return Math.max(0.4, Math.min(want, fits));
+  },
+
   reveal(drops, aim, onShow){
     const flip = Math.max(0, +cfg.packFlipMs || 0);
     const hold = Math.max(0, +cfg.packRevealMs || 0);
@@ -194,8 +228,8 @@ export const Box3D = {
     const dupMs = Math.max(0, +cfg.packDupMs || 0);
     const closeMs = Math.max(0, +cfg.packCloseMs || 0);
 
-    const h = Math.max(0.4, +cfg.packCardSize || 2.2);
-    const gap = Math.max(0.1, +cfg.packCardGap || 1.25);
+    const h = this._cardHeight(drops.length);
+    const gap = h * CARD_ASPECT * Math.max(0, +cfg.packCardSpacing || 0.18);
     const from = aim.clone(); from.y += HOVER_Y;
 
     let t = 0;

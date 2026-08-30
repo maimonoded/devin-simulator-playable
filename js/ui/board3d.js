@@ -160,7 +160,13 @@ const Board3D = {
        depth-tested and moved by the camera like anything else on the board. */
     Estate3D.init(this._scene);
     /* The box that pops open over the board, and the cards that come out of it. */
-    Box3D.init(this._scene);
+    /* A CALLBACK, not a number: the frustum changes on every resize and on the box throw's
+       pull-out, and a revealed card is sized against what is actually on screen. Handing over
+       the live values is what lets cfg.packCardScreen mean "this much of the view" on a phone
+       and on a desktop alike, which a height in tiles never could. */
+    Box3D.init(this._scene, {
+      view: () => ({ h: 2 * this._fit, w: 2 * this._fit * this._aspect }),
+    });
     this.syncPageBackground();
     /* Init once, not per build(): the dice hang off their own group, which build() leaves
        alone, so they survive a board rebuild the way the token does. */
