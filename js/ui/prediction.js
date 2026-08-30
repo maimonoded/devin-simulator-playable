@@ -24,7 +24,7 @@ function openEpisodeUnlock(id){
     const ep=Episodes.get(id);
     if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return resolve(); }
     const queued=state.epQueue.length;
-    $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode unlocked</div><h2>${ep.title}</h2></div>
+    $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">EP ${Episodes.numberOf(ep.id)} \u00b7 Episode unlocked</div><h2>${ep.title}</h2></div>
       <div class="mbody">
         <div class="hint">You have the evidence. Call what happens next, then watch it.${
           queued>1?` You have <b style="color:var(--pink)">${queued}</b> waiting.`:""}</div>
@@ -140,7 +140,7 @@ function openPrediction(wantId){
           (the floor is ${Math.round(Economy.accuracyFor(0)*100)}%).</p>
       </div>
     </div>`;
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
+  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">EP ${Episodes.numberOf(ep.id)} \u00b7 Predict before you watch</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
     ${clueHtml}
     ${askHtml}
@@ -264,7 +264,7 @@ async function runReveal(r){
     ? `You wagered <b style="color:var(--gold)">${fmt(r.wager)}</b> at \u00d7${(+r.odds||Economy.flatMultiplier()).toFixed(1)}`
     : "Watching with no wager";
   const showPlayer=()=>{
-    $("#scrim").innerHTML=`<div class="modal videoModal"><div class="top"><div class="eyebrow">Now playing</div><h2>${ep.title}</h2></div>
+    $("#scrim").innerHTML=`<div class="modal videoModal"><div class="top"><div class="eyebrow">EP ${Episodes.numberOf(ep.id)} \u00b7 Now playing</div><h2>${ep.title}</h2></div>
       <div class="mbody">${playerMarkup(r.id)}
       <div class="hint" style="text-align:center;margin-top:10px">${wagerLine}</div></div></div>`;
   };
@@ -274,7 +274,7 @@ async function runReveal(r){
   let completed=(await playVideo(r.id)).completed;
   while(!completed){
     const resume=await new Promise(done=>{
-      $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Paused</div><h2>${ep.title}</h2></div>
+      $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">EP ${Episodes.numberOf(ep.id)} \u00b7 Paused</div><h2>${ep.title}</h2></div>
         <div class="mbody">
           <div class="hint">Your prediction is locked in — but the answer is in the episode, so the result stays sealed until you have watched it.</div>
           <div class="foot" style="margin-top:16px">
@@ -396,7 +396,7 @@ function showEpisodeResult(ep,r,opened){
          <span class="badge" style="margin-left:8px">${more}</span></button>
        <button class="btn ghost wide" id="closeEp" style="margin-top:8px">Back to the board</button>`
     : `<button class="btn purple wide" id="closeEp" style="margin-top:16px">Back to the board</button>`;
-  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${ep.title}</h2></div>
+  $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">EP ${Episodes.numberOf(ep.id)} \u00b7 Episode complete</div><h2>${ep.title}</h2></div>
     <div class="mbody">${resultHtml}${rewardHtml}${ctaHtml}</div></div>`;
   /* The scrim is normally already up — this screen used to be reachable only straight out of
      the player, which left it showing. The second pass arrives after closeEpisodeUi() has taken

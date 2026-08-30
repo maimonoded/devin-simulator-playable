@@ -71,7 +71,7 @@ function openLibrary(){
 async function replayEpisode(id){
   const ep=Episodes.get(id);
   if(!ep){ toast(`⚠ Missing episode file for <b>${id}</b>`); return; }
-  $("#scrim").innerHTML=`<div class="modal videoModal"><div class="top"><div class="eyebrow">Replay</div><h2>${ep.title}</h2></div>
+  $("#scrim").innerHTML=`<div class="modal videoModal"><div class="top"><div class="eyebrow">EP ${Episodes.numberOf(ep.id)} \u00b7 Replay</div><h2>${ep.title}</h2></div>
     <div class="mbody">${playerMarkup(id)}</div></div>`;
   $("#scrim").classList.add("show");
   log("🎞",`Replaying <b>${ep.title}</b>`);
