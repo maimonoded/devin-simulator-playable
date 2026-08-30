@@ -55,9 +55,19 @@ silhouettes, no two confusable at 19px, which is the whole reason the emoji ladd
 
 | file | subject |
 |---|---|
-| `rank-extra` | a black-and-white film clapperboard, closed, seen head-on |
+| `rank-extra` | a plain empty folding director's chair, head-on, cream canvas and warm timber, no name on it |
 | `rank-fan` | a red-and-white striped popcorn tub, overflowing |
 | `rank-insider` | a single gold cinema admission ticket with a torn stub edge |
 | `rank-regular` | two champagne coupes touching in a toast |
 | `rank-vip` | a pair of dark sunglasses, folded, head-on |
 | `rank-producer` | a gold crown with three points and a red velvet band |
+
+### Why "Extra" is a chair and not a clapperboard
+
+It was a clapperboard first, and a clapperboard is exactly what `episodes.webp` already is. At
+19px they were the same object — the level pill and the episodes button can be on screen
+together, so that is a real collision, not a theoretical one. It came from the subject list
+rather than from the model.
+
+A chair is the better subject anyway: an EXTRA is a person on a set with nothing to do, and an
+empty chair says that. It also has a silhouette nothing else in the ladder shares.
