@@ -100,10 +100,34 @@ const Cards = {
      add() reports it so the beat can show it, and statusPoints() DERIVES it so the track
      actually holds it. Status is never accumulated, only derived (CLAUDE.md), so a value that
      only add() knew about would flash on screen and then vanish on the next render. */
-  firstCopyStatus(r) {
+  /* WHAT ONE COPY IS WORTH — the same for all three of them.
+
+     The three copies used to pay 25% / nothing / 100%: a nudge, a dead beat, and the payoff.
+     That made the second copy the only thing in the game you could pull and be paid nothing
+     for, which was survivable while it was invisible and absurd once the beat started stopping
+     the board on it with an n-of-3 counter and a blank where the number should be.
+
+     Three equal payments instead. A copy is a copy: each one did the same job of getting you
+     one nearer, so each one is worth the same, and the rarity's `status` stays what it always
+     meant — WHAT THE WHOLE COLLECTIBLE IS WORTH, now split across the copies that make it
+     rather than loaded onto the last.
+
+     Rounded per copy, so three of them can come to a point or two under `status` (a Common is
+     3+3+3=9 against 10). Equality is the property that matters here and exactness is not: the
+     drift is under 1% of a Season and it never favours the house by more than a rounding
+     error. Copies PAST the third still trickle, which is unchanged. */
+  copyStatus(r) {
     const rr = (r && r.key) ? r : this.rarity(r);
-    return Math.round((rr.status || 0) * Math.max(0, +cfg.statusFirstCopy || 0));
+    const share = +cfg.statusCopyShare;
+    /* Defaults to an even split when the knob is absent or nonsense, so the rarity table's
+       `status` keeps meaning what the whole Collectible is worth. */
+    const f = share > 0 ? share : 1 / this.copiesToConvert();
+    return Math.round((rr.status || 0) * f);
   },
+  /* Kept as the old name for anything still asking. Same number now — there is no longer a
+     "first copy" rate distinct from any other copy's. */
+  firstCopyStatus(r) { return this.copyStatus(r); },
+
   /* Coins every copy pays, scaled by the roll stake. state.mult is the multiplier the player is
      playing at; it persists between rolls, so it is still the right answer for a box opened in
      the store where no roll happened. Clamped at 1 so a corrupt save cannot zero it. */
@@ -177,17 +201,15 @@ const Cards = {
     const r = this.rarityOf(id);
     const isNew = before === 0;
     const converted = before < need && after >= need;
+    let coins = 0, status = 0;
+    /* EVERY COPY THAT BUILT THE COLLECTIBLE PAYS THE SAME, including the one that completes it.
+       Counted across the jump so add(id, 3) pays exactly what three separate calls would. */
+    const building = Math.max(0, Math.min(after, need) - Math.min(before, need));
+    if (building > 0) status += building * this.copyStatus(r);
     /* Copies past the conversion point trickle, and only those — counted across the whole jump
        so add(id, 5) pays exactly what five separate calls would. */
     const extra = Math.max(0, after - Math.max(before, need));
-    let coins = 0, status = 0;
-    if (converted) status += r.status;
     if (extra > 0) status += extra * r.trickle;
-    /* THE FIRST COPY MOVES THE TRACK. Before this, a card you had never seen paid nothing at
-       all — you could collect for an entire session and watch the status bar sit still, which
-       is exactly backwards for the thing the bar is meant to reward. Conversion is still the
-       payoff; this is the nudge that says the pull mattered. */
-    if (isNew) status += this.firstCopyStatus(r);
     /* A copy that neither started the collection nor converted it still pays. That is the whole
        of §12's first rule: a duplicate always converts to something. */
     const paying = many - (isNew ? 1 : 0) - (converted ? 1 : 0);
@@ -360,10 +382,12 @@ const Cards = {
       const c = this.count(id);
       if (c <= 0) return;
       const r = this.rarityOf(id);
-      /* Holding it at all pays the first-copy value — the same number add() reported when it
-         landed. Derived from the count, so it survives a reload with nothing stored. */
-      pts += this.firstCopyStatus(r);
-      if (c >= need) pts += r.status + (c - need) * r.trickle;
+      /* The same rule add() pays by: every copy that built the Collectible is worth the same,
+         and copies past it trickle. THIS IS THE AUTHORITY — status is derived and never
+         accumulated (CLAUDE.md), so if this and add() disagree the beat shows one number and
+         the track moves by another. They are two readings of one rule; change them together. */
+      pts += Math.min(c, need) * this.copyStatus(r);
+      if (c > need) pts += (c - need) * r.trickle;
     });
     Object.keys(state.setsDone || {}).forEach(() => { pts += Math.round(+cfg.setBonusStatus || 0); });
     return pts;

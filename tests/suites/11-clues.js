@@ -294,19 +294,28 @@ test("a DUPLICATE clue gets no card beat — it pays coins and the board keeps m
 });
 
 test("a landing pays ONE beat, however many clues it turned up", () => {
-  /* A clue row pays n, and n is 2 on most rows. A beat each meant two blocking cards back to
-     back for a single roll — 43 of them a session at seven seconds apiece, which is not a beat
-     but a reading session. It is one landing, so it reads as one event. */
+  /* Every shipped clue row pays n:1 — one clue at a time, which is the pace the game wants. The
+     batching is still the contract though: a row is free to pay more, and a beat each would mean
+     two blocking cards back to back for a single roll. So this forces a row to 2 and checks the
+     landing still produces exactly one beat carrying both. */
   freshRun();
-  let paired = 0, beats = 0, landings = 0;
-  const ev = landClues("clue", () => false, 40);
-  ev.filter(e => e.card).forEach(b => {
-    beats++;
-    ok(b.card.drops.length >= 1, "a beat always carries at least one clue");
-    if (b.card.drops.length > 1) paired++;
-  });
-  ok(beats > 0, "beats did happen");
-  ok(paired > 0, "and some landings turned up more than one new clue at once");
-  /* The real guarantee: never more card beats than landings. */
-  eq(beats <= 40, true, "never more beats than there were landings");
+  const rows = Pools.table("clue").filter(r => r.kind === "clue");
+  ok(rows.length > 0, "the clue pool has clue rows");
+  ok(rows.every(r => (r.n || 1) === 1), "and every shipped one pays a single clue");
+
+  const saved = rows.map(r => r.n);
+  rows.forEach(r => { r.n = 2; });
+  try {
+    const ev = landClues("clue", () => true, 1);
+    const beats = ev.filter(e => e.card);
+    eq(beats.length, 1, "one landing, one beat");
+    eq(beats[0].card.drops.length, 2, "carrying both clues");
+  } finally { rows.forEach((r, i) => { r.n = saved[i]; }); }
+});
+
+test("a landing never produces more card beats than there were landings", () => {
+  freshRun();
+  const ev = landClues("clue", () => false, 30);
+  ok(ev.filter(e => e.card).length <= 30);
+  ok(ev.filter(e => e.card).every(b => b.card.drops.length >= 1));
 });

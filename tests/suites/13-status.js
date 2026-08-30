@@ -17,27 +17,28 @@ test("status starts at zero and every inflow moves it", () => {
   /* 2 · calling it right */
   state.predWins = 2;
   eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction);
-  /* 3 · converting a card — the THIRD copy, not the first */
+  /* 3 · collecting a card — three equal payments, the third of which converts it */
   const id = Cards.all()[0].id, r = Cards.rarityOf(id);
-  const first = Cards.firstCopyStatus(r);
+  const first = Cards.copyStatus(r);
   Cards.add(id, 2);
-  /* Holding it pays the first-copy value, once. That is not the Collectible — conversion still
-     is — and this checks the two are counted separately rather than the second copy silently
-     converting anything. */
-  eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first,
-     "two copies is progress, not a Collectible");
+  /* Two copies pay the share twice. That is not the Collectible — conversion still is — and
+     this checks the two are counted separately rather than the second copy silently converting
+     anything. */
+  eq(Status.points(), 3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + 2 * first,
+     "two copies is twice the progress, not a Collectible");
   Cards.add(id, 1);
-  /* The third copy converts. The first-copy value does NOT go away when it does — you still
-     hold the card — so the two stack. */
+  /* The third copy converts, and is worth exactly what the other two were: the Collectible's
+     value is split across the copies that make it rather than loaded onto the last one. */
+  const whole = Cards.copiesToConvert() * first;
   eq(Status.points(),
-     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status);
+     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + whole);
   /* 4 · a trophy — the only thing left that is granted whole rather than converted. The shelf
      of ten buyable items used to be the fourth inflow; it is gone, because §8.1 lists exactly
      four sources for a Collectible and "bought with coins" is not one of them. */
   const ep = Episodes.ids()[0];
   Status.grantTrophy(ep);
   eq(Status.points(),
-     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + first + r.status + cfg.trophyStatus);
+     3 * cfg.statusPerEpisode + 2 * cfg.statusPerPrediction + whole + cfg.trophyStatus);
 });
 
 test("completing a set pays too, through the collection", () => {

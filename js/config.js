@@ -223,7 +223,16 @@ const DEFAULTS={
      and a Legendary still lands harder than a Common. cardCoins is what every copy pays in
      money, before the roll stake multiplies it. Neither is economy-owned — no workbook has a
      column for them. */
-  statusFirstCopy:0.25, cardCoins:25,
+  /* What ONE copy of a card pays, as a share of what the whole Collectible is worth — and all
+     three copies pay it, so three thirds come to the rarity's `status` value.
+
+     A NEW NAME because the MEANING changed, not just the number. statusFirstCopy was the share
+     the FIRST copy paid ON TOP of a full-value third copy; this is the share EVERY copy pays
+     and there is no separate conversion payment. Reusing the old name would have let a saved
+     0.25 quietly cut every card's worth by a quarter — the same trap packCardGap fell into, and
+     presentation and collection knobs have no version gate to catch it. statusFirstCopy is dead
+     and left to rot harmlessly in old saves. */
+  statusCopyShare:1/3, statusFirstCopy:0.25, cardCoins:25,
   cluesPerEpisode:4, clueSeasonStep:0, clueStuckDays:3, dupClueCoins:150,
 };
 let cfg=Object.assign({},DEFAULTS);
@@ -455,7 +464,7 @@ const TUNING=[
    ["clueSeasonStep","…and how many more each Season",1,{min:0}],
    ["clueStuckDays","Catch-up valve: days before it eases",1,{min:0}],
    ["dupClueCoins","Duplicate clue: coins",10,{min:0}],
-   ["statusFirstCopy","New card: share of convert value",0.05,{min:0,max:1}],
+   ["statusCopyShare","Each copy: share of the Collectible's worth",0.01,{min:0.01,max:1}],
    ["cardCoins","Any card: coins (x stake)",5,{min:0}],
    ["startEnergy","First session: energy granted",5,{min:0}],
    ["avgOdds","Payout multiplier (flat)",0.1],

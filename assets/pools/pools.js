@@ -45,7 +45,7 @@ const POOLS = {
     { name: "A good day",       weight: 18, kind: "money",  amount: 70 },
     { name: "Payday",           weight:  8, kind: "money",  amount: 170 },
     { name: "A find",           weight: 30, kind: "card" },
-    { name: "Overheard",        weight: 18, kind: "clue",   n: 2 },
+    { name: "Overheard",        weight: 18, kind: "clue",   n: 1 },
     { name: "Nothing doing",    weight:  6, kind: "event",  flavour: "Quiet street." },
   ],
 
@@ -64,7 +64,7 @@ const POOLS = {
      now pays `n: 2`, which does most of the work — it makes the landing meatier instead of
      making clues more frequent and more forgettable. */
   clue: [
-    { name: "A word in private", weight: 60, kind: "clue",   n: 2 },
+    { name: "A word in private", weight: 60, kind: "clue",   n: 1 },
     { name: "A keepsake",        weight: 22, kind: "card" },
     { name: "A tip-off",         weight: 12, kind: "money",  amount: 60 },
     { name: "Just passing",      weight:  6, kind: "event",  flavour: "They had nothing new." },
@@ -81,7 +81,7 @@ const POOLS = {
     { name: "A generous night",  weight: 36, kind: "money",  amount: 240, game: "train-small" },
     { name: "The good table",    weight: 18, kind: "money",  amount: 690, game: "train-large", ladder: true },
     { name: "Someone's gift",    weight: 26, kind: "card" },
-    { name: "A whisper",         weight: 15, kind: "clue",   n: 2 },
+    { name: "A whisper",         weight: 15, kind: "clue",   n: 1 },
     { name: "A moment to rest",  weight:  5, kind: "energy", amount: 3 },
   ],
 
@@ -93,7 +93,7 @@ const POOLS = {
     { name: "Paparazzi",         weight: 11, kind: "money",  amount: -90 },
     { name: "A bad review",      weight:  7, kind: "money",  amount: -180 },
     { name: "Left on a table",   weight: 22, kind: "card" },
-    { name: "A loose thread",    weight: 28, kind: "clue",   n: 2 },
+    { name: "A loose thread",    weight: 28, kind: "clue",   n: 1 },
     { name: "Called to the set", weight:  4, kind: "move",   to: "start" },
     { name: "A long lunch",      weight:  4, kind: "energy", amount: 4 },
     { name: "Slow news day",     weight:  2, kind: "event",  flavour: "Nothing in the papers." },

@@ -124,11 +124,18 @@ test("three copies convert, and the third is the one that pays the status", () =
   eq(Cards.converted(id), false);
   const b = Cards.add(id, 1);
   eq(b.converted, false);
-  eq(b.status, 0, "a plain duplicate is not a new card and pays no status");
+  /* ALL THREE COPIES PAY THE SAME. They used to pay 25% / nothing / 100%: a nudge, a dead beat
+     and the payoff. That made the second copy the only thing in the game you could pull and be
+     paid nothing for — survivable while it was invisible, absurd once the beat started stopping
+     the board on it with an n-of-3 counter and a blank where the number goes. A copy is a copy:
+     each did the same job of getting you one nearer. */
+  eq(b.status, Cards.copyStatus(r), "the copy that got you to 2 of 3 is worth the same as the 1st");
   ok(b.coins > Cards.cardCoins(), "a plain duplicate always converts to something");
   const c = Cards.add(id, 1);
   eq(c.converted, true, "the third copy is the Collectible");
-  eq(c.status, r.status, "and conversion is still the payoff, undiluted");
+  eq(c.status, Cards.copyStatus(r), "and it is worth the same as the other two");
+  eq(a.status, b.status, "1st and 2nd agree");
+  eq(b.status, c.status, "2nd and 3rd agree \u2014 which is the whole rule");
   eq(c.coins, Cards.cardCoins(), "it pays in status rather than in consolation");
   ok(Cards.converted(id));
 });
@@ -167,17 +174,17 @@ test("what the collection is worth is derived from the copies and nothing else",
   freshRun();
   eq(Cards.statusPoints(), 0);
   const id = Cards.all()[0].id, r = Cards.rarityOf(id);
-  const first = Cards.firstCopyStatus(r);
+  const per = Cards.copyStatus(r), need = Cards.copiesToConvert();
   Cards.add(id, 2);
-  /* Holding it pays the first-copy value ONCE however many copies are held — two copies is
-     still progress rather than a Collectible, and that is the invariant this guards. The
-     derived total and what add() reported must agree, or the bar would move and then snap back
-     on the next render. */
-  eq(Cards.statusPoints(), first, "two copies is progress, not a Collectible");
+  /* Two copies pay twice — progress, still not a Collectible. THE INVARIANT THIS GUARDS is that
+     the derived total agrees with what add() reported: status is derived and never accumulated,
+     so if the two readings of the rule drift the bar moves on the beat and snaps back on the
+     next render. */
+  eq(Cards.statusPoints(), 2 * per, "two copies is twice the progress, and still not a Collectible");
   Cards.add(id, 1);
-  eq(Cards.statusPoints(), first + r.status);
+  eq(Cards.statusPoints(), need * per, "and the third completes it \u2014 three equal payments");
   Cards.add(id, 2);
-  eq(Cards.statusPoints(), first + r.status + 2 * r.trickle);
+  eq(Cards.statusPoints(), need * per + 2 * r.trickle, "past that it trickles, unchanged");
 });
 
 suite("cards: drawing");
@@ -305,7 +312,8 @@ test("…and therefore keeps its STATUS — the whole point of the record", () =
   freshRun();
   const c = Cards.all().find(x => x.rarity === "legendary");
   const lr = Cards.rarity("legendary");
-  const worth = lr.status + Cards.firstCopyStatus(lr);   // conversion, plus holding it at all
+  // three equal copies, which is what the Collectible is worth
+  const worth = Cards.copiesToConvert() * Cards.copyStatus(lr);
   Cards.add(c.id, 3);
   eq(Cards.statusPoints(), worth);
   withCardRemoved(c.id, () => {

@@ -206,13 +206,15 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
                      →  money · a CARD · a clue · energy · a move · flavour
       →  a clue      →  filed against the episode. Held on screen as its own CARD — the contact
-                        sheet — for 2.5s, or until you TAP it and press Collect. A row pays 2,
-                        and both arrive in ONE beat, side by side              (js/clues.js)
-      →  a MEMORY    →  banked. New → held 2s, headlining the status it paid. Third copy →
-                        becomes that card's COLLECTIBLE. Any other copy → coins  (js/cards.js)
-      →  a TROPHY    →  the same, but held 5s on EVERY copy and counting itself "n of 3" —
-                        the counter is what makes you want the next one, and it can only say
-                        "2 of 3" if the second copy stops the board. Third → celebration
+                        sheet — for 2.5s, or until you TAP it and press Collect. Every shipped
+                        row pays ONE; a row that pays more shows them in one beat (js/clues.js)
+      →  a MEMORY    →  banked. New → held 2s, headlining the status it paid. ALL THREE COPIES
+                        PAY THE SAME; the third also converts it. Beyond that → coins + a
+                        trickle                                                 (js/cards.js)
+      →  a TROPHY    →  the same, but held 5s on EVERY copy, and its counter is three card
+                        SLOTS with the gap still in it — which is what makes you want the next
+                        one, and can only show "2 of 3" if copy 2 stops the board. Third →
+                        celebration
       →  a box       →  tap it, or it opens itself after 5s      (js/ui/pack.js)
                         (the Premiere's free pack, and the store)
    four of an episode's eight clues  →  it UNLOCKS  →  predict & watch, IN STORY ORDER
@@ -675,6 +677,12 @@ so `valueLabel()` returns `""` for every type and the position weights were dele
 two mini-games moved into the `bonus` pool as rows carrying a `game` key, and their money is the
 row's `amount` rather than the model's number. `Economy.trainLadder()` is still what builds the
 three-rung reveal, so the ladder is live and the two payout scalars are not.
+
+**`statusFirstCopy` is dead.** It was the share the FIRST copy of a card paid on top of a
+full-value third copy — a 25/0/100 ramp whose middle step was the only thing in the game you
+could pull and be paid nothing for. All three copies pay the same now (`cfg.statusCopyShare`, a
+third each), so the rarity's `status` is what the whole Collectible is worth rather than what its
+last copy pays. The old key survives only so a stale save round-trips; nothing reads it.
 
 **`clueAlbumSize` is dead.** It was the cosmetic target for a lifetime clue count that no
 longer exists — clues are per-episode now and `Clues.total()` derives the total. The key is
