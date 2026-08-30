@@ -158,7 +158,12 @@
 /* The frame itself, inset far enough to clear both strips. */
 .ccard.fam-clue .ccArt{inset:16px 19px 32%;filter:grayscale(1) contrast(1.3) brightness(.86)}
 .size-sm.fam-clue .ccArt{inset:8px 10px 34%}
-.size-lg.fam-clue .ccArt{inset:22px 26px 31%}
+/* 35%, not 31%: four lines of slip need the band between the photograph's foot and the caption
+   to be about a third of the card. The photo gives up a few percent of height and the sentence
+   stops being cropped — the right trade for the one card in the game carrying prose. The grain
+   overlay below is the sprocket window and MUST use the same inset, or the frame and the photo
+   disagree by four percent and the card looks misprinted. */
+.size-lg.fam-clue .ccArt{inset:22px 26px 35%}
 
 /* ccGrain is the grease-pencil RING on this family — the same element that carries film grain
    on any other. Reusing it keeps dropFace() from needing a per-family element list. */
@@ -166,12 +171,16 @@
   background:none;border:3px solid rgba(226,58,48,.85);border-radius:50%;
   transform:scale(.72) rotate(-6deg)}
 .size-sm.fam-clue .ccGrain{inset:8px 10px 34%;border-width:1.5px}
-.size-lg.fam-clue .ccGrain{inset:22px 26px 31%;border-width:4px}
+.size-lg.fam-clue .ccGrain{inset:22px 26px 35%;border-width:4px}
 
 /* The annotation, in the margin under the frame. */
 .ccard.fam-clue .ccSlip{left:19px;right:19px;bottom:15%;background:none;box-shadow:none;
   transform:none;padding:0;border-radius:0}
-.ccard.fam-clue .ccSlip span{color:#d6d2c6;text-align:left;-webkit-line-clamp:3}
+/* Four lines, not three. The 144 authored clues run 25-85 characters; at the board-centre size
+   the longest needs four. A clamp is a safety net against a pathological line, not a layout
+   tool — when it fires on ordinary content the card is too small, which is what the width
+   rule at the bottom of this file fixes. */
+.ccard.fam-clue .ccSlip span{color:#d6d2c6;text-align:left;-webkit-line-clamp:4}
 .size-sm.fam-clue .ccSlip{left:10px;right:10px;bottom:17%}
 /* The large sprockets are 21px, so 19px of margin runs the text under them. Every size clears
    its own strip by a couple of pixels; this is the one place the three have to be kept in step. */
@@ -526,10 +535,17 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    aspect-ratio and no intrinsic width — .playcard used to supply that and cardFace() does not —
    so without this the card collapses to a dark rounded dot. Loaded after overlay.css, so this
    wins over `.centerfx.card{width:auto}` without inflating the selector. */
-/* Sized against the SHORTER viewport axis, not a fixed pixel width: this is the reward beat, it
-   should own the screen for the few seconds it is up, and it has to do that on a phone frame and
-   a desktop board alike. The cap stops it going silly on a very tall window. */
-.centerfx.card .ccard{width:min(56vmin,400px);margin:0 auto}
+/* Sized against the viewport, not a fixed pixel width: this is the reward beat, it should own
+   the screen for the few seconds it is up, and it has to do that on a phone frame and a desktop
+   board alike. The cap stops it going silly on a very tall window.
+
+   78vw, not 56vmin. On a 375-wide phone vmin IS the width, so 56vmin came out at 210px — and a
+   CLUE card at 210px clipped its own sentence: the slip got three lines of 12px Courier and the
+   longest clue in the Season needs four. The whole reason the slip exists is that the line has
+   to be READ (see .fam-clue below), so a clue ending in an ellipsis is the one failure this face
+   cannot have. 78vw gives ~292px there. On any desktop the 400px cap still wins, so nothing
+   moves on the view this was originally tuned against. */
+.centerfx.card .ccard{width:min(78vw,56vh,400px);margin:0 auto}
 .centerfx.card.win .ccard{animation:revealPop .45s cubic-bezier(.2,1.5,.4,1)}
 /* The line under a converted card: what the third copy just bought. */
 .ccWon{margin-top:10px;text-align:center;font-size:15px;font-weight:800;color:var(--gold);

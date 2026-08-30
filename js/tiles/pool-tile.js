@@ -135,13 +135,35 @@ class PoolTile extends Tile {
     if(fresh.length) ev.push({float:{text:"+"+fresh.length+"🔍",color:"var(--teal)"}});
     else ev.push({float:{text:"+"+fmt(dupCoins),color:"var(--gold)"}});
 
+    /* A CLUE IS A CARD, AND IT GETS A CARD'S BEAT.
+
+       It has its own family face — the contact sheet, the case photograph, the sentence typed
+       on a cream slip (js/ui/cardface.js, .fam-clue in css/collection.css) — and CLAUDE.md ranks
+       that family FIRST of the three, because four clues buy the next episode and the episode is
+       the point of the game.
+
+       For a long time none of that was ever drawn on this route. A clue pulled out of a BOX got
+       the full face (js/ui/box3d.js). The same clue landed on a TILE — which is how most of them
+       arrive — got a one-second "+1🔍" float and a line in the activity log. And ?view=mobile
+       hides the activity log, so on a phone the most important reward in the game arrived
+       completely invisibly: players reached the wager screen and found four clues they had never
+       once seen. The face was built, the art was picked, and nothing called it.
+
+       So the beat is the same three-way split drawCardEvents() uses (js/boxes.js), for the same
+       reason: a duplicate must not cost the player the same five seconds a new one is worth.
+         new clue  → the card, held on the board centre
+         duplicate → a coin float and a log line, and the board keeps moving */
     got.forEach(g=>{
       if(!g.isNew){
         ev.push({log:{icon:"🔍",msg:`${row.name} · you knew that one · +<b>${fmt(g.coins)}</b> coins`}});
         return;
       }
       const [have,need]=Clues.progressFor(g.id);
-      ev.push({log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
+      ev.push({
+        card:{name:"A clue",positive:true,holdMs:cfg.clueHoldMs,
+              /* the SAME shape Boxes.dropClue() returns, so both routes draw the same face */
+              drop:{kind:"clue",ep:g.id,clue:g.clue,isNew:true,coins:g.coins}},
+        log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
     });
     return [...ev,...after];
   }

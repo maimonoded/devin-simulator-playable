@@ -213,3 +213,60 @@ test("a clue landing that unlocks NOTHING announces nothing", () => {
   const ev = landClues("clue", () => false, 1);
   eq(ev.filter(e => e.unlock).length, 0, "one clue, four short of an episode, says nothing");
 });
+
+suite("clues: a clue is a card, and it looks like one");
+
+/* THE FACE EXISTED AND NOTHING CALLED IT. .fam-clue in css/collection.css and the clue branch of
+   dropFace() in js/ui/cardface.js draw a contact sheet with the case photograph and the sentence
+   typed on a slip — and CLAUDE.md ranks that family FIRST of the three, because four of them buy
+   the next episode. A clue out of a BOX got that face. The same clue on a TILE, which is how most
+   of them arrive, got a float and a log line — and ?view=mobile hides the log, so on a phone it
+   arrived with no presentation whatsoever. */
+test("a NEW clue landed on a tile returns a card beat, carrying a drop the face can draw", () => {
+  freshRun();
+  const ev = landClues("clue", () => true, 1);
+  const beat = ev.find(e => e.card);
+  ok(beat, "a new clue produces a {card} beat, like every other card does");
+  const d = beat.card.drop;
+  ok(d, "and it carries a drop rather than a generic panel");
+  eq(d.kind, "clue");
+  ok(Episodes.has(d.ep), "naming the episode it was filed against");
+  ok(d.clue && typeof d.clue.text === "string" && d.clue.text.length > 0, "and the clue itself");
+  eq(d.isNew, true);
+});
+
+test("the tile drop and the BOX drop are the same shape — one face, two routes", () => {
+  /* This is the actual guarantee. If the two shapes drift, the same clue looks like two
+     different objects depending on where it came from, which is the bug this replaced. */
+  freshRun();
+  const tileDrop = landClues("clue", () => true, 1).find(e => e.card).card.drop;
+  freshRun();
+  let boxDrop = null;
+  for (let i = 0; i < 300 && !boxDrop; i++)
+    boxDrop = Boxes.open("insider").drops.find(d => d.kind === "clue") || null;
+  ok(boxDrop, "a box eventually pays a clue");
+  eq(Object.keys(tileDrop).sort().join(","), Object.keys(boxDrop).sort().join(","),
+     "the tile builds exactly the fields Boxes.dropClue() builds");
+});
+
+test("a DUPLICATE clue gets no card beat — it pays coins and the board keeps moving", () => {
+  /* Same three-way split drawCardEvents() uses. A duplicate must not cost the player the five
+     seconds a new clue is worth, or the pacing collapses on a well-explored episode.
+
+     Asserted as an INVARIANT over many landings rather than by staging one duplicate. Staging it
+     is harder than it looks: filling an episode's clues UNLOCKS it, and Clues.grant() then moves
+     to the next episode, so the repeat never happens. Landing repeatedly reproduces the real
+     distribution — four distinct out of eight takes about five draws, so repeats are common. */
+  freshRun();
+  const before = state.coins;
+  const ev = landClues("clue", () => false, 60);
+  const beats = ev.filter(e => e.card);
+  ok(beats.length > 0, "new clues did land");
+  ok(beats.every(b => b.card.drop && b.card.drop.isNew === true),
+     "every card held on screen is a clue the player did NOT already have");
+  const dups = ev.filter(e => e.log && /you knew that one/.test(e.log.msg));
+  ok(dups.length > 0, "and repeats did occur, which is what makes this test mean anything");
+  eq(ev.filter(e => e.card && e.card.drop && !e.card.drop.isNew).length, 0,
+     "not one of them was held on screen");
+  ok(state.coins > before, "they converted to coins instead — GDD \u00a712's rule about variance");
+});

@@ -145,14 +145,25 @@ function clearOverlayFx(){
 }
 /* A card, held on the board's centre.
 
-   `collectible` is a card from the collection, and when it is there the card's OWN face is
-   drawn — the same cardFace() the album and the box popup use. A card that looked like two
-   different things in the two places it appears is not a collection (CLAUDE.md). Without one
-   this falls back to the generic panel, which is what a pool row's flavour outcome gets. */
+   THREE FACES, in order of how much the drop knows about itself:
+
+     `drop`        — any box-drop shape, drawn by dropFace(): a clue's contact sheet, a card,
+                     a Collectible's plaque. This is what lets a clue landed ON A TILE look
+                     exactly like the same clue pulled out of a BOX, which it did not for a
+                     long time — see the note in js/tiles/pool-tile.js drawClue().
+     `collectible` — a card from the collection, drawn by cardFace(): the same face the album
+                     and the box popup use. A card that looked like two different things in the
+                     two places it appears is not a collection (CLAUDE.md).
+     neither       — the generic panel, which is what a pool row's flavour outcome gets.
+
+   dropFace() and cardFace() both live in js/ui/cardface.js, which loads AFTER this file. That
+   is fine and already relied on: these are called at roll time, not at parse time. */
 function showCard(c){
   const el=$("#centerFx");
   el.className="centerfx show card "+(c.positive?"win":"lose");
-  el.innerHTML=c.collectible
+  el.innerHTML=c.drop
+    ? dropFace(c.drop,{size:"lg"})
+    : c.collectible
     ? cardFace(c.collectible,{owned:true,size:"lg",count:c.count,converted:c.converted})+
       (c.converted?`<div class="ccWon">Collected \u2014 that is the third copy</div>`:"")
     : `<div class="playcard">
@@ -166,7 +177,12 @@ function showCard(c){
   /* The converting copy holds longer: it is the moment three pulls were spent buying, and
      giving it the same beat as an ordinary new card would flatten the one payoff the
      collection has. */
-  const ms=c.converted?(+cfg.cardConvertMs||0):(+cfg.cardHoldMs||0);
+  /* holdMs lets a beat ask for its own length. A clue is the one face carrying a SENTENCE, and
+     a sentence takes longer to read than a card's name — so it holds for cfg.clueHoldMs rather
+     than borrowing the card timing and hoping. */
+  const ms=c.holdMs!=null?(+c.holdMs||0)
+          :c.converted?(+cfg.cardConvertMs||0)
+          :(+cfg.cardHoldMs||0);
   return sleep(Math.max(200,ms)).then(()=>{ el.className="centerfx"; el.innerHTML=""; });
 }
 /* Blocking Collect popup (train tiles). Resolves on click, or automatically after a
