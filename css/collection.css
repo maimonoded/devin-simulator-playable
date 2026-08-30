@@ -7,7 +7,10 @@
    3:4, art edge to edge, the name on a gradient over the bottom of it. Three sizes, because a
    card in an album slot, a card in a two-up box and a single card filling the popup are the
    same object at genuinely different scales. */
-.ccard{position:relative;aspect-ratio:3/4;border-radius:11px;overflow:hidden;
+/* container-type so the clue face can size its TYPE against the card instead of against a size
+   class — see .fam-clue below. inline-size only: the card's height comes from aspect-ratio, and
+   a size container would break that. */
+.ccard{container-type:inline-size;position:relative;aspect-ratio:3/4;border-radius:11px;overflow:hidden;
   background:linear-gradient(180deg,#1a1f47,#0e1230);border:1.5px solid var(--line);
   box-shadow:0 6px 16px rgba(0,0,0,.45);isolation:isolate}
 .ccard.size-sm{border-radius:9px;border-width:1.5px}
@@ -176,11 +179,31 @@
 /* The annotation, in the margin under the frame. */
 .ccard.fam-clue .ccSlip{left:19px;right:19px;bottom:15%;background:none;box-shadow:none;
   transform:none;padding:0;border-radius:0}
-/* Four lines, not three. The 144 authored clues run 25-85 characters; at the board-centre size
-   the longest needs four. A clamp is a safety net against a pathological line, not a layout
-   tool — when it fires on ordinary content the card is too small, which is what the width
-   rule at the bottom of this file fixes. */
-.ccard.fam-clue .ccSlip span{color:#d6d2c6;text-align:left;-webkit-line-clamp:4}
+/* THE CLUE FACE SIZES ITS TYPE AGAINST THE CARD, not against a size class.
+
+   Every other face carries a NAME — two or three words that look fine a little large or a
+   little small. This one carries a SENTENCE, in a fixed band between the photograph's foot and
+   the caption, and the band is a percentage of the card while 12px is not. So the same card
+   that read perfectly at 293px overran its own caption at 180px: the type did not shrink with
+   the frame, and four lines stopped fitting in a band that had got smaller.
+
+   cqw ties them together. 4.1cqw is ~12px on the 293px board-centre card — the size this was
+   originally tuned at — and stays in proportion at every other width, including the 54px
+   evidence thumbnail and whatever a short window produces. Four lines fit at any size, which is
+   what the clamp below can then go back to being a safety net for.
+
+   These win over the .size-* rules further down on specificity (three classes to two), which is
+   why those can stay as they are for every other family.
+   The max() floors matter as much as the cqw. Scaling all the way down turns a small card's
+   type into three-pixel grey fuzz, which is worse than the fixed sizes this replaced — so below
+   about 140px the type stops shrinking and the clamp does its job instead. Nothing in the game
+   draws a clue that small with its type showing (the evidence thumbnail hides it), but a future
+   caller should get a small card, not a broken one. */
+.ccard.fam-clue .ccSlip span{color:#d6d2c6;text-align:left;-webkit-line-clamp:4;
+  font-size:max(6px,4.1cqw);line-height:1.36}
+.ccard.fam-clue .ccName{font-size:max(9px,5.8cqw)}
+.ccard.fam-clue .ccSub{font-size:max(7px,3.7cqw)}
+.ccard.fam-clue .ccRar{font-size:max(6px,3.5cqw)}
 .size-sm.fam-clue .ccSlip{left:10px;right:10px;bottom:17%}
 /* The large sprockets are 21px, so 19px of margin runs the text under them. Every size clears
    its own strip by a couple of pixels; this is the one place the three have to be kept in step. */

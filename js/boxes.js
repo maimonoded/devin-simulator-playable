@@ -130,7 +130,7 @@ const Boxes = {
   dropClue() {
     const got = Clues.grant();
     if (!got) return this.dropCoins({ amount: cfg.boxCoins });
-    return { kind: "clue", ep: got.id, clue: got.clue, isNew: got.isNew, coins: got.coins };
+    return Clues.dropFor(got.id, got.clue, { isNew: got.isNew, coins: got.coins });
   },
   dropCoins(pick) {
     const amount = Math.round((pick && pick.amount ? pick.amount : cfg.boxCoins) * (cfg.boardScale || 1));

@@ -161,8 +161,9 @@ class PoolTile extends Tile {
       const [have,need]=Clues.progressFor(g.id);
       ev.push({
         card:{name:"A clue",positive:true,holdMs:cfg.clueHoldMs,
-              /* the SAME shape Boxes.dropClue() returns, so both routes draw the same face */
-              drop:{kind:"clue",ep:g.id,clue:g.clue,isNew:true,coins:g.coins}},
+              /* Clues.dropFor is the one builder — Boxes.dropClue() and the wager screen's
+                 evidence board call it too, so all three draw an identical face. */
+              drop:Clues.dropFor(g.id,g.clue,{isNew:true,coins:g.coins})},
         log:{icon:"🔍",msg:`${row.name} · <i>${g.clue.text}</i> · <b>${have}/${need}</b> on ${Episodes.titleOf(g.id)}`}});
     });
     return [...ev,...after];

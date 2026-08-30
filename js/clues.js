@@ -73,6 +73,23 @@ const Clues = {
     const held = this.heldFor(id);
     return this.authoredFor(id).filter(c => held.includes(c.id));
   },
+  /* THE DROP SHAPE, BUILT IN ONE PLACE.
+
+     A clue is drawn by dropFace() (js/ui/cardface.js) as a contact sheet, and three different
+     things need to hand it one: a box paying a clue, a tile landing on a clue row, and the
+     evidence board on the wager screen. They were building the object separately, and a field
+     drifting between them would mean the same clue looked like two different cards depending on
+     where you met it — which is the one thing a collection cannot do.
+
+     `isNew` is what the face keys on to decide between printing the SENTENCE and printing "You
+     knew that one" over a duplicate's coin value. Held evidence is neither of those things: it
+     is a clue you own and are re-reading, so it renders as the sentence. Hence the default. */
+  dropFor(id, clue, opts) {
+    const o = opts || {};
+    return { kind: "clue", ep: id, clue,
+             isNew: o.isNew !== false, coins: +o.coins || 0 };
+  },
+
   /* Lifetime clues collected, derived. The HUD's running total. */
   total() {
     return Object.keys(state.clues || {}).reduce((a, id) => a + this.countFor(id), 0);

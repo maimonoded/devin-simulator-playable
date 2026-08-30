@@ -268,6 +268,34 @@
 .evHead.open::after{transform:rotate(180deg)}
 .evCount{color:var(--teal);font-weight:700;margin-left:auto}
 .evBody{padding:10px 12px;border-top:1px solid var(--line)}
-.evList{margin:0;padding-left:18px;font-size:13px;color:var(--text);line-height:1.55}
-.evList li{margin:0 0 5px}
-.evList li:last-child{margin:0}
+/* THE EVIDENCE BOARD. Each row is the clue's own card beside its sentence.
+
+   The card, because a clue IS a card and this is the screen where the player handles their
+   evidence — a bulleted list of strings made the thing they spent four draws collecting look
+   like a footnote. The sentence beside it, because at row size the card's own slip is 6px:
+   the thumbnail says WHAT this is, the text says what it SAYS. Tapping opens .evZoom. */
+.evList{display:flex;flex-direction:column;gap:9px}
+.evRow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;
+     border:1px solid transparent;border-radius:9px;padding:4px;transition:.15s;cursor:pointer}
+.evRow:hover,.evRow:active{background:rgba(45,212,191,.08);border-color:rgba(45,212,191,.35)}
+.evThumb{flex:0 0 54px;display:block;pointer-events:none}
+.evThumb .ccard{width:54px}
+/* The thumbnail is the PHOTOGRAPH in its sprocketed frame, nothing else. A clue card carries a
+   slip, a name and an episode caption; at 54px those render at six and seven pixels and read as
+   grey noise stapled under the picture — three illegible things competing with the sentence
+   sitting right beside them, which is the one thing here that has to be read. So the frame and
+   the photo stay, the type goes, and the photo takes the space the type was using. The whole
+   card, type and all, is one tap away in .evZoom. */
+.evThumb .ccSlip,.evThumb .ccFoot,.evThumb .ccRar{display:none}
+.evThumb .ccard.fam-clue .ccArt,
+.evThumb .ccard.fam-clue .ccGrain{inset:7px 8px}
+.evText{flex:1 1 auto;font-size:13px;color:var(--text);line-height:1.5}
+
+/* The zoom. Fixed at 85: above .scrim (80) so it clears the modal it opens from, below
+   .confetti (90). Appended INSIDE #scrim, so closeEpisodeUi() takes it with everything else and
+   there is nothing extra to tear down. */
+.evZoom{position:fixed;inset:0;z-index:85;display:flex;align-items:center;justify-content:center;
+     padding:24px;background:rgba(6,8,24,.82);backdrop-filter:blur(4px);cursor:zoom-out;
+     animation:evZoomIn .18s ease}
+.evZoom .ccard{width:min(78vw,56vh,400px)}
+@keyframes evZoomIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}

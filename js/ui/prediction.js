@@ -129,7 +129,11 @@ function openPrediction(wantId){
       </button>
       <div class="evBody" id="evBody" hidden>
         ${evidence.length
-          ? `<ul class="evList">${evidence.map(c=>`<li>${c.text}</li>`).join("")}</ul>`
+          ? `<div class="evList">${evidence.map((c,k)=>`
+               <button class="evRow" data-clue="${k}">
+                 <span class="evThumb">${dropFace(Clues.dropFor(id,c),{size:"sm"})}</span>
+                 <span class="evText">${c.text}</span>
+               </button>`).join("")}</div>`
           : `<p class="hint" style="margin:0">Nothing on file for this one.</p>`}
         <p class="hint" style="margin:8px 0 0">Modelled accuracy with this much to go on:
           <b style="color:var(--teal)">${Math.round(Economy.accuracyFor(evidence.length)*100)}%</b>
@@ -150,6 +154,25 @@ function openPrediction(wantId){
     evB.hidden=!open; evT.setAttribute("aria-expanded",String(open));
     evT.classList.toggle("open",open);
   };
+  /* TAP A PIECE OF EVIDENCE TO LOOK AT IT PROPERLY.
+
+     The thumbnail is a real clue card, but at evidence-row size its own sentence is 6px — which
+     is why the row carries the text beside it rather than relying on the face. The card is there
+     because a clue IS a card and this is the screen where you handle your evidence; the zoom is
+     there because a card you cannot look at is a picture of a card.
+
+     The layer is fixed at z-index 85: above .scrim (80) so it clears the modal it is opened
+     from, below .confetti (90). It lives INSIDE #scrim, so closeEpisodeUi() takes it with the
+     rest and there is nothing extra to tear down. */
+  $("#scrim").querySelectorAll(".evRow").forEach(row=>row.onclick=()=>{
+    const c=evidence[+row.dataset.clue];
+    if(!c) return;
+    const zoom=document.createElement("div");
+    zoom.className="evZoom";
+    zoom.innerHTML=dropFace(Clues.dropFor(id,c),{size:"lg"});
+    zoom.onclick=()=>zoom.remove();
+    $("#scrim").appendChild(zoom);
+  });
   $("#scrim").querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
     $("#scrim").querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
     b.classList.add("sel"); pending.sel=+b.dataset.idx;

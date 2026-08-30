@@ -235,9 +235,11 @@ test("a NEW clue landed on a tile returns a card beat, carrying a drop the face 
   eq(d.isNew, true);
 });
 
-test("the tile drop and the BOX drop are the same shape — one face, two routes", () => {
-  /* This is the actual guarantee. If the two shapes drift, the same clue looks like two
-     different objects depending on where it came from, which is the bug this replaced. */
+test("all THREE routes build the same drop — one face wherever you meet a clue", () => {
+  /* This is the actual guarantee. Three things hand dropFace() a clue: a box paying one, a tile
+     landing on a clue row, and the evidence board on the wager screen. If their shapes drift,
+     the same clue looks like different objects depending on where you met it — which is the one
+     thing a collection cannot do. Clues.dropFor() is the single builder; this pins that. */
   freshRun();
   const tileDrop = landClues("clue", () => true, 1).find(e => e.card).card.drop;
   freshRun();
@@ -245,8 +247,28 @@ test("the tile drop and the BOX drop are the same shape — one face, two routes
   for (let i = 0; i < 300 && !boxDrop; i++)
     boxDrop = Boxes.open("insider").drops.find(d => d.kind === "clue") || null;
   ok(boxDrop, "a box eventually pays a clue");
-  eq(Object.keys(tileDrop).sort().join(","), Object.keys(boxDrop).sort().join(","),
-     "the tile builds exactly the fields Boxes.dropClue() builds");
+  const ep = Episodes.ids()[0];
+  const evidenceDrop = Clues.dropFor(ep, Clues.authoredFor(ep)[0]);
+  const shape = d => Object.keys(d).sort().join(",");
+  eq(shape(tileDrop), shape(boxDrop), "tile and box agree");
+  eq(shape(evidenceDrop), shape(boxDrop), "and so does the wager screen's evidence board");
+});
+
+test("a held clue renders as its SENTENCE, not as a duplicate's coin value", () => {
+  /* dropFace keys on isNew to choose between printing the clue text and printing "You knew that
+     one" over a coin badge. Evidence being re-read on the wager screen is neither a fresh drop
+     nor a duplicate — it is a clue you own and are looking at again — so dropFor defaults to the
+     face that shows the words. Getting this backwards would make the evidence board, whose
+     entire job is to be read before betting, print the same four non-sentences every time. */
+  const ep = Episodes.ids()[0], clue = Clues.authoredFor(ep)[0];
+  const d = Clues.dropFor(ep, clue);
+  eq(d.kind, "clue");
+  eq(d.ep, ep);
+  eq(d.clue, clue);
+  eq(d.isNew, true, "so the face prints the sentence");
+  eq(d.coins, 0, "and there is no duplicate payout to announce");
+  eq(Clues.dropFor(ep, clue, { isNew: false, coins: 40 }).isNew, false, "callers can still say otherwise");
+  eq(Clues.dropFor(ep, clue, { isNew: false, coins: 40 }).coins, 40);
 });
 
 test("a DUPLICATE clue gets no card beat — it pays coins and the board keeps moving", () => {
