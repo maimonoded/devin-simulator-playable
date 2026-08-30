@@ -191,6 +191,10 @@ const DEFAULTS={
   /* How long a completed CARD SET is held on screen. Shorter than a set of episodes
      finishing, on purpose: it is a reward, not a chapter ending. */
   setDoneMs:2600,
+  /* A skip button on the video player that counts the episode as WATCHED — not as walked out
+     of. A demo build is tested far more than it is played and the footage is 30-60s a go; this
+     is the switch that takes it away for a real audience. */
+  videoSkip:1,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
   /* GDD 7.3: FLAT ODDS. Every answer pays the same multiplier, because per-answer odds leak the
@@ -341,6 +345,7 @@ const TUNING=[
    ["collectMaxSec","Train collect auto-close max (s)",1],
    ["autoCollectMs","Train collect during auto-play (ms)",50],
    ["fallbackSceneMs","Episode w/o video: placeholder (ms)",100],
+   ["videoSkip","Video: skip button (counts as watched)",1,{min:0,max:1}],
    ["longPressMs","Video: hold for 2× after (ms)",25],
    ["autoRollHoldMs","Roll: hold this long for auto-roll (ms)",100],
    ["bonusGames","Bonus mini-games (0/1)",1],
