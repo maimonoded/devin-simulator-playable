@@ -224,7 +224,10 @@ function renderStatusChip(){
      the number moves several times a session, the band once every five levels. */
   $("#hLevel").textContent=lv;
   $("#hRank").textContent=rank.name;
-  $("#hRankIco").textContent=rank.icon;
+  /* The band's own artwork, swapped by class — six files, one per rung. textContent would put a
+     glyph back inside a span that is now a background image and nothing would show. */
+  const ri=$("#hRankIco");
+  if(ri){ ri.className="ic i-rank i-rank-"+(rank.key||"extra"); ri.title=rank.name; }
   $("#hRankFill").style.width=Math.round(Status.levelProgress(pts)*100)+"%";
   /* Pop when the number moves, since the chip is small and easy to miss. */
   if(state.lastStatus!==pts){
@@ -371,7 +374,14 @@ function renderAll(){ renderHUD();renderNav();renderStats();renderStory();render
   rollBtn.disabled=rollIsAuto?false:(autoBusy||cantRoll);
   /* The LABEL only — the energy readout and its bar are siblings and must survive the swap. */
   const rollLabel=$("#rollLabel");
-  if(rollLabel) rollLabel.textContent=rollIsAuto?"⏸ Stop auto roll":"🎲 Roll";
+  /* innerHTML, not textContent. The label carries an ICON SPAN now (assets/icons/dice.webp), and
+     textContent would have replaced it with a string the first time the button rendered — the
+     die would simply never have appeared, in a way that looks like a missing asset rather than
+     a wrong assignment. The pause state keeps a glyph because there is no art for it: it is a
+     transient control state, not a thing in the game. */
+  if(rollLabel) rollLabel.innerHTML=rollIsAuto
+    ? "\u23f8 Stop auto roll"
+    : `<span class="ic i-dice"></span>Roll`;
   rollBtn.classList.toggle("auto",rollIsAuto);
   // the multiplier is the stake for the roll in flight — lock it mid-spin and during auto
   $("#multBtn").disabled=state.animating||autoBusy;

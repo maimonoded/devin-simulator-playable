@@ -260,7 +260,17 @@ function showCard(c){
     ? `${pair?`<div class="cbLines">${drops.map(d=>`<p>${d.clue.text}</p>`).join("")}</div>`:""}
        <div class="cbHint" id="cbHint">Tap to keep ${pair?"them":"it"} open</div>`
     : `<div class="cbCap">
-        ${pts>0?`<div class="cbStat"><b>${trophy?"\ud83c\udfc6 ":""}+${fmt(pts)}</b><i>status</i></div>`:""}
+        ${pts>0?(trophy
+          /* THE CUP IS THE SIZE OF THE THING IT MEANS. It was a text-sized emoji tucked in front
+             of the number, in a caption with dead space either side of it — so the mark that says
+             "this is a trophy, not a memory" was the smallest thing on a beat about winning one.
+             It flanks the number now, at fifty pixels a side, filling exactly the space that was
+             empty. Two cups rather than one because the number stays CENTRED: an award reads as
+             an award when it is framed, and a single cup shunted to one side just looks adrift. */
+          ? `<div class="cbAward"><span class="cbCup"></span>
+               <div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>
+               <span class="cbCup"></span></div>`
+          : `<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`):""}
         ${c.collectible?cbSlots(Cards.artFor(c.collectible),Math.min(c.count,need),need):""}
         ${celebrate?`<div class="cbDone">⭐ Collected \u2014 it is a Collectible now</div>`
           :converted?`<div class="ccWon">Collected — that is the third copy</div>`:""}

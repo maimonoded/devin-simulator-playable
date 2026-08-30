@@ -694,6 +694,12 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    says what it was WORTH, which is the thing the player is actually accumulating and which used
    to be a word in a log line they could not see on a phone. */
 .centerfx.card .cbCap{margin-top:11px;pointer-events:none}
+/* The award row: a big cup either side of what it was worth, the number centred between them. */
+.cbAward{display:flex;align-items:center;justify-content:center;gap:16px}
+.cbCup{flex:0 0 auto;width:52px;height:52px;background:url('../assets/icons/trophies.webp') center/contain no-repeat;
+  filter:drop-shadow(0 3px 10px rgba(0,0,0,.6)) drop-shadow(0 0 14px rgba(255,203,92,.35))}
+/* Mirrored, so the pair reads as a matched frame rather than as two copies of one picture. */
+.cbAward .cbCup:last-child{transform:scaleX(-1)}
 .cbStat{font-family:Georgia,serif;line-height:1}
 .cbStat b{font-size:40px;font-weight:800;color:var(--gold);
      text-shadow:0 3px 14px rgba(0,0,0,.75),0 0 26px rgba(255,203,92,.35)}

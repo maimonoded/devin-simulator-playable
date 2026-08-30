@@ -50,7 +50,38 @@ input{font-family:inherit}
 .avatarBtn:active{transform:scale(.94)}
 .pill{display:flex;align-items:center;gap:8px;background:var(--panel2);
       border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-width:96px}
-.pill .ic{font-size:16px}
+/* ---------- THE UI ICONS ARE ART NOW, NOT EMOJI ----------
+   Emoji were somebody else's art direction: they change with the operating system, they carry a
+   palette that has nothing to do with this game, and a 📔 does not say "collectibles" to anyone
+   who has not been told. assets/icons/*.webp, generated to one prompt — tools/icon-art/.
+
+   SIZE IS THE WHOLE CONSTRAINT. These were 13px in the mobile pills, and an illustrated icon at
+   13px is grey mush — measured, by putting the first one on screen at 13, 16, 26, 40 and 64 and
+   looking at it. So the pills give the icon a few more pixels than the emoji needed. It is the
+   cheapest possible change and it is the difference between art and a smudge. */
+.ic{display:inline-block;flex:0 0 auto;background-repeat:no-repeat;background-position:center;
+    background-size:contain}
+.i-coins{background-image:url('../assets/icons/coins.webp')}
+.i-collectibles{background-image:url('../assets/icons/collectibles.webp')}
+.i-trophies{background-image:url('../assets/icons/trophies.webp')}
+.i-episodes{background-image:url('../assets/icons/episodes.webp')}
+.i-album{background-image:url('../assets/icons/album.webp')}
+.i-dice{background-image:url('../assets/icons/dice.webp')}
+.i-energy{background-image:url('../assets/icons/energy.webp')}
+.i-store{background-image:url('../assets/icons/store.webp')}
+/* The six status bands. One file a rung, because the rung IS the picture — see the ladder note
+   in assets/status/status.js. */
+.i-rank-extra{background-image:url('../assets/icons/rank-extra.webp')}
+.i-rank-fan{background-image:url('../assets/icons/rank-fan.webp')}
+.i-rank-insider{background-image:url('../assets/icons/rank-insider.webp')}
+.i-rank-regular{background-image:url('../assets/icons/rank-regular.webp')}
+.i-rank-vip{background-image:url('../assets/icons/rank-vip.webp')}
+.i-rank-producer{background-image:url('../assets/icons/rank-producer.webp')}
+.pill .ic{width:22px;height:22px}
+.storeBtn .ic{width:19px;height:19px;margin-right:6px;vertical-align:-4px}
+.btn.navb .ic,.btn.album .ic{width:28px;height:28px}
+.rollLabel .ic{width:22px;height:22px;margin-right:7px;vertical-align:-5px}
+.rollEn .ic{width:14px;height:14px;margin-right:3px;vertical-align:-2px}
 .pill .v{font-weight:800;font-size:15px}
 .pill .lb{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .pill.coins .v{color:var(--gold)}

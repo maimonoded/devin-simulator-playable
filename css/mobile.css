@@ -88,7 +88,9 @@ html.viewMobile .avatarBtn { width: 34px; height: 34px; font-size: 16px; }
 html.viewMobile .hud .pill { padding: 4px 8px; gap: 5px; min-width: 0; }
 html.viewMobile .hud .pill .lb { display: none; }
 html.viewMobile .hud .pill .v { font-size: 13px; }
-html.viewMobile .hud .pill .ic { font-size: 13px; }
+/* 19, not 13. The pills lose their captions here so there is room, and 13px of illustrated icon
+   is a smudge — see the note in css/base.css. */
+html.viewMobile .hud .pill .ic { width: 19px; height: 19px; }
 /* .energywrap is gone — energy moved onto the Roll button. */
 html.viewMobile .hud .ebar { height: 5px; margin-top: 3px; }
 /* Day and clock are simulator instrumentation — a player has no session counter on screen.

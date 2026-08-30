@@ -46,24 +46,24 @@
          being the thing that ends a Season, and the album still carries it. -->
     <div class="pills">
       <button class="pill lvl" id="hLevelPill" title="Your status — tap for the profile">
-        <span class="ic" id="hRankIco">🎬</span>
+        <span class="ic i-rank i-rank-extra" id="hRankIco"></span>
         <div>
           <div class="v" id="hLevel">1</div>
           <div class="lb" id="hRank">Extra</div>
           <span class="rkBar"><span class="rkFill" id="hRankFill"></span></span>
         </div>
       </button>
-      <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
+      <div class="pill coins"><span class="ic i-coins"></span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
       <!-- TWO THINGS THE PLAYER ACCUMULATES, and a top bar counts NOUNS. "Called it" is a
            reason — how the trophy was won — and a reason cannot be counted: nobody thinks "I
            have four called-its". It is the right heading for the profile zone that explains
            them, and the wrong label for a number. The bar says what you own; the profile says
            where it came from. -->
       <button class="pill collectibles" id="hCollectPill" title="Collectibles — tap for the profile">
-        <span class="ic">🃏</span><div><div class="v" id="hCollect">0</div><div class="lb">Collectibles</div></div>
+        <span class="ic i-collectibles"></span><div><div class="v" id="hCollect">0</div><div class="lb">Collectibles</div></div>
       </button>
       <button class="pill trophies" id="hTrophyPill" title="Trophies — won by calling a prediction right">
-        <span class="ic">🏆</span><div><div class="v" id="hTrophies">0</div><div class="lb">Trophies</div></div>
+        <span class="ic i-trophies"></span><div><div class="v" id="hTrophies">0</div><div class="lb">Trophies</div></div>
       </button>
     </div>
     <!-- Player. The handle for the profile panel. The rank chip that used to ride beside it is
@@ -76,7 +76,7 @@
 
   <!-- stage -->
   <div class="stage">
-    <button class="storeBtn" id="storeBtn">🛒 Store</button>
+    <button class="storeBtn" id="storeBtn"><span class="ic i-store"></span>Store</button>
     <!-- THE OBJECTIVE TRACKER. The one thing a collection game has to answer between rolls:
          what am I chasing, how close am I, and can I do anything about it right now. It lived
          only in the .side panel, which ?view=mobile hides outright — so on a phone the game
@@ -117,7 +117,7 @@
         <!-- Episodes: straight into the next unwatched one when something is waiting, the
              library otherwise. One button, because "watch the next" and "watch one again" are
              the same intent from the player's side. The badge counts what is waiting. -->
-        <button class="btn navb" id="episodesBtn" title="Episodes">🎬<i class="navDot" id="episodesDot">0</i></button>
+        <button class="btn navb" id="episodesBtn" title="Episodes"><span class="ic i-episodes"></span><i class="navDot" id="episodesDot">0</i></button>
         <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
         <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
         <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop.
@@ -127,13 +127,13 @@
              the energy readout with it. Children are pointer-events:none so the hold gesture
              still lands on the button. -->
         <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">
-          <span class="rollLabel" id="rollLabel">🎲 Roll</span>
-          <span class="rollEn">⚡<b id="rollEnergy">0</b><i id="rollEnergyCap">/30</i></span>
+          <span class="rollLabel" id="rollLabel"><span class="ic i-dice"></span>Roll</span>
+          <span class="rollEn"><span class="ic i-energy"></span><b id="rollEnergy">0</b><i id="rollEnergyCap">/30</i></span>
           <span class="rollEbar"><span class="rollEfill" id="rollEfill"></span></span>
         </button>
         <!-- The album: one page per episode, and the empty slots are the point. Badged while
              clue cards are banked for the next prediction, since those are about to be spent. -->
-        <button class="btn album" id="albumBtn" title="Album">📔<i class="albumDot" id="albumDot"></i></button>
+        <button class="btn album" id="albumBtn" title="Collection"><span class="ic i-album"></span><i class="albumDot" id="albumDot"></i></button>
       </div>
     </div>
     <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->

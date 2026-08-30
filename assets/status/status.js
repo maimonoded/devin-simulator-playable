@@ -62,13 +62,17 @@ const STATUS_ZONES = [
 
      🎬 on the set as nobody · 🍿 in the audience · 🎟 through the door
      🥂 at the party · 🕶 recognised at it · 👑 running it */
+/* `key` names the band's artwork (assets/icons/rank-<key>.webp) and `icon` is the glyph that
+   stands in wherever art cannot go — the activity log, a title attribute, the estate plaque's
+   canvas. Two fields because the two places have different constraints, not because the ladder
+   has two identities. */
 const STATUS_RANKS = [
-  { from:  1, name: "Extra",     icon: "🎬" },
-  { from:  6, name: "Fan",       icon: "🍿" },
-  { from: 11, name: "Insider",   icon: "🎟" },
-  { from: 16, name: "Regular",   icon: "🥂" },
-  { from: 21, name: "VIP",       icon: "🕶" },
-  { from: 26, name: "Producer",  icon: "👑" },
+  { from:  1, key: "extra",    name: "Extra",     icon: "🎬" },
+  { from:  6, key: "fan",      name: "Fan",       icon: "🍿" },
+  { from: 11, key: "insider",  name: "Insider",   icon: "🎟" },
+  { from: 16, key: "regular",  name: "Regular",   icon: "🥂" },
+  { from: 21, key: "vip",      name: "VIP",       icon: "🕶" },
+  { from: 26, key: "producer", name: "Producer",  icon: "👑" },
 ];
 
 /* MILESTONES, every five levels (GDD 5.3). What they pay is chosen to push back on the thing
