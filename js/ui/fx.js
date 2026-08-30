@@ -250,7 +250,7 @@ function showCard(c){
     : `<div class="cbCap">
         ${pts>0?`<div class="cbStat"><b>+${fmt(pts)}</b><i>status</i></div>`:""}
         ${trophy?cbSlots(c.collectible,Math.min(c.count,need),need):""}
-        ${celebrate?`<div class="cbDone">⭐ Collected! It goes on your shelf</div>`
+        ${celebrate?`<div class="cbDone">⭐ Collected \u2014 it is a Collectible now</div>`
           :converted?`<div class="ccWon">Collected — that is the third copy</div>`:""}
       </div>`;
   el.innerHTML=face+caption;

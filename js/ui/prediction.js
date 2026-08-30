@@ -228,9 +228,19 @@ async function playEpisode(){
   /* `called` rides along because the result screen has to know whether there was a guess to
      judge. Without it a skip renders "You'd have been wrong" — a verdict on a choice the player
      never made. It is persisted with the rest of the reveal, so a sealed result still knows. */
+  const rc=res.reward.card;
   state.pendingReveal={id:p.id,wager:p.wager,odds:res.odds,won:res.won,payout:res.payout,
                        called:res.called,
-                       cardId:res.reward.card?res.reward.card.id:null,
+                       cardId:rc?rc.id:null,
+                       /* The DROP, not just the id, because the reward is opened out of a box
+                          now and a box draws faces from drops. Everything here was decided and
+                          BANKED by resolvePrediction — this is a record of what happened, not a
+                          second draw. The catalogue object is deliberately NOT stored: it is
+                          rebuilt from the id at reveal time, so a Season change cannot leave a
+                          stale card pinned inside a save. */
+                       cardDrop:rc?{kind:"card",id:rc.id,isNew:!!rc.isNew,
+                                    converted:!!rc.converted,count:rc.count|0,
+                                    coins:rc.coins|0,status:rc.status|0}:null,
                        trophy:!!res.reward.trophy};
   scheduleSaveState();
   await runReveal(state.pendingReveal);
@@ -291,8 +301,48 @@ async function runReveal(r){
   showEpisodeResult(ep,r);
 }
 
-/* The win/loss screen. Split out so both a fresh bet and a resumed one end the same way. */
-function showEpisodeResult(ep,r){
+/* THE REWARD ARRIVES IN A BOX (GDD §7.4), gold for a call you got right and plain for one you
+   did not. Two skins of the same object: what is inside is what the prediction already paid.
+
+   PRESENTATION TIERS, NOT PURCHASABLE ONES. They are deliberately not in cfg.boxTiers — that
+   list is the store's stock, and a tier in it with no price is a button that sells nothing.
+   Everything showPack() needs from a tier is a name, an icon, art and a skin. */
+const PRED_TIER_WIN ={key:"predWin", name:"Winner's Case",     icon:"\ud83c\udfc6", rank:2,
+                      skin:"gold",   art:"assets/boxes/gold.webp"};
+const PRED_TIER_LOSE={key:"predLose",name:"Consolation Case",  icon:"\ud83c\udf81", rank:1,
+                      skin:"silver", art:"assets/boxes/silver.webp"};
+
+/* What the box holds: exactly what resolvePrediction banked, rebuilt for the face to draw.
+   Null when there is nothing to give, which the caller reads as "no box". */
+function rewardPack(r){
+  const drops=[];
+  /* The trophy leads. It is the only thing in the game a real box cannot contain (§7.4), so
+     when it is there it is the reason this box is gold. */
+  if(r.trophy){ const t=Status.trophyOf(r.id); if(t) drops.push({kind:"status",item:t}); }
+  const d=r.cardDrop;
+  if(d&&d.id){
+    const card=Cards.get(d.id);
+    if(card) drops.push(Object.assign({},d,{card}));
+  }else if(r.cardId){
+    /* A reveal sealed before cardDrop existed. The copy count is read live rather than guessed:
+       nothing has touched this card between the bet and here, so it is still the right answer. */
+    const card=Cards.get(r.cardId);
+    if(card) drops.push({kind:"card",id:r.cardId,card,isNew:false,
+                         converted:Cards.converted(r.cardId),count:Cards.count(r.cardId),
+                         coins:0,status:0});
+  }
+  if(!drops.length) return null;
+  return {tier:r.won?PRED_TIER_WIN:PRED_TIER_LOSE,drops};
+}
+
+/* The win/loss screen. Split out so both a fresh bet and a resumed one end the same way.
+
+   TWO PASSES. The first shows the outcome and the CASE it won, unopened, with one thing to do.
+   Opening it closes this screen, plays the box on the board like every other box in the game,
+   and comes back here with `opened` true for the "what next" choice. The reward used to be a
+   small card printed in the corner of this modal, which is the one presentation the game
+   reserves for things that do not matter. */
+function showEpisodeResult(ep,r,opened){
   const {won,payout,wager}=r;
   /* Undefined, not false, for a reveal sealed before `called` existed — those all went through
      the substituting skip, so they were scored as calls and should still read as ones. */
@@ -302,7 +352,7 @@ function showEpisodeResult(ep,r){
   const truthHtml=won?"":`<div style="margin-top:8px;font-size:12px;color:var(--muted)">The answer was <b style="color:var(--teal)">${truth}</b></div>`;
   let resultHtml="";
   if(wager>0){
-    if(won){ resultHtml=`<div class="result"><div class="big win">You called it! \ud83c\udf89</div><div style="margin-top:6px">+<b style="color:var(--gold)">${fmt(payout)}</b> coins \u00b7 streak ${state.streak}</div></div>`; confetti(); }
+    if(won){ resultHtml=`<div class="result"><div class="big win">You called it! \ud83c\udf89</div><div style="margin-top:6px">+<b style="color:var(--gold)">${fmt(payout)}</b> coins \u00b7 streak ${state.streak}</div></div>`; if(!opened) confetti(); }
     else { resultHtml=`<div class="result"><div class="big lose">Not this time</div><div style="margin-top:6px;color:var(--muted)">Lost your <b>${fmt(wager)}</b> wager \u00b7 streak reset</div>${truthHtml}</div>`; }
   }else if(!called){
     /* Watched without guessing. There is nothing to be right or wrong about, so the screen says
@@ -316,14 +366,15 @@ function showEpisodeResult(ep,r){
      also pays the trophy, which is the only thing in the game a box cannot contain. */
   const card=r.cardId?Cards.get(r.cardId):null;
   const trophy=r.trophy?Status.trophyOf(r.id):null;
-  const rewardHtml=(card||trophy)?`<div class="predSpoils">
-      ${trophy?`<div class="psItem">${dropFace({kind:"status",item:trophy},{size:"sm"})}
-                  <span class="psTag">Called it</span></div>`:""}
-      ${card?`<div class="psItem">${cardFace(card,{owned:true,count:Cards.count(card.id),size:"sm"})}
-                  <span class="psTag">${won?"Your reward":"Yours anyway"}</span></div>`:""}
+  const pack=opened?null:rewardPack(r);
+  const rewardHtml=pack?`<div class="predCase">
+      <img class="pcaseArt" src="${pack.tier.art}" alt="">
+      <div class="pcaseName">${pack.tier.icon} ${pack.tier.name}</div>
+      <div class="pcaseSub">${won?"You called it \u2014 open it":"Yours anyway \u2014 open it"}</div>
     </div>`:"";
-  log(won?"\u2705":"\u274c",`${ep.title} \u00b7 ${wager>0?(won?`won +${fmt(payout)}`:`lost ${fmt(wager)}`):"watched (no wager)"}${
-    card?` \u00b7 ${card.name}`:""}${trophy?" \u00b7 <b>trophy</b>":""}`);
+  if(!opened)
+    log(won?"\u2705":"\u274c",`${ep.title} \u00b7 ${wager>0?(won?`won +${fmt(payout)}`:`lost ${fmt(wager)}`):"watched (no wager)"}${
+      card?` \u00b7 ${card.name}`:""}${trophy?" \u00b7 <b>trophy</b>":""}`);
   /* The episode left the queue when the bet was locked, so what is left is what is still
      waiting. Offer the next one straight from here: a binge should not mean closing back to
      the board and hunting for the button again between every episode. */
@@ -334,7 +385,11 @@ function showEpisodeResult(ep,r){
      point — so the celebration is owed to whichever episode turns out to be the last one seen,
      which is always the one that just finished. */
   const setDone=Collection.boardFinished();
-  const ctaHtml=setDone
+  /* FIRST PASS: one thing to do, and it is opening the case. Offering "next episode" beside an
+     unopened box would be offering to walk away from the reward. */
+  const ctaHtml=pack
+    ? `<button class="btn pink wide" id="openReward" style="margin-top:16px">Open the case</button>`
+    : setDone
     ? `<button class="btn purple wide" id="finishSet" style="margin-top:16px">That is the set \u2014 see it \ud83c\udfc6</button>`
     : more
     ? `<button class="btn pink wide" id="nextEp" style="margin-top:16px">Next episode \u2192
@@ -343,8 +398,22 @@ function showEpisodeResult(ep,r){
     : `<button class="btn purple wide" id="closeEp" style="margin-top:16px">Back to the board</button>`;
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Episode complete</div><h2>${ep.title}</h2></div>
     <div class="mbody">${resultHtml}${rewardHtml}${ctaHtml}</div></div>`;
+  /* The scrim is normally already up — this screen used to be reachable only straight out of
+     the player, which left it showing. The second pass arrives after closeEpisodeUi() has taken
+     it down for the box, so it has to be raised again. Idempotent, and cheaper than making the
+     caller remember which pass it is on. */
+  $("#scrim").classList.add("show");
+  if(pack) $("#openReward").onclick=async()=>{
+    /* The modal goes so the board is clear, then the case is opened exactly the way every other
+       box in the game is — the same mesh, the same tap, the same cards in the air. Nothing is
+       banked here: it was all banked when the prediction resolved, which is why closing the tab
+       mid-open cannot cost anything. Then back for the "what next" choice. */
+    closeEpisodeUi();
+    await playEvents([{pack}]);
+    showEpisodeResult(ep,r,true);
+  };
   if($("#closeEp")) $("#closeEp").onclick=()=>{ closeEpisodeUi(); renderAll(); };
-  if(setDone) $("#finishSet").onclick=()=>{ closeEpisodeUi(); renderAll(); showBoardComplete(); };
-  else if(more) $("#nextEp").onclick=()=>openPrediction();
+  if(setDone&&$("#finishSet")) $("#finishSet").onclick=()=>{ closeEpisodeUi(); renderAll(); showBoardComplete(); };
+  else if(more&&$("#nextEp")) $("#nextEp").onclick=()=>openPrediction();
   renderAll();
 }

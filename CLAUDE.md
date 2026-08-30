@@ -549,8 +549,14 @@ at, so nothing in the spreadsheet moved. `answers[].odds` stays in the episode f
 by nothing.
 
 **Every prediction pays a Collectible** (§7.4) — won, lost or skipped — so a round is never one
-that gave you nothing, and the collectible rather than the coin number is the headline on the
-result screen. A correct call pays a better one (`cfg.predRewardFloor`) *and* a **trophy** unique
+that gave you nothing, and it arrives in a **case you open on the board**: gold for a call you
+got right, plain for one you did not. Two skins of the same object, and what is inside is what
+`resolvePrediction` already banked — the case is a wrapper, never a second draw, which is why
+closing the tab mid-open cannot cost anything. The reward used to be printed as a small card in
+the corner of the result modal, which is the presentation the game reserves for things that do
+not matter. The two presentation tiers live in `js/ui/prediction.js` and deliberately **not** in
+`cfg.boxTiers`: that list is the store's stock, and a tier in it with no price is a button that
+sells nothing. A correct call pays a better one (`cfg.predRewardFloor`) *and* a **trophy** unique
 to that episode: a "Called it", the only thing in the game a pack cannot contain, which is
 exactly why it is worth having. Trophies are Showcase pieces and count on the Status track.
 

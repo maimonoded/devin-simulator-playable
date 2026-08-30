@@ -230,7 +230,22 @@ function loadState(){
          /* The reward was banked when the bet was locked, so it rides along and is announced
             when the reveal finally plays — a trophy arriving with no explanation is worse than
             one arriving late. */
-         cardId:typeof pr.cardId==="string"?pr.cardId:null, trophy:!!pr.trophy}
+         cardId:typeof pr.cardId==="string"?pr.cardId:null, trophy:!!pr.trophy,
+         /* `called` decides whether the result screen judges the guess or says the player sat
+            this one out. It is the one field here that can legitimately be ABSENT — a reveal
+            sealed before it existed — and absent has to keep meaning "called", so it is only
+            written when the save actually says false. Defaulting it to true instead would be
+            the same thing until someone reads it as a boolean and finds it always true. */
+         ...(pr.called===false?{called:false}:{}),
+         /* The drop, so the reward can be opened out of a box rather than printed. Rebuilt
+            defensively: everything is re-coerced and the catalogue object is deliberately NOT
+            stored, so a Season that no longer defines this card falls back to the cardId path
+            rather than reviving a stale face. */
+         cardDrop:(pr.cardDrop&&typeof pr.cardDrop==="object"&&typeof pr.cardDrop.id==="string")
+           ? {kind:"card",id:pr.cardDrop.id,isNew:!!pr.cardDrop.isNew,
+              converted:!!pr.cardDrop.converted,count:pr.cardDrop.count|0,
+              coins:pr.cardDrop.coins|0,status:pr.cardDrop.status|0}
+           : null}
       : null;
     /* Nothing to restore for the library: Collection.unlockedEpisodeIds() derives it from the
        evidence restored above. That is what makes an OLD save work — a run with four episodes

@@ -570,6 +570,17 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
    moves on the view this was originally tuned against. */
 .centerfx.card .ccard{width:min(78vw,56vh,400px);margin:0 auto}
 .centerfx.card.win .ccard{animation:revealPop .45s cubic-bezier(.2,1.5,.4,1)}
+/* THE CASE A PREDICTION PAYS, unopened, on the result screen. The reward used to be printed
+   here as a small card in the corner, which is the one presentation the game reserves for
+   things that do not matter — so what is inside now stays inside until the box is opened on
+   the board like every other box. */
+.predCase{margin:16px auto 0;max-width:230px;text-align:center}
+.pcaseArt{width:118px;height:118px;object-fit:contain;display:block;margin:0 auto;
+     filter:drop-shadow(0 10px 22px rgba(0,0,0,.55));animation:pcaseBob 2.6s ease-in-out infinite}
+@keyframes pcaseBob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-6px) rotate(1.5deg)}}
+.pcaseName{margin-top:8px;font-weight:800;font-size:15px;color:var(--gold)}
+.pcaseSub{margin-top:3px;font-size:12px;color:var(--muted)}
+
 /* ---------- the caption under a held card ----------
    The status number is the headline (js/ui/fx.js showCard). A card's face says what it IS; this
    says what it was WORTH, which is the thing the player is actually accumulating and which used

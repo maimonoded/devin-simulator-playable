@@ -212,8 +212,15 @@ test("a sealed reveal survives a reload — closing the tab cannot duck the bet"
   freshRun();
   eq(state.pendingReveal, null, "gone in memory");
   loadState();
-  deepEq(state.pendingReveal, sealed,
-         "restored, so the bet is still owed its reveal — and its spoils are still nameable");
+  /* Field by field rather than deepEq on the whole object. The rehydration whitelists what it
+     restores, so it also NORMALISES: a reveal saved without a reward drop comes back with an
+     explicit cardDrop:null. Comparing the whole shape made this test fail every time the reveal
+     grew a field, which is a test about the object's exact keys pretending to be a test about
+     the bet still being owed. */
+  Object.keys(sealed).forEach(k =>
+    eq(state.pendingReveal[k], sealed[k], `${k} survived`));
+  eq(state.pendingReveal.cardDrop, null,
+     "and a reveal with no drop says so explicitly rather than omitting it");
 });
 
 test("a sealed reveal for a missing or malformed episode is dropped", () => {
@@ -315,4 +322,57 @@ test("clearConfig and clearState empty their own slots only", () => {
   ok(localStorage.getItem("pmdrama.state.v1") !== null, "progress must survive a config reset");
   clearState();
   eq(localStorage.getItem("pmdrama.state.v1"), null);
+});
+
+suite("storage: the sealed reveal keeps what the result screen needs");
+
+/* A reveal can outlive the tab, so everything the result screen says has to survive the save.
+   The rehydration WHITELISTS fields — which is right, a save is untrusted input — and that means
+   every new field has to be added to it or it is silently dropped. Two were: `called`, which
+   decides whether the screen judges the guess at all, and `cardDrop`, which is what the reward
+   box opens. Both failed quietly: the screen simply told a player who sat one out that they had
+   been wrong, and the box fell back to a coarser guess at the card. */
+test("a sealed reveal round-trips `called` and its reward drop", () => {
+  freshRun();
+  const id = Episodes.ids()[0];
+  state.pendingReveal = { id, wager: 0, odds: 1.8, won: false, payout: 0, called: false,
+                          cardId: "cold-coffee", trophy: false,
+                          cardDrop: { kind: "card", id: "cold-coffee", isNew: true,
+                                      converted: false, count: 1, coins: 40, status: 3 } };
+  saveState();
+  state.pendingReveal = null;
+  ok(loadState());
+  const pr = state.pendingReveal;
+  ok(pr, "the reveal came back");
+  eq(pr.called, false, "and it still knows nobody called it");
+  ok(pr.cardDrop, "and what the case holds");
+  eq(pr.cardDrop.id, "cold-coffee");
+  eq(pr.cardDrop.isNew, true);
+  eq(pr.cardDrop.count, 1);
+  eq(pr.cardDrop.status, 3);
+});
+
+test("a reveal sealed before `called` existed still reads as a call", () => {
+  /* Those all went through the substituting skip, so they WERE scored as calls. Absent has to
+     keep meaning called, which is why the field is only written when the save says false. */
+  freshRun();
+  const id = Episodes.ids()[0];
+  state.pendingReveal = { id, wager: 100, odds: 1.8, won: true, payout: 180, cardId: null, trophy: false };
+  saveState();
+  state.pendingReveal = null;
+  ok(loadState());
+  eq(state.pendingReveal.called, undefined, "not stored...");
+  eq(state.pendingReveal.called !== false, true, "...and the screen reads that as a call");
+});
+
+test("a garbage drop in a save is refused, not revived", () => {
+  freshRun();
+  const id = Episodes.ids()[0];
+  state.pendingReveal = { id, wager: 0, odds: 1, won: false, payout: 0, cardId: null, trophy: false };
+  saveState();
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  raw.pendingReveal.cardDrop = { id: 42, card: { name: "a stale face" } };
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  ok(loadState());
+  eq(state.pendingReveal.cardDrop, null, "a drop with no string id is dropped");
 });

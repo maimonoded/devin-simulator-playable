@@ -367,7 +367,10 @@ export const Box3D = {
          status items are; they read what they were worth. */
       edge = "#ffcb5c"; ornate = true; label = "STATUS";
       hero = "+" + fmt(drop.item.points);
-      name = drop.item.name; sub = "For your shelf";
+      /* "Collected", not "For your shelf": the shelf of hand-authored status items is gone, and
+         this is the canvas twin of dropFace()'s status face in js/ui/cardface.js — the two have
+         to say the same thing or one card reads as two objects. */
+      name = drop.item.name; sub = "Collected";
       img = art(drop.item.art);
     }else if (drop.kind === "coins"){
       edge = "#ffcb5c"; label = "COINS"; name = "+" + fmt(drop.amount); plain = "🪙"; ink = "#ffcb5c";
