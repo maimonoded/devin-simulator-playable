@@ -24,14 +24,23 @@ let albumSet = 0;
 
 function openAlbum(){
   const sets = Cards.sets();
-  /* The set closest to done, ignoring the ones already finished — "what am I nearly done with". */
-  let best = 0, bestShort = Infinity;
-  sets.forEach((s, i) => {
+  /* THE FIRST SET NOT YET FINISHED — where you are in the collection, read left to right.
+
+     It used to open on the set CLOSEST TO DONE, on the reasoning that "what am I nearly done
+     with" is the useful question. It is, for about the last tenth of a Season. For the rest of
+     it the sets sit within a card or two of each other, so the winner is noise: measured over
+     forty sixty-roll runs the album opened on page 1, 2, 3 and 4 thirteen, twelve, six and nine
+     times. Opening somewhere different every time, for a reason the screen never states, is
+     indistinguishable from a bug — and it was reported as one.
+
+     First-incomplete is never arbitrary, matches the order the sets are authored in (and so the
+     arcs they belong to), and lands on page 1 for every new player, which is where a collection
+     starts. Finished sets are behind you; this is the one you are working on. */
+  let best = sets.findIndex(s => {
     const [got, need] = Cards.setProgress(s.key);
-    const short = need - got;
-    if (short > 0 && short < bestShort){ bestShort = short; best = i; }
+    return got < need;
   });
-  albumSet = best;
+  albumSet = best < 0 ? 0 : best;      // every set complete: back to the beginning
   renderAlbum();
 }
 
