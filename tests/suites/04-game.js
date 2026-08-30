@@ -310,3 +310,61 @@ test("the gap is the greater of a full refill and one session slot", () => {
   eq(state.clock - before, 720, "session slot dominates a short refill");
   resetCfg();
 });
+
+suite("prediction: a skip is not a call");
+
+/* THE GUARD WAS RIGHT AND THE CALLER DEFEATED IT.
+
+   resolvePrediction decides with `called = auto || sel != null` (js/game.js), precisely so that
+   watching without guessing lands on neither side of the record — a null pick would otherwise
+   read as a loss. But js/ui/prediction.js's "Skip & watch" handler used to substitute index 0
+   for a null pick, under a stale comment claiming a zero wager made the substitution harmless.
+   That stopped being true when the record moved off the stake and onto the call.
+
+   Index 0 is not null, so every skip became a real call on a coin flip: 194 wins, 206 losses
+   and 194 "Called it" trophies across 400 skips with nothing picked. The one button a stuck
+   player can press was gambling with their lifetime record and paying trophies for it.
+
+   These tests hold the ENGINE's contract. The caller is DOM code the suite cannot reach, so
+   the comment on that handler carries the other half. */
+test("watching with no answer picked scores neither a win nor a loss", () => {
+  freshRun();
+  const id = Episodes.ids()[0], ep = Episodes.get(id);
+  state.epQueue = [id];
+  let wins = 0, losses = 0, trophies = 0;
+  for (let i = 0; i < 200; i++) {
+    freshRun();
+    state.epQueue = [id];
+    resolvePrediction({ wager: 0, sel: null, correct: ep.correct, id, auto: false });
+    wins += state.predWins; losses += state.predLoss; trophies += Status.trophyIds().length;
+  }
+  eq(wins, 0, "no wins");
+  eq(losses, 0, "no losses");
+  eq(trophies, 0, "and no 'Called it' trophy — that is the one thing a box cannot contain");
+});
+
+test("...but the episode is still watched, and still pays a Collectible (§7.4)", () => {
+  /* Neutral on the RECORD is not the same as nothing happened. A round must never give nothing. */
+  freshRun();
+  const id = Episodes.ids()[0], ep = Episodes.get(id);
+  state.epQueue = [id];
+  const r = resolvePrediction({ wager: 0, sel: null, correct: ep.correct, id, auto: false });
+  eq(state.epsWatched, 1, "it counts as watched");
+  eq(state.epQueue.includes(id), false, "and leaves the queue");
+  ok(r.reward.card, "and still pays a card");
+  eq(r.called, false, "while reporting that it was not a call");
+});
+
+test("a skip AFTER picking IS a call — the record counts a call, not a stake", () => {
+  /* The other half, and the reason this cannot be fixed by ignoring sel whenever wager is 0.
+     "Skip & watch" is always offered, and a player who declines the bet and calls it right has
+     still called it right (CLAUDE.md, GDD §7.4). */
+  freshRun();
+  const id = Episodes.ids()[0], ep = Episodes.get(id);
+  state.epQueue = [id];
+  const r = resolvePrediction({ wager: 0, sel: ep.correct, correct: ep.correct, id, auto: false });
+  eq(r.called, true);
+  eq(r.won, true);
+  eq(state.predWins, 1, "a right call with no money on it still goes on the record");
+  ok(Status.hasTrophy(id), "and still pays the trophy");
+});

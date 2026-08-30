@@ -83,10 +83,34 @@
 .modal .mbody::-webkit-scrollbar{width:8px}
 .modal .mbody::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
 .modal .mbody::-webkit-scrollbar-track{background:transparent}
+/* The prompt over the answers. Small, but it is the difference between "two panels" and "a
+   question with two answers" — and it is what makes the disabled button's label make sense. */
+.optAsk{margin-top:16px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+     color:var(--gold)}
+.optAsk+.opt{margin-top:7px}
 .opt{width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
      padding:13px 15px;margin-top:9px;display:flex;justify-content:space-between;align-items:center;transition:.15s}
 .opt:hover{border-color:var(--purple);transform:translateX(3px)}
+/* A PRESS STATE, because :hover never fires on a phone.
+
+   These were the only interactive controls in the app whose sole affordance was hover — every
+   other tappable surface already has an :active (.btn, .storeBtn, .libRow, .packBox, .sheetX,
+   .avatarBtn, .pack). On ?view=mobile that left the two answers looking exactly like the
+   evidence panel above them and the wager tiers below: same var(--panel2) ground, same
+   var(--line) border, same radius. A stack of identical slate panels, two of which are secretly
+   the only thing that unlocks the primary button.
+
+   The radio dot is the other half. The gold ring on the pre-selected wager tier was the only
+   "chosen" mark on the screen, so the one choice already made FOR the player looked decided and
+   the one they had to make looked inert. An empty dot says "this is a choice, and it is open".  */
+.opt:active{border-color:var(--purple);background:#262e63}
+.opt::before{content:"";flex:0 0 auto;width:16px;height:16px;margin-right:11px;border-radius:50%;
+     border:2px solid var(--line);transition:.15s}
+.opt:hover::before{border-color:var(--purple)}
 .opt.sel{border-color:var(--gold);background:#2b2b52}
+.opt.sel::before{border-color:var(--gold);background:radial-gradient(circle,var(--gold) 45%,transparent 47%)}
+/* The text is the flexible half now that the dot leads; the odds span still tucks to the right. */
+.opt>span:first-of-type{flex:1 1 auto}
 .opt .odds{font-weight:800;color:var(--gold);font-size:13px}
 /* Wager tiers — three shares of the balance, not a free slider (js/economy.js wagerTiers). */
 .tierRow{display:flex;gap:8px;margin-top:16px}

@@ -83,6 +83,13 @@ function openPrediction(wantId){
   const startTier=canBet?Economy.DEFAULT_TIER:null;
   pending={id,ep,order,sel:null,tier:startTier,
            wager:canBet?Economy.wagerTier(startTier,state.coins).amount:0};
+  /* ASK THE QUESTION OUT LOUD. The two options used to sit directly under the evidence panel
+     with no heading, in the same slate as everything around them — and the only affirmative
+     button on the screen shipped `disabled`, cleared solely by tapping one of them. A player
+     who did not guess that saw a dead primary CTA and two panels that looked like content.
+     Note the sibling branch below: the case where the button is REMOVED explains itself in a
+     full sentence, while the case where it is disabled explained nothing. */
+  const askHtml=`<div class="optAsk">What happens next?</div>`;
   const optHtml=order.map((src,idx)=>{ const a=ep.answers[src];
     /* No per-answer odds (GDD 7.3): they leaked the answer, and they made a guess about a story
        read as a betting market. Every option pays the same, so the only thing to weigh is what
@@ -106,7 +113,7 @@ function openPrediction(wantId){
      a choice the player actually has. See Economy.apply(). */
   const footHtml=`<button class="btn ghost" id="watchLater" style="flex:1">Watch later</button>
        <button class="btn ghost" id="skipPred" style="flex:1">Skip &amp; watch</button>${
-         canBet?`<button class="btn pink" id="commitPred" style="flex:2" disabled>Lock in prediction</button>`:""}`;
+         canBet?`<button class="btn pink" id="commitPred" style="flex:2" disabled>Pick an answer first</button>`:""}`;
   /* REVIEW THE EVIDENCE (GDD §7.2). The clues that unlocked this episode are the clues you are
      reasoning from, and they are shown here in full — not as a count. That is the whole payoff
      of making the gate and the edge one object: the thing you spent four draws collecting is
@@ -132,6 +139,7 @@ function openPrediction(wantId){
   $("#scrim").innerHTML=`<div class="modal"><div class="top"><div class="eyebrow">Predict before you watch</div><h2>${ep.title}</h2></div>
     <div class="mbody"><div style="font-size:14px;color:var(--muted);margin-bottom:4px">${ep.question}</div>
     ${clueHtml}
+    ${askHtml}
     ${optHtml}
     ${wagerHtml}
     <div class="foot">${footHtml}</div></div></div>`;
@@ -145,11 +153,28 @@ function openPrediction(wantId){
   $("#scrim").querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
     $("#scrim").querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
     b.classList.add("sel"); pending.sel=+b.dataset.idx;
-    const commit=$("#commitPred"); if(commit) commit.disabled=false; });
+    /* The button says what it WANTS while it cannot be pressed, and what it DOES once it can.
+       A disabled control that already carries its final label has no way to explain itself. */
+    const commit=$("#commitPred");
+    if(commit){ commit.disabled=false; commit.textContent="Lock in prediction"; } });
   $("#watchLater").onclick=()=>{ closeEpisodeUi(); renderAll(); };   // stays queued
-  /* Skipping settles nothing: wager 0 means resolvePrediction leaves coins, streak and the
-     win counter alone, so the arbitrary sel can't score. */
-  $("#skipPred").onclick=()=>{ pending.wager=0; pending.tier=null; pending.sel=pending.sel??0; playEpisode(); };
+  /* SKIPPING WITHOUT PICKING LEAVES sel NULL, AND THAT IS THE WHOLE POINT.
+
+     This line used to read `pending.sel = pending.sel ?? 0`, under a comment explaining that a
+     wager of 0 meant the substituted answer could not score. That was true once. It stopped
+     being true when the record moved off the stake and onto the call — resolvePrediction now
+     decides with `called = auto || sel != null` (js/game.js), precisely so a skip lands on
+     neither side, because a null pick would otherwise read as a loss.
+
+     The `?? 0` defeated that guard from the outside: index 0 is not null, so every skip became
+     a real call on a coin flip. Measured over 400 skips with nothing picked: 194 wins, 206
+     losses, 194 "Called it" trophies. The one button a stuck player can actually press was
+     quietly gambling with their lifetime record — and paying out trophies for it.
+
+     A skip AFTER picking still counts, which is deliberate (CLAUDE.md, GDD §7.4): the record
+     counts a call, not a stake, and a player who declines the bet and calls it right has still
+     called it right. So `pending.sel` is passed through exactly as the player left it. */
+  $("#skipPred").onclick=()=>{ pending.wager=0; pending.tier=null; playEpisode(); };
   if(canBet){
     $("#scrim").querySelectorAll(".tier").forEach(b=>b.onclick=()=>{
       $("#scrim").querySelectorAll(".tier").forEach(x=>x.classList.remove("sel"));
@@ -177,7 +202,11 @@ async function playEpisode(){
   /* The reward rides on the sealed reveal, because the reveal can outlive the tab: a correct
      call that was banked has to still be announced when the player comes back to finish the
      episode, or the trophy would arrive with no explanation. */
+  /* `called` rides along because the result screen has to know whether there was a guess to
+     judge. Without it a skip renders "You'd have been wrong" — a verdict on a choice the player
+     never made. It is persisted with the rest of the reveal, so a sealed result still knows. */
   state.pendingReveal={id:p.id,wager:p.wager,odds:res.odds,won:res.won,payout:res.payout,
+                       called:res.called,
                        cardId:res.reward.card?res.reward.card.id:null,
                        trophy:!!res.reward.trophy};
   scheduleSaveState();
@@ -242,6 +271,9 @@ async function runReveal(r){
 /* The win/loss screen. Split out so both a fresh bet and a resumed one end the same way. */
 function showEpisodeResult(ep,r){
   const {won,payout,wager}=r;
+  /* Undefined, not false, for a reveal sealed before `called` existed — those all went through
+     the substituting skip, so they were scored as calls and should still read as ones. */
+  const called=r.called!==false;
   // name the true answer when the player got it wrong
   const truth=ep.answers[ep.correct]?.text||"";
   const truthHtml=won?"":`<div style="margin-top:8px;font-size:12px;color:var(--muted)">The answer was <b style="color:var(--teal)">${truth}</b></div>`;
@@ -249,6 +281,10 @@ function showEpisodeResult(ep,r){
   if(wager>0){
     if(won){ resultHtml=`<div class="result"><div class="big win">You called it! \ud83c\udf89</div><div style="margin-top:6px">+<b style="color:var(--gold)">${fmt(payout)}</b> coins \u00b7 streak ${state.streak}</div></div>`; confetti(); }
     else { resultHtml=`<div class="result"><div class="big lose">Not this time</div><div style="margin-top:6px;color:var(--muted)">Lost your <b>${fmt(wager)}</b> wager \u00b7 streak reset</div>${truthHtml}</div>`; }
+  }else if(!called){
+    /* Watched without guessing. There is nothing to be right or wrong about, so the screen says
+       what happened and shows the answer — which is the interesting part either way. */
+    resultHtml=`<div class="result"><div class="big" style="color:var(--muted)">You sat this one out</div><div style="margin-top:6px;color:var(--muted)">No prediction, no wager \u2014 it counts for neither</div><div style="margin-top:8px;font-size:12px;color:var(--muted)">The answer was <b style="color:var(--teal)">${truth}</b></div></div>`;
   }else{
     resultHtml=`<div class="result"><div class="big" style="color:var(--teal)">${won?"You'd have been right \u2713":"You'd have been wrong \u2717"}</div><div style="margin-top:6px;color:var(--muted)">No wager placed</div>${truthHtml}</div>`;
   }

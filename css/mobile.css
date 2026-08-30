@@ -109,4 +109,13 @@ html.viewMobile {
   --safeT: env(safe-area-inset-top, 0px);
   --safeB: env(safe-area-inset-bottom, 0px);
 }
-html.viewMobile .playbar,
+/* This file was committed TRUNCATED: it ended on the dangling selector "html.viewMobile
+   .playbar," with no block. Braces balanced 20/20 so nothing looked wrong, and a CSS parser
+   silently discards a trailing selector — so --safeB was declared directly above and then used
+   by nothing at all. The play controls sat at bottom:14px, under the home indicator, on every
+   notched phone. The rule below is what was missing. */
+html.viewMobile .playbar { bottom: calc(14px + var(--safeB)); }
+/* The modal is a flex box centred in a fixed, inset:0 scrim, so its footer sits wherever the
+   bottom edge is — which on a notched phone is under the home indicator. Padding the scrim
+   moves the whole dialog up rather than clipping it. */
+html.viewMobile .scrim { padding-bottom: calc(20px + var(--safeB)); }
