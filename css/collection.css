@@ -643,7 +643,13 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
      text-shadow:0 2px 8px rgba(0,0,0,.85);animation:cbHintIn .3s ease .9s both}
 @keyframes cbHintIn{from{opacity:0}to{opacity:1}}
 .centerfx.holdable .ccard{pointer-events:auto;cursor:pointer}
-.cbCollect{pointer-events:auto;margin-top:12px;min-width:150px}
+/* Centred by AUTO MARGINS, not by the parent's text-align. .btn is inline-flex, so it ought to
+   centre on #centerFx's text-align — but the beat appends this button as a sibling of blocks
+   that set their own alignment (.cbLines is left-aligned so two clue sentences read as a list),
+   and it came out hard against the left edge. A block with auto side margins does not care what
+   anything around it aligns to. */
+.cbCollect{pointer-events:auto;display:flex;justify-content:center;
+     margin:12px auto 0;min-width:150px}
 
 /* The line under a converted card: what the third copy just bought. */
 .ccWon{margin-top:10px;text-align:center;font-size:15px;font-weight:800;color:var(--gold);
