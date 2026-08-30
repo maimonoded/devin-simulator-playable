@@ -262,12 +262,12 @@ test("validate catches a band outside the Season and a milestone that pays nothi
    invents its own phrasing and they drift. */
 test("earnWords turns a condition into a sentence, with the plural right", () => {
   const w = i => Status.earnWords(i);
-  eq(w({ earn: { cards: 5 } }), "collecting 5 cards");
-  eq(w({ earn: { cards: 1 } }), "collecting 1 card", "not '1 cards'");
-  eq(w({ earn: { episodes: 1 } }), "watching 1 episode");
-  eq(w({ earn: { episodes: 3 } }), "watching 3 episodes");
-  eq(w({ earn: { boards: 1 } }), "finishing 1 set");
-  eq(w({ earn: { boards: 2 } }), "finishing 2 sets");
+  eq(w({ earn: { cards: 5 } }), "5 cards collected");
+  eq(w({ earn: { cards: 1 } }), "1 card collected", "not '1 cards'");
+  eq(w({ earn: { episodes: 1 } }), "1 episode watched");
+  eq(w({ earn: { episodes: 3 } }), "3 episodes watched");
+  eq(w({ earn: { boards: 1 } }), "1 set finished", "singular agrees with the requirement");
+  eq(w({ earn: { boards: 2 } }), "2 sets finished");
   eq(w({ earn: { rolls: 60 } }), "60 rolls");
   eq(w({}), "", "an item with no condition says nothing rather than something wrong");
   eq(w(null), "");
@@ -278,7 +278,7 @@ test("the deed and the unit come from ONE table and cannot drift", () => {
      condition, two shapes — and they lived in two separate tables that had already drifted to
      "collecting" vs "collected" for the same mug. Both now key off Status.EARN. */
   const mug = { earn: { cards: 5 } };
-  eq(Status.earnWords(mug), "collecting 5 cards", "the deed, for something owned");
+  eq(Status.earnWords(mug), "5 cards collected", "the whole threshold");
   eq(Status.earnUnit(mug), "cards collected", "the unit, for counting progress");
   eq(Status.earnKey(mug), "cards");
   /* Every key that produces a deed must also produce a unit, or one screen goes blank. */

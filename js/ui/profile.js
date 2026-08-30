@@ -144,7 +144,7 @@ function statusItemHtml(item){
   const deed=Status.earnWords(item);
   const how=got==="bought" ? "Bought"
           : got==="found"  ? "Found in a box"
-          : got==="earned" ? (deed?`Earned for ${deed}`:"Earned")
+          : got==="earned" ? (deed?`Earned at ${deed}`:"Earned")
           : "Owned";
   return `<div class="stItem${owned?" got":""}">
       <div class="stArt" style="${cardArtCss(item.art)}"></div>

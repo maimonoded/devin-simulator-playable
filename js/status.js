@@ -253,36 +253,43 @@ const Status = {
     if (!key) return null;
     return { key, have: m[key] || 0, need: item.earn[key] };
   },
-  /* THE EARN CONDITIONS, IN ENGLISH — one table, two shapes.
+  /* THE EARN CONDITIONS, IN ENGLISH.
 
-     Every surface that shows a status item owes the player an explanation, and they need the
-     same fact worded two ways: the reward beat says what you DID ("Earned for collecting 5
-     cards"), the profile's locked slot counts what is LEFT ("3/5 cards collected"). Those are
-     the same condition and they must not drift.
+     A THRESHOLD, NOT A SET. `{cards: 5}` is measured as
+     `Object.keys(state.cards).length >= 5` — ANY five distinct cards, not five particular ones.
+     The wording has to say that, because "Earned for collecting 5 cards" reads as though five
+     named cards bought the mug and invites the reasonable question "which five?". There is no
+     answer: it is the moment the collection reached five.
 
-     They already had. The profile carried its own {cards:"cards collected"} table while the
-     beat carried {cards:"collecting N cards"}, so one screen said "collected" and the other
-     "collecting" about the same mug. Two tables is one table with a bug in it waiting.
+     So one string, "5 cards collected", used by every surface with its own preposition:
 
-     The plural lives here rather than at the call sites: "1 cards" survives review and then
-     reads as a bug in a screenshot. */
+         the reward beat   Earned at 5 cards collected
+         an owned item     ✓ Earned at 5 cards collected
+         a locked item     or 3/5 cards collected
+
+     One string rather than two shapes, which is also one fewer thing to drift. It briefly WAS
+     two — the profile said "cards collected" while the beat said "collecting 5 cards" — and
+     collapsing them is what exposed that neither was true.
+
+     The plural agrees with the REQUIREMENT, so "0/1 set finished" rather than "0/1 sets". */
   EARN: {
-    cards:    { did: n => `collecting ${n} card${n === 1 ? "" : "s"}`,  unit: "cards collected" },
-    episodes: { did: n => `watching ${n} episode${n === 1 ? "" : "s"}`, unit: "episodes watched" },
-    boards:   { did: n => `finishing ${n} set${n === 1 ? "" : "s"}`,    unit: "sets finished" },
-    rolls:    { did: n => `${n} roll${n === 1 ? "" : "s"}`,             unit: "rolls" },
+    cards:    { one: "card collected",  many: "cards collected" },
+    episodes: { one: "episode watched", many: "episodes watched" },
+    boards:   { one: "set finished",    many: "sets finished" },
+    rolls:    { one: "roll",            many: "rolls" },
   },
   earnKey(item) { return Object.keys((item && item.earn) || {})[0] || ""; },
-  /* "collecting 5 cards" — the deed, for something already owned or being awarded. */
+  /* "cards collected" / "set finished" — the unit alone, agreeing with what the item requires.
+     For the locked slot, which supplies its own "3/5" in front. */
+  earnUnit(item) {
+    const key = this.earnKey(item), e = this.EARN[key];
+    if (!e) return "";
+    return item.earn[key] === 1 ? e.one : e.many;
+  },
+  /* "5 cards collected" — the whole threshold, for anything already owned or being awarded. */
   earnWords(item) {
     const key = this.earnKey(item);
-    const e = this.EARN[key];
-    return e ? e.did(item.earn[key]) : "";
-  },
-  /* "cards collected" — the unit, for counting progress toward something not yet owned. */
-  earnUnit(item) {
-    const e = this.EARN[this.earnKey(item)];
-    return e ? e.unit : "";
+    return this.EARN[key] ? `${item.earn[key]} ${this.earnUnit(item)}` : "";
   },
   earnMet(item) {
     const m = this.metrics();

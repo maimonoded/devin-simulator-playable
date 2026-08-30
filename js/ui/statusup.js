@@ -56,7 +56,7 @@ function showStatusUp(up){
       : up.source==="box"
         ? "Found in the pack"
         : one&&Status.earnWords(one)
-          ? `Earned for ${Status.earnWords(one)}`
+          ? `Earned at ${Status.earnWords(one)}`
           : "Earned";
     const owed=Status.toNextLevel(to);
     el.innerHTML=`
