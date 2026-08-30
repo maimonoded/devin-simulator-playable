@@ -293,6 +293,7 @@ $("#albumBtn").onclick=()=>openAlbum();
 $("#avatarBtn").onclick=()=>openProfile();
 $("#hLevelPill").onclick=()=>openProfile();
 $("#hTrophyPill").onclick=()=>openProfile();
+$("#hCollectPill").onclick=()=>openProfile();   // both lead where both are listed
 $("#watchBtn").onclick=()=>openPrediction();
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;

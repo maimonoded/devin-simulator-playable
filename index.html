@@ -54,8 +54,16 @@
         </div>
       </button>
       <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
+      <!-- TWO KINDS OF TROPHY, and they had one name between them. The cups pill is the
+           COLLECTIBLES — trophy cards taken to three copies, which is what the collection is
+           for. The target pill is a "Called it", won by a correct prediction and the one thing
+           a box cannot contain. Calling both "Trophies" made the top bar ambiguous about the
+           two things the player is actually accumulating. -->
+      <button class="pill collectibles" id="hCollectPill" title="Collectibles — tap for the profile">
+        <span class="ic">🏆</span><div><div class="v" id="hCollect">0</div><div class="lb">Collected</div></div>
+      </button>
       <button class="pill trophies" id="hTrophyPill" title="Called it — tap for the profile">
-        <span class="ic">🎯</span><div><div class="v" id="hTrophies">0</div><div class="lb">Trophies</div></div>
+        <span class="ic">🎯</span><div><div class="v" id="hTrophies">0</div><div class="lb">Called it</div></div>
       </button>
     </div>
     <!-- Player. The handle for the profile panel. The rank chip that used to ride beside it is

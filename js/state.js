@@ -48,7 +48,7 @@ function initState(){
     /* THE TROPHIES (GDD 7.4). Episode id → the day it was called right. One per episode, unique,
        and the only thing in the game that cannot come out of a box — which is exactly why it is
        worth having. Showcase pieces, not catalogue cards. */
-    trophies:{}, lastTrophies:0,
+    trophies:{}, lastTrophies:0, lastCollect:0,
     /* Milestone level → the day it was paid. Stored because "was this given" is not derivable
        from a level that only goes up. */
     statusMilestones:{},

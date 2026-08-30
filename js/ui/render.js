@@ -184,6 +184,13 @@ function renderHUD(){
   const tro=Status.trophyIds().length;
   tweenNumber($("#hTrophies"),state.lastTrophies,tro,v=>String(Math.round(v)));
   state.lastTrophies=tro;
+  /* COLLECTIBLES — cards taken to three copies. A count, not a fraction, for the same reason
+     the trophies are: "how many have I got" is the question a top bar answers, and the
+     denominator lives in the profile where there is room to mean something. Derived from
+     state.cards, so it cannot drift from the album. */
+  const col=Cards.collectibleCount();
+  tweenNumber($("#hCollect"),state.lastCollect,col,v=>String(Math.round(v)));
+  state.lastCollect=col;
   /* The Gala pot and the collection counter are NOT in the HUD. The pot is a number the player
      can do nothing about, and the collection duplicated the status track without being the
      thing that ends a Season. Both are still visible where they can be acted on — the log and
