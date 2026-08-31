@@ -9,24 +9,47 @@ has the pipeline, the pinned model ids and — more importantly — the half-doz
 guessable and cost a re-roll each to discover. This file does not repeat them. It says *what* to
 build; the skill says *how*, and the how is where the failures are.
 
-## What exists and what is missing
+## THIS PLAN IS BUILT. All thirty levels have a model.
 
-Six tiers, each opening a band of five levels. The tier's own model covers the level it opens at.
-Every other level may have one of its own; where it does not, it shares the tier's.
+Every asset this file asked for exists, is registered in `estate.js` and is on
+`collectible_version`. Stepping 1 → 30 in [`tools/estate-levels.html`](../../tools/estate-levels.html)
+draws **thirty distinct meshes** with no console errors and no 404s. Nothing below is outstanding
+work; the plan is kept because the reasoning in it is what the next Season's estate should be
+built from, and because the per-band notes record what each level actually contains.
 
-| tier | band | opens at | levels still to build |
-|---|---|---|---|
-| 1 · The bedsit | 1–5 | `tier1.glb` | — **done** (`tier1-lv2` … `lv5`) |
-| 2 · The flat | 6–10 | `tier2.glb` | **7**, 8, 9, 10 |
-| 3 · The townhouse | 11–15 | `tier3.glb` | 12, 13, 14, 15 |
-| 4 · The apartment | 16–20 | `tier4.glb` | 17, 18, 19, 20 |
-| 5 · The penthouse | 21–25 | `tier5.glb` | 22, 23, 24, 25 |
-| 6 · The villa | 26–30 | `tier6.glb` | 27, 28, 29, 30 |
+**Read [`claude-skills/estate-art/FIELD-NOTES.md`](../../claude-skills/estate-art/FIELD-NOTES.md)
+before building anything like this again.** It carries what the run learnt, including the rules
+that were not in the skill when this plan was written and the places where this plan was wrong.
 
-Twenty files. Level 7 was briefed separately and may already be done — **check
-`assets/estate/models/` and the tier 2 entry in `estate.js` before starting it.**
+| tier | band | opens at | levels | built |
+|---|---|---|---|---|
+| 1 · The bedsit | 1–5 | `tier1.glb` | `tier1-lv2` … `lv5` | earlier |
+| 2 · The flat | 6–10 | `tier2.glb` | 7, 8, 9, 10 | ✔ |
+| 3 · The townhouse | 11–15 | `tier3.glb` | 12, 13, 14, 15 | ✔ |
+| 4 · The apartment | 16–20 | `tier4.glb` | 17, 18, 19, 20 | ✔ |
+| 5 · The penthouse | 21–25 | `tier5.glb` | 22, 23, 24, 25 | ✔ |
+| 6 · The villa | 26–30 | `tier6.glb` | 27, 28, 29, 30 | ✔ |
 
+Twenty files built in one run, from twenty-three image-to-3D conversions and roughly 3,700 CU.
 Naming is `tierN-lvL.glb`, absolute level, e.g. `tier3-lv13.glb`.
+
+**Two things in this plan turned out to be wrong**, both recorded in full in the field notes and
+worth knowing before reusing it:
+
+- **The contrast axes were right in all five bands; the named COLOURS were wrong in three.** Each
+  time the plan named a colour the tier already owned — terracotta for the terracotta-floored
+  flat, pale for the already-pale apartment, emerald for the teal-and-gold penthouse — which is
+  the axis with its contrast subtracted. Built as plum, rust and emerald respectively. A plan
+  should name the contrast and leave the colour to whoever is looking at the reference image.
+- **"Drift is expected and not a bug to chase" is true of dimensional drift and false of a change
+  vanishing.** Those are different failures. A footprint wandering a few percent is free; a level
+  whose one change did not survive the conversion is a defect and is always worth a retry. Two
+  levels needed exactly that.
+
+The costing here was also optimistic — three calls per asset is the floor, not the expectation,
+and a band runs 600–1300 CU depending on how much of it lands under a roof. The binding
+constraint turned out to be neither credits nor conversion time but Scenario's rolling rate
+limit; see the field notes and `references/mcp-path.md`.
 
 ## The shape every band follows
 
