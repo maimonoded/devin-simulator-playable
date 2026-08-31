@@ -53,6 +53,12 @@
 const ESTATE_TIERS = [
   { at:  1, name: "The bedsit",      art: "assets/estate/items/tier1.webp",
     model: "assets/estate/models/tier1.glb",
+    /* One building per band left the levels inside it looking identical but for the lamp, which
+       is not enough to read as progress. `levels` names a different GLB at a given level, so the
+       room can improve a piece at a time without leaving the tier: at 2 the mattress becomes a
+       real bed and the kettle's crate becomes a table. Optional and per level — a tier with none
+       of these behaves exactly as before. */
+    levels: { 2: "assets/estate/models/tier1-lv2.glb" },
     blurb: "Above the chip shop. The window doesn't shut." },
   { at:  6, name: "The flat",        art: "assets/estate/items/tier2.webp",
     model: "assets/estate/models/tier2.glb",

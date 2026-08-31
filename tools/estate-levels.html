@@ -179,8 +179,12 @@ function paintWarm(){
   const { step, span } = Estate3D.tierStep(lv);
   const est = scene.getObjectByName("estate");
   const lamp = est && est.children.find(c => c.isPointLight);
+  /* The FILE, not just the lamp. With per-level models the question at each step is "did the
+     building change", and two similar rooms are exactly the case where the eye cannot answer it
+     on its own. Read off Estate3D so it names what is actually standing there. */
+  const file = (Estate3D.modelFor(lv) || "–").split("/").pop();
   $("warm").textContent =
-    `step ${step + 1}/${span} in band · lamp ${lamp ? lamp.intensity.toFixed(2) : "–"}`;
+    `step ${step + 1}/${span} · lamp ${lamp ? lamp.intensity.toFixed(2) : "–"} · ${file}`;
 }
 $("down").onclick = () => setLevel(lv - 1);
 $("up").onclick   = () => setLevel(lv + 1);
@@ -197,7 +201,9 @@ addEventListener("keydown", e => {
   if (e.key === "ArrowDown" || e.key === "-")                  { $("down").click(); e.preventDefault(); }
 });
 
-cfg.estateFogMs = +Q.get("fog") || cfg.estateFogMs;
+/* `|| default` would swallow ?fog=0, which is the one value someone types deliberately —
+   "show me the swap with no cloud over it". */
+if (Q.has("fog")) { cfg.estateFogMs = Math.max(0, +Q.get("fog") || 0); cfg.estateFog = cfg.estateFogMs > 0 ? 1 : 0; }
 const fogms = $("fogms");
 fogms.value = cfg.estateFogMs;
 $("fogval").textContent = cfg.estateFogMs + "ms";

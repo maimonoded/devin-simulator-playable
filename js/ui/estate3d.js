@@ -239,6 +239,9 @@ export const Estate3D = {
   /* Which tier the building on screen IS. Not derivable from _bodySig, which carries the level
      — and a level change inside one tier must not fog, because nothing is being swapped. */
   _bodyTier: null,
+  /* And the PATH it was built from. With per-level models a tier is no longer enough to say
+     which building is standing: two levels of one band can be two different files. */
+  _bodyUrl: null,
   _fog: null, _fogFrom: 0, _fogDur: 0, _fogSwap: null, _fogTimers: [],
   _fogTex: null, _fogGeo: null,
 
@@ -295,6 +298,22 @@ export const Estate3D = {
     return (typeof VIEW_MOBILE !== "undefined" && VIEW_MOBILE) || !!cfg.phoneView;
   },
 
+  /* WHICH BUILDING THIS LEVEL WANTS — the tier's, unless the level has one of its own.
+
+     A tier is a band of five levels and one model covers all five, which is why the only thing
+     that changed between them was the lamp. `levels` lets a tier name a different GLB at a given
+     level, so the bedsit can get a real bed at 2 and its stairs fixed at 3 while staying the
+     bedsit. Absent, every level in the band shares the tier's model exactly as before — this is
+     an opt-in per tier and per level, not a new requirement to author thirty buildings.
+
+     Keyed by the absolute level rather than by a step within the band, because that is how the
+     manifest reads out loud: `levels: { 2: ... }` on a tier that opens at 1 is "at level 2". */
+  modelFor(level){
+    const lv = level == null ? Status.level() : level;
+    const t = this.tierFor(lv);
+    return (t.levels && t.levels[lv]) || t.model || null;
+  },
+
   /* Which tier the current level has reached. Derived from the level, so re-cutting the bands
      re-cuts the estate for free — and the last tier holds rather than running off the end. */
   tierFor(level){
@@ -333,8 +352,7 @@ export const Estate3D = {
      Loaded once per path and kept, because the SIGN repaints every time the level bar moves and
      re-fetching a megabyte of building behind it would be absurd. Clones are cheap; the fetch is
      not. A failure is remembered too, so a missing file costs one 404 rather than one per roll. */
-  _model(tier){
-    const url = tier && tier.model;
+  _model(url){
     if (!url) return null;
     if (this._models.has(url)) return this._models.get(url);
     if (this._pending.has(url) || this._failed.has(url)) return null;
@@ -387,7 +405,8 @@ export const Estate3D = {
     const lv = Status.level(pts);
     const tier = this.tierFor(lv);
     const view = this._phone() ? "p" : "d";
-    const src = this._model(tier);
+    const url = this.modelFor(lv);
+    const src = this._model(url);
     /* The next tier's building is fetched a level early, so that arriving at it is not the
        moment its megabyte starts downloading. */
     this._preload(lv);
@@ -402,7 +421,7 @@ export const Estate3D = {
        holds still — old house, old plaque — and the promotion happens in one beat when the file
        arrives. Only a tier with no model at all, or one whose model has genuinely failed, falls
        back to the painting; and the first build has nothing to hold, so it paints regardless. */
-    if (!src && tier.model && !this._failed.has(tier.model) && this._body && this._bodyTier) return;
+    if (!src && url && !this._failed.has(url) && this._body && this._bodyUrl) return;
 
     if (src){
       /* MODELLED. The house holds still while the sign counts. */
@@ -411,14 +430,19 @@ export const Estate3D = {
       /* A swap already owing owns the body until it runs. Touching it here would change the
          house in the open and then have the armed swap change it again — see _swapNow. */
       if (bodySig !== this._bodySig && !this._fogSwap){
-        /* A CHANGE OF TIER gets weather over it; anything else is swapped where it stands.
+        /* ANY CHANGE OF BUILDING gets weather over it; anything else is swapped where it stands.
 
-           The two cases that must NOT fog are the ones that look like a tier change and are not:
-           the first build, when there is no old house to hide, and the model arriving after the
-           painting has been standing in for it — same tier, and a puff of cloud there would
-           announce a load rather than a promotion. Both are caught by comparing the TIER, which
-           is why _bodyTier is tracked separately from the signature. */
-        if (this._body && this._bodyTier && this._bodyTier !== tier && this._fogOn()){
+           The test is the MODEL PATH, not the tier. It used to be the tier, which was right while
+           a band shared one building — but a tier can now name a different GLB per level, and a
+           level 1 → 2 swap is exactly as much of a cut as a tier change is. What the fog covers is
+           an exchange, and an exchange is what a changed path means.
+
+           The two cases that must NOT fog are the ones that look like a change and are not: the
+           first build, when there is no old house to hide, and the model arriving after the
+           painting stood in for it — same path, so a puff of cloud there would announce a load
+           rather than a promotion. Both are caught by comparing the path the body was BUILT from,
+           which is why _bodyUrl is tracked separately from the signature. */
+        if (this._body && this._bodyUrl && this._bodyUrl !== url && this._fogOn()){
           /* NOT `this._bodySig = bodySig` here. The signature has to describe what is DRAWN, and
              for the next 46% of the beat that is still the old house — so it is written by the
              swap, in _swapNow, at the moment the house actually changes. Writing it now was a
@@ -433,6 +457,7 @@ export const Estate3D = {
           this._signSig = null;                  // the sign hangs off the plot; remeasure it
           this._body = this._swap(this._body, this._buildModel(src, tier, lv));
           this._bodyTier = tier;
+          this._bodyUrl = url;
           this._sweep();
         }
       }
@@ -473,6 +498,7 @@ export const Estate3D = {
     mesh.renderOrder = 2;
     this._body = this._swap(this._body, mesh);
     this._bodyTier = tier;
+    this._bodyUrl = null;                      // a painting was built from no model at all
   },
 
   /* The ground point `at` units UP-screen of the board's centre. The 45° camera renders a
@@ -557,19 +583,28 @@ export const Estate3D = {
     if (typeof Status === "undefined") return;
     const keep = new Set();
     const add = t => { if (t && t.model) keep.add(t.model); };
-    add(this._bodyTier);                       // borrowed by the clone on the board
-    const i = ESTATE_TIERS.indexOf(this.tierFor(Status.level()));
-    add(ESTATE_TIERS[i]);                      // where the player is
-    add(ESTATE_TIERS[i + 1]);                  // and what _preload is warming
+    if (this._bodyUrl) keep.add(this._bodyUrl); // borrowed by the clone on the board
+    const lv = Status.level();
+    const url = this.modelFor(lv);
+    if (url) keep.add(url);                    // where the player is
+    if (lv < Status.maxLevel()) {
+      const nx = this.modelFor(lv + 1);        // and the next LEVEL, which _preload is warming
+      if (nx) keep.add(nx);
+    }
+    const i = ESTATE_TIERS.indexOf(this.tierFor(lv));
+    add(ESTATE_TIERS[i + 1]);                  // and the next tier's own
     Array.from(this._models.keys()).forEach(url => { if (!keep.has(url)) this._evict(url); });
   },
 
   /* The tier after this one, fetched while the player is still climbing toward it. _model()
      already refuses to fetch twice, so this is safe to call on every sync. */
   _preload(level){
+    /* The next LEVEL first — with per-level models that is the next swap the player will see,
+       and it may be a different file even inside the same band. */
+    if (level < Status.maxLevel()) this._model(this.modelFor(level + 1));
     const i = ESTATE_TIERS.indexOf(this.tierFor(level));
     const next = ESTATE_TIERS[i + 1];
-    if (next) this._model(next);
+    if (next) this._model(next.model);
   },
 
   /* ---------------- the weather ----------------
@@ -692,14 +727,16 @@ export const Estate3D = {
     if (typeof state === "undefined" || typeof Status === "undefined") return;
     const lv = Status.level();
     const tier = this.tierFor(lv);
-    const src = this._model(tier);
+    const url = this.modelFor(lv);
+    const src = this._model(url);
     /* Its model is still in flight. Leave the old house standing and leave the signature alone:
        the sync that runs when the file lands finds a difference and starts a fresh cloud. */
     if (!src) return;
     this._bodySig = `m/${lv}/${this._phone() ? "p" : "d"}`;
     this._body = this._swap(this._body, this._buildModel(src, tier, lv));
     this._bodyTier = tier;
-    this._sweep();                             // the tier we just left is nobody's now
+    this._bodyUrl = url;
+    this._sweep();                             // what we just left is nobody's now
     /* The plaque turns over with the house. _fogSwap is already null by now — _runSwap clears it
        before calling — so the gate in sync() is open and this repaints it, still under cover. */
     this._signSig = null;
