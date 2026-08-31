@@ -11,8 +11,21 @@ boxes; a third copy of a card turns it into the **Collectible** that marks you o
 ## Running it
 
 ```bash
-python3 serve.py          # → http://localhost:8125/index.html
+./start.sh                # → http://localhost:8125/index.html
+./stop.sh                 # stop it again
+./restart.sh              # stop, then start
 ```
+
+All three default to **8125** and all three take a port: `./start.sh 9000`, `./stop.sh 9000`,
+`./restart.sh 9000`. `python3 serve.py [port]` still works and is what the scripts wrap.
+
+**They know about the other worktrees.** This repo keeps several checkouts on different branches
+and 8125 is the default for all of them, so the server on it is often not the one belonging to
+the tree you are standing in. Both scripts settle that the same way — fetch `index.html` and
+compare it byte for byte against the local one. `start.sh` steps up to the next free port when
+the answer is somebody else's; `stop.sh` refuses to kill it and says so, and takes `--force` for
+when you know that tree is finished with it. `stop.sh` also checks the process really is a
+`serve.py` before signalling it, because a port is a weak claim on an identity.
 
 **A server is required — `file://` no longer works.** The board renders with three.js, loaded as
 an ES module, and browsers block module scripts on file URLs. `serve.py` ships with the repo
