@@ -143,6 +143,61 @@ function clearOverlayFx(){
   if(typeof use3d==="function"&&use3d()&&window.Board3D&&Board3D.available&&Board3D.cancelPack)
     Board3D.cancelPack();
 }
+/* A CLUE, SHRINKING INTO THE SLOT IT FILLED.
+
+   The player is shown a clue at full size and, separately, a bar in the toolbar moves. Those are
+   two things changing in different places, and connecting them was left to the player. This
+   flies the card from where it was read to the slot it fills, so the connection is shown.
+
+   THE TRACKER IS STILL SHOWING THE OLD COUNT WHEN THIS RUNS, and that is not luck — playEvents
+   calls renderHUD() before a card beat, not renderAll(), so renderEpTrack has not run since the
+   clue banked. The empty slot the flight aims at is genuinely the one about to fill. Land, then
+   render: reversing those two makes the card fly into a slot that is already full.
+
+   position:fixed on a detached element, because the two ends live in different stacking contexts
+   — the board's centre overlay and the toolbar — and an element animating BETWEEN those trees
+   would be clipped by whichever it was parented to.
+
+   Resolves on a timer like every other beat here: a transitionend never arrives in a background
+   tab, and a flight that never resolves would hang the roll loop behind it. */
+function flyCluesToTracker(fromEl, n){
+  const bar = $("#epTrack") && $("#epTrack").querySelector(".etBar");
+  const src = fromEl && fromEl.querySelector(".ccard");
+  const ms  = Math.max(0, +cfg.clueFlyMs || 0);
+  if(!bar || !src || !ms || document.hidden) return Promise.resolve();
+  const empty = [...bar.querySelectorAll("i:not(.on)")].slice(0, Math.max(1, n | 0));
+  if(!empty.length) return Promise.resolve();
+
+  const a = src.getBoundingClientRect();
+  const art = getComputedStyle(src.querySelector(".ccArt") || src).backgroundImage;
+  empty.forEach((slot, k) => {
+    const b = slot.getBoundingClientRect();
+    const fly = document.createElement("div");
+    fly.className = "clueFly";
+    fly.style.cssText = `left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px;` +
+                        `--flyMs:${ms}ms`;
+    /* The card's own photograph, so the thing that lands is the thing that was read. */
+    if(art && art !== "none") fly.style.backgroundImage = art;
+    else fly.style.background = "#15161a";
+    document.body.appendChild(fly);
+    /* nextPaint, not a bare rAF: the start and end transforms have to land in two different
+       style recalcs or the transition never runs, and rAF is suspended in a hidden tab. */
+    nextPaint(() => {
+      const sx = b.width / a.width, sy = b.height / a.height;
+      fly.style.transform =
+        `translate(${b.left - a.left + (b.width - a.width) / 2}px,` +
+        `${b.top - a.top + (b.height - a.height) / 2}px) scale(${sx},${sy})`;
+      fly.style.opacity = ".85";
+    });
+    setTimeout(() => {
+      fly.remove();
+      slot.classList.add("on", "land");
+      setTimeout(() => slot.classList.remove("land"), 360);
+    }, ms + 20 + k * 60);
+  });
+  return sleep(ms + 80 + (empty.length - 1) * 60);
+}
+
 /* A BIGGER CONFETTI, for the beat that earns one. confetti() is 40 pieces in one wave, which is
    right for an ordinary win and reads as a shrug when the moment is the third copy of a trophy.
    Three staggered waves from a wider spread, so it is still falling while the player reads the
@@ -310,8 +365,11 @@ function showCard(c){
     const finish=()=>{
       if(done) return; done=true;
       clearTimeout(to);
+      /* The flight starts from the card while it is STILL ON SCREEN — its rect is read before
+         the overlay is emptied, or there is nothing to measure and nowhere to fly from. */
+      const flight=clue?flyCluesToTracker(el,drops.length):null;
       el.className="centerfx"; el.innerHTML="";
-      resolve();
+      if(flight) flight.then(resolve); else resolve();
     };
     const to=setTimeout(finish,Math.max(200,ms));
     /* HOLD TO READ. Only a clue, and only for a human — a batch run has nobody to click Collect

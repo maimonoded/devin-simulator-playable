@@ -45,6 +45,7 @@ is why finish.sh SAMPLES the corner instead of hardcoding the key.
 | `dice` | one white game die showing six pips, tilted, with a gold edge highlight |
 | `energy` | a single fat lightning bolt, electric teal-white with a gold outline |
 | `store` | a small market stall with a striped awning, seen head-on |
+| `clue` | one evidence card face-on: near-black, film sprocket edges, a cream paper slip taped across the lower half, a red grease-pencil circle above it. Used at ELEVEN PIXELS in the tracker's slots, so it is the one icon where the silhouette is the whole design |
 
 ## The six status bands
 

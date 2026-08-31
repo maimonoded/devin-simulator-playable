@@ -682,11 +682,37 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
 .etState b{color:var(--teal);font-weight:800}
 .etCount{flex:0 0 auto;font-size:11px;color:var(--muted)}
 .etCount b{color:var(--teal);font-weight:800}
-/* A segment per clue the episode wants — not four blank card slots, which said "collect four of
-   the same thing" about four different pieces of evidence. */
-.etBar{display:flex;gap:3px;flex:0 0 auto}
-.etBar i{display:block;width:12px;height:5px;border-radius:999px;background:rgba(255,255,255,.16)}
-.etBar i.on{background:linear-gradient(90deg,var(--teal),#7ef0dd);box-shadow:0 0 7px rgba(45,212,191,.5)}
+/* A SLOT PER CLUE, SHAPED LIKE THE THING THAT FILLS IT. They were flat bars, which counted
+   correctly and looked like a loading indicator — and the thing being counted is a card the
+   player has just been shown at full size. Small cards read as "four of these to collect" with
+   no explaining; a bar reads as "some progress".
+
+   Card proportions at this size are 11x15. Filled wears the clue card's own art; empty is the
+   same rectangle as an outline, so the row is legible as slots-with-gaps rather than as two
+   different objects. */
+.etBar{display:flex;gap:4px;flex:0 0 auto;align-items:center}
+.etBar i{display:block;width:11px;height:15px;border-radius:2.5px;
+  border:1px dashed rgba(190,205,255,.38);background:rgba(10,14,38,.5);
+  background-size:cover;background-position:center;transition:.2s}
+.etBar i.on{border-style:solid;border-color:rgba(255,203,92,.85);background-color:transparent;
+  background-image:url('../assets/icons/clue.webp');
+  box-shadow:0 0 7px rgba(255,203,92,.35)}
+/* The slot the flight lands in. Kept short — it is punctuation on an arrival, not an animation
+   in its own right. */
+@keyframes etSlotPop{0%{transform:scale(1)}45%{transform:scale(1.5)}100%{transform:scale(1)}}
+.etBar i.land{animation:etSlotPop .34s cubic-bezier(.2,1.6,.4,1)}
+
+/* THE CLUE IN FLIGHT. A card the player was just shown at full size, shrinking into the slot it
+   filled — so the connection between "I got a clue" and "the bar moved" is shown rather than
+   left for the player to infer from two things changing in different places.
+
+   position:fixed and a transform, because the two ends are in different stacking contexts (the
+   board's centre overlay and the toolbar's tracker) and anything that tried to animate BETWEEN
+   those trees would be clipped by one of them. */
+.clueFly{position:fixed;z-index:60;pointer-events:none;border-radius:6px;
+  background-size:cover;background-position:center;
+  box-shadow:0 8px 22px rgba(0,0,0,.5);
+  transition:transform var(--flyMs,460ms) cubic-bezier(.45,0,.25,1), opacity var(--flyMs,460ms) ease-in}
 /* Ready is the one state worth acting on, so it is the one state that looks like a button. */
 .epTrack.ready{border-color:var(--pink);background:rgba(60,18,50,.9);cursor:pointer;
   box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 18px rgba(255,111,165,.26)}

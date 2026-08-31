@@ -23,6 +23,8 @@ const DEFAULTS={
      back as the plaque, and only then does the track run. Staged, because two things moving at
      once means neither is watched. */
   statusCardMs:620, statusFlipMs:460,
+  /* A collected clue shrinking into the slot it filled on the objective tracker. */
+  clueFlyMs:460,
   vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
@@ -368,6 +370,7 @@ const TUNING=[
    ["statusHoldMs","Status card, not yet a Collectible (ms)",100],
    ["cardConvertMs","…and its third copy, out of a box (ms)",100],
    ["clueHoldMs","Clue card held — tap it to hold (ms)",100],
+   ["clueFlyMs","Clue flies into the tracker (ms)",20],
    ["statusCardMs","Convert: card held before the turn (ms)",20],
    ["statusFlipMs","Convert: the turn itself (ms)",20],
    ["vipRevealMs","Gala: dwell before moving on (ms)",100],
