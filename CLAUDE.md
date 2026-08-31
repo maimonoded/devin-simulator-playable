@@ -69,10 +69,11 @@ assets/boxes/       the three box tiers' art                            → asse
 minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
 tools/              normalize-env.py — conforms an environment GLB to the asset contract
                     make-dice.py    — builds assets/dice/models/die.glb from one blank face
-claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles) and
-                    board-env-art (the world around them). Run link-skills.sh once after
-                    cloning — it runs each skill's setup.sh, then symlinks them into
-                    .claude/skills, which is git-ignored. Both need the Scenario MCP server
+claude-skills/      the Claude Code skills this repo owns: board-tile-art (the 40 tiles),
+                    board-env-art (the world around them), estate-art (the house at the centre,
+                    and how a level differs from the one before it). Run link-skills.sh once
+                    after cloning — it runs each skill's setup.sh, then symlinks them into
+                    .claude/skills, which is git-ignored. All three need the Scenario MCP server
 css/                base · board · panels · drawer · overlay · collection · mobile (loaded last)
 episodes/           episode content: NNN.js (prediction) + NNN.mp4 (video)   → episodes/README.md
 js/
