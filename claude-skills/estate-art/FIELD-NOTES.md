@@ -243,3 +243,106 @@ one of tier 4's landmarks — a "never loses one" violation by the letter. A ret
 first. Given the choice between losing a landmark and losing the step, losing the landmark is
 correct: the step is why the file exists. But it is a real defect and it should be recorded as one
 rather than filed under drift.
+
+---
+
+# Appendix: tiers 5 and 6, and the run's final numbers
+
+Added after finishing the plan. Tier 6 was taken before tier 5, following the plan's own
+priority list — a rate limit had made budget short, and level 30 is the Season gate, so it is
+the worst level in the game to leave unbuilt. Both bands then went in cleanly.
+
+## The exposure theory held, and the confound is now separated
+
+The confound noted above — that exposed changes were also often the larger ones — is resolved by
+the last two bands, and the theory comes out of it stronger than it went in.
+
+| tier | character | conversions for 4 assets | retries |
+|---|---|---|---|
+| 2 · the flat | two floors, half enclosed | 10 | 6 |
+| 3 · the townhouse | four floors, all enclosed | 4 | 0 |
+| 4 · the apartment | three floors, glass | 5 | 1 |
+| 5 · the penthouse | one room + open deck | 4 | 0 |
+| 6 · the villa | open island | 4 | 0 |
+
+Tier 6 is almost entirely sky-facing — an island of gardens, pools, a helipad and a cutaway
+villa — and every one of its four converted first time, including a change made of nothing but
+light. Tier 5 is one enclosed lounge under an open roof deck, and also went four for four. Tier
+2's ten conversions remain the outlier, and eight of them were spent on the two assets whose
+change sat under the first-floor overhang. Nineteen of twenty-three conversions in the run were
+usable; every one of the four failures was a change placed under something.
+
+Tier 3 is the honest counter-evidence and should not be swept away: four enclosed interiors,
+four clean conversions, no retries. What separated it from tier 2 was not luck but that by then
+every prompt said *put this at the open cutaway edge* explicitly. That is the actual finding —
+enclosure is not fatal, it is a cost you pay unless you buy your way out of it in the prompt.
+
+## Pattern beats tint, which is a second axis the skill does not have
+
+The clearest new thing from tier 5. Level 23 is a deco sunburst inlaid across the lounge floor
+in black, cream and brass; level 8 in tier 2 was blue-and-white tiles across the ground floor.
+Same rung of the arc, same kind of surface, both under an overhang — and 23 converted first
+time and reads at board scale while 8 lost its tiles entirely on the first attempt and is the
+weakest step in its band even now.
+
+The difference is that 23 is **high-contrast pattern** and 8 is closer to a **tint**. A radiating
+fan of black rays with brass between them still reads as a designed floor at two hundred pixels;
+a field of small blue-and-white tiles averages out to pale grey. So, beside "colour survives
+being 200 px wide, craftsmanship does not", the skill wants: *pattern survives being 200 px wide,
+and an interior surface should be given a pattern rather than a colour.*
+
+## A change made of light needs an object to ride on
+
+Level 30 is the Season gate and the plan asks for the whole island lit at night. That is the one
+change this pipeline has no reason to preserve — the reference's lighting is baked into the
+texture and the engine then lights that again, so a genuinely dark scene comes back muddy twice
+over, and a glow is not geometry at all.
+
+Two things made it work, and both generalise. The prompt asks for a *brilliantly lit island at
+golden dusk*, explicitly holding the marble, planting and turquoise water at daylight values and
+saying in as many words that this is not a night scene — so the baked texture stays light and the
+illumination arrives as glowing windows and lit water on top of it. And the step is anchored by a
+**solid object** as well as by light: a second, larger superyacht at the jetty, which carries the
+beat whether or not the glow survives. Any step made of light, weather or atmosphere should carry
+an object for the same reason.
+
+## The plan's colours were wrong three times out of five
+
+Not the contrast axes — those were right every time, and they are the most valuable thing in the
+plan. The named colours were wrong wherever the plan happened to name something the tier already
+owned:
+
+- **tier 2**, terracotta sofa → the flat's floor and splashback are terracotta. Spent emerald.
+- **tier 4**, pale sectional and pale stone floors → the apartment is already entirely pale.
+  Spent burnt orange, honey oak and charcoal.
+- **tier 5**, emerald banquette → teal-and-gold is the penthouse's signature, and tier 2 had
+  already spent emerald. Spent plum.
+
+Tiers 3 and 6 were fine because their palettes are narrow and brown or white, so almost anything
+saturated is new. The rule: **the plan should name the contrast and leave the colour to whoever
+is looking at the reference.** A colour chosen away from the image is a coin flip, and it fails
+in the specific way that is hardest to notice — it produces a picture that looks perfectly nice
+and reads as no change at all.
+
+## Where I still disagree
+
+Everything in the disagreement section above stands. One addition, now that all five bands are
+built: **every band's best step is its last one**, because the plan's furniture → floor → walls →
+structure shape is also, in that order, an ordering by exposure. Five bands, five times the
+structure rung was the most legible. A player climbing 6 → 7 → 8 meets the two weakest steps in
+the band before they meet anything that lands, and then the band ends just as it gets good. If
+the shape is ever revisited, the question worth asking is whether each band should OPEN with
+something that touches the outline rather than close with it.
+
+## Final numbers
+
+Twenty assets. Twenty-three image-to-3D conversions, of which nineteen were kept. Roughly 3,700
+CU in total, or about **185 CU per asset** averaged across the run — but that average hides the
+spread, which runs from 148 (tiers 3, 5, 6) to 316 (tier 2). Quote a band at 600–1300 CU
+depending on how much of it lands under a roof.
+
+Wall-clock was dominated not by conversion time but by the rolling rate limit described in
+[references/mcp-path.md](references/mcp-path.md): about ninety minutes of the run was spent
+waiting out `429` cooldowns after sustained use. Buying compute units did clear it, so the cap
+appears to move with plan tier rather than being a fixed request ceiling — but pacing from the
+start is still cheaper than discovering it at asset twelve.
