@@ -306,7 +306,14 @@ function holdStatusChip(c){
      crash, since nothing about it looks broken. releaseStatusChip clears it on every normal
      path; nothing else has to remember to. */
   clearTimeout(hudHoldTimer);
-  hudHoldTimer = setTimeout(() => { hudHold = null; hudAnim = null; renderStatusChip(); }, 15000);
+  hudHoldTimer = setTimeout(() => {
+    hudHold = null; hudAnim = null;
+    renderStatusChip();
+    /* Both surfaces read the pin, so both have to be let go. Restoring only the pill would leave
+       the estate showing the older number for the rest of the session — the two disagreeing,
+       which is the exact failure this whole mechanism exists to prevent. */
+    if(window.Board3D && Board3D.available && Board3D.syncCase) Board3D.syncCase();
+  }, 15000);
 }
 
 /* Let it go, and show it going. Resolves when the bar has landed, so the roll loop waits for
@@ -355,6 +362,11 @@ function releaseStatusChip(){
      A TIMER RATHER THAN A FRAME LOOP, like everything else in this file — rAF is suspended in a
      background tab, and 40ms steps are indistinguishable from 60fps on a seven-pixel bar across
      the board while costing a third of the texture uploads. */
+  /* paintEstateBar returns false when there is no sign to paint on — the painted fallback keeps
+     its plaque inside the picture, and there is a window after a swap disposes one sign and
+     before the next is built. Nothing is done about that on purpose: retrying as a full sync
+     per step is the cost this exists to avoid, and the settle below lands the real number
+     either way. The estate simply sits still for that beat. */
   const est = (p, pts) => {
     if(window.Board3D && Board3D.available && Board3D.paintEstateBar)
       Board3D.paintEstateBar(p, pts, true);
@@ -430,15 +442,18 @@ function releaseStatusChip(){
     setTimeout(() => {
       timers.forEach(clearTimeout);
       clearInterval(estTimer);
-      /* The stand-in goes before either surface is settled, so both read the truth again. */
+      /* STATE FIRST, REPAINTS SECOND. The stand-in and the classes go before anything that can
+         throw, so a failing repaint cannot leave the pin up or the pill stuck gold. */
       hudAnim = null;
       el.classList.remove("gain", "levelled");
       fill.style.transition = "";
-      renderStatusChip();
-      /* A full sync rather than a last paintBar: it puts the bar back to teal, re-stamps the
-         signature so the next renderAll does not repaint, and is the one place the plaque is
-         guaranteed to land on the real number however the beat was interrupted. */
-      if(window.Board3D && Board3D.available && Board3D.syncCase) Board3D.syncCase();
+      try{
+        renderStatusChip();
+        /* A full sync rather than a last paintBar: it puts the bar back to teal and is the one
+           place the plaque is guaranteed to land on the real number however the beat was
+           interrupted. paintBar has cleared the signature, so this cannot be gated out. */
+        if(window.Board3D && Board3D.available && Board3D.syncCase) Board3D.syncCase();
+      }catch(err){ /* the beat is over either way — never strand the roll loop behind it */ }
       resolve();
     }, ms + hold + 60);
   });

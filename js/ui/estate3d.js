@@ -945,7 +945,7 @@ export const Estate3D = {
     /* THE SIGN IS THE PLAQUE — the whole canvas and nothing else on it — so the status beat
        repaints it outright. Hanging the plaque on its own plane is what makes that true; in the
        painted face it is a band inside a picture and would have to be snapshotted and restored. */
-    this._live = { ctx: x, map };
+    this._live = { ctx: x, map, level };
     return map;
   },
 
@@ -960,8 +960,23 @@ export const Estate3D = {
     const L = this._live;
     if (!L || !L.map) return false;
     L.ctx.clearRect(0, 0, P.w, P.h);
-    this._plaque(L.ctx, P.pad, P.pad, P.w - P.pad * 2, Status.level(pts), { p, pts, gain });
+    /* THE LEVEL THE SIGN IS ALREADY SHOWING, not the one the points imply. Only the bar and the
+       number under it move here; the tier's name, the "LV n" and the pips are the sign's
+       IDENTITY, and sync() holds those deliberately — behind the fog while the house changes,
+       and behind _fogSwap while a swap is owing. Reading Status.level(pts) instead would turn
+       the plaque over while the previous building was still standing, which is the one thing
+       §3.5's pairing and the fog both exist to prevent. */
+    this._plaque(L.ctx, P.pad, P.pad, P.w - P.pad * 2, L.level, { p, pts, gain });
     L.map.needsUpdate = true;
+    /* THE SIGNATURE NO LONGER DESCRIBES WHAT IS DRAWN, so it must stop being trusted.
+
+       sync() skips the rebuild when its signature is unchanged, and that signature quantises
+       progress to a whole percent — so a small gain often computes the SAME string it did
+       before the beat, and at the Season gate levelProgress is pinned at 1 and the string can
+       never change at all. The settling sync would then early-return and leave this gold, lit,
+       mid-beat bar on the plaque permanently. Invalidating here is what makes the settle's
+       "guaranteed to land on the real number" actually true. */
+    this._signSig = null;
     return true;
   },
 
@@ -1043,7 +1058,10 @@ export const Estate3D = {
        Measured WITHIN the level, not against the Season: points banked since this level began,
        over what this level costs. At the top there is no next level, so it says so rather than
        printing a fraction of a span that does not exist. */
-    const lvNow = Status.level(pts);
+    /* Measured within the level this face is DRAWING, not the one the points imply. They are the
+       same on every full paint; they come apart during a beat, where the bar is steered and the
+       plaque's identity is deliberately held (see paintBar). */
+    const lvNow = level;
     x.textBaseline = "middle";
     x.textAlign = "center";
     x.font = "800 13px 'Segoe UI', system-ui, -apple-system, sans-serif";
