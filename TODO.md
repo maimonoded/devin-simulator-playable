@@ -243,11 +243,12 @@ the Season reset is code without content.
 **Done when:** a second Season exists — a board entry, a 150-card catalogue with fresh ids, and a
 cast. It is content, not code: nothing in `js/status.js` or `js/cards.js` changes.
 
-### Episodes 013–018 are written but not loaded
-Six episode files exist, complete with their eight clues each, and have no `<script>` tag in
-`index.html`. The run is twelve episodes. Adding the six tags extends it by a set and a bit.
-
-**Done when:** someone decides whether the run should be 12 or 18, and the tags match.
+### ~~Episodes 013–018 are written but not loaded~~ — DONE
+All eighteen episode files carry a `<script>` tag in `index.html`, so **the run is eighteen**.
+The question this entry asked — 12 or 18 — was answered by the Season gate being solved against
+eighteen: `cfg.statusTotal` (5800) is what makes the last episode and level 30 land together,
+which is §8.2's requirement, and that solve assumed the full run. Re-cutting to twelve would mean
+re-solving the gate, not just deleting six tags.
 
 ### ~~Status points and the shelf are not in the model either~~ — DONE
 `economy.status` now holds the Season's levels, its opening climb, its **total** — the Season
