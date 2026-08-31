@@ -34,6 +34,15 @@ Confirm the Scenario MCP tools are available, then `teams_list` once per session
 must pass `team_id` and `project_id` on every generation call. Exact calls and pinned model IDs
 are in [references/mcp-path.md](references/mcp-path.md). Read it before the first generation.
 
+**Then decide your pace, before the first call rather than after the fortieth.** An asset costs
+three model calls, and the account rate-limits on *burst*: forty calls inside ninety minutes earned
+`429`s with cooldowns of eight to twelve minutes, which is slower than not hurrying would have been.
+A run of more than a dozen assets should spread its calls rather than fire them as fast as they
+return. Two things worth not guessing at: buying credits does not lift this (an exhausted balance is
+a payment error, a rate limit is a `429` with a retry-after), and this pipeline reaches the limit on
+its own with nothing else running, so do not wait on another workload to clear. Detail in
+[references/mcp-path.md](references/mcp-path.md).
+
 ## Step 1: the reference image
 
 **Never generate the estate from scratch.** Every tier already has a painting in
