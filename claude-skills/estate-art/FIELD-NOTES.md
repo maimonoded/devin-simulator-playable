@@ -1,4 +1,4 @@
-# Field notes — building levels 7 to 20
+# Field notes — building levels 7 to 30
 
 Written while working through [LEVEL-PLAN.md](../../assets/estate/LEVEL-PLAN.md) with
 [SKILL.md](SKILL.md), by somebody who had not seen this repo before. These are **findings, not a
@@ -6,7 +6,15 @@ rewrite of the skill** — the durable rules belong in SKILL.md and somebody els
 What is here is what actually happened, including the parts that went wrong, because a rule with
 the incident that produced it is worth ten rules asserted flat.
 
-Covers tier 2 (levels 7–10), tier 3 (12–15) and tier 4 (17–20). Tiers 5 and 6 were not reached.
+Covers all twenty level assets: tier 2 (7–10), tier 3 (12–15), tier 4 (17–20), tier 5 (22–25) and
+tier 6 (27–30).
+
+**Read it in two passes.** The body below was written after tiers 2, 3 and 4, with tiers 5 and 6
+still unbuilt, and it is left in that state on purpose — its confidence about the exposure theory
+is hedged in a way that is worth seeing before the evidence came in. The
+[appendix](#appendix-tiers-5-and-6-and-the-runs-final-numbers) covers the last two bands, settles
+the hedge, and carries the run's final numbers. Where the two disagree, the appendix is later and
+wins.
 
 ## The one finding that matters most
 
