@@ -223,6 +223,22 @@ model calls in ninety minutes the account began returning `429` with cooldowns o
 seconds — an effective budget of about **one call every twelve minutes**, which turns a three-call
 asset into a forty-minute one. Pace from the start rather than discovering it at asset twelve.
 
+Three things about that limit, checked against the account's own usage figures rather than assumed,
+because each one is a thing somebody will otherwise reasonably guess wrong:
+
+- **It is a burst limit, not a daily quota.** The day it was tripped carried 72 estate calls in
+  total, which is not a large number spread over a day. Forty of them inside ninety minutes is what
+  did it. Pacing beats rationing.
+- **Buying credits does not lift it.** They are different axes, and an empty balance and a rate
+  limit can be true at the same time. It is worth knowing which one you are looking at: an
+  exhausted balance usually reports itself as a payment error, and a rate limit gives you a
+  `429` with a retry-after in seconds.
+- **It was self-inflicted, not contention.** The obvious suspicion is another workload on the same
+  account — this project's icon art ran 129 image jobs over the two previous days, which dwarfs the
+  estate pipeline's volume. But on the day the limit was hit that work was finished: two image jobs
+  all day against seventy-two estate calls. The estate pipeline reaches the limit on its own.
+  Sequencing it away from other art work is still worth doing, but it is not the fix.
+
 **Weight.** Each file is 1.6–2.4 MB. Twenty more takes `assets/estate/models/` from about 22 MB to
 roughly 60 MB, and the whole `assets/` directory past 130 MB. Runtime memory is fine — `_sweep()`
 evicts everything but the drawn tier, the current and the pre-fetched next — but the repository

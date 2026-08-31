@@ -21,6 +21,13 @@ began returning `429` with cooldowns of 517, 687 and 702 seconds. Once you are i
 budget is about **one model call every twelve minutes**, which turns a three-call asset into a
 forty-minute asset. Pace deliberately from the start rather than discovering this at asset twelve.
 
+It is a **burst** limit rather than a daily quota — the day it was tripped carried 72 estate calls
+in total, which is unremarkable spread out; forty inside ninety minutes is what did it. Buying
+credits does not lift it: an empty balance and a rate limit are different axes, and they report
+themselves differently — a payment error against a `429` with a retry-after. And it is reachable by
+this pipeline alone, with nothing else running on the account, so do not assume another workload is
+to blame and wait for it to finish.
+
 **The search index lags about ten minutes behind reality.** An asset created two minutes ago is not
 in `search` at all. Take ids from the job that made them, never from a search.
 
