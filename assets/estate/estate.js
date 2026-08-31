@@ -92,8 +92,28 @@ const ESTATE_TIERS = [
 
        The wicker sofa stays beside it deliberately. Two variants came back and the one that
        deleted it was the worse asset: with nothing plain left in shot the new sofa is merely
-       the furniture, where next to the old one it is visibly an upgrade. */
-    levels: { 7: "assets/estate/models/tier2-lv7.glb" },
+       the furniture, where next to the old one it is visibly an upgrade.
+
+       The band then follows the bedsit's shape — furniture, floor, walls, structure:
+
+         7  an emerald velvet sofa, delivered into a room that is otherwise all cream and beige
+         8  blue-and-white patterned encaustic tiles laid across the whole ground floor
+         9  the back walls painted crisp white, and a real fitted kitchen along them
+        10  the terrace done properly: a vine-covered pergola, loungers, planting all round the
+            balustrade, and the little boat repainted
+
+       Note which of those actually survive image-to-3D, because it is not the ones you would
+       expect. The pergola at 10 is the most legible step in the band by a distance: it stands
+       ABOVE the roofline, where nothing occludes it, so it reconstructs cleanly every time and
+       changes the building's silhouette rather than its contents. The floor at 8 is the least
+       reliable — a large flat area lying UNDER the first-floor overhang, which is where the
+       camera has least information — and the first conversion came back with the tiles gone
+       entirely and the slab plain grey. The one that shipped is a second sample of the same
+       cutout. See the commit for the rule this produced. */
+    levels: { 7: "assets/estate/models/tier2-lv7.glb",
+              8: "assets/estate/models/tier2-lv8.glb",
+              9: "assets/estate/models/tier2-lv9.glb",
+             10: "assets/estate/models/tier2-lv10.glb" },
     blurb: "A balcony, and something growing on it." },
   { at: 11, name: "The townhouse",   art: "assets/estate/items/tier3.webp",
     model: "assets/estate/models/tier3.glb",
