@@ -108,11 +108,70 @@ A worked arc, the bedsit's, which is a story rather than five variations:
 Furniture → floor → walls → structure. Each step is a larger area than the last, so the tier
 builds rather than plateaus.
 
+### WHERE the change goes decides whether it survives
+
+This is the rule that cost the most to find, it is not intuitive, and it belongs beside the
+contrast rule rather than below it: **put the one change where the camera can see it, not where it
+belongs.**
+
+The reference image is a 2D cutaway and shows the whole interior unobstructed. The mesh is not. A
+first-floor slab overhangs the ground floor, so an object placed sensibly — a sofa against the back
+wall, where a person would actually put one — sits in a pocket the 38° camera barely sees, and
+image-to-3D has almost no information about it. The flat's level 7 sofa was lost three times from
+that one position: once as a teal smear with a grey shard through the room, once as a deformed
+building with a blue spike across the terrace, and once as a clean building with **the sofa simply
+absent**. Moving it to the open front edge of the floor, clear of the overhang, and saying so in
+the prompt, fixed it on the next conversion.
+
+**Exposure decides reliability, not size and not colour.** Ranked, from what has been observed
+across three tiers:
+
+| where the change is | how it converts |
+|---|---|
+| above the roofline, breaking the silhouette | every time |
+| the open front edge of a floor | usually |
+| back walls, and the slab under an overhang | this is where changes quietly disappear |
+
+Budget a second conversion for anything in that last row, and say "hard against the open cutaway
+edge" in the prompt for every interior change. The townhouse is four storeys of enclosed rooms and
+three of its four steps are interior; stating the placement explicitly in every prompt is what made
+12, 13 and 14 read at all.
+
+### The loudest step in a band is the one that sticks out of the building
+
+Observed twice, so treat it as a rule rather than a coincidence. The flat's band is carried by the
+level 10 **pergola**; the townhouse's by the level 15 **awning and signwriting**. Both project from
+the building, so nothing occludes them from any angle, and both change the **silhouette** rather
+than the contents — which is what actually reads when the estate is 200 px wide.
+
+So when a band needs one step to land, spend it on something that breaks the outline. And this is
+a second reason the arc ends on *structure*: it is the rung most likely to survive, so it is the
+right one to finish on.
+
+### Two failures that look alike and are not
+
+- **Dimensional drift** — the footprint wandering a few percent between levels. Expected, not
+  fixable with this pipeline, not worth a retry. See the foot of this file.
+- **A change vanishing entirely** — the building converts cleanly and the thing you asked for is
+  simply not there. This is a *failure*, it is worth a retry every time, and it is the one that
+  looks like success: nothing is malformed, the mesh is clean, and only comparing it against the
+  previous level shows that nothing happened.
+
+Do not let the first excuse the second. **Check every asset against the level before it in
+`tools/estate-levels.html` before committing** — a lost change is invisible in a diff and invisible
+in the mesh on its own.
+
 ### Choosing between the two variants
 
 Prefer the one with the **lower walls and the more open floor**: it occludes less at 38°, it
 reconstructs better, and it leaves more room for whatever ends up standing in it. Reject anything
 that closed itself back up. A door is four pixels at board scale and a room is not.
+
+The same judgement applies to the two **conversions**, and it is not the same question. Take the
+mesh where the ONE CHANGE is crisp, even if another sample is better everywhere else: a warmer
+floor with mangled sofa cushions is the worse asset when the sofa is the whole point of the level.
+And a softer complete mesh beats a sharper one that has lost something — the flat's level 9 was
+kept as its first sample for exactly that reason, after a retry came back with the kitchen mush.
 
 ## Step 2: cut out the background
 

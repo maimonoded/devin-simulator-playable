@@ -61,6 +61,27 @@ Colour still does the heavy lifting at 200 px. Tier 1's blue blanket carried lev
 was the only saturated colour in the band. Give each band one or two colours it did not have
 before and let those arrive with the new thing.
 
+## What tiers 2 and 3 taught, which the remaining bands should use
+
+Three findings came out of building the flat and the townhouse. They are in the skill in full;
+here is what they mean for the bands still to do.
+
+**Say where the change goes, in every prompt.** Not where the object belongs — where the camera
+can see it. "Hard against the open cutaway edge, clear of the floor above" is the phrase. An
+interior change tucked under an overhang is the one place image-to-3D reliably loses things, and
+the townhouse only reads because all three of its interior steps were pushed to the open edge.
+
+**The structure rung carries the band, so make it project.** The flat's pergola and the
+townhouse's awning are the two loudest steps built so far, both because they stick out of the
+building and change its silhouette rather than its contents. Each remaining band's last rung
+already has something that projects — the apartment's canopy, the penthouse's cabana, the villa's
+guest pavilion — so lean into those rather than treating them as dressing.
+
+**Retry a vanished change; do not retry drift.** A clean mesh with the change simply absent is a
+failure and worth another conversion every time. A footprint a few percent off is not. The first
+looks like success, which is why every asset has to be stepped against the one before it in
+`tools/estate-levels.html` before it is committed.
+
 ## The twenty, by band
 
 Each line is the ONE change for that level. Everything else in the prompt is a list of what stays,
@@ -176,10 +197,15 @@ roughly 60 MB, and the whole `assets/` directory past 130 MB. Runtime memory is 
 evicts everything but the drawn tier, the current and the pre-fetched next — but the repository
 grows and does not shrink. **Worth confirming this is acceptable before starting, not after.**
 
-**Drift is expected and is not a bug to chase.** Each file is an independent reconstruction, so
-levels within a band differ slightly everywhere, not only in the thing that changed. Tier 1's
-footprints ran 0.835 → 0.860 → 0.922 → 0.854 → 0.906, up to 10% off and not monotonic. The fog
-hides it in play. If it ever becomes intolerable the fix is per-level props on a fixed room, which
+**Dimensional drift is expected and is not a bug to chase.** Each file is an independent
+reconstruction, so levels within a band differ slightly everywhere, not only in the thing that
+changed. Tier 1's footprints ran 0.835 → 0.860 → 0.922 → 0.854 → 0.906, up to 10% off and not
+monotonic. The fog hides it in play.
+
+**That is not the same as a change vanishing**, and the two must not be confused — an earlier
+version of this sentence did confuse them, and may have cost a retry. A building that converts
+cleanly with the new thing simply absent is a failure, not drift, and is worth another conversion
+every time. If it ever becomes intolerable the fix is per-level props on a fixed room, which
 is written up at the foot of the skill — but that is a rebuild, not an adjustment.
 
 ## If you have budget for only some of it
