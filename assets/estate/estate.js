@@ -179,6 +179,14 @@ const ESTATE_TIERS = [
             rather than more furniture
         23  an inlaid deco sunburst floor in black, cream and brass across the whole lounge
         24  the lounge walls refaced in fluted gold leaf, and a deco chandelier over the piano
+        25  the roof deck rebuilt: a cabana, a sunken hot tub, more neon, the bar in brass
+            and onyx
+
+       23 is the better of the two interior surfaces and the reason is worth carrying: it is a
+       large area of high-contrast PATTERN rather than of a single colour, and pattern survives
+       being shrunk to two hundred pixels where a flat tint does not. The flat's plain blue
+       floor at level 8 needed a second conversion; this one did not. Where a step has to be an
+       interior surface, give it a pattern.
 
        The plan asks for that banquette in EMERALD. Emerald was wrong twice over: teal-and-gold
        is already this tier's signature accent, so an emerald piece blends into the wall it
@@ -187,7 +195,8 @@ const ESTATE_TIERS = [
        against what the tier already owns before spending them. */
     levels: { 22: "assets/estate/models/tier5-lv22.glb",
               23: "assets/estate/models/tier5-lv23.glb",
-              24: "assets/estate/models/tier5-lv24.glb" },
+              24: "assets/estate/models/tier5-lv24.glb",
+              25: "assets/estate/models/tier5-lv25.glb" },
     blurb: "The pool is on the roof. So is everyone else." },
   { at: 26, name: "The villa",       art: "assets/estate/items/tier6.webp",
     model: "assets/estate/models/tier6.glb",
