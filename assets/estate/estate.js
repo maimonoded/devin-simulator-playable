@@ -140,6 +140,35 @@ const ESTATE_TIERS = [
     blurb: "Bay windows. Brass on the door." },
   { at: 16, name: "The apartment",   art: "assets/estate/items/tier4.webp",
     model: "assets/estate/models/tier4.glb",
+    /* New-built and cold, so the contrast is LIVED IN against showroom-empty:
+
+        17  a burnt orange sectional and a patterned rug on the open pool terrace
+        18  honey oak floors throughout, and a dark green-black marble kitchen island
+        19  the feature wall refaced in charcoal slate, with a long ribbon fireplace
+        20  the terraces landscaped: an outdoor kitchen, a dining canopy, mature planting
+
+       The plan's own suggestions had to be inverted here, and the reason generalises: it asks
+       for pale stone floors and a large pale sectional in a building that is already entirely
+       pale stone and pale sectionals. A colour named in a plan written away from the reference
+       is a coin flip — name the CONTRAST in the plan and pick the colour in front of the art.
+       So this tier spends warmth and darkness against cream: rust, honey, then charcoal, which
+       is the first dark mass the apartment has ever had.
+
+       This tier is also the hardest to put anything INSIDE. It is mostly glass, and glass
+       reconstructs as an opaque smear — the shipped tier4.glb has it too, so it is the tier's
+       established look rather than something these levels introduced. That is why all three
+       interior steps lean on a whole surface (a floor finish, a wall) rather than an object:
+       a prop in these rooms would be wasted work. Level 17 sits on the open sky-facing terrace
+       for the same reason.
+
+       One known defect, recorded rather than hidden: 17's mesh dropped the turquoise pool. A
+       retry brought the pool back but washed the sofa from burnt orange to cream, which loses
+       the step itself rather than a landmark, so the first was kept. Losing the landmark is the
+       better of the two — the step is why the file exists — but it is a real loss. */
+    levels: { 17: "assets/estate/models/tier4-lv17.glb",
+              18: "assets/estate/models/tier4-lv18.glb",
+              19: "assets/estate/models/tier4-lv19.glb",
+              20: "assets/estate/models/tier4-lv20.glb" },
     blurb: "The terrace wraps all the way round." },
   { at: 21, name: "The penthouse",   art: "assets/estate/items/tier5.webp",
     model: "assets/estate/models/tier5.glb",
