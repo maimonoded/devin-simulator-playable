@@ -23,8 +23,16 @@ const DEFAULTS={
      back as the plaque, and only then does the track run. Staged, because two things moving at
      once means neither is watched. */
   statusCardMs:620, statusFlipMs:460,
-  /* A collected clue shrinking into the slot it filled on the objective tracker. */
-  clueFlyMs:460,
+  /* WHERE A CARD GOES WHEN ITS BEAT ENDS. A clue shrinks into the slot it filled on the
+     objective tracker; every other card shrinks into the collection button, because that is
+     where it now is. Both are one argument: "I was given a thing" and "a counter moved" are two
+     events in two places, and the flight is what makes the player read them as one. */
+  clueFlyMs:460, cardFlyMs:460,
+  /* ...AND ONLY THEN DOES THE HUD TRACK MOVE. Status is banked before the beat that reports it
+     is built, so without a hold the bar has already moved by the time the player looks at the
+     card that paid for it -- the effect arriving before its cause. hudStatusMs is the bar's run
+     and hudStatusHoldMs how long the highlight lingers after it lands. */
+  hudStatusMs:820, hudStatusHoldMs:420,
   vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
   /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
      whole journey rather than a per-tile speed. */
@@ -371,6 +379,9 @@ const TUNING=[
    ["cardConvertMs","…and its third copy, out of a box (ms)",100],
    ["clueHoldMs","Clue card held — tap it to hold (ms)",100],
    ["clueFlyMs","Clue flies into the tracker (ms)",20],
+   ["cardFlyMs","Card flies into the collection (ms)",20],
+   ["hudStatusMs","HUD track: the bar moves (ms)",20],
+   ["hudStatusHoldMs","HUD track: highlight lingers (ms)",20],
    ["statusCardMs","Convert: card held before the turn (ms)",20],
    ["statusFlipMs","Convert: the turn itself (ms)",20],
    ["vipRevealMs","Gala: dwell before moving on (ms)",100],

@@ -6,7 +6,21 @@
    unlock → set complete → pause. Everything from `card` down blocks the roll loop (and
    therefore auto-play) until it finishes. */
 async function playEvents(events){
+  /* THE HUD TRACK IS PINNED BEFORE THE LIST IS PLAYED, not at the card that pays.
+
+     A card does not arrive alone: drawCardEvents puts its float and its log line FIRST and the
+     beat second — one draw, two events — and the float calls renderHUD. Pinning at the card
+     would therefore be exactly one event too late, and the bar would have finished moving
+     before the card that moved it was ever on screen. Which is the bug this exists to fix.
+
+     Scanned rather than assumed, because only a card that PAYS is worth holding the HUD for.
+     js/ui/fx.js holdStatusChip; the release is after the beat below. */
+  const paying=events.find(e=>e.card&&+e.card.status>0);
+  if(paying) holdStatusChip(paying.card);
   for(const ev of events){
+    /* A SECOND paying card later in the same list gets its own hold — the guard inside
+       holdStatusChip makes this a no-op while one is already up. */
+    if(ev.card) holdStatusChip(ev.card);
     /* renderHUD on a float too, not only on the blocking beats. A box pays out entirely in
        state changes, so without this the coin and card counters would sit still through the
        whole collection and only jump at the end of the roll — which reads as "I collected it
@@ -16,7 +30,15 @@ async function playEvents(events){
     if(ev.move){ for(const p of ev.move.path){ state.pos=p; positionToken(); await sleep(ev.move.stepMs); } }
     if(ev.confetti) confetti();
     if(ev.dice) diceConfetti();
-    if(ev.card){ renderHUD(); await showCard(ev.card); }
+    /* …and released only once the card has gone, so the bar moves against a clear screen and
+       reads as the consequence of the card rather than as something that happened beside it.
+       The finally is what makes a stale pin impossible: showCard resolves on a timer, but a
+       throw anywhere inside it would otherwise leave the HUD frozen for the session. */
+    if(ev.card){
+      renderHUD();
+      try{ await showCard(ev.card); }
+      finally{ await releaseStatusChip(); }
+    }
     if(ev.reveal){ renderHUD(); await showReveal(ev.reveal); }
     if(ev.collect){ renderHUD(); await showCollect(ev.collect); }
     /* A box: closed, tapped or opened by its own timer, then its cards one at a time.

@@ -219,7 +219,14 @@ function renderEnergy(){
    session and a band moves once every five; a bar that never visibly fills is not a bar. */
 function renderStatusChip(){
   const el=$("#hLevelPill"); if(!el) return;
-  const pts=Status.points(), rank=Status.rank(pts), lv=Status.level(pts);
+  /* PINNED? Then draw an older reading of the truth, and leave state.lastStatus alone.
+     A card beat holds the chip so the bar cannot finish moving before the player has been shown
+     the card that moved it — status is banked while the event list is built, which is well
+     before the beat opens. releaseStatusChip (js/ui/fx.js) runs the bar afterwards and calls
+     this again to settle on the real number. Nothing is stored: Status.points() is the truth
+     throughout, and the pin is only ever a value to DRAW. */
+  const held=typeof statusHeldPoints==="function"?statusHeldPoints():null;
+  const pts=held!=null?held:Status.points(), rank=Status.rank(pts), lv=Status.level(pts);
   /* The LEVEL is the value and the band is its label, which is the right way round for a pill:
      the number moves several times a session, the band once every five levels. */
   $("#hLevel").textContent=lv;
@@ -229,8 +236,9 @@ function renderStatusChip(){
   const ri=$("#hRankIco");
   if(ri){ ri.className="ic i-rank i-rank-"+(rank.key||"extra"); ri.title=rank.name; }
   $("#hRankFill").style.width=Math.round(Status.levelProgress(pts)*100)+"%";
-  /* Pop when the number moves, since the chip is small and easy to miss. */
-  if(state.lastStatus!==pts){
+  /* Pop when the number moves, since the chip is small and easy to miss. Not while pinned —
+     the release owns that move and gives it a louder one than this. */
+  if(held==null&&state.lastStatus!==pts){
     el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
     state.lastStatus=pts;
   }

@@ -713,6 +713,20 @@ html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12
   background-size:cover;background-position:center;
   box-shadow:0 8px 22px rgba(0,0,0,.5);
   transition:transform var(--flyMs,460ms) cubic-bezier(.45,0,.25,1), opacity var(--flyMs,460ms) ease-in}
+
+/* THE CARD IN FLIGHT, into the collection button it just joined. The clue flight above borrows a
+   picture because it lands in an eleven-pixel slot, where a frame is one pixel of noise; the
+   album button is big enough to show what arrived, so this carries the whole cloned face.
+
+   The landing pop lives here rather than beside .btn.album in board.css: the flight and the thing
+   it lands on are one behaviour, and splitting them across two files is how one of them gets
+   changed alone. collection.css loads after board.css, so it wins on order without inflating the
+   selector. */
+.cardFly{position:fixed;z-index:60;pointer-events:none;
+  transition:transform var(--flyMs,460ms) cubic-bezier(.45,0,.25,1), opacity var(--flyMs,460ms) ease-in}
+.cardFly .ccard{margin:0}
+@keyframes albumLand{0%{transform:scale(1)}40%{transform:scale(1.2)}100%{transform:scale(1)}}
+.btn.album.land{animation:albumLand .42s cubic-bezier(.2,1.6,.4,1)}
 /* Ready is the one state worth acting on, so it is the one state that looks like a button. */
 .epTrack.ready{border-color:var(--pink);background:rgba(60,18,50,.9);cursor:pointer;
   box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 18px rgba(255,111,165,.26)}

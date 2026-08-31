@@ -223,6 +223,42 @@ roll  →  land        →  DRAW one row from that tile's pool     (js/pools.js)
    twelve cards of one SET  →  its display piece, which is the set's rarest Collectible
 ```
 
+**A REWARD IS SHOWN WHERE IT WENT, AND THE COUNTER MOVES LAST.** Both halves of a landing used
+to end the same way: the card simply stopped existing, and somewhere else a number was already
+different. Two events, in two places, with the join left to the player.
+
+So every card now *goes somewhere*. A clue shrinks into the slot it fills on the objective
+tracker (`flyCluesToTracker`); every other card shrinks into the collection button it just joined
+(`flyCardToAlbum`) — the whole cloned face, not a borrowed picture, because that button is big
+enough to show what landed in it. Both are in `js/ui/fx.js`, both are `position:fixed` because
+the centre overlay and the toolbar are different stacking contexts and anything animating between
+two trees would be clipped by one of them, and both resolve on a **timer** rather than a
+`transitionend`, which never arrives in a background tab.
+
+**And the HUD track is PINNED for the duration.** Status is banked while the event list is being
+*built*, and `playEvents` renders the HUD before it opens a card — so the bar had finished moving
+before the card that paid for it was ever on screen. `holdStatusChip` pins the chip at the value
+it is already displaying, `renderStatusChip` draws that older reading while the pin is up, and
+`releaseStatusChip` runs the bar afterwards against a clear screen: the card flies away, *then*
+the bar fills and the pill lights up.
+
+Three things about it are load-bearing:
+
+- **The pin goes in before the list is played, not at the card that pays.** A card does not
+  arrive alone — `drawCardEvents` puts its float and log line first and the beat second — and the
+  float calls `renderHUD`. Pinning at the card is exactly one event too late, which is the bug
+  this exists to fix.
+- **The pin is a value to DRAW, never a value that is stored.** `Status.points()` stays the truth
+  throughout, so there is no second copy of the number to drift from.
+- **A level crossed cannot be one move.** The new level starts near empty, so animating straight
+  to the new fraction runs the bar *backwards* across everything just earned. It fills to the top
+  of the old level, the level turns over, and it fills again from the bottom of the new one — the
+  same two moves, for the same reason, as the conversion ribbon in `js/ui/statusup.js`.
+
+A `finally` around the beat releases the pin, because a pin that is never let go is a HUD quietly
+showing the wrong number for the rest of the session — and `holdStatusChip` arms a watchdog on
+top of that, since nothing about a stale number looks broken.
+
 **Unlocking and watching are two different gates.** Which clues fall is luck, so pages fill in
 whatever order they fill — page 2 can complete first. Watching cannot work that way: the drama is
 serialised, and episode 2's prediction question gives away episode 1. So a page filling *unlocks*

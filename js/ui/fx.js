@@ -198,6 +198,198 @@ function flyCluesToTracker(fromEl, n){
   return sleep(ms + 80 + (empty.length - 1) * 60);
 }
 
+/* A CARD, SHRINKING INTO THE COLLECTION IT JOINED.
+
+   The clue flight's argument applied to the other half of the draw. A card is held at full size
+   in the middle of the board and then simply stops existing, while somewhere else entirely a
+   counter moves. Flying it into the album button says the two were one event, and answers the
+   question a collection game cannot afford to leave hanging: where did that just go.
+
+   THE WHOLE CARD FLIES, not a picture of it. flyCluesToTracker builds a plain div and borrows the
+   art, which is right for a slot eleven pixels wide -- at that size a frame is one pixel of noise.
+   The album button is several times that, so this clones the face: frame, badge, count and all,
+   and the thing that lands is recognisably the thing that was read.
+
+   position:fixed for the same reason the clue flight uses it -- the centre overlay and the
+   toolbar are different stacking contexts, and an element animating BETWEEN two trees would be
+   clipped by whichever one it was parented to. Resolved on a timer for the same reason too: a
+   transitionend never arrives in a background tab, and a flight that never resolves hangs the
+   roll loop waiting behind it. */
+function flyCardToAlbum(fromEl){
+  const btn = $("#albumBtn");
+  const src = fromEl && fromEl.querySelector(".ccard");
+  const ms  = Math.max(0, +cfg.cardFlyMs || 0);
+  if(!btn || !src || !ms || document.hidden) return Promise.resolve();
+  const a = src.getBoundingClientRect(), b = btn.getBoundingClientRect();
+  /* A button scrolled out of the layout measures zero, and scaling to zero is a card that
+     vanishes on the spot -- worse than no flight at all, because it reads as a dropped frame. */
+  if(!a.width || !b.width) return Promise.resolve();
+
+  const fly = document.createElement("div");
+  fly.className = "cardFly";
+  fly.style.cssText = `left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px;` +
+                      `--flyMs:${ms}ms`;
+  /* The clone is SIZED IN PIXELS before it leaves. `.centerfx.card .ccard` is what gave it its
+     width, and that selector does not reach document.body -- so an unsized clone would snap to
+     its default the instant it was appended, and the flight would start from the wrong card. */
+  const clone = src.cloneNode(true);
+  clone.style.width = a.width + "px";
+  clone.style.height = a.height + "px";
+  clone.style.margin = "0";
+  fly.appendChild(clone);
+  document.body.appendChild(fly);
+
+  /* nextPaint, not a bare rAF: the start and end transforms have to land in two different style
+     recalcs or the transition never runs, and rAF is suspended in a hidden tab. */
+  nextPaint(() => {
+    /* Centre onto centre, then scale to sit INSIDE the button rather than cover it. The default
+       transform-origin is the element's middle, which is what makes those two the same move. */
+    const s = Math.min(b.width / a.width, b.height / a.height) * 0.8;
+    fly.style.transform =
+      `translate(${b.left + b.width / 2 - (a.left + a.width / 2)}px,` +
+      `${b.top + b.height / 2 - (a.top + a.height / 2)}px) scale(${s})`;
+    fly.style.opacity = ".25";
+  });
+  setTimeout(() => {
+    fly.remove();
+    /* The button takes the hit, so the flight lands ON something instead of ending at nothing. */
+    btn.classList.add("land");
+    setTimeout(() => btn.classList.remove("land"), 420);
+  }, ms + 20);
+  return sleep(ms + 40);
+}
+
+/* ---------- THE HUD TRACK: HELD, THEN RUN ----------
+
+   Status is banked while the event list is being BUILT, and playEvents renders the HUD before it
+   opens a card. So the bar had already finished moving by the time the player was looking at the
+   card that paid for it: the effect arrived before its cause, and the one number the whole loop
+   feeds moved while there was something else on screen to look at.
+
+   So it is pinned for the duration of a card beat and run afterwards, against a screen with
+   nothing left on it -- three moves in the order the events actually happened: the card flies
+   into the collection, the bar fills, the pill lights up.
+
+   THE PIN IS A DISPLAYED VALUE, NEVER A STORED ONE. Status.points() stays the truth throughout;
+   renderStatusChip simply draws an older reading of it while the hold is up. Nothing here can
+   drift, because there is no second copy of the number to drift from. */
+let hudHold = null, hudHoldTimer = null;
+
+/* What renderStatusChip should draw instead of the live total, or null for the truth. It lives
+   here rather than in render.js because index.html loads fx.js first and a file may only use
+   globals defined above it (CLAUDE.md). */
+function statusHeldPoints(){ return hudHold; }
+
+/* Pin the chip at WHAT IT IS ALREADY SHOWING. state.lastStatus is exactly that -- the value the
+   chip was last drawn with -- so the pin needs no reading of its own and cannot disagree with
+   what is on screen. Only for a beat that actually pays: pinning on a clue would freeze the HUD
+   for nothing. */
+function holdStatusChip(c){
+  if(!c || !(+c.status > 0) || hudHold != null) return;
+  hudHold = state.lastStatus != null ? state.lastStatus : Status.points();
+  /* A WATCHDOG, because a pin that is never released is a HUD quietly showing the wrong number
+     for the rest of the session -- the exact class of bug this codebase treats as worse than a
+     crash, since nothing about it looks broken. releaseStatusChip clears it on every normal
+     path; nothing else has to remember to. */
+  clearTimeout(hudHoldTimer);
+  hudHoldTimer = setTimeout(() => { hudHold = null; renderStatusChip(); }, 15000);
+}
+
+/* Let it go, and show it going. Resolves when the bar has landed, so the roll loop waits for
+   this the way it waits for every other beat. */
+function releaseStatusChip(){
+  const from = hudHold;
+  hudHold = null; clearTimeout(hudHoldTimer);
+  if(from == null) return Promise.resolve();
+
+  const to = Status.points();
+  const el = $("#hLevelPill"), fill = $("#hRankFill");
+  const auto = typeof autoMode !== "undefined" && autoMode === "session";
+  const ms = Math.max(0, +cfg.hudStatusMs || 0);
+  /* Nothing to watch, nobody watching, or no time to watch it in -- settle and move on. */
+  if(!el || !fill || to <= from || auto || !ms || document.hidden){
+    renderStatusChip(); return Promise.resolve();
+  }
+
+  /* The chip's own bump fires on state.lastStatus moving. Claim the move here so it does not
+     also fire: a small pop competing with the highlight makes two vague animations out of one
+     clear one. */
+  state.lastStatus = to;
+
+  const hold = Math.max(0, +cfg.hudStatusHoldMs || 0);
+  const lvFrom = Status.level(from), lvTo = Status.level(to);
+  const levelled = lvTo > lvFrom;
+  const pct = p => Math.round(Status.levelProgress(p) * 100) + "%";
+
+  el.classList.remove("bump");
+  el.classList.add("gain");
+  hudGainFloat(el, to - from);
+
+  fill.style.transition = "none";
+  fill.style.width = pct(from);
+
+  const timers = [];
+  const later = (fn, t) => timers.push(setTimeout(fn, t));
+
+  nextPaint(() => {
+    if(!levelled){
+      fill.style.transition = `width ${ms}ms cubic-bezier(.2,.9,.3,1)`;
+      fill.style.width = pct(to);
+      return;
+    }
+    /* A LEVEL CROSSED CANNOT BE ONE MOVE. The new level starts near empty, so animating straight
+       to the new fraction runs the bar BACKWARDS across everything that was just earned. It fills
+       to the top of the level they were in, the level turns over, and it fills again from the
+       bottom of the new one -- the same two moves the conversion ribbon makes, for the same
+       reason (js/ui/statusup.js). */
+    const half = Math.max(1, Math.round(ms * 0.45));
+    fill.style.transition = `width ${half}ms cubic-bezier(.3,.8,.4,1)`;
+    fill.style.width = "100%";
+    later(() => {
+      const rank = Status.rank(to);
+      const lvEl = $("#hLevel"), nmEl = $("#hRank"), ico = $("#hRankIco");
+      if(lvEl) lvEl.textContent = lvTo;
+      if(nmEl) nmEl.textContent = rank.name;
+      /* className, not textContent: the icon is a background image on a span, and writing text
+         into it would put a glyph back where a picture is meant to be. */
+      if(ico){ ico.className = "ic i-rank i-rank-" + (rank.key || "extra"); ico.title = rank.name; }
+      el.classList.add("levelled");
+      fill.style.transition = "none"; fill.style.width = "0%";
+      nextPaint(() => {
+        fill.style.transition = `width ${ms - half}ms cubic-bezier(.2,.9,.3,1)`;
+        fill.style.width = pct(to);
+      });
+    }, half + 40);
+  });
+
+  return new Promise(resolve => {
+    /* On a timer like every other beat here. A transitionend never arrives in a background tab,
+       and the whole point of this function is that the roll waits for it. */
+    setTimeout(() => {
+      timers.forEach(clearTimeout);
+      el.classList.remove("gain", "levelled");
+      fill.style.transition = "";
+      renderStatusChip();
+      resolve();
+    }, ms + hold + 60);
+  });
+}
+
+/* "+30", rising off the pill that just moved. The bar says how far along the level they now are;
+   this says how much just arrived, which is the number the player is actually counting. Fixed
+   rather than parented to the pill, because the HUD clips its own overflow. */
+function hudGainFloat(el, n){
+  if(!(n > 0)) return;
+  const r = el.getBoundingClientRect();
+  const f = document.createElement("div");
+  f.className = "hudGain";
+  f.textContent = "+" + fmt(Math.round(n));
+  f.style.left = (r.left + r.width / 2) + "px";
+  f.style.top  = r.top + "px";
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 1300);
+}
+
 /* A BIGGER CONFETTI, for the beat that earns one. confetti() is 40 pieces in one wave, which is
    right for an ordinary win and reads as a shrug when the moment is the third copy of a trophy.
    Three staggered waves from a wider spread, so it is still falling while the player reads the
@@ -366,8 +558,17 @@ function showCard(c){
       if(done) return; done=true;
       clearTimeout(to);
       /* The flight starts from the card while it is STILL ON SCREEN — its rect is read before
-         the overlay is emptied, or there is nothing to measure and nowhere to fly from. */
-      const flight=clue?flyCluesToTracker(el,drops.length):null;
+         the overlay is emptied, or there is nothing to measure and nowhere to fly from.
+
+         A clue goes to the slot it filled on the tracker; every other card goes to the collection
+         button, because that is where it now is. A card with no face — the plain playcard a twist
+         hands over — flies nowhere, and flyCardToAlbum returns straight away for it.
+
+         Guarded, because this is the only path that resolves the beat: a throw here would leave
+         the promise pending and the roll loop stopped behind an empty overlay. */
+      let flight=null;
+      try{ flight=clue?flyCluesToTracker(el,drops.length):flyCardToAlbum(el); }
+      catch(err){ flight=null; }
       el.className="centerfx"; el.innerHTML="";
       if(flight) flight.then(resolve); else resolve();
     };

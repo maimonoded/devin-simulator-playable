@@ -102,6 +102,37 @@ input{font-family:inherit}
 .pill.lvl .rkFill{display:block;height:100%;border-radius:999px;
   background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}
 .pill.lvl.bump{animation:chipBump .5s cubic-bezier(.2,1.5,.4,1)}
+
+/* ---- THE TRACK MOVING ----
+   What a card just paid, shown AFTER the card has gone rather than behind it (releaseStatusChip
+   in js/ui/fx.js). The pill is small and at the edge of vision, so the highlight has to be loud
+   enough to pull the eye back to a corner the player had stopped looking at: gold instead of
+   teal, a glow around the whole pill, and the amount rising off the top of it. */
+.pill.lvl.gain{border-color:var(--gold);
+  box-shadow:0 0 0 1px rgba(255,203,92,.45), 0 0 22px rgba(255,203,92,.4);
+  transition:box-shadow .25s ease, border-color .25s ease}
+.pill.lvl.gain .rkBar{background:rgba(0,0,0,.55)}
+.pill.lvl.gain .rkFill{background:linear-gradient(90deg,var(--gold-d),var(--gold),#fff2cf);
+  box-shadow:0 0 8px rgba(255,203,92,.9)}
+.pill.lvl.gain .v{color:#fff2cf;text-shadow:0 0 12px rgba(255,203,92,.7)}
+/* A LEVEL TURNING OVER is a bigger event than points arriving, and the bar cannot say so — it has
+   just refilled from empty, which on its own looks like the move never happened. The number and
+   the band's icon are what changed, so they are what pops. Origin left, because the pill is
+   text-aligned left and scaling about the centre would slide the digit sideways. */
+@keyframes lvlFlip{0%{transform:scale(1)}35%{transform:scale(1.35)}100%{transform:scale(1)}}
+.pill.lvl.levelled .v{animation:lvlFlip .45s cubic-bezier(.2,1.6,.4,1);transform-origin:left center}
+.pill.lvl.levelled .ic{animation:lvlFlip .45s cubic-bezier(.2,1.6,.4,1) .06s both}
+/* The amount, rising off the pill. position:fixed because the HUD clips its own overflow, so a
+   number leaving the pill would be cut off at the edge of the bar it came from. */
+.hudGain{position:fixed;z-index:70;pointer-events:none;
+  font:800 15px/1 "Segoe UI",system-ui,-apple-system,sans-serif;color:var(--gold);
+  text-shadow:0 2px 10px rgba(0,0,0,.85), 0 0 14px rgba(255,203,92,.6);
+  animation:hudGainRise 1.2s cubic-bezier(.2,.8,.3,1) forwards}
+@keyframes hudGainRise{
+  0%{opacity:0;transform:translate(-50%,4px) scale(.7)}
+  18%{opacity:1;transform:translate(-50%,-6px) scale(1.12)}
+  40%{opacity:1;transform:translate(-50%,-14px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-34px) scale(1)}}
 .energywrap{min-width:190px}
 .ebar{height:9px;background:#10143a;border-radius:6px;overflow:hidden;margin-top:5px;border:1px solid var(--line)}
 .efill{height:100%;background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}
