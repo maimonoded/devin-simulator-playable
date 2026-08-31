@@ -175,5 +175,29 @@ const ESTATE_TIERS = [
     blurb: "The pool is on the roof. So is everyone else." },
   { at: 26, name: "The villa",       art: "assets/estate/items/tier6.webp",
     model: "assets/estate/models/tier6.glb",
+    /* The top of the track, so the contrast is ESTATE-SCALE against merely-enormous — the
+       island is already huge at 26 and cannot get more expensive, only more considered:
+
+        27  the great rooms furnished: an oxblood banqueting table, a packed library wall,
+            four-posters, chandeliers
+        28  formal gardens across the terraces: box parterres, fountains, statuary, lit walks
+        29  a glass-and-stone guest pavilion on the seaward shelf, with its own small pool
+        30  the crown — the whole island lit, and a second, larger yacht at the jetty
+
+       Level 30 is the Season gate and is the one level allowed to change the light of the
+       whole piece. Two things made it work rather than go muddy. It is written as a brilliantly
+       lit island at golden DUSK and not as a night scene, with the white marble, planting and
+       turquoise water explicitly held at daylight values — a genuinely dark reference bakes a
+       dark texture, and the engine then lights that again. And the step is anchored by a solid
+       object as well as by light: the second superyacht carries the beat even where the glow
+       does not survive, which is the hedge worth taking on any change made of illumination.
+
+       29 is the other one to keep: a whole new BUILDING on its own terrace, so the island stops
+       reading as one house on a rock. Every band so far has had its best step be the one that
+       breaks the outline, and this is the fourth. */
+    levels: { 27: "assets/estate/models/tier6-lv27.glb",
+              28: "assets/estate/models/tier6-lv28.glb",
+              29: "assets/estate/models/tier6-lv29.glb",
+              30: "assets/estate/models/tier6-lv30.glb" },
     blurb: "Clifftop. There is a helipad. There is a yacht." },
 ];
