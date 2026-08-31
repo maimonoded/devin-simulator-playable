@@ -420,6 +420,7 @@ export const Estate3D = {
           this._signSig = null;                  // the sign hangs off the plot; remeasure it
           this._body = this._swap(this._body, this._buildModel(src, tier, lv));
           this._bodyTier = tier;
+          this._sweep();
         }
       }
       /* While the cloud is THICKENING, the sign holds its old name: the plaque and the house
@@ -489,6 +490,54 @@ export const Estate3D = {
     }
     if (next) g.add(next);
     return next || null;
+  },
+
+  /* ---------------- letting go of a tier ----------------
+
+     WHY THIS EXISTS. Each tier's building carries one baked 4096² texture — about 89 MB once the
+     GPU has decoded it and built its mips, against 2 MB on disk. Six tiers is 15 MB of repository
+     and about 537 MB of video memory, and a Season walks the player through all six. Keeping
+     every tier it had ever seen is what the cache did at first: fine on a desktop, a crash on a
+     phone, and invisible in every check that looks at file sizes.
+
+     WHY IT IS NOT SIMPLY "DISPOSE THE OLD ONE". The cached scene is what every clone is made
+     from, and THREE's clone() shares geometry, while a cloned material shares its `.map`. So the
+     source owns the two expensive things and the clone standing on the board is borrowing them:
+     dispose the source while its clone is on screen and the estate turns into untextured noise.
+     _swap() therefore disposes a clone's materials and nothing else, and eviction waits until
+     nothing is borrowing.
+
+     `keep` is what makes that wait unnecessary to reason about at the call site: whatever the
+     BODY was built from is always kept, whether or not the level still agrees with it. That
+     covers both windows where the two disagree — the fog, where the new tier is current while
+     the old house is still standing, and the hold, where the new tier's file has not arrived. */
+  _evict(url){
+    const scene = this._models.get(url);
+    if (!scene) return;
+    this._models.delete(url);
+    scene.traverse(o => {
+      if (!o.isMesh) return;
+      if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+        if (!m) return;
+        if (m.map && m.map.dispose) m.map.dispose();
+        if (m.dispose) m.dispose();
+      });
+    });
+  },
+
+  /* Keep what is drawn, where the player is, and where they are going next; drop the rest.
+     Called after a build rather than on a timer, because a build is exactly when the answer
+     changes. Re-reaching an evicted tier simply re-fetches it. */
+  _sweep(){
+    if (typeof Status === "undefined") return;
+    const keep = new Set();
+    const add = t => { if (t && t.model) keep.add(t.model); };
+    add(this._bodyTier);                       // borrowed by the clone on the board
+    const i = ESTATE_TIERS.indexOf(this.tierFor(Status.level()));
+    add(ESTATE_TIERS[i]);                      // where the player is
+    add(ESTATE_TIERS[i + 1]);                  // and what _preload is warming
+    Array.from(this._models.keys()).forEach(url => { if (!keep.has(url)) this._evict(url); });
   },
 
   /* The tier after this one, fetched while the player is still climbing toward it. _model()
@@ -626,6 +675,7 @@ export const Estate3D = {
     this._bodySig = `m/${lv}/${this._phone() ? "p" : "d"}`;
     this._body = this._swap(this._body, this._buildModel(src, tier, lv));
     this._bodyTier = tier;
+    this._sweep();                             // the tier we just left is nobody's now
     /* The plaque turns over with the house. _fogSwap is already null by now — _runSwap clears it
        before calling — so the gate in sync() is open and this repaints it, still under cover. */
     this._signSig = null;

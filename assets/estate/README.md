@@ -114,6 +114,21 @@ scene's key — it floodlit the front and took the teal straight out of the wall
 Paintings are portrait, 384×512, ~30 KB each. Meshes run 1.6–2.4 MB and 9.9k–10.9k triangles,
 almost all of it the baked texture. Both were generated with Scenario.
 
+**A tier is let go once nothing is borrowing it.** Each mesh carries one 4096² baked texture —
+about 2 MB on disk and about **89 MB** once the GPU has decoded it and built its mips. Six of
+those is 15 MB of repository and roughly **537 MB of video memory**, and a Season walks the player
+through all six, so a cache that simply kept everything it had loaded was fine on a desktop and a
+crash on a phone — and invisible to any check that looks at file sizes. `Estate3D._sweep()` keeps
+what is drawn, the tier the player is on, and the one being pre-fetched, and disposes the rest;
+re-reaching an evicted tier re-fetches it. Two or three resident instead of six.
+
+Why it is not simply "dispose the old one": the cached scene is what every clone is made from, and
+three.js shares geometry across `clone()` while a cloned material shares its `.map`. The source
+owns the two expensive things and the building on the board is borrowing them. `_swap()` therefore
+disposes a clone's *materials* and nothing else, and `_sweep()` always keeps whatever the body was
+built from — which is what makes it safe during the two windows where the level and the drawn
+house disagree, the fog and the load hold.
+
 The paintings stay now that every tier is modelled, and they are not dead weight: they are what
 the board shows if a GLB fails to load, which turns a broken file into a picture rather than an
 empty middle. Keep each one a picture of the estate its model shows.
