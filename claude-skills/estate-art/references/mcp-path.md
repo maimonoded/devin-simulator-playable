@@ -3,6 +3,27 @@
 Pinned. Swapping a model mid-set changes the look of the set, so these ids are as much part of the
 asset contract as the file format is.
 
+## 0. Two things about the transport that will cost you money
+
+**`wait: true` does not work.** MCP calls on at least some hosts are capped at 60 seconds and a
+conversion takes two to three minutes, so `wait: true` returns a timeout **even though the job was
+created and is running perfectly well**. `jobs_wait` times out the same way. The dangerous part is
+that a timeout looks like a failure, and the obvious reaction — fire it again — pays another 105 CU
+for a duplicate.
+
+    model_run(..., wait: false)   ->  job id
+    job_get(job_id)               ->  poll until status is success
+    AFTER ANY TIMEOUT: jobs_list  ->  before re-firing anything, check it is not already running
+
+**There is a rolling rate limit and it is the binding constraint on a long run** — more than
+credits, more than conversion time. After roughly forty model calls in ninety minutes an account
+began returning `429` with cooldowns of 517, 687 and 702 seconds. Once you are in it the effective
+budget is about **one model call every twelve minutes**, which turns a three-call asset into a
+forty-minute asset. Pace deliberately from the start rather than discovering this at asset twelve.
+
+**The search index lags about ten minutes behind reality.** An asset created two minutes ago is not
+in `search` at all. Take ids from the job that made them, never from a search.
+
 ## 1. Resolve team and project (once per session)
 
 OAuth callers must pass `team_id` and `project_id` on every generation call, or:
@@ -52,6 +73,25 @@ scenario:model_run(
 For a TIER the reference is the tier's own painting. For a LEVEL it is **the previous level's
 image** — that is what makes improvements accumulate rather than reset.
 
+### Finding the previous level's image when you did not make it
+
+Within a band you have just built, you hold the asset id. For the FIRST level of a band the
+reference is the tier's own cutaway, made earlier by somebody else and sitting among several
+hundred assets. **Keyword search will not find it** — the descriptions are auto-generated and all
+say something like "a cutaway view of a coastal house".
+
+The parent chain is what works: list image assets by `createdAt` descending, find the tier's
+background-removed cutout by its description, then `asset_get` it and read `metadata.parentId` —
+that is the edited image you want. `metadata.rootParentId` is the uploaded `items/tierN.webp`,
+which proves you have the right tier.
+
+Already resolved, so nobody pays that cost again:
+
+    tier 2, level 6    asset_QRqY46nBgA33HmSYAgDSuSSu
+    tier 3, level 11   asset_Fo3QS9LeNzyXeAfebtBcSgoM
+    tier 4, level 16   asset_25s8obThKyVzmcnq3wCUbApN
+    tier 1, level 1    asset_NU4ZeeDvrKYEHPSKX2WKnHvr
+
 `numOutputs: 2` and look at both. Rejection is cheap here and expensive after image-to-3D. A
 `status: "failure"` with one asset returned means one of the two failed; the other is usable.
 
@@ -85,7 +125,7 @@ scenario:model_run(
   },
   wait = false
 )
-scenario:jobs_wait(job_ids=["job_xxx"])
+scenario:job_get(job_id="job_xxx")     # poll; see section 0 on why not jobs_wait
 ```
 
 - `pbr: false` — PBR emits separate albedo/metal-rough/normal maps and **ignores the texture
@@ -108,10 +148,21 @@ curl -sL -o assets/estate/models/tier3.glb "<signed url>"
 
 Follow redirects. The url is signed and short-lived, so download promptly.
 
-## Cost
+## Cost, measured rather than estimated
 
-Each estate file is three model calls: an edit, a cutout and a conversion. The conversion is the
-expensive one at ~105 CU. A full tier with four extra levels is fifteen calls.
+Three model calls per asset is the floor, not the expectation. Retries are the variable, and they
+are a function of how much of the band lands somewhere the camera cannot see:
+
+| tier | assets | conversions | CU | per asset |
+|---|---|---|---|---|
+| 2 · the flat | 4 | 10 | ~1265 | ~316 |
+| 3 · the townhouse | 4 | 4 | ~590 | ~148 |
+| 4 · the apartment | 3 | 5 | ~700 | ~230 |
+
+Tier 3 hit the theoretical number exactly — four assets, four conversions, every one usable first
+time. Tier 2 cost more than twice that, almost all of it on one asset while the placement rule was
+being learnt. **Quote a band at 600–1300 CU**, and remember the rate limit in section 0 is what
+actually decides how long it takes.
 
 ## Alternatives worth knowing
 

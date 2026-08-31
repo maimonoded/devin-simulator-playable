@@ -81,6 +81,16 @@ bed conspicuously, almost comically NEW against a room left exactly as decayed: 
 white sheets, and a **saturated blue blanket**, the only saturated colour in the tier. Colour
 survives being 200 px wide; craftsmanship does not.
 
+**Choose that colour by looking at the tier, never in advance.** A colour named in a plan written
+away from the reference is a coin flip. A plan asked for a *terracotta* sofa in the flat, and
+terracotta is exactly the colour of that tier's existing floor tiles and splashback — the axis with
+its contrast removed; emerald went in instead, the only saturated colour the tier did not own. The
+same trap in the apartment, worse: the plan asked for "pale stone floors" and "a large pale
+sectional" in a building already entirely pale stone and pale sectionals. Burnt orange, honey oak
+and charcoal went in instead, and the charcoal fireplace wall — the first dark mass that tier had
+ever had — was the strongest single step of that run. Read the plan's AXIS, then open the reference
+and see what the tier has already spent, then choose.
+
 **Do not improve the room. Put something new IN the room and leave the room alone.** The bad fit is
 the message — this is somebody's first upgrade, not a refurbishment. Say so explicitly:
 *"Do not tidy the room. Do not repaint the walls. Do not clean the floor. The room must stay a
@@ -107,6 +117,13 @@ A worked arc, the bedsit's, which is a story rather than five variations:
 
 Furniture → floor → walls → structure. Each step is a larger area than the last, so the tier
 builds rather than plateaus.
+
+**Know what the shape costs, though.** Those rungs are also, in that order, increasingly
+**exposed**: furniture and floors are interior and half-hidden, structure is exterior and
+unmissable. So a band's most reliable and most legible step is always its last, and its most
+fragile are the two the player meets first. Budget retries accordingly — the first two rungs need
+them and the last two do not. If the shape is ever revisited, consider opening a band with
+something that touches the outline instead.
 
 ### WHERE the change goes decides whether it survives
 
@@ -163,15 +180,42 @@ in the mesh on its own.
 
 ### Choosing between the two variants
 
-Prefer the one with the **lower walls and the more open floor**: it occludes less at 38°, it
-reconstructs better, and it leaves more room for whatever ends up standing in it. Reject anything
-that closed itself back up. A door is four pixels at board scale and a room is not.
+**Do not use "lower walls and a more open floor" to choose.** That was this skill's rule and it is
+useless within a band: across seven pairs the two variants never differed meaningfully that way,
+because they are edits of one reference and the architecture is fixed. It discriminates when
+choosing a TIER's cutaway, where the composition really is in play. Not here.
+
+What the variants actually differ in, every time, is two things:
+
+- **Whether one silently deleted something it was told to keep.** One removed the plain wicker sofa
+  that was there to be clashed against; one dropped a crimson carpet and kept only the parquet; one
+  applied a new wall colour to the wrong floor.
+- **Where it put the new thing** — and by the rule above, that decides whether it survives at all.
+
+So the selection rule is: **take the variant that kept everything and put the change where it can
+be seen.**
 
 The same judgement applies to the two **conversions**, and it is not the same question. Take the
 mesh where the ONE CHANGE is crisp, even if another sample is better everywhere else: a warmer
 floor with mangled sofa cushions is the worse asset when the sofa is the whole point of the level.
 And a softer complete mesh beats a sharper one that has lost something — the flat's level 9 was
 kept as its first sample for exactly that reason, after a retry came back with the kitchen mush.
+
+### Look at the reference at 200 px before you convert it
+
+The edit comes back at 1792×2400 and everything reads beautifully in it. The estate renders about
+**200 px wide**. Shrink the candidate to that and look: it takes seconds, costs nothing, and it is
+the only check that answers the question the conversion is about to charge 105 CU to answer badly.
+A sofa tucked under a first-floor slab is obviously invisible at 200 px and not at all obvious at
+1792.
+
+### Do a whole band's images first, then all its conversions
+
+The image chain is strictly sequential — level 9's reference is level 8's image — and cheap, about
+40 CU. The conversions are expensive and, once their images exist, independent. So: run all four
+edits, look at all four at board scale, decide whether the band reads as one story, and only then
+fire the conversions. It paces better against the rate limit, and gives you a chance to change your
+mind about a step before paying for it.
 
 ## Step 2: cut out the background
 
