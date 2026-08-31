@@ -49,7 +49,8 @@ assets/dice/        the die: models/die.glb, built not reconstructed    → asse
 assets/npcs/        the series' characters, to stand on tiles           → assets/npcs/README.md
 assets/cards/       WHAT THERE IS TO COLLECT: cards.js + the card art   → assets/cards/README.md
 assets/status/      the status track: bands and milestones              → assets/status/README.md
-assets/estate/      THE OBJECT AT THE BOARD'S CENTRE: six tiers of one building
+assets/estate/      THE OBJECT AT THE BOARD'S CENTRE: six tiers of one building, roof off so you
+                    see in — models/ is the estate, items/ the painting it falls back to
                                                                 → assets/estate/README.md
 assets/boxes/       the three box tiers' art                            → assets/boxes/README.md
 minigames/          full-frame bonus games, one per train bonus        → minigames/README.md
@@ -191,7 +192,7 @@ function, because `js/boxes.js` needs the same rule and is not a `BoardActor`.
 | **The collection** | `js/cards.js` `assets/cards/` | 48 cards a Season — 29 Common, 12 Rare, 6 Epic, 1 Legendary — in **4 sets of twelve**, and 20 of the 48 are **status cards**: the watch, the necklace, the villa (§4.1). Three copies **convert** a card into its Collectible — the object that carries Status and stands on the Showcase (§4.3); copies past that trickle. A set is a target and **never a gate**, and finishing one pays its **display piece** (§4.4). Ownership is Season-wide and survives a Season reset. → [README](assets/cards/README.md) |
 | **Boxes** | `js/boxes.js` `js/ui/box3d.js` `assets/boxes/` | The only way anything is collected. Three tiers, each `items` draws against its own weighted table. Opened the moment they are won — and **not in a dialog**: the box is the same GLB the board used to stand on a tile, it arrives over the middle of the board, and you tap the mesh. It bursts where it stood and the cards fly out and hang in the air. The only DOM is a caption and the countdown bar (`js/ui/pack.js`), which also holds the modal fallback for when there is no WebGL. Every empty case falls forward, so a box always pays. → [README](assets/boxes/README.md) |
 | **Status** | `js/status.js` `js/ui/profile.js` `assets/status/` | **A LEVEL, 1–30, that resets every Season** (GDD §5). Four inflows, every one of them *derived*: converting a card, completing a set, watching an episode, calling a prediction right. **None of them is a purchase** — §8.1 gives a Collectible no route in but play, so this file is the track, the bands and the trophies, and nothing here has a price. Milestones every five levels pay a clue cache, energy or a pack. The curve lives in the economy model — §5.4 calls the Season gate "the single most important value in the game". → [README](assets/status/README.md) |
-| **The Status Estate** | `js/ui/estate3d.js` `assets/estate/` | The object at the board's centre, upgrading with the level (§3.5). One tier per status band, so the title and the house change in the same beat. → [README](assets/estate/README.md) |
+| **The Status Estate** | `js/ui/estate3d.js` `assets/estate/` | The object at the board's centre, upgrading with the level (§3.5). One tier per status band, so the title and the house change in the same beat. A tier with a `model` **stands a GLB on the board** and puts its plaque on a sign beside it; the framed painting is the FALLBACK for a file that will not load. **All six tiers are modelled.** Each is an **open dollhouse** — no roof, near walls gone — because the camera already looks down at it and because the floors are where collected things will eventually stand. Changing tier is covered by a **cloud** (`cfg.estateFogMs`): the swap happens where it is thickest, so a promotion reads as weather rather than as an asset popping in. → [README](assets/estate/README.md) |
 | NPCs | `assets/npcs/` `js/ui/npc3d.js` | Simon, Victoria and Carl, walking the ring clockwise on the tiles' **inner** edge — the tile centre is taken by art and the token. **Scenery, deliberately**: they own no state, are not persisted, and pay nothing, so they stay outside the event list that everything else reaches the player through. Scaled by **height** like the player piece and held under `cfg.tokenHeight`, so a figure walking in front of the token can never bury it. Who walks and which way each faces is data in `assets/npcs/npcs.js` — facing is not a convention here, since one of the three fronts −X. **`cfg.npcs` ships at 0**, and off means the models are never fetched: `NPC3D.init()` deliberately does not load, `tick()` does on the first frame it runs enabled, so the drawer toggle still works with no reload. Switching back off hides them rather than dropping them. → [README](assets/npcs/README.md) |
 | Economy model | `js/economy.js` `js/economy-import.js` | The numbers the game is balanced to, loaded from a spreadsheet. Segmented cost curve, ordered series, the clue→accuracy edge. `Economy.apply()` projects it onto `cfg`. See below. |
 | Episodes & video | `episodes/` | Prediction data, the video player, betting rules. → [README](episodes/README.md) |
@@ -307,12 +308,18 @@ the scene occlude each other; they do not take turns existing.**
   against the panel's middle, and vanished behind the whole thing.
 - And a box being opened switched the case board off for the duration.
 
-What works is ordinary 3D. The panels are **upright planes standing on the board**, yawed to face
-the camera — depth then varies down their height exactly as a standee's does, so a die nearer the
-camera draws in front of them and a die behind is hidden, both correctly. The camera never
+What works is ordinary 3D. Anything flat is an **upright plane standing on the board**, yawed to
+face the camera — depth then varies down its height exactly as a standee's does, so a die nearer
+the camera draws in front of it and a die behind is hidden, both correctly. The camera never
 orbits (orthographic, fixed 45°/38°), so the yaw is a constant and never needs updating; standing
 upright costs `cos 38°` of on-screen height, which the geometry is scaled up by so the `height`
 constants keep meaning screen size.
+
+**The estate itself no longer needs any of that care**, because it is no longer flat: a tier with
+a model is a solid open-topped building standing in the ring, so it occludes and is occluded on
+its own terms and writes depth like any other geometry — including against its own interior. What is still a plane is its **sign** — the plaque, on
+the ground in front of the plot — and the painting the estate falls back to when a tier has no
+model. Those two follow the rule above.
 
 A box and its cards are put **in front** rather than the board being taken away: `_packAnchor()`
 moves the anchor along the view direction toward the camera, which under an orthographic camera
@@ -483,6 +490,14 @@ next roll opened a second one behind it.
 `setTimeout(dur + 20)` guarantees `settle()` runs, forcing the final pose and the end callback
 exactly once whichever gets there first. **Anything that removes an object from the scene belongs
 in the timer, not in the last frame.**
+
+**And read the phase off the CLOCK, not off accumulated frame deltas.** The estate's tier-change
+cloud (`js/ui/estate3d.js`) does: its tick ignores the `dt` the loop hands it and works out how
+far through the beat it is from `performance.now()`. Accumulating `dt` is only correct while
+frames arrive at the rate the accumulation assumes — a tab throttled to a frame a second crawls
+the animation at a sixtieth speed, so it is still opening when the timer that ends it fires.
+Off the clock, a sparse frame simply lands at the right point, and a tab that renders nothing at
+all loses nothing, because the state changes were on timers to begin with.
 
 The same trap catches the DOM. A CSS transition needs its two values written in different style
 recalcs, so the second write is deferred — and a bare `requestAnimationFrame` for that never runs

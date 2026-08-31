@@ -765,6 +765,7 @@ const Board3D = {
     }
     NPC3D.tick(1000 / 60);
     Box3D.tick(1000 / 60);
+    Estate3D.tick();
     this._followCamera();
     Env3D.tick(1 / 60);
     Dice3D.tick();

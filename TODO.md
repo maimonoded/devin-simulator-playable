@@ -278,6 +278,21 @@ what a run would have cost.
 
 ---
 
+### `Estate3D.validate()` is written but never called
+Every other content check in the project runs twice — once in the boot sweep at the foot of
+`js/ui/main.js`, once in the tuning drawer — so a mis-authored board, pool, clue or catalogue
+reports itself the moment you open the game. The estate's does neither, so a tier that opened at
+a level no status band opens at would go through silently, and the house and the title would
+change on different rolls: exactly what §3.5's pairing exists to prevent. (Today's six tiers do
+line up, which is why nothing has gone wrong yet.)
+
+The reason is structural rather than an oversight in the list: `Estate3D` is an ES module export
+and `main.js` is a classic script, so the name is simply not in scope there. Every other
+validator belongs to a global.
+
+**Done when:** `Board3D` — which is on `window` and already imports the module — forwards it, and
+`main.js`'s sweep and `drawer.js`'s panel both include "The estate" beside the others.
+
 ## Economy plumbing
 
 ### The five relative knobs are stored but only one is wired

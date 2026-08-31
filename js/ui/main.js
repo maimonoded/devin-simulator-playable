@@ -354,8 +354,11 @@ function applyPhoneView(on){
   $("#phoneBtn").classList.toggle("on",on);
   $("#phoneBtn").textContent=on?"🖥 Desktop view":"📱 Phone view";
   /* The two views use different zooms, so re-fit even when the box size happens not to
-     change — the ResizeObserver would not fire in that case and the frustum would be stale. */
-  if(use3d()&&window.Board3D&&Board3D.available) Board3D.resize();
+     change — the ResizeObserver would not fire in that case and the frustum would be stale.
+     The Status Estate is sized and placed per view as well, and its signature carries which one
+     — so it has to be told too, or it keeps the other view's fit until the next thing that
+     happens to call renderAll(). */
+  if(use3d()&&window.Board3D&&Board3D.available){ Board3D.resize(); Board3D.syncCase(); }
 }
 /* One stake button instead of a row: each tap steps to the next multiplier and wraps.
    indexOf returning -1 for a stake that is no longer in the list (an old save, or a shortened

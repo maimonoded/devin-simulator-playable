@@ -155,10 +155,16 @@ const DEFAULTS={
 
      statusBarMs is how long the track takes to move when status is earned and statusUpMs how
      long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
-     both belong in the drawer. */
+     both belong in the drawer.
+
+     estateFogMs is the weather over the board's centre when the estate changes tier. It does
+     NOT block the roll loop: it plays behind the status ribbon, which is where the player is
+     looking, and the swap it hides happens at its thickest point. Long enough to read as
+     weather rather than a wipe; short enough that a fast run does not spend its life in cloud. */
   statusPerEpisode:50, statusPerPrediction:150,
   statusLevels:30, statusFirst:25, statusTotal:5800,
   statusBarMs:900, statusUpMs:1500,
+  estateFog:1, estateFogMs:1500,
   /* What a box's `coins` outcome pays when its table row does not name an amount. */
   boxCoins:60,
   /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
@@ -470,7 +476,9 @@ const TUNING=[
    ["statusFirst","Status for level 2",10,{min:1}],
    ["statusTotal","Status for the whole Season",500,{min:100}],
    ["statusBarMs","Earned: track moves (ms)",50],
-   ["statusUpMs","Earned: held afterwards (ms)",50]]},
+   ["statusUpMs","Earned: held afterwards (ms)",50],
+   ["estateFog","Fog over the estate when it changes (0/1)",1],
+   ["estateFogMs","Estate fog — whole beat (ms)",100,{min:0,max:6000}]]},
  {group:"Prediction & wager",items:[
    ["minWager","Minimum wager (floor under every tier)",10],
    ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],
