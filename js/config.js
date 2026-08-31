@@ -15,10 +15,14 @@ const DEFAULTS={
      is allowed to sit there longer.
 
      A card lands on roughly a quarter of all rolls, so every 100ms here is about 25ms on the
-     average roll. These are set deliberately long — the card IS the reward, and a reward that
-     is gone before it has been read is not one. Turn them down here if the board starts to feel
-     like it is waiting for you. */
-  cardHoldMs:2000, statusHoldMs:2000, cardConvertMs:2000, clueHoldMs:2500,
+     average roll. Turn them down here if the board starts to feel like it is waiting for you.
+
+     THE HOLD IS NO LONGER THE WHOLE BEAT, which is why the plain memory is the short one. A card
+     is held, then it FLIES into the collection button (cardFlyMs), and then the HUD pill and the
+     estate's sign run (hudStatusMs + hudStatusHoldMs) — so a memory costs about 2.8s in total at
+     a 1s hold, not 1s. The trophy and the converting copy keep their two seconds because they
+     have something to read that the memory does not: a counter at 2 of 3, and a conversion. */
+  cardHoldMs:1000, statusHoldMs:2000, cardConvertMs:2000, clueHoldMs:2500,
   /* The conversion beat, in three moves: the card is held as a card, it turns edge-on and comes
      back as the plaque, and only then does the track run. Staged, because two things moving at
      once means neither is watched. */
