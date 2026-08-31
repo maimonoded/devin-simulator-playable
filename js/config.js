@@ -18,7 +18,7 @@ const DEFAULTS={
      average roll. These are set deliberately long — the card IS the reward, and a reward that
      is gone before it has been read is not one. Turn them down here if the board starts to feel
      like it is waiting for you. */
-  cardHoldMs:2000, statusHoldMs:5000, cardConvertMs:5000, clueHoldMs:2500,
+  cardHoldMs:2000, statusHoldMs:2000, cardConvertMs:2000, clueHoldMs:2500,
   /* The conversion beat, in three moves: the card is held as a card, it turns edge-on and comes
      back as the plaque, and only then does the track run. Staged, because two things moving at
      once means neither is watched. */
@@ -365,8 +365,8 @@ const TUNING=[
    ["bonusLoadMs","Bonus game: opening animation (ms)",100],
    ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
    ["cardHoldMs","Memory card held (ms)",100],
-   ["statusHoldMs","Status card held (ms)",100],
-   ["cardConvertMs","…a status card's THIRD copy (ms)",100],
+   ["statusHoldMs","Status card, not yet a Collectible (ms)",100],
+   ["cardConvertMs","…and its third copy, out of a box (ms)",100],
    ["clueHoldMs","Clue card held — tap it to hold (ms)",100],
    ["statusCardMs","Convert: card held before the turn (ms)",20],
    ["statusFlipMs","Convert: the turn itself (ms)",20],

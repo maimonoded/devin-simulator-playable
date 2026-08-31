@@ -203,11 +203,27 @@ function cbSlots(art,have,need){
    The three beats differ because the three things differ (§4.1, §4.3):
 
      memory card   cfg.cardHoldMs      the moment is the picture; two seconds is enough
-     status card   cfg.statusHoldMs    a trophy, so it also counts itself out of three — the
-                                       whole reason to want another copy is legible on the card
-     …its third    cfg.cardConvertMs   the copy that converts it into a Collectible. This is
-                                       what a trophy was collected FOR, so it gets the big
-                                       celebration
+     status card   cfg.statusHoldMs    ALSO two. A trophy card is not a Collectible yet — it
+                                       becomes one on its third copy — so copies one and two are
+                                       cards like any other, and holding them longer spent five
+                                       seconds on the state of not having finished. The slot fan
+                                       is what makes them different, and a fan is read at a
+                                       glance. Kept as its own knob rather than folded into
+                                       cardHoldMs: the two are equal today by decision, not by
+                                       being the same thing
+     …its third    cfg.cardConvertMs   ALSO two. All three copies of a trophy are on screen for
+                                       the same length now: a card is a card, and the third one
+                                       being the one that converts is the CONVERSION BEAT's news
+                                       to break, not this one's.
+
+                                       On the tile route this does not fire at all — the
+                                       conversion IS the statusUp, which opens on the card and
+                                       turns it into the plaque (js/ui/statusup.js). It survives
+                                       for the box route, where the pack popup shows the drop and
+                                       the celebration follows it. Its own timings
+                                       (statusCardMs, statusFlipMs, statusBarMs, statusUpMs) are
+                                       separate and deliberately longer: that beat is not showing
+                                       a card, it is showing a card BECOMING something
      a clue        cfg.clueHoldMs      the only face carrying a SENTENCE, and a sentence has to
                                        be read. Longest by default, and the only one that can be
                                        HELD: tapping it stops the clock and waits for Collect,
