@@ -405,3 +405,19 @@ level 30 both land around session 6. **It is not self-maintaining.** Any change 
 the episode count or the per-copy Status value moves the two independently, and the sim in
 `tools/` is the only thing that will notice. Re-measure both numbers together after any of them
 moves, not just the one that changed.
+
+### The villa's climax reads smaller than its opening
+
+`MODEL` bounds the estate by **height and span**, and the span is what binds for tier 6: measured
+across levels 26 to 30 the width sits at 4.7–4.9 throughout while the height falls from 2.51 at
+level 27 to **1.78** at level 30. The last two levels earn a second building and gardens, the
+footprint grows, and the fit scales the whole plot down to keep it in frame — so the house itself
+is at its shortest exactly where the Season ends. The progression inverts at the moment it should
+peak.
+
+It is cosmetic and the build is playable with it. Three ways out, in rough order of appeal: fit
+the **main building** rather than the whole plot, so outbuildings are allowed to overflow the span;
+raise `MODEL.span` for tier 6 only, since a per-tier `scale` is already supported in the manifest;
+or author the late levels to grow **upward** rather than outward, which is a prompt change and no
+code at all. The third is the cheapest and would want doing before tier 5's levels are generated,
+since they will hit the same wall.
