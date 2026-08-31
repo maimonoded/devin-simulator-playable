@@ -177,13 +177,17 @@ const ESTATE_TIERS = [
 
         22  a curved plum velvet banquette and a brass sculpture — one statement piece
             rather than more furniture
+        23  an inlaid deco sunburst floor in black, cream and brass across the whole lounge
+        24  the lounge walls refaced in fluted gold leaf, and a deco chandelier over the piano
 
        The plan asks for that banquette in EMERALD. Emerald was wrong twice over: teal-and-gold
        is already this tier's signature accent, so an emerald piece blends into the wall it
        stands against, and tier 2 had spent emerald on the flat's sofa. Plum is absent from
        every tier and reads against cream, gold and turquoise alike. Check the plan's colours
        against what the tier already owns before spending them. */
-    levels: { 22: "assets/estate/models/tier5-lv22.glb" },
+    levels: { 22: "assets/estate/models/tier5-lv22.glb",
+              23: "assets/estate/models/tier5-lv23.glb",
+              24: "assets/estate/models/tier5-lv24.glb" },
     blurb: "The pool is on the roof. So is everyone else." },
   { at: 26, name: "The villa",       art: "assets/estate/items/tier6.webp",
     model: "assets/estate/models/tier6.glb",
