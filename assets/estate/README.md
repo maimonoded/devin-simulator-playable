@@ -65,6 +65,32 @@ front of the estate's feet would be measured against its middle and vanish behin
 thing. See CLAUDE.md, "Nothing on the board fades or hides". The model needs none of that care:
 it is solid, so it occludes and is occluded on its own terms.
 
+### Seeing it without playing to level 30
+
+[`tools/estate-levels.html`](../../tools/estate-levels.html) steps the Status track with **+** and
+**−** (or the arrow keys) and draws the estate exactly as the board draws it — every level from 1
+to 30, the fog included wherever it fires.
+
+It is not a mock-up: it imports the shipped `js/ui/estate3d.js` and loads the real `ESTATE_TIERS`,
+`Status` and `Economy` curve under a camera and light rig copied from `js/ui/board3d.js`. So the
+building, its fit, its lamp, its plaque and its cloud are the ones the game renders, and the tool
+cannot drift away from them the way a second implementation would. The only stubs are the parts of
+`Status` that reach into a run it does not have — `Cards.statusPoints()` is the dial the buttons
+turn, so a level can be set to an exact points total.
+
+The readout says which step of which band you are on and what the lamp is at, because most steps
+change the LIGHT and not the house: six buildings cover thirty levels, and without a number on it
+"nothing happened" and "the lamp went from 0.94 to 1.43" look the same.
+
+    python3 serve.py
+    http://localhost:8125/tools/estate-levels.html
+    http://localhost:8125/tools/estate-levels.html?lv=20&fog=6000
+
+Note the `<base href="../">` at the top of that file, which is load-bearing rather than tidy:
+`Estate3D` fetches its models by document-relative path because it was written for `index.html` at
+the root, and from `/tools/` those resolve to `/tools/assets/...` and 404 — leaving an empty gilt
+frame that reads as a rendering bug rather than a path one.
+
 ### Changing tier: weather, not a cut
 
 A promotion swaps one building for another in the middle of the board, and swapping it in place
