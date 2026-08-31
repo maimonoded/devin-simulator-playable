@@ -55,10 +55,26 @@ const ESTATE_TIERS = [
     model: "assets/estate/models/tier1.glb",
     /* One building per band left the levels inside it looking identical but for the lamp, which
        is not enough to read as progress. `levels` names a different GLB at a given level, so the
-       room can improve a piece at a time without leaving the tier: at 2 the mattress becomes a
-       real bed and the kettle's crate becomes a table. Optional and per level — a tier with none
-       of these behaves exactly as before. */
-    levels: { 2: "assets/estate/models/tier1-lv2.glb" },
+       room can improve a piece at a time without leaving the tier. Optional and per level — a
+       tier with none of these behaves exactly as before.
+
+       The bedsit's five are one story told in four steps, and each was generated FROM THE ONE
+       BEFORE IT so the improvements accumulate rather than reset:
+
+         1  a wreck
+         2  a conspicuously new bed, white sheets and a blue blanket, in a room still ruined
+         3  the upper floor reboarded in clean gold, and a red rug
+         4  the upper walls stripped and painted sage, white skirting, white window frame
+         5  the shop below replastered and tidied, plants in, and the fire escape mended
+
+       What makes each step legible is CONTRAST, not size: the new thing has to look wrong in the
+       old room. The first attempt at level 2 politely upgraded the bed and read as nothing at
+       all at the size this renders. The blue blanket is the whole trick — the only saturated
+       colour in the tier, so it survives being two hundred pixels wide. */
+    levels: { 2: "assets/estate/models/tier1-lv2.glb",
+              3: "assets/estate/models/tier1-lv3.glb",
+              4: "assets/estate/models/tier1-lv4.glb",
+              5: "assets/estate/models/tier1-lv5.glb" },
     blurb: "Above the chip shop. The window doesn't shut." },
   { at:  6, name: "The flat",        art: "assets/estate/items/tier2.webp",
     model: "assets/estate/models/tier2.glb",
