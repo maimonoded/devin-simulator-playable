@@ -147,6 +147,9 @@ function resize(){
 addEventListener("resize", resize); resize();
 
 Estate3D.init(scene);
+/* Handles for the console. This is a debugging tool; being able to poke the thing it is showing
+   is the point of it, and it saves rebuilding the page every time a number needs checking. */
+window.Estate3D = Estate3D; window.estateScene = scene; window.estateCam = cam;
 
 /* ---- the dial ---- */
 const $ = id => document.getElementById(id);

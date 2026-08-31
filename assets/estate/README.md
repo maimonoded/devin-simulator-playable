@@ -101,6 +101,18 @@ So a cloud rolls over the plot, the building is exchanged where the cloud is thi
 clears: `cfg.estateFogMs` end to end, `cfg.estateFog` to switch it off. Nothing waits on it —
 it plays behind the status ribbon, and what it hides was banked in `state` long before.
 
+**The old place goes down and the new one comes up.** Under the thickest part of the cloud the
+outgoing estate collapses onto its own footprint and the incoming one swells out of the same spot,
+overshooting a little before it settles. Weather alone hides an exchange; it does not make one feel
+like anything, and a player watching the middle of the board would just see a file get swapped. The
+plot stays put and the house on it is replaced, which is what moving up a level actually is.
+
+That needs a **pivot at the plot** — the model hangs from a group sitting exactly on the ground
+point, so it scales about its own base. Scaling the fitted holder instead would slide the building
+toward the scene origin as it shrank, sinking through the deck and drifting toward the middle of
+the board. Verified: base Y stays pinned at 0.140 and the centre moves under 0.01 at every scale
+from full down to a sixteenth.
+
 Three things about it are load-bearing:
 
 - **It obeys the depth rules.** The puffs are not drawn over the scene with depth testing off,

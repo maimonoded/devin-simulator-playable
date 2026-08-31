@@ -175,6 +175,28 @@ const FOG = {
    same amount because that is where its open corner happens to point. */
 const MODEL_YAW = 45 * Math.PI / 180;
 
+/* THE OLD PLACE GOES DOWN AND THE NEW ONE COMES UP, under the thickest part of the cloud.
+
+   Weather on its own hides an exchange; it does not make one feel like anything. The building
+   simply is not there and then is, and a player who happens to be looking at the middle of the
+   board sees a file get swapped. So the outgoing estate collapses toward its own footprint and
+   the incoming one swells up out of the same spot — the plot stays put and the house on it is
+   replaced, which is what moving up a level actually is.
+
+   `in` and `out` are fractions of the whole beat and sit either side of FOG.swapAt, so the motion
+   is over well before the cloud has finished clearing. That is deliberate: the shrink has to be
+   finished BEFORE the swap, not still running through it, or the old house is still visibly
+   there at the moment it is exchanged.
+
+   `floor` is where the shrink stops. Not zero: a scale of nought is a degenerate matrix, and
+   more to the point a building that vanishes completely reads as a bug for the frame before its
+   replacement appears. A sixteenth is small enough to be lost in the fog. */
+const MORPH = { in: 0.26, out: 0.30, floor: 0.06 };
+/* Slow, then quick — the old place holds its size and then drops away. */
+const easeIn = k => k * k;
+/* Quick, then a little past and back — the new one arrives with some weight behind it. */
+const backOut = k => { const c = 1.70158, p = k - 1; return 1 + (c + 1) * p * p * p + c * p * p; };
+
 /* THE LIGHTS COMING ON, as a light rather than as a wash.
 
    On the painting the per-level change was a golden soft-light pass over the picture: the same
@@ -734,6 +756,9 @@ export const Estate3D = {
     if (!src) return;
     this._bodySig = `m/${lv}/${this._phone() ? "p" : "d"}`;
     this._body = this._swap(this._body, this._buildModel(src, tier, lv));
+    /* Installed already collapsed, so the first frame after the exchange is the new place at its
+       smallest rather than at full size — the spring out starts from where the old one ended. */
+    if (this._fog) this._applyMorph(MORPH.floor);
     this._bodyTier = tier;
     this._bodyUrl = url;
     this._sweep();                             // what we just left is nobody's now
@@ -755,6 +780,10 @@ export const Estate3D = {
     this._fogTimers.forEach(clearTimeout);
     this._fogTimers = [];
     if (runOwing) this._runSwap(); else this._fogSwap = null;
+    /* FORCE THE FINAL POSE. The morph is drawn by frames and ended here, for the reason the whole
+       file is built around: a tab that stops rendering mid-beat would otherwise leave the estate
+       stranded at a sixteenth of its size, and it would stay that way until the next level. */
+    this._applyMorph(1);
     const g = this._fog;
     this._fog = null;
     if (!g) return;
@@ -775,7 +804,44 @@ export const Estate3D = {
      the swap and the clean-up are on timers either way. */
   tick(){
     if (!this._fog) return;
-    this._tickFog(Math.min(1, (now() - this._fogFrom) / this._fogDur));
+    const p = Math.min(1, (now() - this._fogFrom) / this._fogDur);
+    this._tickFog(p);
+    this._tickMorph(p);
+  },
+
+  /* THE SCALE OF WHATEVER IS STANDING THERE, read off the same clock as the cloud.
+
+     One function covers both halves because at any instant there is only ever one building: it
+     is the outgoing one before FOG.swapAt and the incoming one after, and the same `k` applies
+     either way. Which of the two it is, is _swapNow's business, not this one's.
+
+     `_body` may be the painted fallback, which is a flat plane with no fit to scale about and no
+     pivot to scale from — so it is left alone. Nothing else here needs to know which path it is
+     on; the absence of a pivot IS the test. */
+  _tickMorph(p){
+    const b = this._body;
+    if (!b || !b.isGroup) return;
+    this._applyMorph(this._morphAt(p));
+  },
+
+  /* 1 outside the window either side of the swap; collapsing into it, springing out of it. */
+  _morphAt(p){
+    const a = FOG.swapAt;
+    if (p < a - MORPH.in || p > a + MORPH.out) return 1;
+    if (p < a){
+      const u = (p - (a - MORPH.in)) / MORPH.in;
+      return 1 + (MORPH.floor - 1) * easeIn(u);
+    }
+    const u = (p - a) / MORPH.out;
+    return MORPH.floor + (1 - MORPH.floor) * backOut(u);
+  },
+
+  _applyMorph(k){
+    const b = this._body;
+    if (b && b.isGroup) b.scale.setScalar(k);
+    /* The lamp belongs to the house, so it goes down and comes up with it. Squared, so a
+       building at a sixteenth of its size is not still throwing a full-strength glow. */
+    if (this._lamp && this._lampFull != null) this._lamp.intensity = this._lampFull * k * k;
   },
 
   _tickFog(t){
@@ -840,7 +906,20 @@ export const Estate3D = {
        along it is the nearest point of the plot on screen, and the sign stands `gap` beyond it.
        Stored on the holder so _buildSign can read it back without measuring twice. */
     box = new THREE.Box3().setFromObject(holder, true);
-    holder.userData.nearU = (box.max.x + box.max.z) / Math.SQRT2;
+
+    /* A PIVOT AT THE PLOT, so the estate can be scaled about its own base rather than about the
+       scene's origin. Without it, shrinking the holder would slide the building toward (0,0,0)
+       as it went — sinking through the deck and off toward the middle of the board — because a
+       group scales about ITS origin, and the holder's origin is wherever the fit happened to
+       leave it. Re-parenting under a group that sits exactly on the ground point means the
+       building collapses onto its own footprint and grows back out of it, which is the only
+       version of the motion that looks like a house being replaced rather than one being
+       dragged away. The holder keeps its world pose; only who it hangs from changes. */
+    const pivot = new THREE.Group();
+    pivot.position.set(g.x, BASE_Y, g.z);
+    holder.position.sub(pivot.position);
+    pivot.add(holder);
+    pivot.userData.nearU = (box.max.x + box.max.z) / Math.SQRT2;
     /* The height it actually CAME OUT at, which is not spot.height — that is only the bound the
        fit was tested against, and the ground span is just as likely to be the one that binds.
        For the bedsit the height binds and the two agree; for a wide tier like the villa, or any
@@ -873,8 +952,11 @@ export const Estate3D = {
     /* Light the rooms. `built` and not spot.height — see above. */
     this._lamp.position.set(g.x, BASE_Y + built * LAMP.at, g.z);
     this._lamp.intensity = LAMP.from + warm * (LAMP.to - LAMP.from);
+    /* Remembered so the morph can dim the lamp with the house it belongs to — a light left at
+       full while its building shrinks away is a glow hanging over an empty plot. */
+    this._lampFull = this._lamp.intensity;
 
-    return holder;
+    return pivot;
   },
 
   /* ---------------- the sign ----------------
