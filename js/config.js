@@ -161,6 +161,13 @@ const DEFAULTS={
      long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
      both belong in the drawer.
 
+     estatePromoMs is the same beat when the change is a PROMOTION — a new tier, five levels
+     apart, the moment the title and the house turn over together. It is longer than estateFogMs
+     because it carries more: the cloud is bigger, there is a burst of light and a ring across the
+     plot, and the new place arrives with a spring. A step inside a band is a small improvement
+     and should stay small; crossing a band is the event the Season is built around, and the two
+     reading identically was what made every level feel the same.
+
      estateFogMs is the weather over the board's centre when the estate changes tier. It does
      NOT block the roll loop: it plays behind the status ribbon, which is where the player is
      looking, and the swap it hides happens at its thickest point. Long enough to read as
@@ -168,7 +175,7 @@ const DEFAULTS={
   statusPerEpisode:50, statusPerPrediction:150,
   statusLevels:30, statusFirst:25, statusTotal:5800,
   statusBarMs:900, statusUpMs:1500,
-  estateFog:1, estateFogMs:1500,
+  estateFog:1, estateFogMs:1500, estatePromoMs:2800,
   /* What a box's `coins` outcome pays when its table row does not name an amount. */
   boxCoins:60,
   /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
@@ -482,7 +489,8 @@ const TUNING=[
    ["statusBarMs","Earned: track moves (ms)",50],
    ["statusUpMs","Earned: held afterwards (ms)",50],
    ["estateFog","Fog over the estate when it changes (0/1)",1],
-   ["estateFogMs","Estate fog — whole beat (ms)",100,{min:0,max:6000}]]},
+   ["estateFogMs","Estate fog — whole beat (ms)",100,{min:0,max:6000}],
+   ["estatePromoMs","Estate promotion — whole beat (ms)",100,{min:0,max:8000}]]},
  {group:"Prediction & wager",items:[
    ["minWager","Minimum wager (floor under every tier)",10],
    ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],

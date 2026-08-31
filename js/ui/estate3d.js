@@ -192,6 +192,49 @@ const MODEL_YAW = 45 * Math.PI / 180;
    more to the point a building that vanishes completely reads as a bug for the frame before its
    replacement appears. A sixteenth is small enough to be lost in the fog. */
 const MORPH = { in: 0.26, out: 0.30, floor: 0.06 };
+
+/* WHAT A PROMOTION GETS THAT A LEVEL DOES NOT.
+
+   Crossing a band is the beat the Season is built around — the title changes, the house changes,
+   a milestone pays out, all on one roll. A step inside a band is somebody buying a bed. Both were
+   getting the same cloud and the same shrink, and the effect of that was not that the small one
+   felt big: it was that the big one felt small, because nothing distinguished it.
+
+   So a promotion keeps all of that and adds three things, each of which does a different job:
+
+     BURST   a hard flare of gold at the instant of the exchange. This is the punctuation — the
+             one frame that says something happened, rather than something is happening.
+     RING    a band of light thrown out across the plot and fading as it goes. This is what makes
+             the burst feel like it came FROM the estate rather than being pasted over it, and it
+             is on the ground, so it reads as the ground being struck.
+     MOTES   embers carried up off the plot afterwards. This is the tail — the part that says the
+             event is over and was good, the way confetti is never thrown at the start.
+
+   The cloud is bigger too, and the new house arrives with more spring. Everything here is scaled
+   off the same clock as the fog and torn down by the same timer. */
+const PROMO = {
+  /* Bigger, not a whiteout. The first pass at these ran the cloud to nearly twice the spread and
+     the burst to a peak that lit the whole of it — the estate disappeared into a white disc
+     filling the ring, which reads as a bug rather than a celebration. A promotion wants to be
+     obviously the larger of the two beats while still being weather over a house. */
+  /* Barely bigger, deliberately. Two passes were spent inflating the cloud before the obvious
+     thing landed: a promotion should not be MORE WEATHER, it should be the same weather plus
+     things happening in it. A bigger cloud only hides more of the estate, which is the opposite
+     of a celebration — at 1.7x it was a white disc filling the ring. The burst, the ring and the
+     motes are what make this the larger beat; the cloud just gives them somewhere to happen. */
+  puffs: 1.2,
+  spread: 1.05,
+  size: 1.0,
+  overshoot: 2.1,      // multiplies the backOut kick, so the new place lands harder
+  burst: { at: 0.46, ms: 0.20, peak: 11, color: 0xffd98a },
+  /* `to` is a multiple of the estate's SPAN, so a ring that travels to 2.6 of it crosses most of
+     the ring of tiles — which reads as the board being hit, not the plot. Just past the plot is
+     the whole idea: the estate throws it, and it dies at the edge of its own ground. */
+  ring:  { at: 0.46, ms: 0.42, from: 0.30, to: 1.15, peak: 0.55, color: 0xffcb5c },
+  /* Embers, and the size is the difference between an ember and a floodlight. At a tenth of the
+     span these were glowing balls the size of the windows. */
+  motes: { n: 18, at: 0.44, ms: 0.52, rise: 1.5, size: 0.03, peak: 0.7, color: 0xffcb5c },
+};
 /* Slow, then quick — the old place holds its size and then drops away. */
 const easeIn = k => k * k;
 /* Quick, then a little past and back — the new one arrives with some weight behind it. */
@@ -266,6 +309,7 @@ export const Estate3D = {
   _bodyUrl: null,
   _fog: null, _fogFrom: 0, _fogDur: 0, _fogSwap: null, _fogTimers: [],
   _fogTex: null, _fogGeo: null,
+  _promo: false, _burst: null, _ring: null, _motes: null,
 
   init(scene){
     this._scene = scene;
@@ -465,6 +509,10 @@ export const Estate3D = {
            rather than a promotion. Both are caught by comparing the path the body was BUILT from,
            which is why _bodyUrl is tracked separately from the signature. */
         if (this._body && this._bodyUrl && this._bodyUrl !== url && this._fogOn()){
+          /* A PROMOTION is a change of TIER, not merely of building. Both fog; only this one
+             gets the burst, the ring and the motes. The distinction is the whole point of the
+             two beats — see PROMO. */
+          const promo = this._bodyTier !== tier;
           /* NOT `this._bodySig = bodySig` here. The signature has to describe what is DRAWN, and
              for the next 46% of the beat that is still the old house — so it is written by the
              swap, in _swapNow, at the moment the house actually changes. Writing it now was a
@@ -473,7 +521,7 @@ export const Estate3D = {
              (a Season reset, or a status value nudged in the tuning drawer) found nothing to do,
              and the armed swap then installed the townhouse over it for good — right house,
              wrong player, under the flat's plaque, and stuck until the next level change. */
-          this._beginFog();
+          this._beginFog(promo);
         } else {
           this._bodySig = bodySig;
           this._signSig = null;                  // the sign hangs off the plot; remeasure it
@@ -665,7 +713,7 @@ export const Estate3D = {
      requestAnimationFrame is suspended in a background tab, and a swap stranded behind a frame
      that never comes would leave the old tier standing forever. Same reason the teardown is a
      timer: see CLAUDE.md, "the scene's animations are driven by frames but ENDED by timers". */
-  _beginFog(){
+  _beginFog(promo){
     /* A second promotion arriving mid-cloud. Drop the swap the first one still owed rather than
        running it: this cloud's own callback will build whatever tier is current by then, so the
        skipped house is never wanted. Running it here — which is what the first version did —
@@ -674,9 +722,13 @@ export const Estate3D = {
        whose entire job is to prevent one. */
     this._endFog(false);
 
-    const dur = Math.max(1, +cfg.estateFogMs || 0);
+    this._promo = !!promo;
+    const dur = Math.max(1, +(promo ? cfg.estatePromoMs : cfg.estateFogMs) || 0);
     const spot = this._phone() ? MODEL_PHONE : MODEL;
     const g = this._ground(spot.at);
+    /* A promotion's cloud is bigger in every direction, so the extra staging has somewhere to
+       happen and the beat does not look like the small one with decoration bolted on. */
+    const P = promo ? PROMO : { puffs: 1, spread: 1, size: 1 };
 
     const group = new THREE.Group();
     group.name = "estatefog";
@@ -687,13 +739,14 @@ export const Estate3D = {
     if (!this._fogGeo) this._fogGeo = new THREE.PlaneGeometry(1, 1);
     const cool = new THREE.Color(FOG.cool), warm = new THREE.Color(FOG.warm);
 
-    for (let i = 0; i < FOG.count; i++){
+    const count = Math.round(FOG.count * P.puffs);
+    for (let i = 0; i < count; i++){
       /* Scattered deterministically rather than randomly. Two clouds in a row that differ only
          by noise look the same anyway, and a fixed pattern is one less thing that can produce a
          bad roll — a run of puffs all landing on one side would leave the swap visible.
          The golden angle spreads them evenly however many there are. */
       const a = i * 2.39996;
-      const r = Math.sqrt((i + 0.5) / FOG.count) * spot.span * FOG.spread;
+      const r = Math.sqrt((i + 0.5) / count) * spot.span * FOG.spread * P.spread;
       const m = new THREE.MeshBasicMaterial({
         map: tex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false,
         color: cool.clone().lerp(warm, (i % 3) / 2 * 0.7),
@@ -709,12 +762,14 @@ export const Estate3D = {
         z: Math.sin(a) * r,
         /* The last puff starts FOG.stagger into the beat, so the cloud builds rather than
            blinking on all at once. */
-        lag: (i / Math.max(1, FOG.count - 1)) * FOG.stagger,
+        lag: (i / Math.max(1, count - 1)) * FOG.stagger,
         seed: (i % 5) / 5,
       };
       puff.renderOrder = 3;
       group.add(puff);
     }
+
+    if (promo) this._buildPromo(group, spot, g);
 
     this._fog = group;
     this._fogFrom = now();
@@ -725,6 +780,91 @@ export const Estate3D = {
 
     this._fogTimers.push(setTimeout(() => this._runSwap(), dur * FOG.swapAt));
     this._fogTimers.push(setTimeout(() => this._endFog(true), dur + 20));
+  },
+
+  /* THE BURST, THE RING AND THE MOTES. Built with the cloud and hung off the same group, so the
+     one teardown that removes the weather removes these too — there is no second lifetime to get
+     wrong. All three sit at zero until their moment; _tickPromo is what gives them one. */
+  _buildPromo(group, spot, g){
+    /* The flare. A light rather than a sprite, so what it lights is the estate — a white quad
+       over the top would read as a UI flash pasted on the scene, which is the one thing the
+       board's rules are most insistent about. It lives on the GROUP, in world space, because the
+       group is pushed toward the camera and a light does not care about that. */
+    this._burst = new THREE.PointLight(PROMO.burst.color, 0, spot.span * 3.2, 2);
+    this._burst.position.set(g.x, BASE_Y + spot.height * 0.35, g.z);
+    this._group.add(this._burst);
+
+    /* The ring, lying on the plot. Flat on the ground rather than upright: it is the deck being
+       struck, and a ring standing up would read as a halo round the house. On _group and not the
+       fog group, so it keeps honest depth against the estate — the building occludes the part of
+       the ring behind it, which is what sells it as being ON the ground. */
+    const ringGeo = new THREE.RingGeometry(0.62, 1, 48);
+    this._ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      color: PROMO.ring.color, transparent: true, opacity: 0,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    this._ring.rotation.x = -Math.PI / 2;
+    this._ring.position.set(g.x, BASE_Y + 0.012, g.z);   // clear of the deck, no z-fighting
+    this._ring.userData.own = "all";
+    this._group.add(this._ring);
+
+    /* The motes. Upright quads sharing the puff texture, so they are lit dots rather than a
+       second asset, riding the fog group's camera-ward offset so they read over the cloud. */
+    const tex = this._puffTexture();
+    if (!this._fogGeo) this._fogGeo = new THREE.PlaneGeometry(1, 1);
+    this._motes = [];
+    for (let i = 0; i < PROMO.motes.n; i++){
+      const a = i * 2.39996;
+      const r = Math.sqrt((i + 0.5) / PROMO.motes.n) * spot.span * 0.42;
+      const m = new THREE.Mesh(this._fogGeo, new THREE.MeshBasicMaterial({
+        map: tex, color: PROMO.motes.color, transparent: true, opacity: 0,
+        depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+      m.rotation.y = CAM_YAW;
+      m.userData = { x: Math.cos(a) * r, z: Math.sin(a) * r,
+                     lag: (i / PROMO.motes.n) * 0.18, seed: (i % 5) / 5 };
+      m.renderOrder = 4;
+      group.add(m);
+      this._motes.push(m);
+    }
+  },
+
+  /* Each of the three on its own little clock, all read off the beat's phase. */
+  _tickPromo(p){
+    if (!this._promo) return;
+    const spot = this._phone() ? MODEL_PHONE : MODEL;
+
+    if (this._burst){
+      /* Struck at the exchange and gone almost at once — a flare that lingers is a lamp. */
+      const u = (p - PROMO.burst.at) / PROMO.burst.ms;
+      this._burst.intensity = (u < 0 || u > 1) ? 0 : PROMO.burst.peak * Math.pow(1 - u, 2.2);
+    }
+    if (this._ring){
+      const u = (p - PROMO.ring.at) / PROMO.ring.ms;
+      if (u < 0 || u > 1){ this._ring.visible = false; }
+      else {
+        this._ring.visible = true;
+        /* Out fast and thinning as it goes, so it reads as something travelling rather than
+           something inflating. */
+        const e = 1 - Math.pow(1 - u, 2.6);
+        const rad = spot.span * (PROMO.ring.from + (PROMO.ring.to - PROMO.ring.from) * e);
+        this._ring.scale.setScalar(rad);
+        this._ring.material.opacity = PROMO.ring.peak * Math.pow(1 - u, 1.4);
+      }
+    }
+    if (this._motes){
+      this._motes.forEach(m => {
+        const d = m.userData;
+        const u = (p - PROMO.motes.at - d.lag) / PROMO.motes.ms;
+        if (u < 0 || u > 1){ m.visible = false; return; }
+        m.visible = true;
+        /* Up and out, fading the whole way — embers, not fireworks. */
+        m.material.opacity = Math.sin(Math.pow(u, 0.6) * Math.PI) * PROMO.motes.peak;
+        const sz = spot.span * PROMO.motes.size * (0.6 + d.seed * 0.8);
+        m.scale.set(sz, sz * FORESHORTEN, 1);
+        m.position.set(d.x * (1 + u * 0.5),
+                       BASE_Y + spot.height * (0.12 + PROMO.motes.rise * u),
+                       d.z * (1 + u * 0.5));
+      });
+    }
   },
 
   /* Exactly once, whoever gets here first. */
@@ -784,6 +924,19 @@ export const Estate3D = {
        file is built around: a tab that stops rendering mid-beat would otherwise leave the estate
        stranded at a sixteenth of its size, and it would stay that way until the next level. */
     this._applyMorph(1);
+    /* The burst and the ring hang off the group rather than the cloud, so that the ring can be
+       occluded by the estate — which means they are this function's to remove as well. The motes
+       ride the cloud and go with it. */
+    this._promo = false;
+    this._motes = null;
+    if (this._burst){ this._group.remove(this._burst); this._burst = null; }
+    if (this._ring){
+      this._group.remove(this._ring);
+      if (this._ring.material.map) this._ring.material.map.dispose();
+      this._ring.material.dispose();
+      this._ring.geometry.dispose();
+      this._ring = null;
+    }
     const g = this._fog;
     this._fog = null;
     if (!g) return;
@@ -807,6 +960,7 @@ export const Estate3D = {
     const p = Math.min(1, (now() - this._fogFrom) / this._fogDur);
     this._tickFog(p);
     this._tickMorph(p);
+    this._tickPromo(p);
   },
 
   /* THE SCALE OF WHATEVER IS STANDING THERE, read off the same clock as the cloud.
@@ -833,7 +987,11 @@ export const Estate3D = {
       return 1 + (MORPH.floor - 1) * easeIn(u);
     }
     const u = (p - a) / MORPH.out;
-    return MORPH.floor + (1 - MORPH.floor) * backOut(u);
+    /* A promotion overshoots further on the way in. Same curve, more kick — the new place should
+       arrive rather than appear. */
+    const k = backOut(u);
+    const over = this._promo ? PROMO.overshoot : 1;
+    return MORPH.floor + (1 - MORPH.floor) * (k <= 1 ? k : 1 + (k - 1) * over);
   },
 
   _applyMorph(k){
@@ -855,7 +1013,8 @@ export const Estate3D = {
       p.material.opacity = a * FOG.peak;
       p.visible = p.material.opacity > 0.004;
       const spot = this._phone() ? MODEL_PHONE : MODEL;
-      const size = spot.span * FOG.size * (1 + (d.seed - 0.5) * 0.35)
+      const P = this._promo ? PROMO : { size: 1 };
+      const size = spot.span * FOG.size * P.size * (1 + (d.seed - 0.5) * 0.35)
                  * (0.62 + FOG.grow * 0.38 * u);
       p.scale.set(size, size * FORESHORTEN, 1);
       p.position.set(d.x, d.y + spot.height * FOG.rise * u, d.z);

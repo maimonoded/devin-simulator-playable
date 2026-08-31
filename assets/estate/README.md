@@ -101,6 +101,30 @@ So a cloud rolls over the plot, the building is exchanged where the cloud is thi
 clears: `cfg.estateFogMs` end to end, `cfg.estateFog` to switch it off. Nothing waits on it —
 it plays behind the status ribbon, and what it hides was banked in `state` long before.
 
+### A promotion is not a level
+
+Crossing a band is the beat the Season is built around — the title changes, the house changes and
+a milestone pays, all on one roll. A step inside a band is somebody buying a bed. Both were getting
+the same cloud and the same shrink, and the effect of that was not that the small one felt big: the
+big one felt small, because nothing told them apart.
+
+So a promotion runs on `cfg.estatePromoMs` instead of `cfg.estateFogMs`, and adds three things,
+each doing a different job:
+
+| | |
+|---|---|
+| **burst** | a hard flare of gold at the instant of the exchange — the punctuation that says something *happened*, not that something is happening |
+| **ring** | a band of light thrown out across the plot and dying at the edge of its own ground — what makes the burst feel like it came *from* the estate rather than being pasted over it |
+| **motes** | embers carried up off the plot afterwards — the tail, the part that says the event is over and was good, the way confetti is never thrown at the start |
+
+The new house also lands with more spring (`PROMO.overshoot`).
+
+**The cloud is barely bigger, and that took two passes to learn.** The instinct is to make a
+promotion *more weather*; at 1.7× the spread it was a white disc filling the ring, and the estate —
+the thing being celebrated — disappeared into it. A bigger cloud only hides more. The burst, the
+ring and the motes are what make this the larger beat; the cloud just gives them somewhere to
+happen.
+
 **The old place goes down and the new one comes up.** Under the thickest part of the cloud the
 outgoing estate collapses onto its own footprint and the incoming one swells out of the same spot,
 overshooting a little before it settles. Weather alone hides an exchange; it does not make one feel
