@@ -408,16 +408,25 @@ moves, not just the one that changed.
 
 ### The villa's climax reads smaller than its opening
 
-`MODEL` bounds the estate by **height and span**, and the span is what binds for tier 6: measured
-across levels 26 to 30 the width sits at 4.7–4.9 throughout while the height falls from 2.51 at
-level 27 to **1.78** at level 30. The last two levels earn a second building and gardens, the
-footprint grows, and the fit scales the whole plot down to keep it in frame — so the house itself
-is at its shortest exactly where the Season ends. The progression inverts at the moment it should
-peak.
+`MODEL` bounds the estate by **height and span** — `min(3.15/y, 3.90/max(x,z))` — and for tier 6
+the span is what binds. Measured on the board, every level of tiers 1 to 5 stands at the full 3.15
+(the apartment's cutaway at 3.128 is the one hair under), while the villa runs 2.295, 2.513, 2.337,
+1.890 and **1.778**. The Season gate is the smallest house on the track.
 
-It is cosmetic and the build is playable with it. Three ways out, in rough order of appeal: fit
-the **main building** rather than the whole plot, so outbuildings are allowed to overflow the span;
-raise `MODEL.span` for tier 6 only, since a per-tier `scale` is already supported in the manifest;
-or author the late levels to grow **upward** rather than outward, which is a prompt change and no
-code at all. The third is the cheapest and would want doing before tier 5's levels are generated,
-since they will hit the same wall.
+**The tier's own cutaway is most of it, which is not where the eye goes.** The bare villa is
+already 27% short before a single level step; level 27, which only furnishes the interior, draws
+*taller* than it, and so does level 28's gardens. Only rungs 29 and 30 fall below the base. So this
+is inherited from the cutaway a band was grown from rather than accumulated across its levels — a
+wide tier is five short houses.
+
+Three ways out, in rough order of appeal: fit the **main building** rather than the whole plot, so
+outbuildings may overflow the span; author the late levels to grow **upward** rather than outward,
+which is a prompt change and no code; or accept it. Note what does **not** work — a tier's `scale`
+multiplies *both* bounds, so it enlarges a span-bound model uniformly, spilling the footprint past
+the 3.90 that exists to stop a wide tier swallowing the ring. It draws a wrong proportion bigger
+rather than correcting it.
+
+The prompt-side half is now written up in the estate-art skill ("A wide plot is drawn short"), with
+the console check that catches it, so a future band should not repeat it. The engine-side option is
+still open and is what this entry is for.
+

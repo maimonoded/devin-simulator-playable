@@ -97,8 +97,10 @@ the townhouse only reads because all three of its interior steps were pushed to 
 **The structure rung carries the band, so make it project.** The flat's pergola and the
 townhouse's awning are the two loudest steps built so far, both because they stick out of the
 building and change its silhouette rather than its contents. Each remaining band's last rung
-already has something that projects — the apartment's canopy, the penthouse's cabana, the villa's
-guest pavilion — so lean into those rather than treating them as dressing.
+already has something that projects — the apartment's canopy, the penthouse's cabana — so lean into
+those rather than treating them as dressing. **The villa is the exception and its rung must project
+upward**, not across the island: tier 6 is span-bound, so anything added on the ground is charged
+to the roofline. See "A wide plot is drawn short" in the estate-art skill.
 
 **Retry a vanished change; do not retry drift.** A clean mesh with the change simply absent is a
 failure and worth another conversion every time. A footprint a few percent off is not. The first
@@ -187,8 +189,10 @@ helicopter, a domed rotunda, cypresses, a jetty with a yacht. The top of the tra
   actually full, four-posters, chandeliers throughout.
 - **28 · grounds** — formal gardens across the terraces: clipped parterres, fountains, statuary,
   lit paths.
-- **29 · structure** — a guest pavilion added on the island's far side, glass and stone, with its
-  own small pool.
+- **29 · structure** — a belvedere raised over the villa itself, glass and stone, with a roof
+  terrace above the great room. **Upward, and not across the island.** As shipped this rung was
+  built to an earlier wording — a guest pavilion on the far side — and `tier6-lv29.glb` is drawn
+  at 1.89 of a 3.15 height budget as a result. Kept here as the correction, not as the record.
 - **30 · the crown** — the Season gate, and it should feel like arriving. The whole island lit at
   night: every window warm, the pools lit from beneath, the paths and the rotunda picked out, a
   second larger yacht at the jetty. This is the only level allowed to change the light of the

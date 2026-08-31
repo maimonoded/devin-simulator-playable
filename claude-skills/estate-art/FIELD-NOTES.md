@@ -285,6 +285,16 @@ four clean conversions, no retries. What separated it from tier 2 was not luck b
 every prompt said *put this at the open cutaway edge* explicitly. That is the actual finding —
 enclosure is not fatal, it is a cost you pay unless you buy your way out of it in the prompt.
 
+**Addendum, 31 Aug 2026 — converting cleanly and being drawn correctly are different things.**
+Tier 6 is recorded above as the run's best-behaved band, four conversions and no retries, and the
+credit goes to the island being almost entirely sky-facing. That still holds for the conversion.
+It does not hold for the result: measured on the board, tier 6 draws between 2.51 and **1.78**
+against a 3.15 height budget, while every level of tiers 1 to 5 stands at the cap. A sky-facing
+subject is a wide subject, and the fit charges for width out of height — so the property that made
+the band easy to convert is the same one that makes it draw small. See "A wide plot is drawn short"
+in SKILL.md. The narrative above is left as written; a record with a correction attached is still a
+record.
+
 ## Pattern beats tint, which is a second axis the skill does not have
 
 The clearest new thing from tier 5. Level 23 is a deco sunburst inlaid across the lounge floor

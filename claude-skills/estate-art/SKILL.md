@@ -50,6 +50,61 @@ its own with nothing else running, so do not wait on another workload to clear. 
 plot. That is the right composition, the right style and the right identity already. The job is to
 edit it, not to replace it.
 
+### A wide plot is drawn short, and the villa already pays for it
+
+`_buildModel()` fits the mesh inside **two** budgets and takes whichever runs out first —
+`min(3.15 / height, 3.90 / footprint)` — so a building reaches its full height only while its
+footprint stays under about **1.24×** it. Past that the span binds, the whole model is scaled down
+until it fits, and every extra metre of plot is paid for out of the roofline. Nothing warns you:
+the file loads, the mesh is clean, the tool draws it, and the house is simply smaller than the one
+before it.
+
+**Which bound binds splits the six tiers in two, and that is the whole of it.** Tiers 1 to 5 are
+rooms and buildings: they stand at 3.15 at every level, height-bound, with span to spare. Tier 6 is
+a clifftop island and is span-bound before a single level step — the bare cutaway draws at
+**2.295**, twenty-seven percent short — and levels 29 and 30 take it to 1.89 and **1.78**. So the
+villa is at its smallest on screen at the Season gate, the one place the track is meant to peak.
+
+Note where the loss actually is, because it is not where you would guess. Level 27 furnishes the
+interior and draws *taller* than the base at 2.513; level 28 adds the formal gardens and is taller
+too. **The tier's own cutaway is the bigger lever**, and the last two rungs finished the job. A
+band inherits its proportion from the cutaway it was grown from, so a wide tier is five short
+houses rather than one.
+
+**The rule is therefore a constraint on the SUBJECT.** A room cannot sprawl — a sofa, a floor, a
+wall colour add the area of the change and not a millimetre of plot, which is why furniture → floor
+→ walls → structure ran five tiers without anyone discovering there was a second budget. A plot can
+only sprawl, because everything a villa is recognisable by sits on the ground. Decide which of the
+two you are prompting for before you write the prompt; nothing else in this file will ask you.
+
+For a plot, say what may not grow, in the prompt, in about these words: *"the island stays exactly
+the size it is, do not extend the grounds, do not add land or terraces"*. Reach for a storey, a
+tower, a belvedere, a cupola, a raised deck, a terrace over what is already there. Avoid a second
+building, a wing, gardens spread across the plot, a longer jetty, another moored boat — and
+especially anything phrased **"on the far side"**, which is an instruction to put the new mass as
+far from the house as the plot allows.
+
+**Do not try to measure 1.24 in the reference image.** It is a mesh number, taken *after* the
+engine turns the model 45°, and image-to-3D returns each plan in the frame of its own reference —
+so the same building can land either side of the line by as much as a factor of √2 depending only
+on how it happened to arrive. In the 3:4 image the limit looks like *a subject no wider than it is
+tall*: the projection stretches the plot sideways and foreshortens the height, so a reference that
+measures 1.24 on the page is already far over. Aim well inside it, and get the real number at
+Step 5.
+
+**What it is worth.** Under about 1.3 the loss is a couple of percent and not worth a retry — the
+apartment's cutaway sits at 1.247 and gives up 0.7%, which is why 25 of the 30 levels can be called
+clean. Past about 1.6 you are giving up a quarter of the roofline, and that is a re-edit of the
+reference rather than another conversion: **a conversion cannot change the proportion of the thing
+it is converting.**
+
+**And the budget is not slack to be reclaimed.** A tier's `scale` multiplies *both* bounds, so on a
+span-bound model it does raise the house — by spilling the footprint past 3.90 in the same
+proportion, which is precisely what `span` exists to stop. The comment above `MODEL` in
+`js/ui/estate3d.js` says why, and names this tier while doing it: `span` is what keeps a wide one
+from swallowing the ring the game is played on. `scale` cannot fix a proportion. It can only draw a
+wrong one larger.
+
 ### For a TIER: take the roof off
 
 `model_google-gemini-3-1-flash`, the tier's art as `referenceImages`, `aspectRatio: "3:4"`,
@@ -66,7 +121,9 @@ imply it. In this order:
    of landmarks — the yellow door and blue balcony, the copper cupola, the olive trees in their
    planters. "Keep the style" loses all of them.
 6. Furnish the exposed interior, and say **what to leave uncluttered**.
-7. Keep the isometric three-quarter view, centred, fully in frame.
+7. Keep the isometric three-quarter view, centred, fully in frame — and **compact**: taller than
+   it is wide, the plot no larger than the building standing on it. The cutaway sets the
+   proportion for all five of the band's levels.
 8. Isolate it: "alone in empty space on a plain flat dark navy background, no ground plane,
    nothing around or underneath it".
 9. End with the constraint restated flat: **no roof, no ceilings, no front walls, open to the sky**.
@@ -112,7 +169,9 @@ walls too, and two rungs of the ladder are spent at once.
    same plot, same camera, same framing, same lighting, same style, same background.
 2. **Everything the room has already gained**, named individually, and that it stays. "This room
    accumulates improvements and never loses one."
-3. The single thing that moves — and then, again, that the rest stays a wreck.
+3. The single thing that moves — and then, again, that the rest stays a wreck. Where the subject
+   is a plot rather than a room, add that the ground does not grow: same island, same terraces,
+   same footprint, the new thing fitted onto what is already there.
 
 A worked arc, the bedsit's, which is a story rather than five variations:
 
@@ -173,6 +232,15 @@ than the contents — which is what actually reads when the estate is 200 px wid
 So when a band needs one step to land, spend it on something that breaks the outline. And this is
 a second reason the arc ends on *structure*: it is the rung most likely to survive, so it is the
 right one to finish on.
+
+**Which direction is free depends on which bound is binding**, and the two are exact opposites —
+so "break the outline" is right in both regimes and means different things in each. On a
+height-bound tier the model is already scaled to 3.15, so a new storey buys nothing and costs
+everything: raising the mesh only makes the fit shrink it, and the hero object you spent the level
+on gets smaller. Sideways is the free direction there, which is why a pergola and an awning are the
+two loudest steps in the file. On a span-bound tier it inverts — sideways is the direction already
+costing the roofline, and the same job has to be done with a storey, a tower or a terrace over what
+is already there. Know which one you are on before choosing the rung. Step 5 tells you.
 
 ### Two failures that look alike and are not
 
@@ -287,6 +355,23 @@ angle, which is why `MODEL_YAW` has a default; that is not a guarantee about the
 Status track with + and − across all 30 levels and draws the estate exactly as the board does, fog
 included. It names the file it is drawing, so "did the building actually change" is answerable at
 a glance. Step 1 → 5 and check the arc reads as one story.
+
+**Then the height, because the eye cannot catch this one.** A sprawling estate is perfectly
+legible — it is only small — so the 200 px check passes it, and the loss happens afterwards in the
+fit. With the level on screen and the cloud finished, ask the scene:
+
+```js
+const THREE = await import("/vendor/three.module.js");
+const s = new THREE.Box3().setFromObject(Estate3D._body, true).getSize(new THREE.Vector3());
+({ file: Estate3D._bodyUrl, height: +s.y.toFixed(3), footprint: +Math.max(s.x, s.z).toFixed(3) });
+```
+
+`height` should read **3.15** — times the tier's `scale` if it sets one, and 2.60 instead with the
+9:16 box ticked. Materially under it means the span bound is biting, and `footprint` will be pinned
+at exactly **3.90**: level 3 answers `3.332 / 3.15`, level 30 answers `3.900 / 1.778`. The `true`
+flag is load-bearing — without it you measure the box of a rotated box and read high. Measure after
+the cloud has cleared rather than during it: the promotion collapses the body to 6% and springs it
+back, so mid-beat every model reads small.
 
 Both need the server: `python3 serve.py`, then `localhost:8125/tools/…`. Note that with several
 worktrees on this repo, **a 404 on a file you know exists usually means the checkout being served
