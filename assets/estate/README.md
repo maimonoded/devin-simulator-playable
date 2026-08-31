@@ -237,6 +237,13 @@ itself with `yaw` and needs no code change.
 
 Neither is a code change, which is the point.
 
+## What is left to build
+
+Levels 7 to 30 do not exist yet — twenty files, four per band above the first.
+[`LEVEL-PLAN.md`](LEVEL-PLAN.md) is the work plan: what each level changes, band by band, the
+contrast to play in each one, the order the chaining requires, and what it will cost in credits
+and repository weight. It is written to be picked up cold and worked through unattended.
+
 ## How a tier is made
 
 The pipeline that produced `models/tier1.glb`, and the reason the other five are cheap: **the art
