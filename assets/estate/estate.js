@@ -117,6 +117,26 @@ const ESTATE_TIERS = [
     blurb: "A balcony, and something growing on it." },
   { at: 11, name: "The townhouse",   art: "assets/estate/items/tier3.webp",
     model: "assets/estate/models/tier3.glb",
+    /* Handsome and a bit down at heel, so the contrast here is RESTORED against
+       shabby-genteel — the house is not a wreck and not yet smart:
+
+        12  a deep green leather chesterfield and a writing desk, and books arrive
+        13  herringbone parquet laid, with a deep crimson antique carpet over it
+        14  the panelling restored and painted ink blue, a gilt picture wall, brass lights
+        15  the shopfront done properly: gilt signwriting, a striped awning, the railings
+            regilded and the cupola reglazed
+
+       Level 15 is the one that carries the band. The awning PROJECTS from the building's
+       face and the sign sits on it, so both are unoccluded from the camera's angle and
+       survive reconstruction intact — and unlike the three interior steps before it, it
+       changes the silhouette. The townhouse is four storeys of enclosed rooms, which is the
+       hardest case for this pipeline: every interior step here is a change made inside a
+       box the camera only half sees. Placing each one hard against the open cutaway edge is
+       what makes 12, 13 and 14 read at all. */
+    levels: { 12: "assets/estate/models/tier3-lv12.glb",
+              13: "assets/estate/models/tier3-lv13.glb",
+              14: "assets/estate/models/tier3-lv14.glb",
+              15: "assets/estate/models/tier3-lv15.glb" },
     blurb: "Bay windows. Brass on the door." },
   { at: 16, name: "The apartment",   art: "assets/estate/items/tier4.webp",
     model: "assets/estate/models/tier4.glb",
