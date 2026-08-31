@@ -78,6 +78,22 @@ const ESTATE_TIERS = [
     blurb: "Above the chip shop. The window doesn't shut." },
   { at:  6, name: "The flat",        art: "assets/estate/items/tier2.webp",
     model: "assets/estate/models/tier2.glb",
+    /* The flat is not a wreck, so a step inside it cannot be read the way the bedsit's are.
+       There the contrast was new-against-DERELICT; here the room is already pleasant and the
+       only contrast left is new-against-PLAIN, which is a narrower gap and has to be paid for
+       in colour rather than in condition.
+
+       Level 7 is the furniture rung of the same arc — the ground floor's plain beige sofa
+       replaced by an emerald velvet one, and nothing else in the building touched. Emerald
+       because the tier had already spent every other saturated colour it owns: blue on the
+       balcony, the terrace, the bicycle and the boat, yellow on the door and the bed. Green
+       was here only as leaves, so an emerald object is the one thing that cannot be mistaken
+       for something that was always there.
+
+       The wicker sofa stays beside it deliberately. Two variants came back and the one that
+       deleted it was the worse asset: with nothing plain left in shot the new sofa is merely
+       the furniture, where next to the old one it is visibly an upgrade. */
+    levels: { 7: "assets/estate/models/tier2-lv7.glb" },
     blurb: "A balcony, and something growing on it." },
   { at: 11, name: "The townhouse",   art: "assets/estate/items/tier3.webp",
     model: "assets/estate/models/tier3.glb",
