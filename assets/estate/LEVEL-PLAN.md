@@ -82,6 +82,13 @@ failure and worth another conversion every time. A footprint a few percent off i
 looks like success, which is why every asset has to be stepped against the one before it in
 `tools/estate-levels.html` before it is committed.
 
+**Colours here are suggestions and several of them were wrong.** This file was written away from
+the reference images, and a colour chosen that way is a coin flip: it asks for a terracotta sofa in
+a tier whose floor tiles are already terracotta, and for "pale stone floors" and "a large pale
+sectional" in a building that is entirely pale stone and pale sectionals. Both would have been the
+contrast with its contrast removed. **Take the axis from this file and choose the colour after
+looking at what the tier has already spent.**
+
 ## The twenty, by band
 
 Each line is the ONE change for that level. Everything else in the prompt is a list of what stays,
@@ -125,6 +132,17 @@ planters, warm strip lighting. New-built and half empty.
   proper architectural lighting.
 - **20 · structure** — the terrace landscaped: an outdoor kitchen, a dining table under a canopy,
   mature planting all the way round, the pool surround rebuilt in stone.
+
+### Tier 4 · a warning from the band already built
+
+Tier 4 is mostly **glass**, and glass reconstructs as an opaque smear — the shipped `tier4.glb` has
+it too, so it is the tier's established look rather than something the levels introduced. The
+consequence: the apartment's interiors are not a usable place to put a change, and an interior
+*prop* there is wasted work. All three built steps had to lean on a large element — a whole floor
+finish, a whole wall — rather than an object. Level 17's mesh also dropped the turquoise pool, one
+of the tier's landmarks; the retry lost the change instead, so the landmark was sacrificed. That is
+the right call when forced — the step is why the file exists — but it is a real defect, recorded as
+one rather than filed under drift.
 
 ### Tier 5 · The penthouse (22–25)
 Art-deco teal and gold, long turquoise rooftop pool, cocktail bar with a neon arch, palms,
@@ -188,9 +206,22 @@ sequential.
 
 ## What this will cost, and what it is worth knowing before starting
 
-**Time and credits.** Three model calls per asset — an edit, a cutout, a conversion — and the
-conversion is ~105 CU and 2–3 minutes. Twenty assets is sixty calls and roughly two hours of
-conversion time alone.
+**Time and credits, measured rather than estimated.** Three calls per asset is the floor, not the
+expectation — retries are the variable, and they scale with how much of a band lands where the
+camera cannot see. Actual, over eleven assets:
+
+| tier | assets | conversions | CU | per asset |
+|---|---|---|---|---|
+| 2 · the flat | 4 | 10 | ~1265 | ~316 |
+| 3 · the townhouse | 4 | 4 | ~590 | ~148 |
+| 4 · the apartment | 3 | 5 | ~700 | ~230 |
+
+Quote a band at **600–1300 CU**.
+
+**The binding constraint is the request rate, not credits or conversion time.** After roughly forty
+model calls in ninety minutes the account began returning `429` with cooldowns of 517, 687 and 702
+seconds — an effective budget of about **one call every twelve minutes**, which turns a three-call
+asset into a forty-minute one. Pace from the start rather than discovering it at asset twelve.
 
 **Weight.** Each file is 1.6–2.4 MB. Twenty more takes `assets/estate/models/` from about 22 MB to
 roughly 60 MB, and the whole `assets/` directory past 130 MB. Runtime memory is fine — `_sweep()`
