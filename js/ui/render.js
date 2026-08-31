@@ -225,8 +225,9 @@ function renderStatusChip(){
      before the beat opens. releaseStatusChip (js/ui/fx.js) runs the bar afterwards and calls
      this again to settle on the real number. Nothing is stored: Status.points() is the truth
      throughout, and the pin is only ever a value to DRAW. */
-  const held=typeof statusHeldPoints==="function"?statusHeldPoints():null;
-  const pts=held!=null?held:Status.points(), rank=Status.rank(pts), lv=Status.level(pts);
+  const pinned=typeof statusPinned==="function"&&statusPinned();
+  const pts=typeof statusShownPoints==="function"?statusShownPoints():Status.points();
+  const rank=Status.rank(pts), lv=Status.level(pts);
   /* The LEVEL is the value and the band is its label, which is the right way round for a pill:
      the number moves several times a session, the band once every five levels. */
   $("#hLevel").textContent=lv;
@@ -238,7 +239,7 @@ function renderStatusChip(){
   $("#hRankFill").style.width=Math.round(Status.levelProgress(pts)*100)+"%";
   /* Pop when the number moves, since the chip is small and easy to miss. Not while pinned —
      the release owns that move and gives it a louder one than this. */
-  if(held==null&&state.lastStatus!==pts){
+  if(!pinned&&state.lastStatus!==pts){
     el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
     state.lastStatus=pts;
   }

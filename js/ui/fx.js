@@ -273,12 +273,26 @@ function flyCardToAlbum(fromEl){
    THE PIN IS A DISPLAYED VALUE, NEVER A STORED ONE. Status.points() stays the truth throughout;
    renderStatusChip simply draws an older reading of it while the hold is up. Nothing here can
    drift, because there is no second copy of the number to drift from. */
-let hudHold = null, hudHoldTimer = null;
+let hudHold = null, hudHoldTimer = null, hudAnim = null;
 
-/* What renderStatusChip should draw instead of the live total, or null for the truth. It lives
-   here rather than in render.js because index.html loads fx.js first and a file may only use
-   globals defined above it (CLAUDE.md). */
-function statusHeldPoints(){ return hudHold; }
+/* THE ONE CLOCK EVERY STATUS SURFACE READS. There are two of them — the HUD pill and the estate
+   plaque at the middle of the board — and they carry the same level, the same band and the same
+   bar. Two surfaces reading the live total independently is how they end up disagreeing at the
+   same instant, which is worse than neither of them moving.
+
+   The live total most of the time; an older reading while a card beat holds it; an interpolated
+   one while the beat's bar is running. Never a stored number: Status.points() stays the truth
+   throughout and these are only ever values to DRAW.
+
+   Both live here rather than in render.js because index.html loads fx.js first and a file may
+   only use globals defined above it (CLAUDE.md). estate3d.js is a module and reads them off the
+   global scope for the same reason it reads Status and cfg. */
+function statusShownPoints(){
+  return hudAnim != null ? hudAnim : (hudHold != null ? hudHold : Status.points());
+}
+/* Whether the number on screen is one of those stand-ins — which is what tells renderStatusChip
+   not to claim the move as settled, or to fire the little bump that competes with the beat. */
+function statusPinned(){ return hudHold != null || hudAnim != null; }
 
 /* Pin the chip at WHAT IT IS ALREADY SHOWING. state.lastStatus is exactly that -- the value the
    chip was last drawn with -- so the pin needs no reading of its own and cannot disagree with
@@ -292,7 +306,7 @@ function holdStatusChip(c){
      crash, since nothing about it looks broken. releaseStatusChip clears it on every normal
      path; nothing else has to remember to. */
   clearTimeout(hudHoldTimer);
-  hudHoldTimer = setTimeout(() => { hudHold = null; renderStatusChip(); }, 15000);
+  hudHoldTimer = setTimeout(() => { hudHold = null; hudAnim = null; renderStatusChip(); }, 15000);
 }
 
 /* Let it go, and show it going. Resolves when the bar has landed, so the roll loop waits for
@@ -331,6 +345,54 @@ function releaseStatusChip(){
   const timers = [];
   const later = (fn, t) => timers.push(setTimeout(fn, t));
 
+  /* ---- THE ESTATE, ON THE SAME CLOCK ----
+
+     The plaque at the middle of the board carries this same bar, so it moves with the pill or the
+     two contradict each other while the player is looking straight at them. It is a canvas
+     texture on a plane, not a DOM node, so there is no CSS transition to hand the work to: the
+     value is stepped on a timer and the band repainted underneath it.
+
+     A TIMER RATHER THAN A FRAME LOOP, like everything else in this file — rAF is suspended in a
+     background tab, and 40ms steps are indistinguishable from 60fps on a seven-pixel bar across
+     the board while costing a third of the texture uploads. */
+  const est = (p, pts) => {
+    if(window.Board3D && Board3D.available && Board3D.paintEstateBar)
+      Board3D.paintEstateBar(p, pts, true);
+  };
+  const p0 = Status.levelProgress(from), pEnd = Status.levelProgress(to);
+  const half = levelled ? Math.max(1, Math.round(ms * 0.45)) : 0;
+  const bTop = levelled ? Status.levelAt(lvFrom + 1) : 0;
+  const base = levelled ? Status.levelAt(lvTo) : 0;
+  const ease = t => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+  const t0 = Date.now();
+  let flipped = false;
+  const estTimer = setInterval(() => {
+    const t = Date.now() - t0;
+    if(!levelled){
+      const e = ease(t / ms);
+      hudAnim = from + (to - from) * e;
+      est(p0 + (pEnd - p0) * e, hudAnim);
+    }else if(t < half){
+      const e = ease(t / half);
+      hudAnim = from + (bTop - from) * e;
+      /* Held just short of the boundary: at exactly bTop the level has already turned over, and
+         the bar would read as the EMPTY start of the next level one step before the flip. */
+      est(p0 + (1 - p0) * e, Math.min(hudAnim, bTop - 0.001));
+    }else{
+      if(!flipped){
+        /* The level turns over. Name, LV, pips and the tier's art all change — that is a whole
+           face, so it is a real sync rather than a band repaint. Exactly one of them per beat. */
+        flipped = true;
+        hudAnim = base;
+        if(window.Board3D && Board3D.available && Board3D.syncCase) Board3D.syncCase();
+      }
+      const e = ease((t - half) / Math.max(1, ms - half));
+      hudAnim = base + (to - base) * e;
+      est(pEnd * e, hudAnim);
+    }
+    if(t >= ms) clearInterval(estTimer);
+  }, 40);
+
   nextPaint(() => {
     if(!levelled){
       fill.style.transition = `width ${ms}ms cubic-bezier(.2,.9,.3,1)`;
@@ -367,9 +429,16 @@ function releaseStatusChip(){
        and the whole point of this function is that the roll waits for it. */
     setTimeout(() => {
       timers.forEach(clearTimeout);
+      clearInterval(estTimer);
+      /* The stand-in goes before either surface is settled, so both read the truth again. */
+      hudAnim = null;
       el.classList.remove("gain", "levelled");
       fill.style.transition = "";
       renderStatusChip();
+      /* A full sync rather than a last paintBar: it puts the bar back to teal, re-stamps the
+         signature so the next renderAll does not repaint, and is the one place the plaque is
+         guaranteed to land on the real number however the beat was interrupted. */
+      if(window.Board3D && Board3D.available && Board3D.syncCase) Board3D.syncCase();
       resolve();
     }, ms + hold + 60);
   });

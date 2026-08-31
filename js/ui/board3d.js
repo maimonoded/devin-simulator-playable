@@ -622,6 +622,10 @@ const Board3D = {
 
   /* The Status Estate — redrawn only when what it shows changes; see Estate3D.sync(). */
   syncCase(){ if (this.available) Estate3D.sync(); },
+  /* The estate's SIGN alone, repainted in place. The status beat steps this on a timer
+     (js/ui/fx.js releaseStatusChip); a syncCase per step would rebuild the mesh and upload a new
+     texture, which is the cost sync()'s signature gate exists to avoid. */
+  paintEstateBar(p, pts, gain){ return this.available ? Estate3D.paintBar(p, pts, gain) : false; },
 
   /* ---------------- opening a box ----------------
      Two beats, both in the scene and both awaited by the roll loop: the closed box waiting to be

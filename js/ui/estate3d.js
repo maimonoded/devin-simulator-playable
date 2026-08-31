@@ -211,6 +211,15 @@ const P = { w: 300, h: PLAQUE_H + F.pad * 2, pad: F.pad };
 const now = () => (typeof performance !== "undefined" && performance.now)
   ? performance.now() : Date.now();
 
+/* WHAT THE STATUS SURFACES ARE CURRENTLY DRAWING — the live total most of the time, a held older
+   reading while a card beat is up, and an interpolated one while that beat's bar runs
+   (js/ui/fx.js). The estate's sign is one of those surfaces and the HUD pill is the other: they
+   carry the same level and the same bar, so they have to read ONE value or they contradict each
+   other on screen at the same instant, which is worse than neither of them moving. */
+function shownPts(){
+  return typeof statusShownPoints === "function" ? statusShownPoints() : Status.points();
+}
+
 function roundRect(x, a, b, w, h, rad){
   if (x.roundRect){ x.beginPath(); x.roundRect(a, b, w, h, rad); return; }
   const k = Math.min(rad, w / 2, h / 2);
@@ -371,7 +380,11 @@ export const Estate3D = {
   sync(){
     if (!this._scene) return;
     if (typeof state === "undefined" || typeof Status === "undefined") return;
-    const lv = Status.level();
+    /* The SHOWN total, not the live one — so a renderAll() landing mid-beat repaints what the
+       beat is showing rather than snapping the sign to the answer its bar is still travelling
+       toward. */
+    const pts = shownPts();
+    const lv = Status.level(pts);
     const tier = this.tierFor(lv);
     const view = this._phone() ? "p" : "d";
     const src = this._model(tier);
@@ -394,7 +407,7 @@ export const Estate3D = {
     if (src){
       /* MODELLED. The house holds still while the sign counts. */
       const bodySig = `m/${lv}/${view}`;
-      const signSig = `m/${lv}/${Math.round(Status.levelProgress() * 100)}/${view}`;
+      const signSig = `m/${lv}/${Math.round(Status.levelProgress(pts) * 100)}/${view}`;
       /* A swap already owing owns the body until it runs. Touching it here would change the
          house in the open and then have the armed swap change it again — see _swapNow. */
       if (bodySig !== this._bodySig && !this._fogSwap){
@@ -440,7 +453,7 @@ export const Estate3D = {
     }
 
     /* PAINTED. The plaque is part of the picture, so there is nothing to hang beside it. */
-    const bodySig = `f/${lv}/${Math.round(Status.levelProgress() * 100)}/${view}/${artTick()}`;
+    const bodySig = `f/${lv}/${Math.round(Status.levelProgress(pts) * 100)}/${view}/${artTick()}`;
     if (bodySig === this._bodySig) return;
     this._bodySig = bodySig;
     this._signSig = null;
@@ -482,7 +495,18 @@ export const Estate3D = {
         if (!o.isMesh) return;
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (o.userData.own === "all"){
-          mats.forEach(m => m && m.map && m.map.dispose && m.map.dispose());
+          mats.forEach(m => {
+            if (!m || !m.map) return;
+            /* THE SIGN'S HANDLE DIES WITH THE SIGN — but with that sign only, matched on the
+               texture actually being disposed. Nulling it unconditionally looks equivalent and
+               is not: `next` is an ARGUMENT, so _buildSign has already painted the replacement
+               and set the new handle by the time this runs, and a blanket null would erase the
+               sign about to be installed rather than the one going away. Invalidating here
+               rather than at each call site is what makes it a property of disposal, so a
+               paintBar can never write into a dead texture. */
+            if (this._live && this._live.map === m.map) this._live = null;
+            if (m.map.dispose) m.map.dispose();
+          });
           if (o.geometry && o.geometry.dispose) o.geometry.dispose();
         }
         mats.forEach(m => m && m.dispose && m.dispose());
@@ -917,7 +941,28 @@ export const Estate3D = {
     c.width = P.w; c.height = P.h;
     const x = c.getContext("2d");
     this._plaque(x, P.pad, P.pad, P.w - P.pad * 2, level);
-    return this._texture(c, P.w / P.h);
+    const map = this._texture(c, P.w / P.h);
+    /* THE SIGN IS THE PLAQUE — the whole canvas and nothing else on it — so the status beat
+       repaints it outright. Hanging the plaque on its own plane is what makes that true; in the
+       painted face it is a band inside a picture and would have to be snapshotted and restored. */
+    this._live = { ctx: x, map };
+    return map;
+  },
+
+  /* THE BEAT'S BAR. Repaints the sign in place and re-uploads its texture — no new mesh, no new
+     material, and no trip through sync()'s signature gate — so this is cheap enough to step on a
+     timer while the status beat plays, which a full sync() explicitly is not.
+
+     Returns false when there is no sign to paint on: the painted fallback draws its plaque into
+     the picture instead, and there is a window after a swap disposes one sign and before the next
+     is built. The caller falls back to a full sync, which is the behaviour before any of this. */
+  paintBar(p, pts, gain){
+    const L = this._live;
+    if (!L || !L.map) return false;
+    L.ctx.clearRect(0, 0, P.w, P.h);
+    this._plaque(L.ctx, P.pad, P.pad, P.w - P.pad * 2, Status.level(pts), { p, pts, gain });
+    L.map.needsUpdate = true;
+    return true;
   },
 
   _texture(canvas, aspect){
@@ -931,9 +976,15 @@ export const Estate3D = {
      (ox, oy) in a box `w` wide and PLAQUE_H tall. Everything inside is placed relative to that
      corner, which is what lets the painting hang it under a picture and the sign stand it on
      the ground with one copy of the code. */
-  _plaque(x, ox, oy, w, level){
+  _plaque(x, ox, oy, w, level, bar){
     const tier = this.tierFor(level);
-    const rank = Status.rank();
+    /* THE POINTS THIS FACE IS DRAWING — shownPts() normally, or the beat's own interpolated
+       value when it is steering. The fraction is passed in rather than derived during a beat
+       because a level crossing is TWO moves, not one: fill to the top of the old level, turn
+       over, fill again from the bottom of the new one. Deriving it would run the bar backwards
+       across everything just earned. */
+    const pts = bar && bar.pts != null ? bar.pts : shownPts();
+    const rank = Status.rank(pts);
 
     roundRect(x, ox, oy, w, PLAQUE_H, 9);
     const grad = x.createLinearGradient(0, oy, 0, oy + PLAQUE_H + F.pad);
@@ -949,7 +1000,7 @@ export const Estate3D = {
     x.textAlign = "right";
     x.fillStyle = "#e8ecff";
     x.font = "800 14px 'Segoe UI', system-ui, -apple-system, sans-serif";
-    x.fillText(`LV ${Status.level()}`, ox + w - 10, oy + 17);
+    x.fillText(`LV ${level}`, ox + w - 10, oy + 17);
 
     /* PIPS — one per level in this tier, filled up to where you are. The warmth ramp is felt
        rather than read; this is the half that can be READ, so "something changed" is never a
@@ -969,10 +1020,19 @@ export const Estate3D = {
     const bx = ox + 10, bw = w - 20, by = oy + 44, bh = 7;
     roundRect(x, bx, by, bw, bh, 4);
     x.fillStyle = "rgba(255,255,255,.13)"; x.fill();
-    const p = Math.max(0, Math.min(1, Status.levelProgress()));
+    const p = Math.max(0, Math.min(1, bar && bar.p != null ? bar.p : Status.levelProgress(pts)));
     if (p > 0){
       roundRect(x, bx, by, Math.max(4, bw * p), bh, 4);
-      x.fillStyle = "#2dd4bf"; x.fill();
+      if (bar && bar.gain){
+        /* Gold and lit while the beat runs. The card that paid for this has just flown off the
+           board into the collection button, so the eye is already on its way back here. */
+        x.save();
+        x.shadowColor = "rgba(255,203,92,.85)"; x.shadowBlur = 12;
+        x.fillStyle = "#ffcb5c"; x.fill();
+        x.restore();
+      } else {
+        x.fillStyle = "#2dd4bf"; x.fill();
+      }
     }
 
     /* HAVE / NEEDED, under the bar. A bar on its own says "some of the way"; the numbers say
@@ -983,7 +1043,7 @@ export const Estate3D = {
        Measured WITHIN the level, not against the Season: points banked since this level began,
        over what this level costs. At the top there is no next level, so it says so rather than
        printing a fraction of a span that does not exist. */
-    const lvNow = Status.level();
+    const lvNow = Status.level(pts);
     x.textBaseline = "middle";
     x.textAlign = "center";
     x.font = "800 13px 'Segoe UI', system-ui, -apple-system, sans-serif";
@@ -992,9 +1052,9 @@ export const Estate3D = {
       x.fillText("SEASON COMPLETE", ox + w / 2, by + 20);
     } else {
       const here = Status.levelAt(lvNow), next = Status.levelAt(lvNow + 1);
-      const have = Math.max(0, Math.round(Status.points() - here));
+      const have = Math.max(0, Math.round(pts - here));
       const need = Math.max(1, Math.round(next - here));
-      x.fillStyle = "rgba(232,236,255,.92)";
+      x.fillStyle = bar && bar.gain ? "#fff2cf" : "rgba(232,236,255,.92)";
       x.fillText(`${fmt(have)} / ${fmt(need)}`, ox + w / 2, by + 20);
     }
   },

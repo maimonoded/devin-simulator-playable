@@ -260,6 +260,33 @@ A `finally` around the beat releases the pin, because a pin that is never let go
 showing the wrong number for the rest of the session — and `holdStatusChip` arms a watchdog on
 top of that, since nothing about a stale number looks broken.
 
+**THERE ARE TWO STATUS SURFACES, AND THEY READ ONE VALUE.** The HUD pill is one; the estate's
+sign, standing at the front of the plot, is the other — same level, same band, same bar. Two
+surfaces each reading `Status.points()` for themselves is how they end up contradicting each
+other at the same instant, which is worse than neither of them moving. So `statusShownPoints()`
+(`js/ui/fx.js`) is the single value both draw, and `shownPts()` in `js/ui/estate3d.js` is just
+that function reached from a module.
+
+The sign cannot use a CSS transition, so the beat steps it on a **40 ms timer** — not a frame
+loop, for the reason everything else here is on a timer. `Estate3D.paintBar()` repaints the sign
+canvas in place and re-uploads its texture, skipping `sync()`'s signature gate entirely: a full
+`sync()` per step would rebuild the mesh, which is precisely the cost that gate exists to avoid.
+This is only cheap because the sign is its **own** 300×94 canvas. While the plaque lived inside
+the 300×400 painted face, the same beat needed a `getImageData` band snapshot and a
+`putImageData` restore — so hanging the plaque on its own plane deleted a whole mechanism.
+
+Two things there are easy to get wrong, and both were:
+
+- **`_live` must be invalidated by DISPOSAL, matched on the texture actually being disposed.**
+  `_swap(old, next)` takes `next` as an argument, so `_buildSign` has already painted the
+  replacement and set the new handle before `_swap`'s body runs. Nulling unconditionally looks
+  equivalent and instead erases the sign about to be installed — `paintBar` then declines
+  forever and the estate never animates.
+- **The settle `sync()` must not be gated.** The fog holds the sign rebuild behind `_fogSwap` so
+  the house and the plaque turn over together; the beat's own flip `sync()` can legitimately be
+  swallowed by that, but the settle is the backstop that puts the real number on the plaque
+  however the beat was interrupted.
+
 **Unlocking and watching are two different gates.** Which clues fall is luck, so pages fill in
 whatever order they fill — page 2 can complete first. Watching cannot work that way: the drama is
 serialised, and episode 2's prediction question gives away episode 1. So a page filling *unlocks*
