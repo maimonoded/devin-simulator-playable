@@ -39,18 +39,6 @@
 /* What a mystery box held, centred where it popped. Wider than the plain reveal because it can
    carry three rows, and it pops in per row so the numbers arrive with the confetti rather than
    all at once after it. */
-.centerfx.spoils{width:auto}
-.spoilTop{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);
-          opacity:.9;margin-bottom:4px;text-shadow:0 2px 8px rgba(0,0,0,.8)}
-.spoilRow{display:flex;align-items:center;justify-content:center;gap:9px;line-height:1.15;
-          animation:revealPop .42s cubic-bezier(.2,1.5,.4,1) both}
-.spoilRow:nth-child(3){animation-delay:.10s}
-.spoilRow:nth-child(4){animation-delay:.20s}
-.spoilIco{font-size:30px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))}
-.spoilAmt{font-family:Georgia,serif;font-weight:800;font-size:36px;color:var(--gold);
-          text-shadow:0 3px 12px rgba(0,0,0,.75)}
-.spoilAmt.teal{color:var(--teal)}
-
 /* drawn deck card */
 .centerfx.card{width:auto}
 .playcard{width:158px;margin:0 auto;padding:12px 12px 14px;border-radius:14px;
@@ -71,18 +59,58 @@
 .scrim{position:fixed;inset:0;background:rgba(6,8,24,.72);backdrop-filter:blur(3px);z-index:80;
        display:none;align-items:center;justify-content:center;padding:20px}
 .scrim.show{display:flex}
-.modal{width:min(480px,100%);background:linear-gradient(180deg,var(--panel),#12163a);
+/* A modal is never taller than the window, and its BODY is what scrolls — the header keeps the
+   title and the close affordance on screen, and the footer buttons stay reachable. Without this
+   a tall one (the store, the library with a long list) simply grew past the viewport and lost
+   both ends of itself with nothing to scroll.
+
+   The height cap lives here rather than on each modal because every one of them can grow: the
+   store gained three box tiers, the library grows an episode per set, and the prediction grows
+   an answer per question. */
+.modal{width:min(480px,100%);max-height:100%;display:flex;flex-direction:column;
+       background:linear-gradient(180deg,var(--panel),#12163a);
        border:1px solid var(--purple);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.6);
        overflow:hidden;animation:pop .3s cubic-bezier(.2,1.3,.4,1)}
 @keyframes pop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
-.modal .top{padding:18px 22px;background:linear-gradient(180deg,rgba(139,109,255,.22),transparent)}
+.modal .top{flex:0 0 auto;padding:18px 22px;
+            background:linear-gradient(180deg,rgba(139,109,255,.22),transparent)}
 .modal .eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--pink)}
 .modal h2{margin:6px 0 0;font-size:22px;font-family:Georgia,serif;line-height:1.2}
-.modal .mbody{padding:8px 22px 22px}
+/* min-height:0 is what actually lets a flex child shrink below its content and scroll — without
+   it the body keeps its natural height and pushes the modal past the cap above. */
+.modal .mbody{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+              padding:8px 22px 22px}
+.modal .mbody::-webkit-scrollbar{width:8px}
+.modal .mbody::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.modal .mbody::-webkit-scrollbar-track{background:transparent}
+/* The prompt over the answers. Small, but it is the difference between "two panels" and "a
+   question with two answers" — and it is what makes the disabled button's label make sense. */
+.optAsk{margin-top:16px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+     color:var(--gold)}
+.optAsk+.opt{margin-top:7px}
 .opt{width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
      padding:13px 15px;margin-top:9px;display:flex;justify-content:space-between;align-items:center;transition:.15s}
 .opt:hover{border-color:var(--purple);transform:translateX(3px)}
+/* A PRESS STATE, because :hover never fires on a phone.
+
+   These were the only interactive controls in the app whose sole affordance was hover — every
+   other tappable surface already has an :active (.btn, .storeBtn, .libRow, .packBox, .sheetX,
+   .avatarBtn, .pack). On ?view=mobile that left the two answers looking exactly like the
+   evidence panel above them and the wager tiers below: same var(--panel2) ground, same
+   var(--line) border, same radius. A stack of identical slate panels, two of which are secretly
+   the only thing that unlocks the primary button.
+
+   The radio dot is the other half. The gold ring on the pre-selected wager tier was the only
+   "chosen" mark on the screen, so the one choice already made FOR the player looked decided and
+   the one they had to make looked inert. An empty dot says "this is a choice, and it is open".  */
+.opt:active{border-color:var(--purple);background:#262e63}
+.opt::before{content:"";flex:0 0 auto;width:16px;height:16px;margin-right:11px;border-radius:50%;
+     border:2px solid var(--line);transition:.15s}
+.opt:hover::before{border-color:var(--purple)}
 .opt.sel{border-color:var(--gold);background:#2b2b52}
+.opt.sel::before{border-color:var(--gold);background:radial-gradient(circle,var(--gold) 45%,transparent 47%)}
+/* The text is the flexible half now that the dot leads; the odds span still tucks to the right. */
+.opt>span:first-of-type{flex:1 1 auto}
 .opt .odds{font-weight:800;color:var(--gold);font-size:13px}
 /* Wager tiers — three shares of the balance, not a free slider (js/economy.js wagerTiers). */
 .tierRow{display:flex;gap:8px;margin-top:16px}
@@ -128,10 +156,6 @@
 
 /* ---------- clue found ---------- */
 .clueModal{width:min(400px,100%)}
-.clueFound{display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;
-           background:#1b2150;border:1px solid var(--teal);border-radius:10px;
-           padding:9px 11px;margin-top:8px;line-height:1.35}
-
 /* ---------- clue album ---------- */
 .modal.albumModal{width:min(520px,100%)}
 .albumBar{height:8px;background:#10143a;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
@@ -231,3 +255,47 @@
        border-radius:12px;padding:10px 18px;font-weight:700;font-size:14px;box-shadow:var(--shadow);
        animation:toastin .3s ease}
 @keyframes toastin{0%{transform:translateY(-14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+
+/* ---- Review the evidence (js/ui/prediction.js, GDD §7.2) ----
+   Collapsed by default: the clues are the reason to open it, and a wall of text above the
+   answers would bury the question the player is actually being asked. */
+.evidence{margin:8px 0 2px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.evHead{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+  background:rgba(45,212,191,.07);border:0;color:var(--text);font:inherit;font-size:13px;
+  padding:9px 12px;cursor:pointer;text-align:left}
+.evHead:hover{background:rgba(45,212,191,.13)}
+.evHead::after{content:"▾";color:var(--muted);transition:transform .18s ease}
+.evHead.open::after{transform:rotate(180deg)}
+.evCount{color:var(--teal);font-weight:700;margin-left:auto}
+.evBody{padding:10px 12px;border-top:1px solid var(--line)}
+/* THE EVIDENCE BOARD. Each row is the clue's own card beside its sentence.
+
+   The card, because a clue IS a card and this is the screen where the player handles their
+   evidence — a bulleted list of strings made the thing they spent four draws collecting look
+   like a footnote. The sentence beside it, because at row size the card's own slip is 6px:
+   the thumbnail says WHAT this is, the text says what it SAYS. Tapping opens .evZoom. */
+.evList{display:flex;flex-direction:column;gap:9px}
+.evRow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;
+     border:1px solid transparent;border-radius:9px;padding:4px;transition:.15s;cursor:pointer}
+.evRow:hover,.evRow:active{background:rgba(45,212,191,.08);border-color:rgba(45,212,191,.35)}
+.evThumb{flex:0 0 54px;display:block;pointer-events:none}
+.evThumb .ccard{width:54px}
+/* The thumbnail is the PHOTOGRAPH in its sprocketed frame, nothing else. A clue card carries a
+   slip, a name and an episode caption; at 54px those render at six and seven pixels and read as
+   grey noise stapled under the picture — three illegible things competing with the sentence
+   sitting right beside them, which is the one thing here that has to be read. So the frame and
+   the photo stay, the type goes, and the photo takes the space the type was using. The whole
+   card, type and all, is one tap away in .evZoom. */
+.evThumb .ccSlip,.evThumb .ccFoot,.evThumb .ccRar{display:none}
+.evThumb .ccard.fam-clue .ccArt,
+.evThumb .ccard.fam-clue .ccGrain{inset:7px 8px}
+.evText{flex:1 1 auto;font-size:13px;color:var(--text);line-height:1.5}
+
+/* The zoom. Fixed at 85: above .scrim (80) so it clears the modal it opens from, below
+   .confetti (90). Appended INSIDE #scrim, so closeEpisodeUi() takes it with everything else and
+   there is nothing extra to tear down. */
+.evZoom{position:fixed;inset:0;z-index:85;display:flex;align-items:center;justify-content:center;
+     padding:24px;background:rgba(6,8,24,.82);backdrop-filter:blur(4px);cursor:zoom-out;
+     animation:evZoomIn .18s ease}
+.evZoom .ccard{width:min(78vw,56vh,400px)}
+@keyframes evZoomIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}

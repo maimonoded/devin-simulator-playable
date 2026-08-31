@@ -8,5 +8,15 @@ Episodes.add({
     { "text": "They share the bed without much fuss", "odds": 4.55 }
   ],
   "correct": 0,
-  "difficulty": 5
+  "difficulty": 5,
+  "clues": [
+    { "id": "c1", "text": "He offers the floor before she has to ask." },
+    { "id": "c2", "text": "The room is freezing and there is one blanket." },
+    { "id": "c3", "text": "Neither of them has slept properly in a week." },
+    { "id": "c4", "text": "They are still talking at two in the morning." },
+    { "id": "c5", "text": "The floor is bare boards." },
+    { "id": "c6", "text": "She does not actually tell him to take it." },
+    { "id": "c7", "text": "He has slept rough for six months and says it is nothing." },
+    { "id": "c8", "text": "The light goes off and neither of them moves towards the door." }
+  ]
 });

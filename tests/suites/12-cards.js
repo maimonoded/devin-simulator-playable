@@ -1,0 +1,416 @@
+"use strict";
+/* cards.js — the Season catalogue, what you own of it, and what owning it is worth (GDD §4).
+
+   The composition tests are content tests, and they matter more than they look: "90/38/18/4" is
+   a balance decision, and a typo in it is invisible in play. The game would simply feel slightly
+   wrong for a whole Season. */
+
+suite("cards: the catalogue");
+
+test("the shipped catalogue validates clean", () => {
+  deepEq(Cards.validate(), []);
+});
+
+test("the catalogue is sized to the CONTENT: 48 cards, four sets of twelve, 29/12/6/1", () => {
+  /* §4.6's 150 cards across 15 sets is written for a 60-episode Season. We have 18 episodes, and
+     the doc's own ratios — ~2.5 cards an episode (§4.6), one set per four-episode arc (§4.4) —
+     put that at 48 in four sets.
+
+     This is not tidiness. Conversion needs THREE COPIES OF ONE CARD, and across 150 cards a
+     given Common turned up 0.67 times in a full demo run — so the loop the whole Status track
+     hangs off almost never fired. §4.6 says its numbers are "a coherent starting shape for the
+     simulation to tune, not tuned values", and this is that tuning.
+
+     Cards.validate() deliberately does NOT check any of this — it has no idea how big a Season
+     should be, and a count is a balance decision rather than a correctness one. Which is why it
+     is asserted here instead. */
+  const all = Cards.all();
+  eq(all.length, 48);
+  eq(Cards.sets().length, 4);
+  Cards.sets().forEach(s => eq(s.cards.length, 12, s.key));
+  const by = {};
+  all.forEach(c => { by[c.rarity] = (by[c.rarity] || 0) + 1; });
+  /* Still §4.2's 60/25/12/3 shares, to the nearest card. Asserted per rarity rather than with
+     deepEq on the whole object, because deepEq here compares key ORDER too — and the order is
+     whatever the catalogue happened to author first, which is not a fact worth failing on. */
+  eq(by.common, 29, "common"); eq(by.rare, 12, "rare");
+  eq(by.epic, 6, "epic");      eq(by.legendary, 1, "legendary");
+});
+
+test("every set mixes the memory and the trophy (§4.1)", () => {
+  /* "The two kinds are interleaved within sets so that completing a set means owning both the
+     memory and the trophy." A set that is all narrative or all Status cards would still validate
+     and still play — it would just quietly stop being the thing §4.1 describes.
+
+     Status cards are identified by the aspirational-object ids they were authored with; there is
+     deliberately no `kind` field on a card row, because the engine must not care which sort a
+     card is. That is the point of the design: they convert identically. */
+  const STATUS = new Set(["silk-scarf","gold-cufflinks","cashmere-coat","swiss-watch","penthouse-key",
+    "monogrammed-shirt","leather-gloves","crystal-decanter","diamond-studs","private-jet",
+    "velvet-heels","pearl-earrings","perfume-bottle","emerald-necklace","vintage-roadster",
+    "silver-case","designer-luggage","couture-gown","sapphire-ring","the-villa"]);
+  eq(Cards.all().filter(c => STATUS.has(c.id)).length, 20, "twenty Status cards in the Season");
+  Cards.sets().forEach(s => {
+    const status = s.cards.filter(c => STATUS.has(c.id)).length;
+    ok(status > 0, `${s.key} has no Status card — no trophy in it`);
+    ok(status < s.cards.length, `${s.key} is all Status cards — no memory in it`);
+  });
+});
+
+test("the rarity weights are §4.2's 60/25/12/3 and read as percentages", () => {
+  deepEq(Cards.rarities().map(r => r.weight), [60, 25, 12, 3]);
+  eq(Cards.rarities().reduce((a, r) => a + r.weight, 0), 100);
+});
+
+test("rarer is worth more, at every step and on every axis", () => {
+  const rs = Cards.rarities();
+  for (let i = 1; i < rs.length; i++) {
+    ok(rs[i].rank > rs[i - 1].rank, `${rs[i].key} rank`);
+    ok(rs[i].weight < rs[i - 1].weight, `${rs[i].key} must be rarer`);
+    ok(rs[i].status > rs[i - 1].status, `${rs[i].key} status`);
+    ok(rs[i].dup > rs[i - 1].dup, `${rs[i].key} duplicate value`);
+  }
+});
+
+test("a card knows its set and its Season without storing either", () => {
+  const c = Cards.all()[0];
+  const set = Cards.setForCard(c.id);
+  ok(set && set.cards.includes(c), "derived from the catalogue, not from a field on the card");
+  eq(Cards.setForCard("no-such-card"), null);
+});
+
+test("art is optional, and where it exists it resolves under the Season's directory", () => {
+  const withArt = Cards.all().filter(c => c.art);
+  ok(withArt.length > 0, "the Season has painted art");
+  withArt.forEach(c => ok(Cards.artFor(c).startsWith(Cards.season().art), c.id));
+  /* NO ART IS A NORMAL STATE, not a gap — and this asserts it against a card BUILT without art
+     rather than one found in the catalogue. Season 1 is now fully painted, so searching for an
+     unpainted card finds nothing and the assertion would quietly go vacuous; the next Season
+     opens unpainted and would be relying on a check that had stopped checking.
+
+     This used to also assert that SOME cards were unpainted, which was a fact about how far the
+     art had got rather than anything about the code. It failed the moment the last Common was
+     painted, which is the wrong direction for a test to fire in. */
+  eq(Cards.artFor({ id: "no-such-card", name: "?", rarity: "common" }), null);
+  eq(Cards.artFor(null), null, "and a missing card is not a crash");
+});
+
+test("validate catches a reused id, a bad rarity and weights that no longer sum to 100", () => {
+  const set = Cards.sets()[0], real = set.cards.slice();
+  const w = Cards.rarities()[0].weight;
+  try {
+    set.cards = real.concat([{ id: Cards.all()[20].id, name: "clash", rarity: "common" },
+                             { id: "brand-new", name: "?", rarity: "mythic" }]);
+    Cards.rarities()[0].weight = 59;
+    const errs = Cards.validate();
+    ok(errs.some(e => /reuses an id/.test(e)), "the clash");
+    ok(errs.some(e => /which does not exist/.test(e)), "the bad rarity");
+    ok(errs.some(e => /sum to 99/.test(e)), "the broken percentage");
+  } finally { set.cards = real; Cards.rarities()[0].weight = w; }
+});
+
+suite("cards: owning, and converting");
+
+test("three copies convert, and the third is the one that pays the status", () => {
+  freshRun();
+  const id = Cards.all()[0].id, r = Cards.rarityOf(id);
+  const a = Cards.add(id, 1);
+  eq(a.isNew, true); eq(a.converted, false);
+  /* A card you have never seen now pays BOTH — a share of the conversion value, so the status
+     track moves on the pull, and the flat per-copy coins every copy pays. It used to pay
+     nothing at all, which meant a whole session of new cards left the bar sitting still. */
+  eq(a.status, Cards.firstCopyStatus(r), "a new card moves the track");
+  eq(a.coins, Cards.cardCoins(), "and every copy pays a little money");
+  eq(Cards.converted(id), false);
+  const b = Cards.add(id, 1);
+  eq(b.converted, false);
+  /* ALL THREE COPIES PAY THE SAME. They used to pay 25% / nothing / 100%: a nudge, a dead beat
+     and the payoff. That made the second copy the only thing in the game you could pull and be
+     paid nothing for — survivable while it was invisible, absurd once the beat started stopping
+     the board on it with an n-of-3 counter and a blank where the number goes. A copy is a copy:
+     each did the same job of getting you one nearer. */
+  eq(b.status, Cards.copyStatus(r), "the copy that got you to 2 of 3 is worth the same as the 1st");
+  ok(b.coins > Cards.cardCoins(), "a plain duplicate always converts to something");
+  const c = Cards.add(id, 1);
+  eq(c.converted, true, "the third copy is the Collectible");
+  eq(c.status, Cards.copyStatus(r), "and it is worth the same as the other two");
+  eq(a.status, b.status, "1st and 2nd agree");
+  eq(b.status, c.status, "2nd and 3rd agree \u2014 which is the whole rule");
+  eq(c.coins, Cards.cardCoins(), "it pays in status rather than in consolation");
+  ok(Cards.converted(id));
+});
+
+test("copies past the third trickle status, so no pull is ever dead", () => {
+  freshRun();
+  const id = Cards.all()[0].id, r = Cards.rarityOf(id);
+  Cards.add(id, 3);
+  const extra = Cards.add(id, 1);
+  eq(extra.status, r.trickle);
+  ok(extra.coins > 0, "and it still pays coins");
+});
+
+test("adding several copies at once pays exactly what adding them one at a time would", () => {
+  freshRun();
+  const id = Cards.all()[0].id;
+  const many = Cards.add(id, 5);
+  const coinsMany = state.coins, statusMany = many.status;
+  freshRun();
+  let coins1 = 0, status1 = 0;
+  for (let k = 0; k < 5; k++) { const r = Cards.add(id, 1); status1 += r.status; }
+  coins1 = state.coins;
+  eq(coinsMany, coins1, "coins");
+  eq(statusMany, status1, "status");
+});
+
+test("a duplicate is worth its rarity — a Legendary dupe is not a Common dupe", () => {
+  freshRun();
+  const pick = k => Cards.all().find(c => c.rarity === k).id;
+  const paid = k => { const id = pick(k); Cards.add(id, 1); state.coins = 0; Cards.add(id, 1); return state.coins; };
+  const common = paid("common"), leg = paid("legendary");
+  ok(leg > common, "rarity has to survive into the consolation or a dupe is a dupe");
+});
+
+test("what the collection is worth is derived from the copies and nothing else", () => {
+  freshRun();
+  eq(Cards.statusPoints(), 0);
+  const id = Cards.all()[0].id, r = Cards.rarityOf(id);
+  const per = Cards.copyStatus(r), need = Cards.copiesToConvert();
+  Cards.add(id, 2);
+  /* Two copies pay twice — progress, still not a Collectible. THE INVARIANT THIS GUARDS is that
+     the derived total agrees with what add() reported: status is derived and never accumulated,
+     so if the two readings of the rule drift the bar moves on the beat and snaps back on the
+     next render. */
+  eq(Cards.statusPoints(), 2 * per, "two copies is twice the progress, and still not a Collectible");
+  Cards.add(id, 1);
+  eq(Cards.statusPoints(), need * per, "and the third completes it \u2014 three equal payments");
+  Cards.add(id, 2);
+  eq(Cards.statusPoints(), need * per + 2 * r.trickle, "past that it trickles, unchanged");
+});
+
+suite("cards: drawing");
+
+test("draws follow the rarity weights", () => {
+  freshRun();
+  const hits = {}, N = 20000;
+  for (let k = 0; k < N; k++) { const c = Cards.draw(); hits[c.rarity] = (hits[c.rarity] || 0) + 1; }
+  Cards.rarities().forEach(r => {
+    const got = (hits[r.key] || 0) / N * 100;
+    near(got, r.weight, 2, `${r.key} came up ${got.toFixed(1)}% against an authored ${r.weight}%`);
+  });
+});
+
+test("a floor is a GUARANTEE, not a target — never undershot, and better is allowed", () => {
+  freshRun();
+  const min = Cards.rarity("epic").rank;
+  const seen = new Set();
+  for (let k = 0; k < 3000; k++) {
+    const c = Cards.draw("epic");
+    ok(Cards.rarity(c.rarity).rank >= min, `${c.rarity} is below the floor`);
+    seen.add(c.rarity);
+  }
+  ok(seen.has("legendary"), "a floor must not cap the draw at itself");
+});
+
+test("a floor with nothing authored above it falls DOWN rather than paying nothing", () => {
+  freshRun();
+  const set = Cards.sets()[0];
+  const real = CARD_SEASONS[0].sets;
+  try {
+    /* A Season of Commons only, asked for a Legendary. */
+    CARD_SEASONS[0].sets = [{ key: "x", name: "x", cards: set.cards.map(c => ({ ...c, rarity: "common" })) }];
+    const c = Cards.draw("legendary");
+    ok(c, "a draw that pays nothing is the one outcome a collection game cannot afford");
+    eq(c.rarity, "common");
+  } finally { CARD_SEASONS[0].sets = real; }
+});
+
+suite("cards: sets");
+
+test("a set completes on the last card OWNED, not the last one converted", () => {
+  freshRun();
+  const set = Cards.sets()[0];
+  set.cards.slice(0, -1).forEach(c => Cards.add(c.id, 1));
+  eq(Cards.setComplete(set.key), false);
+  deepEq(Cards.setProgress(set.key), [set.cards.length - 1, set.cards.length]);
+  Cards.add(set.cards[set.cards.length - 1].id, 1);
+  ok(Cards.setComplete(set.key), "thirty copies is a different game");
+});
+
+test("the bonus is paid once, and claiming is idempotent", () => {
+  freshRun();
+  const set = Cards.sets()[0];
+  set.cards.forEach(c => Cards.add(c.id, 1));
+  state.coins = 0;
+  const paid = Cards.claimSet(set.key);
+  ok(paid, "a finished set owes a bonus");
+  eq(state.coins, Math.round(cfg.setBonusCoins * cfg.boardScale));
+  eq(Cards.claimSet(set.key), null, "and only once");
+  eq(state.coins, Math.round(cfg.setBonusCoins * cfg.boardScale));
+  deepEq(Cards.unclaimedSets().map(s => s.key), [], "nothing left to sweep");
+});
+
+test("an unfinished set cannot be claimed", () => {
+  freshRun();
+  const set = Cards.sets()[0];
+  eq(Cards.claimSet(set.key), null);
+  eq(Cards.setClaimed(set.key), false);
+});
+
+test("banking the last card of a set pays for it, through whatever banked it", () => {
+  freshRun();
+  const set = Cards.sets()[0];
+  set.cards.slice(0, -1).forEach(c => Cards.add(c.id, 1));
+  const last = set.cards[set.cards.length - 1].id;
+  const real = Cards.draw;
+  Cards.draw = () => Cards.get(last);
+  try {
+    const ev = drawCardEvents("t");
+    const done = ev.find(e => e.setDone);
+    ok(done, "a set finished by a tile draw is still a set finished");
+    eq(done.setDone.key, set.key);
+    ok(Cards.setClaimed(set.key));
+  } finally { Cards.draw = real; }
+});
+
+suite("cards: nothing is lost when the content changes");
+
+/* Run `fn` with the catalogue pretending a card was never authored, always restored. This is
+   what a rename, a re-cut set or a reshuffled Season looks like from a save's point of view. */
+function withCardRemoved(id, fn) {
+  const set = Cards.setForCard(id);
+  const real = set.cards.slice();
+  set.cards = real.filter(c => c.id !== id);
+  try { return fn(); } finally { set.cards = real; }
+}
+
+test("banking a card remembers what it was", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "legendary");
+  Cards.add(c.id, 1);
+  const m = state.cardMeta[c.id];
+  ok(m, "the record is written on the first copy");
+  eq(m.r, "legendary");
+  eq(m.name, c.name);
+  eq(m.set, Cards.setForCard(c.id).name);
+});
+
+test("a card the catalogue forgets keeps its NAME and its RARITY", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "legendary");
+  Cards.add(c.id, 3);
+  withCardRemoved(c.id, () => {
+    eq(Cards.all().some(x => x.id === c.id), false, "the catalogue really has forgotten it");
+    const got = Cards.get(c.id);
+    ok(got, "…but the save has not");
+    eq(got.name, c.name);
+    eq(got.rarity, "legendary");
+    eq(got.lost, true, "and it says so, rather than passing as ordinary");
+  });
+});
+
+test("…and therefore keeps its STATUS — the whole point of the record", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "legendary");
+  const lr = Cards.rarity("legendary");
+  // three equal copies, which is what the Collectible is worth
+  const worth = Cards.copiesToConvert() * Cards.copyStatus(lr);
+  Cards.add(c.id, 3);
+  eq(Cards.statusPoints(), worth);
+  withCardRemoved(c.id, () => {
+    eq(Cards.statusPoints(), worth,
+       "a converted Legendary must not quietly become a Common because content moved");
+    eq(Cards.rarityOf(c.id).key, "legendary");
+  });
+});
+
+test("a forgotten card is kept, counted and listed — never deleted", () => {
+  freshRun();
+  const c = Cards.all()[0];
+  Cards.add(c.id, 2);
+  withCardRemoved(c.id, () => {
+    eq(Cards.count(c.id), 2, "the copies survive");
+    deepEq(Cards.lostIds(), [c.id]);
+    eq(Cards.lostCards()[0].name, c.name);
+    /* …but it is not part of THIS Season's collection, so it cannot inflate the headline. */
+    ok(!Cards.all().some(x => x.id === c.id));
+    eq(Cards.owned(), 0, "x/150 counts the catalogue, not the bag");
+  });
+});
+
+test("the record survives a save and a reload", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "epic");
+  Cards.add(c.id, 3);
+  saveState();
+  freshRun();
+  loadState();
+  eq(state.cardMeta[c.id].r, "epic");
+  withCardRemoved(c.id, () => eq(Cards.rarityOf(c.id).key, "epic"));
+});
+
+test("a save from before the record existed is covered on load", () => {
+  freshRun();
+  const c = Cards.all().find(x => x.rarity === "epic");
+  Cards.add(c.id, 3);
+  saveState();
+  /* Hand-edit the slot back to what an older build wrote: cards, no cardMeta. */
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  delete raw.cardMeta;
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  freshRun();
+  loadState();
+  eq(state.cardMeta[c.id].r, "epic",
+     "re-derived on load, so an old collection is covered before the next card is banked");
+});
+
+test("an unreadable record degrades rather than throwing the collection away", () => {
+  freshRun();
+  const c = Cards.all()[0];
+  Cards.add(c.id, 1);
+  saveState();
+  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
+  raw.cardMeta[c.id] = { r: "mythic", name: "" };     // a rarity this build does not have
+  localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
+  freshRun();
+  loadState();
+  eq(state.cardMeta[c.id].r, "common", "an unknown rarity falls back rather than dropping it");
+  ok(state.cardMeta[c.id].name, "and a card remembered by name beats one not remembered at all");
+});
+
+suite("cards: the two kinds in one catalogue (§4.1)");
+
+/* A set interleaves the MEMORY — a moment from the episodes — with the TROPHY, an aspirational
+   object: the watch, the necklace, the villa. The beat treats them differently (a trophy holds
+   longer and counts itself out of three), so which kind a card is has to be knowable, and it is
+   an authoring decision: nothing about a silk scarf's id, rarity or set can be read to work it
+   out. Hence a field in the catalogue rather than a derivation. */
+test("every set mixes memories and trophies — neither kind is missing from one", () => {
+  Cards.sets().forEach(s => {
+    const trophies = s.cards.filter(c => Cards.isStatusCard(c.id)).length;
+    ok(trophies > 0, `${s.name} has no trophy to aspire to`);
+    ok(trophies < s.cards.length, `${s.name} is all trophies and no memories`);
+  });
+});
+
+test("isStatusCard reads the catalogue, and absent means memory", () => {
+  const all = Cards.all();
+  const trophies = all.filter(c => Cards.isStatusCard(c.id));
+  eq(trophies.length, 20, "twenty of the forty-eight");
+  ok(trophies.every(c => c.kind === "status"), "and each says so in the catalogue");
+  ok(all.filter(c => !Cards.isStatusCard(c.id)).every(c => c.kind === undefined),
+     "a memory card carries no kind at all — the annotation only means something if it is rare");
+  eq(Cards.isStatusCard("no-such-card"), false, "an unknown id is not a trophy, and does not throw");
+});
+
+test("a trophy's third copy is what the counter counts to", () => {
+  /* The beat prints "n of 3" from Cards.add's count and copiesToConvert. Pin that the two agree
+     and that the third copy is the converting one, since the celebration hangs off `converted`. */
+  freshRun();
+  const tro = Cards.all().find(c => Cards.isStatusCard(c.id));
+  const need = Cards.copiesToConvert();
+  const seen = [];
+  for (let i = 0; i < need; i++) seen.push(Cards.add(tro.id));
+  eq(seen.map(r => r.count).join(","), [1, 2, 3].slice(0, need).join(","), "counts up one at a time");
+  eq(seen[need - 1].converted, true, "and the last of them converts");
+  ok(seen.filter(r => r.converted).length === 1, "exactly once — the celebration cannot fire twice");
+});

@@ -64,6 +64,36 @@ const DIE_SCREEN_TOWARD = [Math.SQRT1_2, 0, Math.SQRT1_2];   // down the screen,
    rather than trusting the tidy answer. */
 const DIE_THROW_FROM = [0, 0, 1];
 
+/* HOW FAR TO THROW SHORT OF WHERE THE CAMERA IS AIMED, so the dice land in the lower half of
+   the view instead of the middle of it.
+
+   The middle is where everything else is. The Status Estate stands at the board's centre and
+   the HUD sits over the top of the frame, so dice thrown at the camera's aim point land behind
+   one or under the other — which on a phone means the number is simply not readable.
+
+   `drop` is a fraction of the visible HALF-HEIGHT: 0 lands on the aim point as before, 1 would
+   land on the bottom edge of the frame. Being a fraction rather than a distance is what makes
+   it hold at any zoom and on any pane, which is the whole reason it is not a magic number of
+   tiles.
+
+   THE DIVISION BY sin(elevation) IS THE POINT of doing this here. The camera looks down at 38°,
+   so a metre of ground travelled toward the camera only moves the dice sin(38°) ≈ 0.62 of a
+   metre DOWN the screen. Offsetting by the raw screen distance would fall a third short. The
+   drag handler in js/ui/board3d.js divides by the same factor for the same reason.
+
+   Returns a world-space {x, z} to add to the aim point. Pure, so the tests can hold it — a sign
+   error here throws the dice UP the screen and behind the HUD, which is the failure this
+   function exists to prevent and exactly the kind that looks plausible in code review. */
+function diceDrop(halfHeight, drop, elevationDeg) {
+  const f = Math.max(0, Math.min(1, +drop || 0));
+  if (!f || !(halfHeight > 0)) return { x: 0, z: 0 };
+  const el = (+elevationDeg || 0) * Math.PI / 180;
+  const s = Math.sin(el);
+  if (!(s > 1e-6)) return { x: 0, z: 0 };      // a camera on the horizon has no "down screen"
+  const ground = (halfHeight * f) / s;
+  return { x: DIE_SCREEN_TOWARD[0] * ground, z: DIE_SCREEN_TOWARD[2] * ground };
+}
+
 function diceLanding(n, spread, centre) {
   const c = centre || [0, 0];
   const out = [];

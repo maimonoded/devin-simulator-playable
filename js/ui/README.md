@@ -6,7 +6,15 @@ it mutates `state` and returns *event lists* that `playEvents()` here plays back
 | File | Owns |
 |---|---|
 | [fx.js](fx.js) | Generic effects and small DOM outputs: floating rewards, the activity log, toasts, confetti + the dice shower, dice-face drawing and the roll shake, the number tween. Also the three blocking board overlays — `showReveal`, `showCard`, `showCollect` — and `clearOverlayFx()` for error recovery. |
-| [render.js](render.js) | Pure state → DOM rendering: the board, token position, overlay markers, the builders view's upgrade row, HUD, stats, story card, button enable/disable. `renderAll()` is the single entry point. Nothing here mutates game state. |
+| [render.js](render.js) | Pure state → DOM rendering: the board, token position, the HUD (including the status rank beside the avatar), the play row's badges, stats, story card, button enable/disable. `renderAll()` is the single entry point. Nothing here mutates game state. |
+| [cardface.js](cardface.js) | One card, drawn — owned, locked or unknown. Shared by the album and the box popup, because a card that looks like two different things in the two places it appears is not a collection. |
+| [pack.js](pack.js) | Opening a box: drives the in-scene beat (box3d.js) and owns its caption and countdown, plus the modal fallback for when there is no WebGL. Blocking, and resolves on every path. |
+| [album.js](album.js) | The album — one page per episode, with the empty slots named so the player knows what to chase. Paged, and past sets are still reachable. |
+| [profile.js](profile.js) | The status track and the shelf of things that prove it. The only place status items are bought. |
+| [statusup.js](statusup.js) | The beat an earned status item plays: the item in its gold frame, the points gained, and the track moving — filling to the top of the old rank and again from the bottom of the new one when it turns over. A ribbon over the board, not a dialog. |
+| [estate3d.js](estate3d.js) | **The Status Estate**, standing inside the board ring (GDD §3.5) — one canvas-painted plane standing upright on the board, upgrading with Status level. A scene object, not an overlay. A module, imported by board3d.js. |
+| [box3d.js](box3d.js) | The box you tap to open, and the cards that fly out of it. Both are in the scene; the only DOM in the beat is pack.js's caption and countdown. A module, imported by board3d.js. |
+| [artcache.js](artcache.js) | Card and item images, decoded once and shared by estate3d and box3d, with a callback so a face painted before its art arrived repaints when it lands. |
 | [player.js](player.js) | The episode video player — both `playerMarkup(id)` and the `playVideo(id)` behaviour that drives it (autoplay, no-seek, pause, 2×, progress, session skip, missing-video fallback). |
 | [prediction.js](prediction.js) | Predict & watch: the betting modal, playback, and the result screen. |
 | [store.js](store.js) | The coin/energy top-up modal. |

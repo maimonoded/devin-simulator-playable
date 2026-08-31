@@ -1,0 +1,836 @@
+/* ---------- the collection: cards, the album, the box popup, the profile ----------
+
+   Loaded after overlay.css and before mobile.css. The card family is prefixed `cc` because
+   `.card` is already the side panel's box in panels.css — see js/ui/cardface.js. */
+
+/* ---------- one card ----------
+   3:4, art edge to edge, the name on a gradient over the bottom of it. Three sizes, because a
+   card in an album slot, a card in a two-up box and a single card filling the popup are the
+   same object at genuinely different scales. */
+/* container-type so the clue face can size its TYPE against the card instead of against a size
+   class — see .fam-clue below. inline-size only: the card's height comes from aspect-ratio, and
+   a size container would break that. */
+.ccard{container-type:inline-size;position:relative;aspect-ratio:3/4;border-radius:11px;overflow:hidden;
+  background:linear-gradient(180deg,#1a1f47,#0e1230);border:1.5px solid var(--line);
+  box-shadow:0 6px 16px rgba(0,0,0,.45);isolation:isolate}
+.ccard.size-sm{border-radius:9px;border-width:1.5px}
+.ccard.size-lg{border-radius:14px;border-width:2px}
+.ccArt{position:absolute;inset:0;background-size:cover;background-position:center top}
+/* A diagonal gloss, so a card reads as a printed, laminated object rather than a photo in a
+   rounded box. Pointer-events off — it sits over the whole card. */
+.ccSheen{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 34%,
+                             rgba(255,255,255,0) 62%,rgba(255,255,255,.09) 100%)}
+.ccFoot{position:absolute;left:0;right:0;bottom:0;padding:14px 7px 6px;
+  background:linear-gradient(180deg,rgba(8,10,28,0),rgba(8,10,28,.88) 42%,rgba(8,10,28,.97));
+  pointer-events:none}
+/* Two lines, then an ellipsis. A long name is a real case — "The Photograph Through the Glass"
+   is four lines in a small slot — and letting it grow pushes the card's own foot off the art. */
+.ccName{font-family:Georgia,serif;font-weight:700;line-height:1.15;color:var(--text);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ccSub{color:var(--muted);line-height:1.2;margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.size-sm .ccName{font-size:10px} .size-sm .ccSub{font-size:8px}
+.size-md .ccName{font-size:13px} .size-md .ccSub{font-size:10px}
+.size-lg .ccName{font-size:17px} .size-lg .ccSub{font-size:12px}
+/* ---------- the rarity badge ----------
+   ONE TO FOUR STARS, coloured, and drawn on locked slots too: three stars is what tells you
+   whether the gap in the row is a week's play or a lucky Tuesday.
+
+   Stars rather than the name, because "is an Epic better than a Rare?" is a question you have to
+   have learnt the answer to and ★★★ against ★★ is not a question at all. The count also means
+   the badge no longer changes width with the rarity, so it stops colliding with the copy count
+   in a small slot -- which is what the abbreviations existed to avoid.
+
+   The colour comes from the catalogue as --rar (assets/cards/cards.js), so adding a rarity is a
+   data change, not a stylesheet one. */
+.ccRar{position:absolute;top:5px;left:5px;z-index:3;border-radius:999px;
+  padding:1px 7px;font-size:18px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  background:rgba(8,10,28,.85);border:1px solid color-mix(in srgb,var(--rar) 55%,transparent);
+  color:var(--rar);white-space:nowrap;line-height:1.1;
+  /* The glyph is the whole badge, so it carries its own light rather than relying on the
+     card's halo -- a single Common star on dark art is otherwise nearly invisible. */
+  text-shadow:0 0 6px color-mix(in srgb,var(--rar) 70%,transparent)}
+.size-sm .ccRar{font-size:14px;padding:0 4px;top:3px;left:3px;letter-spacing:0}
+.size-lg .ccRar{font-size:26px;padding:2px 9px}
+/* The clue and status badges are WORDS, not stars. Doubling the star size would have set
+   "EVIDENCE" at 18px across a card 200px wide, so the word keeps the size the badge had. */
+.fam-clue .ccRar,.fam-status .ccRar{font-size:9px;letter-spacing:.05em;text-shadow:none;
+  padding:2px 7px;line-height:1.4}
+.size-sm.fam-clue .ccRar,.size-sm.fam-status .ccRar{font-size:6.5px;padding:1.5px 4px}
+.size-lg.fam-clue .ccRar,.size-lg.fam-status .ccRar{font-size:11px;padding:3px 9px}
+.ccCount{position:absolute;top:5px;right:5px;z-index:3;border-radius:999px;padding:2px 7px;
+  font-size:9px;font-weight:800;background:rgba(8,10,28,.82);border:1px solid var(--line);color:var(--muted)}
+/* At album size the count DROPS to the bottom corner, because four stars and a count no longer
+   fit on one line: the badge is 68px of an 86px card, and they overlapped by 7px.
+
+   This is the same collision the rarity abbreviations were invented to avoid ("LEGENDARY 2/3"
+   in ninety pixels). Stars made it survivable, not impossible -- at twice the size it came
+   straight back. Moving the count is the fix that keeps working whatever the badge does next;
+   shrinking the stars until they just fit is the one that breaks again. */
+.size-sm .ccCount{font-size:6.5px;padding:1.5px 4px;top:auto;bottom:31%;right:3px}
+.ccCount.conv{color:var(--gold);border-color:rgba(255,203,92,.5)}
+.ccDup{position:absolute;left:0;right:0;bottom:34%;z-index:3;text-align:center;
+  font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--gold);
+  background:rgba(8,10,28,.7);padding:3px 0}
+.ccLock{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;
+  font-size:22px;opacity:.5}
+.size-sm .ccLock{font-size:15px}
+.size-lg .ccLock{font-size:34px}
+.ccPlain{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:Georgia,serif;font-weight:800;font-size:20px;color:var(--gold);text-align:center;padding:8px}
+.size-sm .ccPlain{font-size:13px}
+.size-lg .ccPlain{font-size:28px}
+
+/* ---------- rarity, on the card itself ----------
+   A GLOW, and nothing else. Rarity used to set the border colour too, which quietly broke the
+   rule this file is built on — the frame is the FAMILY and the badge is the rarity. A Common
+   with a slate border and an Epic with a purple one were two different-looking frames inside one
+   family, and the drab one made an ordinary card look broken rather than ordinary.
+
+   So every collection card wears the same gold frame, and rarity escalates the halo around it.
+   Legendary also gets a slow shimmer, because the rarest thing on screen should be the one that
+   moves. */
+.ccard.rar-common{box-shadow:0 6px 16px rgba(0,0,0,.45)}
+.ccard.rar-rare{box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 14px rgba(79,157,255,.30)}
+.ccard.rar-epic{box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 20px rgba(176,107,255,.40)}
+.ccard.rar-legendary{box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 28px rgba(255,203,92,.55)}
+.ccard.rar-legendary.got .ccSheen{
+  background:linear-gradient(115deg,rgba(255,255,255,.22) 0%,rgba(255,203,92,.12) 30%,
+                             rgba(255,255,255,0) 55%,rgba(255,255,255,.16) 100%);
+  background-size:250% 250%;animation:ccShimmer 3.4s ease-in-out infinite}
+@keyframes ccShimmer{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+/* ---------- THE FRAME IS THE FAMILY ----------
+   Three families are completely different things: a collection card belongs to a set, a status
+   piece is a thing you were PAID — a trophy for calling an episode right — and a clue is a
+   sentence you have to read. The frame carries that, because a label can be missed and a frame
+   cannot — and it is independent of the rarity badge above, so an Epic card and a trophy can
+   never be mistaken for one another however good the art is. */
+
+/* collection — GOLD, and warm underneath. A gilt border with a fine inner rule set just inside
+   it, over a deep plum-brown ground rather than the blue-black everything else in the app uses.
+   That warmth is doing as much work as the gold: a clue is cool cream paper and a collection card
+   is a warm gilded object, so the two are unmistakable at a glance even in a row of thumbnails. */
+.ccard.fam-collection{border-color:#c9a24a;border-width:2px;
+  background:radial-gradient(120% 90% at 50% 18%,#3a2140,#1c1026 60%,#120a18)}
+.size-sm.fam-collection{border-width:1.5px}
+.ccard.fam-collection .ccFrame{position:absolute;inset:5px;z-index:2;pointer-events:none;
+  border-radius:6px;border:1px solid rgba(255,203,92,.42);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+/* Converted: the gilt lights up and the halo warms. The card stops being progress and becomes a
+   thing you own, so the frame is where that is said. */
+/* ---------- a TROPHY card: a memory's twin, wanting to be a plaque ----------
+   Both kinds are `collection` family and always were — the plaque is what a trophy BECOMES on
+   its third copy, not what it is. But a set interleaves the two and the player wants the
+   trophies more (§4.1), so one picture apart is not enough to tell them by.
+
+   The plaque's CORNER BRACKETS, in advance. CLAUDE.md's reason for them on the Showcase face is
+   that brackets read as something hung on a wall; on the card they read as a promise of the
+   same. It is the one motif the two states already share, so a trophy card and the Collectible
+   it turns into are recognisably one object at both ends.
+
+   And a warmer ground: the same radial, pushed from plum toward amber. Deliberately a shift in
+   TEMPERATURE and not a different colour — the gilt border, the star badge and the rarity halo
+   all still mean exactly what they mean on a memory, and none of them is being asked to carry
+   a second job. */
+.ccard.kind-trophy{border-color:#ffcb5c;border-width:3px;
+  background:radial-gradient(120% 90% at 50% 18%,#5a3d1c,#2a1808 58%,#160d04);
+  /* THE HALO IS ALWAYS ON, AND IT IS THE LOUDEST THING ON THE CARD. Rarity's glow is a whisper
+     that escalates (rar-* below); this is a constant, warmer and wider than any of them, so a
+     trophy is identifiable across a room and across a row of memories. That does mean a trophy's
+     glow no longer reports its rarity — which is why the badge stopped being stars and became
+     CUPS: the count moved to the one place that can still carry it. */
+  box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 26px rgba(255,180,60,.55),
+             inset 0 0 22px rgba(255,190,90,.14)}
+.size-sm.kind-trophy{border-width:2px}
+.size-lg.kind-trophy{border-width:4px}
+/* A SECOND FRAME INSIDE THE FIRST — the difference a glance catches before any of the rest.
+   A memory has one gilt line; a trophy is mounted, which is what the object it becomes is. */
+.ccard.kind-trophy .ccFrame{border-color:rgba(255,203,92,.75);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.55),0 0 0 1px rgba(255,203,92,.35)}
+/* The cups need less room than four stars: an emoji is wider than a glyph, and four of them at
+   star size would run half the width of an album card. */
+.ccard.kind-trophy .ccRar{font-size:11px;letter-spacing:-1px;padding:2px 6px}
+.size-sm.kind-trophy .ccRar{font-size:7px;letter-spacing:-1.5px;padding:1px 3px}
+.size-lg.kind-trophy .ccRar{font-size:17px;letter-spacing:-1px;padding:3px 8px}
+.ccard.kind-trophy .ccFrame::before,.ccard.kind-trophy .ccFrame::after{content:"";
+  position:absolute;width:15px;height:15px;border:2px solid rgba(255,203,92,.85);pointer-events:none}
+.ccard.kind-trophy .ccFrame::before{top:-4px;left:-4px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}
+.ccard.kind-trophy .ccFrame::after{bottom:-4px;right:-4px;border-left:0;border-top:0;border-radius:0 0 4px 0}
+.size-sm.kind-trophy .ccFrame::before,.size-sm.kind-trophy .ccFrame::after{width:9px;height:9px;border-width:1.5px}
+.size-lg.kind-trophy .ccFrame::before,.size-lg.kind-trophy .ccFrame::after{width:21px;height:21px;border-width:3px}
+/* A locked trophy keeps the brackets — the point is knowing it IS one before you have it. */
+.ccard.kind-trophy.locked .ccFrame::before,.ccard.kind-trophy.locked .ccFrame::after{opacity:.45}
+
+.ccard.fam-collection.conv{border-color:var(--gold)}
+.ccard.fam-collection.conv .ccFrame{border-color:rgba(255,203,92,.9);
+  box-shadow:inset 0 0 14px rgba(255,203,92,.25),inset 0 0 0 1px rgba(0,0,0,.35)}
+
+/* clue — a CONTACT SHEET. A strip of film, and the frame ringed in grease pencil.
+
+   This is the card the player is actually playing for: four of them buy the next episode, and
+   the episode is the whole point of the game. It used to be the plainest object in the box —
+   cream paper with a sentence on it, next to status plaques that glowed — which had the
+   hierarchy exactly backwards.
+
+   The film strip fixes that with SILHOUETTE rather than colour. Sprocketed edges are a shape
+   nothing else in the game has, so a clue is identifiable before any of its content is read —
+   which matters more than it sounds, because this family is dark like a collection card and
+   cannot rely on ground colour to separate itself the way cream paper did.
+
+   The RED RING is the second half of that. It is the only saturated red in the card system, it
+   marks the frame the way a picture editor marks a keeper, and it gives the eye somewhere to
+   land on a face that is otherwise grey.
+
+   The sentence sits UNDER the frame in typewriter, not on a slip: a contact sheet is annotated
+   in the margin, and prose over a photograph is the thing that reliably becomes unreadable. */
+.ccard.fam-clue{border-color:#2b2d33;border-style:solid;border-width:1px;background:#15161a;
+  box-shadow:0 8px 20px rgba(0,0,0,.55);border-radius:3px}
+/* The sprocket strips. Two pseudo-elements rather than a background on the card, so they sit
+   ABOVE the photograph and read as the film the frame is punched into. */
+.ccard.fam-clue::before,.ccard.fam-clue::after{content:"";position:absolute;top:0;bottom:0;
+  width:15px;z-index:4;pointer-events:none;opacity:.92;
+  background:repeating-linear-gradient(180deg,transparent 0 7px,#e8e6df 7px 15px,transparent 15px 22px)}
+.ccard.fam-clue::before{left:0}
+.ccard.fam-clue::after{right:0}
+/* At album size the strip has to shrink or it eats the picture: 15px of 86px is a sixth of the
+   card, twice. Smaller holes, spaced to match. */
+.size-sm.fam-clue::before,.size-sm.fam-clue::after{width:8px;
+  background:repeating-linear-gradient(180deg,transparent 0 4px,#e8e6df 4px 8px,transparent 8px 12px)}
+.size-lg.fam-clue::before,.size-lg.fam-clue::after{width:21px;
+  background:repeating-linear-gradient(180deg,transparent 0 10px,#e8e6df 10px 21px,transparent 21px 31px)}
+
+/* The frame itself, inset far enough to clear both strips. */
+.ccard.fam-clue .ccArt{inset:16px 19px 32%;filter:grayscale(1) contrast(1.3) brightness(.86)}
+.size-sm.fam-clue .ccArt{inset:8px 10px 34%}
+/* 35%, not 31%: four lines of slip need the band between the photograph's foot and the caption
+   to be about a third of the card. The photo gives up a few percent of height and the sentence
+   stops being cropped — the right trade for the one card in the game carrying prose. The grain
+   overlay below is the sprocket window and MUST use the same inset, or the frame and the photo
+   disagree by four percent and the card looks misprinted. */
+.size-lg.fam-clue .ccArt{inset:22px 26px 35%}
+
+/* ccGrain is the grease-pencil RING on this family — the same element that carries film grain
+   on any other. Reusing it keeps dropFace() from needing a per-family element list. */
+.ccard.fam-clue .ccGrain{inset:16px 19px 32%;z-index:2;mix-blend-mode:normal;opacity:1;
+  background:none;border:3px solid rgba(226,58,48,.85);border-radius:50%;
+  transform:scale(.72) rotate(-6deg)}
+.size-sm.fam-clue .ccGrain{inset:8px 10px 34%;border-width:1.5px}
+.size-lg.fam-clue .ccGrain{inset:22px 26px 35%;border-width:4px}
+
+/* The annotation, in the margin under the frame. */
+.ccard.fam-clue .ccSlip{left:19px;right:19px;bottom:15%;background:none;box-shadow:none;
+  transform:none;padding:0;border-radius:0}
+/* THE CLUE FACE SIZES ITS TYPE AGAINST THE CARD, not against a size class.
+
+   Every other face carries a NAME — two or three words that look fine a little large or a
+   little small. This one carries a SENTENCE, in a fixed band between the photograph's foot and
+   the caption, and the band is a percentage of the card while 12px is not. So the same card
+   that read perfectly at 293px overran its own caption at 180px: the type did not shrink with
+   the frame, and four lines stopped fitting in a band that had got smaller.
+
+   cqw ties them together. 4.1cqw is ~12px on the 293px board-centre card — the size this was
+   originally tuned at — and stays in proportion at every other width, including the 54px
+   evidence thumbnail and whatever a short window produces. Four lines fit at any size, which is
+   what the clamp below can then go back to being a safety net for.
+
+   These win over the .size-* rules further down on specificity (three classes to two), which is
+   why those can stay as they are for every other family.
+   The max() floors matter as much as the cqw. Scaling all the way down turns a small card's
+   type into three-pixel grey fuzz, which is worse than the fixed sizes this replaced — so below
+   about 140px the type stops shrinking and the clamp does its job instead. Nothing in the game
+   draws a clue that small with its type showing (the evidence thumbnail hides it), but a future
+   caller should get a small card, not a broken one. */
+.ccard.fam-clue .ccSlip span{color:#d6d2c6;text-align:left;-webkit-line-clamp:4;
+  font-size:max(6px,4.1cqw);line-height:1.36}
+.ccard.fam-clue .ccName{font-size:max(9px,5.8cqw)}
+.ccard.fam-clue .ccSub{font-size:max(7px,3.7cqw)}
+.ccard.fam-clue .ccRar{font-size:max(6px,3.5cqw)}
+.size-sm.fam-clue .ccSlip{left:10px;right:10px;bottom:17%}
+/* The large sprockets are 21px, so 19px of margin runs the text under them. Every size clears
+   its own strip by a couple of pixels; this is the one place the three have to be kept in step. */
+.size-lg.fam-clue .ccSlip{left:27px;right:27px}
+.ccard.fam-clue .ccFoot{background:none;padding:7px 19px 8px}
+.size-sm.fam-clue .ccFoot{padding:4px 10px 5px}
+.size-lg.fam-clue .ccFoot{padding:9px 27px 10px}
+.ccard.fam-clue .ccName{font-family:"Courier New",ui-monospace,monospace;font-weight:700;
+  color:#f0ede3;letter-spacing:.1em;text-transform:uppercase}
+.ccard.fam-clue .ccSub{color:#7c7a72}
+.ccard.fam-clue .ccFrame{display:none}
+/* The badge moves inboard of the left sprocket strip, and takes the ring's red. */
+.ccard.fam-clue .ccRar{top:20px;left:24px;background:rgba(0,0,0,.8);border-color:#e23a30;
+  color:#ff8a80}
+.size-sm.fam-clue .ccRar{top:11px;left:13px}
+
+/* Shared slip geometry, still used by nothing else but kept general — a family that wants a
+   paper slip back can have one without re-deriving the type sizes. */
+.ccSlip{position:absolute;z-index:3}
+.ccSlip span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+  font-family:"Courier New",ui-monospace,monospace;font-size:9px;line-height:1.35}
+.size-sm .ccSlip span{font-size:6px;line-height:1.25;-webkit-line-clamp:3}
+.size-lg .ccSlip span{font-size:12px;line-height:1.4}
+.ccGrain{position:absolute;inset:0;z-index:1;pointer-events:none}
+
+/* status — a PLAQUE, and the NUMBER is the hero.
+
+   Nobody reads what a trophy is called; they read what it was worth. A status piece is banked,
+   not admired — so the points are set large across the middle and the picture is pushed
+   back behind them to a stamp. That also settles the one confusion that mattered: a face built
+   around a number cannot be mistaken for a photograph (a clue) or for art in a set (a card),
+   whichever way the light falls on it.
+
+   It keeps the gold and the corner ticks — brackets on a frame read as something hung on a
+   wall, which is what a Showcase piece is — but the halo is gone. It was the loudest thing on
+   screen, and it was shouting for the card the player cares least about looking at.
+   (The same frame is painted into the canvas for the in-scene card: js/ui/box3d.js.) */
+.ccard.fam-status{border-color:var(--gold);border-width:4px;
+  background:linear-gradient(180deg,#3d2f10,#1d1607);
+  box-shadow:0 8px 20px rgba(0,0,0,.55),0 0 12px rgba(255,203,92,.22)}
+/* Pushed back and dimmed: present, but never competing with the number. */
+.ccard.fam-status .ccArt{opacity:.34;filter:sepia(.5) contrast(.9)}
+.ccard.fam-status .ccFrame{position:absolute;inset:7px;z-index:2;pointer-events:none;
+  border-radius:6px;border:1.5px solid rgba(255,203,92,.55)}
+.ccard.fam-status .ccFrame::before,.ccard.fam-status .ccFrame::after{content:"";position:absolute;
+  width:16px;height:16px;border:2.5px solid var(--gold)}
+.ccard.fam-status .ccFrame::before{top:-4px;left:-4px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}
+.ccard.fam-status .ccFrame::after{bottom:-4px;right:-4px;border-left:0;border-top:0;border-radius:0 0 4px 0}
+.size-sm .ccFrame{inset:5px}
+.size-sm.fam-status .ccFrame::before,.size-sm.fam-status .ccFrame::after{width:11px;height:11px}
+/* the hero */
+.ccBig{position:absolute;left:0;right:0;top:0;bottom:26%;z-index:3;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.ccBig b{font-family:Georgia,serif;font-weight:700;font-size:34px;line-height:1;color:var(--gold);
+  text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.ccBig i{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.22em;
+  text-transform:uppercase;color:rgba(255,203,92,.72)}
+.size-sm .ccBig b{font-size:19px} .size-sm .ccBig i{font-size:6px;letter-spacing:.14em}
+.size-lg .ccBig b{font-size:48px} .size-lg .ccBig i{font-size:12px}
+
+.ccard.fam-coins,.ccard.fam-energy{border-color:var(--line);background:linear-gradient(180deg,#232a63,#141838)}
+.ccard.fam-energy .ccPlain{color:var(--teal)}
+
+/* ---------- locked ----------
+   Silhouetted, not hidden. You can see the shape of what is missing, which is the whole reason
+   the album shows empty slots at all. */
+.ccard.locked{border-style:dashed;border-color:var(--line);box-shadow:none;opacity:.92}
+.ccard.locked .ccArt{filter:grayscale(1) brightness(.3) contrast(.9)}
+.ccard.locked .ccName{color:var(--muted)}
+.ccard.locked .ccSheen{display:none}
+.ccard.locked.fam-clue{transform:rotate(-1.1deg)}
+.ccard.locked.fam-clue::after{opacity:.35}
+.ccard.unknown{display:flex;align-items:center;justify-content:center;border-style:dashed}
+
+/* ---------- the flip ----------
+   A card turning face up. Runs once on insert; no JS state, so a re-render never re-flips
+   something already on screen. */
+.ccard.flip{animation:ccFlip var(--flipMs,420ms) cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes ccFlip{
+  0%{transform:perspective(700px) rotateY(90deg) scale(.86);opacity:0}
+  60%{opacity:1}
+  100%{transform:perspective(700px) rotateY(0) scale(1);opacity:1}}
+.ccard.fam-clue.flip{animation-name:ccFlipClue}
+@keyframes ccFlipClue{
+  0%{transform:perspective(700px) rotateY(90deg) rotate(-1.1deg) scale(.86);opacity:0}
+  60%{opacity:1}
+  100%{transform:perspective(700px) rotateY(0) rotate(-1.1deg) scale(1);opacity:1}}
+
+/* ---------- the album ---------- */
+.albumModal{width:min(520px,100%)}
+.albBoards{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.albBoard{background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+  padding:4px 11px;font-size:11px;font-weight:700;color:var(--muted)}
+.albBoard.done{color:var(--teal)}
+.albBoard.sel{border-color:var(--gold);color:var(--text);background:#2b2b52}
+.albumBar{height:7px;border-radius:999px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+.albumFill{height:100%;border-radius:999px;transition:width .5s cubic-bezier(.2,.9,.3,1);
+  background:linear-gradient(90deg,var(--purple),var(--pink),var(--gold))}
+.albPage{background:rgba(10,13,38,.5);border:1px solid var(--line);border-radius:14px;padding:11px}
+.albPage.ready{border-color:var(--gold);box-shadow:0 0 18px rgba(255,203,92,.14)}
+.albHead{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.albEp{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal)}
+.albTitle{font-family:Georgia,serif;font-size:14px;font-weight:700;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.albCount{font-size:12px;font-weight:800;color:var(--muted)}
+.albCount.done{color:var(--gold)}
+/* Five across, and they shrink rather than wrap — a page of five that becomes two rows of
+   three and two stops reading as one set. */
+.albGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.albSlot{min-width:0}
+.albFoot{margin-top:10px}
+.albNeed{font-size:12px;color:var(--muted);text-align:center;line-height:1.4}
+.albNeed b{color:var(--text)}
+.albDone{font-size:12px;color:var(--teal);text-align:center;font-weight:700}
+.albNav{display:flex;align-items:center;gap:10px;margin-top:12px}
+.albArrow{padding:6px 14px;font-size:17px;line-height:1}
+.albDots{flex:1;display:flex;justify-content:center;gap:7px}
+.albDot{width:9px;height:9px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);padding:0}
+.albDot.done{background:var(--gold);border-color:var(--gold)}
+.albDot.sel{outline:2px solid var(--purple);outline-offset:2px}
+
+/* ---------- opening a box ---------- */
+.packModal{width:min(460px,100%)}
+.packBox{display:block;margin:6px auto 0;width:186px;height:186px;position:relative;
+  background:none;padding:0;border-radius:20px}
+.packImg{width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 14px 26px rgba(0,0,0,.55));animation:packIdle 2.6s ease-in-out infinite}
+.packBox:active .packImg{transform:scale(.95)}
+.packGlow{position:absolute;inset:8%;border-radius:50%;z-index:-1;
+  background:radial-gradient(circle,rgba(255,203,92,.42),transparent 68%);
+  animation:packPulse 2.6s ease-in-out infinite}
+.packModal.tier-silver .packGlow{background:radial-gradient(circle,rgba(201,210,224,.4),transparent 68%)}
+.packModal.tier-diamond .packGlow{background:radial-gradient(circle,rgba(142,240,255,.5),transparent 68%)}
+@keyframes packIdle{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-9px) rotate(1.5deg)}}
+@keyframes packPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.14)}}
+.packHint{text-align:center;font-size:12px;color:var(--muted);margin-top:12px}
+.packHint b{color:var(--gold)}
+.packBar{height:5px;border-radius:999px;background:var(--panel2);overflow:hidden;
+  border:1px solid var(--line);margin-top:8px}
+.packFill{height:100%;width:0;background:linear-gradient(90deg,var(--purple),var(--pink))}
+.packRow{display:flex;gap:9px;justify-content:center;align-items:flex-start;min-height:150px}
+.packSlot{flex:1;max-width:190px;min-width:0}
+.packRow .ccard.size-lg{max-width:190px;margin:0 auto}
+.packNote{text-align:center;font-size:12px;color:var(--muted);margin-top:12px;min-height:32px;line-height:1.4}
+.packNote b{color:var(--text)}
+.dupNote{color:var(--gold)}
+.ccDup{position:absolute;left:0;right:0;top:38%;z-index:3;text-align:center;font-size:9px;
+  font-weight:800;letter-spacing:.1em;padding:3px 0;color:#1b1405;
+  background:linear-gradient(90deg,transparent,var(--gold) 12%,var(--gold) 88%,transparent);
+  transform:rotate(-7deg)}
+.size-sm .ccDup{font-size:7px}
+
+/* ---------- the store's boxes ---------- */
+.boxRow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
+.boxCard{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:9px 7px;text-align:center}
+.boxCard.tier-gold{border-color:rgba(255,203,92,.5)}
+.boxCard.tier-diamond{border-color:rgba(142,240,255,.55)}
+.boxArt{width:100%;max-width:86px;aspect-ratio:1;object-fit:contain;margin:0 auto;display:block;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
+.boxName{font-family:Georgia,serif;font-size:12px;font-weight:700;margin-top:4px}
+.boxItems{font-size:10px;color:var(--muted)}
+.boxOdds{display:flex;flex-wrap:wrap;gap:2px 6px;justify-content:center;margin:6px 0 8px;
+  font-size:9.5px;color:var(--muted)}
+.boxBuys{display:flex;flex-direction:column;gap:5px}
+.boxBuy{padding:6px 4px;font-size:11px;border-radius:10px;font-weight:700}
+.boxBuy.cant{opacity:.45}
+.pkUsd{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.pkNote{font-size:10px;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:6px}
+
+/* ---------- the status chip in the HUD ----------
+   Beside the avatar, not inside it: the avatar is a circle and a rank name is not. */
+.player{margin-left:auto;display:flex;align-items:center;gap:9px;flex-shrink:0;min-width:0}
+.player .avatarBtn{margin-left:0}
+.statusChip{display:flex;flex-direction:column;align-items:flex-start;gap:3px;line-height:1;
+  background:none;padding:0;min-width:0}
+.statusChip .rkIco{display:none}
+.rkName{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.rkBar{display:block;width:56px;height:4px;border-radius:999px;background:rgba(0,0,0,.35);overflow:hidden}
+.rkFill{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--purple),var(--gold));transition:width .5s cubic-bezier(.2,.9,.3,1)}
+.statusChip.bump{animation:chipBump .5s cubic-bezier(.2,1.5,.4,1)}
+/* On a phone the HUD is one non-wrapping row of balances, so the chip gives up its word and
+   keeps its picture: the rank icon plus a short bar still says "where am I and am I moving",
+   which is all this is for. The name is one tap away in the profile. */
+html.viewMobile .player{gap:6px}
+html.viewMobile .statusChip{flex-direction:row;align-items:center;gap:4px}
+html.viewMobile .statusChip .rkIco{display:block;font-size:14px;line-height:1}
+html.viewMobile .statusChip .rkName{display:none}
+html.viewMobile .rkBar{width:30px;height:4px}
+@keyframes chipBump{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+
+/* ---------- the profile: the trophies, and the Collectibles ---------- */
+.rankBox{background:rgba(10,13,38,.5);border:1px solid var(--line);border-radius:14px;
+  padding:10px 12px;margin-bottom:12px}
+.rankLine{display:flex;align-items:baseline;gap:8px;font-size:13px;margin-bottom:7px}
+.rankLine b{font-size:20px;font-family:Georgia,serif;color:var(--gold)}
+.rankNext{margin-left:auto;font-size:11px;color:var(--muted)}
+.rankWhy{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:7px;font-size:10.5px;color:var(--muted)}
+.stRoom{margin-top:14px}
+.stZone{margin-bottom:12px}
+.stZoneHead{display:flex;align-items:center;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:7px}
+.stZoneCount{margin-left:auto;color:var(--muted);letter-spacing:0}
+.stGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+/* EVERY TILE HERE IS SOMETHING THE PLAYER HOLDS — a trophy they were paid for calling an
+   episode right, or a card they converted. So there is no silhouette state and no lit/unlit
+   pair: the gold frame is the frame, not a highlight. Both went with the shelf of ten items
+   that could be owned or not, and with the buy button under each of them — nothing on this
+   screen is for sale (GDD §2.2), so nothing on it has a price, a "how to earn it" line or an
+   unowned state to draw. */
+.stItem{background:var(--panel2);border:1px solid var(--gold);border-radius:12px;padding:8px;
+  text-align:center;position:relative;box-shadow:0 0 16px rgba(255,203,92,.28)}
+.stArt{width:100%;aspect-ratio:1;background-size:cover;background-position:center;border-radius:9px;
+  box-shadow:inset 0 0 0 1.5px rgba(255,203,92,.5)}
+.stName{font-family:Georgia,serif;font-size:11.5px;font-weight:700;margin-top:5px;line-height:1.2}
+.stPts{font-size:10px;color:var(--gold);font-weight:800;margin-top:1px}
+.stHow{font-size:10px;color:var(--teal);margin-top:4px;font-weight:700}
+.stBlurb{font-size:9.5px;color:var(--muted);margin-top:5px;line-height:1.35;font-style:italic}
+
+/* ---------- the drawer's percentage column ---------- */
+.tpct{color:var(--muted);font-size:11px;text-align:right;white-space:nowrap}
+
+/* ---------- narrow screens ---------- */
+/* Narrow: the three tiers stack, and each becomes a row — art, then what it is and what it
+   pays, then the two prices. Kept SHORT on purpose, because this is the tallest thing in the
+   store and the store is the tallest modal in the game. */
+@media(max-width:560px){
+  .boxRow{grid-template-columns:1fr;gap:6px}
+  .boxCard{display:grid;grid-template-columns:52px 1fr auto;align-items:center;
+           gap:9px;text-align:left;padding:7px 9px}
+  .boxArt{max-width:52px}
+  .boxName{margin-top:0;font-size:13px}
+  .boxItems{font-size:10px}
+  .boxOdds{justify-content:flex-start;margin:2px 0 0;gap:1px 7px}
+  .boxBuys{flex-direction:column;gap:4px;min-width:78px}
+  .boxBuy{padding:5px 8px}
+  .stGrid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ---------- opening a box: the caption and the countdown ----------
+   The only DOM in the beat. The box itself is a real object in the board's scene
+   (js/ui/box3d.js), so there is no panel here and no scrim — the board stays visible and live
+   behind it, and this is a line of text under the thing you are being asked to tap.
+
+   Pinned above the play row rather than centred, because the box hangs over the middle of the
+   board and a caption across it would cover the thing it is captioning. */
+.packHud{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);z-index:44;
+  display:none;flex-direction:column;align-items:center;gap:7px;width:min(320px,72%);
+  pointer-events:none;text-align:center}
+.packHud.show{display:flex}
+.phText{font-size:13px;line-height:1.35;color:var(--text);
+  text-shadow:0 2px 10px rgba(0,0,0,.85),0 0 22px rgba(0,0,0,.6)}
+.phText b{color:var(--gold)}
+.phText .dupNote{color:var(--gold)}
+/* The bar only exists while something is counting down — an empty rail under a caption reads as
+   a broken progress bar. */
+.phBar{display:none;width:100%;height:4px;border-radius:999px;overflow:hidden;
+  background:rgba(8,10,28,.55);box-shadow:0 1px 6px rgba(0,0,0,.5)}
+.packHud.counting .phBar{display:block}
+.phFill{display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--purple),var(--pink))}
+html.viewMobile .packHud{bottom:calc(104px + var(--safeB,0px))}
+
+
+/* ---------- "your status went up" ----------
+   A ribbon over the board, not a dialog: no scrim, no panel, no close button, and the board
+   stays visible and live behind it. It blocks the roll loop the way every other reward beat
+   does, and a tap takes it away early. js/ui/statusup.js. */
+.statusUp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.94);
+  z-index:46;display:none;flex-direction:column;gap:9px;width:min(340px,88%);
+  /* CENTRED, not left-aligned. The panel is built around the object now rather than around a
+     line of text with a picture stuck to it. */
+  padding:18px 16px 16px;border-radius:18px;text-align:center;cursor:pointer;
+  background:linear-gradient(180deg,rgba(20,16,6,.94),rgba(12,10,4,.96));
+  border:2px solid var(--gold);
+  box-shadow:0 20px 50px rgba(0,0,0,.6),0 0 34px rgba(255,203,92,.32),
+             inset 0 1px 0 rgba(255,255,255,.14);
+  opacity:0;transition:opacity .22s ease,transform .22s cubic-bezier(.2,1.4,.4,1)}
+.statusUp.show{display:flex;opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* THE COLLECTIBLE IS THE HERO. This was a 52px thumbnail in a row of text — a notification for
+   the loudest moment the collection has. The object fills the beat now and the words sit under
+   it, because what the player earned is a THING and the points are what it was worth.
+
+   perspective on the container, transform on the face: the turn has to have depth or it reads as
+   a horizontal squash rather than a card being turned over. */
+.suHero{perspective:1100px;display:flex;justify-content:center;margin-bottom:12px}
+.suFace{transform-style:preserve-3d;will-change:transform}
+.suHero .ccard{width:min(58vw,38vh,260px)}
+/* Several at once (a box converting more than one) arrive as plaques already, side by side —
+   half a dozen cards turning over in sequence is a cutscene, not a beat. */
+.suMany{gap:9px;flex-wrap:wrap}
+.suMany .ccard{width:min(30vw,20vh,130px)}
+.suRow{display:flex;align-items:center;gap:11px}
+.suArt{display:flex;gap:6px;flex-shrink:0}
+/* The item, in the frame it arrived in. */
+.suItem{display:block;width:52px;height:52px;border-radius:9px;background-size:cover;
+  background-position:center;border:2px solid var(--gold);
+  box-shadow:0 0 14px rgba(255,203,92,.4)}
+.suWords{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:center;align-items:center}
+.suWhat{font-family:Georgia,serif;font-size:19px;font-weight:700;color:#f7eed6;line-height:1.2}
+.suGain{font-size:20px;font-weight:800;color:var(--gold);font-family:Georgia,serif;margin-top:2px;
+  text-shadow:0 2px 12px rgba(255,203,92,.35)}
+
+/* The track itself, moving. This is the point of the beat. */
+.suTrack{display:grid;grid-template-columns:auto auto 1fr;grid-template-areas:"i n x" "b b b";
+  align-items:center;gap:4px 7px}
+.suIco{grid-area:i;font-size:15px;line-height:1}
+.suName{grid-area:n;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--gold)}
+.suNext{grid-area:x;justify-self:end;font-size:10.5px;color:#b9ad8c}
+/* Why the beat is on screen at all — the line that turns "a mug, +5" into a sentence. Sits
+   between the name and the payout, quieter than both: it is context, not the reward. */
+.suWhy{display:block;font-size:11px;color:#b9ad8c;margin-top:1px}
+.suBar{grid-area:b;display:block;height:7px;border-radius:999px;overflow:hidden;
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,203,92,.28)}
+.suFill{display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--purple),var(--gold))}
+.suName.pop,.suIco.pop{animation:suPop .45s cubic-bezier(.2,1.5,.4,1)}
+@keyframes suPop{0%{transform:scale(.6);opacity:.3}55%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+/* Only when a rank actually turned over. */
+.suNew{align-self:center;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:#1b1405;background:linear-gradient(90deg,var(--gold),#ffe6a8);
+  padding:4px 12px;border-radius:999px;opacity:0;transform:translateY(6px);
+  transition:opacity .3s ease,transform .3s cubic-bezier(.2,1.5,.4,1)}
+.suNew.in{opacity:1;transform:translateY(0)}
+
+html.viewMobile .statusUp,.stage.phone .statusUp{width:min(300px,88%);padding:12px 13px}
+
+/* A ten-card set needs a tighter grid than a five-card page did. */
+.albGrid.ten{grid-template-columns:repeat(5,1fr)}
+/* The clues an episode is still missing, drawn rather than counted — same reason the collection
+   shows empty slots at all. */
+.evGaps{display:flex;gap:6px;margin-top:8px}
+.evGap{flex:1;height:26px;border-radius:4px;border:1.5px dashed rgba(230,214,176,.45)}
+
+/* ---------- a card set completed ----------
+   Deliberately smaller than the set-of-episodes celebration: this is a reward, not a chapter
+   ending, and it never gated anything. */
+.setDone{display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:linear-gradient(180deg,rgba(20,24,56,.97),rgba(10,13,36,.98));
+  border:2px solid var(--gold);border-radius:16px;padding:16px 20px;
+  box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 30px rgba(255,203,92,.28)}
+.sdEyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:800}
+.sdName{font-family:Georgia,serif;font-size:22px;font-weight:700;color:var(--text)}
+.sdRow{display:flex;gap:5px}
+.sdChip{width:44px}
+.sdPaid{font-size:13px;font-weight:800;color:var(--gold)}
+
+/* ---------- what a prediction paid (GDD §7.4) ----------
+   The collectible is the headline, not the coin number — so it is shown as the thing it is,
+   beside the result rather than folded into a sentence under it. */
+.predSpoils{display:flex;gap:12px;justify-content:center;margin:14px 0 4px}
+.psItem{display:flex;flex-direction:column;align-items:center;gap:5px;width:78px}
+/* The card is aspect-ratio only, so without a width of its own it collapses to nothing inside
+   a flex column — which is exactly what it did the first time this shipped. */
+.psItem .ccard{width:100%}
+.psTag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800}
+
+/* The Insider pack says WHY it costs what it costs — a price that climbs without explaining
+   itself reads as a bug, one that says "because you have bought two" reads as a rule. */
+.boxNote{font-size:10px;line-height:1.3;color:var(--teal);margin:2px 0 6px;text-align:center}
+.pack.cant{opacity:.45;cursor:not-allowed}
+
+/* ---------- a card held on the board's centre ----------
+   js/ui/fx.js showCard() drops a bare cardFace() into #centerFx. A .ccard has only an
+   aspect-ratio and no intrinsic width — .playcard used to supply that and cardFace() does not —
+   so without this the card collapses to a dark rounded dot. Loaded after overlay.css, so this
+   wins over `.centerfx.card{width:auto}` without inflating the selector. */
+/* Sized against the viewport, not a fixed pixel width: this is the reward beat, it should own
+   the screen for the few seconds it is up, and it has to do that on a phone frame and a desktop
+   board alike. The cap stops it going silly on a very tall window.
+
+   78vw, not 56vmin. On a 375-wide phone vmin IS the width, so 56vmin came out at 210px — and a
+   CLUE card at 210px clipped its own sentence: the slip got three lines of 12px Courier and the
+   longest clue in the Season needs four. The whole reason the slip exists is that the line has
+   to be READ (see .fam-clue below), so a clue ending in an ellipsis is the one failure this face
+   cannot have. 78vw gives ~292px there. On any desktop the 400px cap still wins, so nothing
+   moves on the view this was originally tuned against. */
+.centerfx.card .ccard{width:min(78vw,56vh,400px);margin:0 auto}
+.centerfx.card.win .ccard{animation:revealPop .45s cubic-bezier(.2,1.5,.4,1)}
+/* THE CASE A PREDICTION PAYS, unopened, on the result screen. The reward used to be printed
+   here as a small card in the corner, which is the one presentation the game reserves for
+   things that do not matter — so what is inside now stays inside until the box is opened on
+   the board like every other box. */
+.predCase{margin:16px auto 0;max-width:230px;text-align:center}
+.pcaseArt{width:118px;height:118px;object-fit:contain;display:block;margin:0 auto;
+     filter:drop-shadow(0 10px 22px rgba(0,0,0,.55));animation:pcaseBob 2.6s ease-in-out infinite}
+@keyframes pcaseBob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-6px) rotate(1.5deg)}}
+.pcaseName{margin-top:8px;font-weight:800;font-size:15px;color:var(--gold)}
+.pcaseSub{margin-top:3px;font-size:12px;color:var(--muted)}
+
+/* What the Status climb is actually FOR, on the screen that shows the climb. Muted, because it
+   is a horizon rather than a task — the player does nothing about it directly, she just plays. */
+.rankGate{margin-top:9px;padding-top:9px;border-top:1px solid rgba(120,140,210,.22);
+  font-size:12px;color:var(--muted);line-height:1.45}
+.rankGate b{color:var(--gold)}
+
+/* ---------- the objective tracker (js/ui/render.js renderEpTrack) ----------
+   ONE ROW, AND IT HANGS OFF THE TOOLBAR. It was a two-line band 47px tall and full width — ninety
+   per cent of the HUD's own height, spent permanently on a state ("still collecting") that is
+   ambient nearly all the time.
+
+   It reads as a drawer pulled out from under the toolbar rather than a second bar floating below
+   one: its top edge slides UNDER the HUD and its top corners are square, so there is no seam and
+   no gap to misjudge. That is done by overlap and z-index rather than by squaring the HUD's own
+   corners, which would change how the toolbar looks on its own. */
+.epTrack{position:absolute;left:10px;right:10px;z-index:37;
+  display:flex;align-items:center;gap:9px;text-align:left;
+  padding:calc(var(--etTuck) + 5px) 12px 7px;border-radius:0 0 13px 13px;
+  border:1px solid rgba(120,140,210,.4);border-top:0;
+  background:rgba(11,15,36,.95);backdrop-filter:blur(8px);
+  box-shadow:0 8px 20px rgba(0,0,0,.4);transition:.18s;
+  --etTuck:10px}
+/* DISABLED HERE MEANS "NOTHING TO TAP", NOT "UNAVAILABLE". base.css dims every disabled button
+   to 40% — correct for an action you cannot take, and exactly wrong for a strip whose whole job
+   is to be read. The attribute stays, because it is what keeps the tap handler honest. */
+.epTrack:disabled{cursor:default;opacity:1}
+/* THE NUMBER LEADS, and it is the one part that never shrinks. A title is a name; "EP 4" is a
+   position, and position is what says where you are in eighteen. */
+.etNum{flex:0 0 auto;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--gold);
+  background:rgba(255,203,92,.12);border:1px solid rgba(255,203,92,.35);
+  border-radius:6px;padding:3px 6px;line-height:1}
+/* The title takes whatever is left and ellipses — a second line is the thing being removed. */
+.etTitle{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:700;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etState{flex:0 0 auto;font-size:11px;color:var(--muted)}
+/* Which episode the meter is counting toward, when the row is offering a DIFFERENT one to
+   watch. Muted and small: it is context, not the action. */
+.etNext{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--muted);
+  margin-left:2px}
+.etState b{color:var(--teal);font-weight:800}
+.etCount{flex:0 0 auto;font-size:11px;color:var(--muted)}
+.etCount b{color:var(--teal);font-weight:800}
+/* A SLOT PER CLUE, SHAPED LIKE THE THING THAT FILLS IT. They were flat bars, which counted
+   correctly and looked like a loading indicator — and the thing being counted is a card the
+   player has just been shown at full size. Small cards read as "four of these to collect" with
+   no explaining; a bar reads as "some progress".
+
+   Card proportions at this size are 11x15. Filled wears the clue card's own art; empty is the
+   same rectangle as an outline, so the row is legible as slots-with-gaps rather than as two
+   different objects. */
+.etBar{display:flex;gap:4px;flex:0 0 auto;align-items:center}
+.etBar i{display:block;width:11px;height:15px;border-radius:2.5px;
+  border:1px dashed rgba(190,205,255,.38);background:rgba(10,14,38,.5);
+  background-size:cover;background-position:center;transition:.2s}
+.etBar i.on{border-style:solid;border-color:rgba(255,203,92,.85);background-color:transparent;
+  background-image:url('../assets/icons/clue.webp');
+  box-shadow:0 0 7px rgba(255,203,92,.35)}
+/* The slot the flight lands in. Kept short — it is punctuation on an arrival, not an animation
+   in its own right. */
+@keyframes etSlotPop{0%{transform:scale(1)}45%{transform:scale(1.5)}100%{transform:scale(1)}}
+.etBar i.land{animation:etSlotPop .34s cubic-bezier(.2,1.6,.4,1)}
+
+/* THE CLUE IN FLIGHT. A card the player was just shown at full size, shrinking into the slot it
+   filled — so the connection between "I got a clue" and "the bar moved" is shown rather than
+   left for the player to infer from two things changing in different places.
+
+   position:fixed and a transform, because the two ends are in different stacking contexts (the
+   board's centre overlay and the toolbar's tracker) and anything that tried to animate BETWEEN
+   those trees would be clipped by one of them. */
+.clueFly{position:fixed;z-index:60;pointer-events:none;border-radius:6px;
+  background-size:cover;background-position:center;
+  box-shadow:0 8px 22px rgba(0,0,0,.5);
+  transition:transform var(--flyMs,460ms) cubic-bezier(.45,0,.25,1), opacity var(--flyMs,460ms) ease-in}
+
+/* THE CARD IN FLIGHT, into the collection button it just joined. The clue flight above borrows a
+   picture because it lands in an eleven-pixel slot, where a frame is one pixel of noise; the
+   album button is big enough to show what arrived, so this carries the whole cloned face.
+
+   The landing pop lives here rather than beside .btn.album in board.css: the flight and the thing
+   it lands on are one behaviour, and splitting them across two files is how one of them gets
+   changed alone. collection.css loads after board.css, so it wins on order without inflating the
+   selector. */
+.cardFly{position:fixed;z-index:60;pointer-events:none;
+  transition:transform var(--flyMs,460ms) cubic-bezier(.45,0,.25,1), opacity var(--flyMs,460ms) ease-in}
+.cardFly .ccard{margin:0}
+@keyframes albumLand{0%{transform:scale(1)}40%{transform:scale(1.2)}100%{transform:scale(1)}}
+.btn.album.land{animation:albumLand .42s cubic-bezier(.2,1.6,.4,1)}
+/* Ready is the one state worth acting on, so it is the one state that looks like a button. */
+.epTrack.ready{border-color:var(--pink);background:rgba(60,18,50,.9);cursor:pointer;
+  box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 18px rgba(255,111,165,.26)}
+.epTrack.ready .etNum{color:var(--pink);background:rgba(255,111,165,.14);border-color:rgba(255,111,165,.45)}
+.epTrack.ready .etState b{color:var(--pink)}
+.epTrack.ready:active{transform:translateY(2px)}
+.epTrack.done{opacity:.72}
+
+/* ---------- the caption under a held card ----------
+   The status number is the headline (js/ui/fx.js showCard). A card's face says what it IS; this
+   says what it was WORTH, which is the thing the player is actually accumulating and which used
+   to be a word in a log line they could not see on a phone. */
+.centerfx.card .cbCap{margin-top:11px;pointer-events:none}
+/* The award row: a big cup either side of what it was worth, the number centred between them. */
+.cbAward{display:flex;align-items:center;justify-content:center;gap:16px}
+.cbCup{flex:0 0 auto;width:52px;height:52px;background:url('../assets/icons/trophies.webp') center/contain no-repeat;
+  filter:drop-shadow(0 3px 10px rgba(0,0,0,.6)) drop-shadow(0 0 14px rgba(255,203,92,.35))}
+/* Mirrored, so the pair reads as a matched frame rather than as two copies of one picture. */
+.cbAward .cbCup:last-child{transform:scaleX(-1)}
+.cbStat{font-family:Georgia,serif;line-height:1}
+.cbStat b{font-size:40px;font-weight:800;color:var(--gold);
+     text-shadow:0 3px 14px rgba(0,0,0,.75),0 0 26px rgba(255,203,92,.35)}
+.cbStat i{display:block;margin-top:2px;font-style:normal;font-family:inherit;font-size:11px;
+     font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text);opacity:.8;
+     text-shadow:0 2px 8px rgba(0,0,0,.8)}
+/* THREE SLOTS, FANNED, filled left to right — how many of the three you hold. Only a trophy
+   counts itself out; a memory card has no counter to show.
+
+   Fanned rather than in a row because a hand of cards is a thing you recognise, and the GAP is
+   the message: two filled and one empty says "one more" without a sentence. They overlap by a
+   third and lean like a dealt hand, so the empty one reads as the next place in the fan rather
+   than as a card that failed to load — which is also why it is a dashed outline over nothing
+   and not a grey rectangle. */
+.cbSlots{margin-top:11px;display:flex;justify-content:center;align-items:flex-end;
+     height:52px;pointer-events:none}
+.cbSlot{width:38px;height:50px;border-radius:5px;flex:0 0 auto;
+     background-size:cover;background-position:center top;
+     border:1.5px dashed rgba(190,205,255,.34);background-color:rgba(10,14,38,.4);
+     box-shadow:0 3px 10px rgba(0,0,0,.5);transition:.2s}
+.cbSlot+.cbSlot{margin-left:-12px}
+/* The lean: outer cards tip away from the middle, like a hand being fanned. */
+.cbSlots .cbSlot:first-child{transform:rotate(-11deg) translateY(3px)}
+.cbSlots .cbSlot:last-child{transform:rotate(11deg) translateY(3px)}
+.cbSlot.on{border-style:solid;border-color:var(--gold);background-color:transparent;
+     box-shadow:0 3px 12px rgba(0,0,0,.6),0 0 14px rgba(255,203,92,.3)}
+/* A single slot is not a fan — no lean, no overlap. */
+.cbSlots .cbSlot:only-child{transform:none;margin-left:0}
+/* Four slots (a clue's four-of-eight gate) need a shallower lean or the outer two tip past the
+   card's edge. Set on the container so the count decides, not the card kind. */
+.cbSlots:has(.cbSlot:nth-child(4)) .cbSlot{width:34px;height:45px}
+.cbSlots:has(.cbSlot:nth-child(4)) .cbSlot:first-child{transform:rotate(-8deg) translateY(3px)}
+.cbSlots:has(.cbSlot:nth-child(4)) .cbSlot:last-child{transform:rotate(8deg) translateY(3px)}
+/* Which episode the fan is counting toward. The clue card names it in its own footer, but a
+   PAIR gives that footer up for space — and either way the fan means nothing without it. */
+.cbEp{margin-top:7px;font-size:12px;color:var(--muted);
+     text-shadow:0 2px 8px rgba(0,0,0,.85)}
+.cbEp b{color:var(--gold);font-weight:800}
+
+/* THE CORNER BADGE GOES ON THIS SCREEN. cardFace draws "1/3" in the card's corner for every
+   owned, unconverted card — true, and now said twice: the fan below is the same number, bigger
+   and countable. Two readings of one fact on one screen is what made a memory card's 1/3 read
+   as a mistake. The converted ★ stays: that is a state, not a count. */
+.centerfx.card .ccCount:not(.conv){display:none}
+.cbDone{margin-top:9px;font-size:14px;font-weight:800;color:var(--gold);
+     text-shadow:0 2px 10px rgba(0,0,0,.85)}
+/* TWO CLUES FROM ONE LANDING, side by side. They give up their slips: at half width the
+   sentence on the card is six-pixel Courier, so the cards carry the PICTURE and .cbLines below
+   carries the words at full width — the same division of labour as the evidence board on the
+   wager screen. The photo grows into the space the slip left, or the frame reads as a card with
+   a hole in it. */
+.cbPair{display:flex;gap:10px;justify-content:center;align-items:flex-start}
+.centerfx.card .cbPair .ccard{width:min(37vw,26vh,190px)}
+.cbPair .ccard.fam-clue .ccSlip{display:none}
+/* The episode caption goes too. Clues.grant always files against the same episode — the first
+   one still locked — so a pair is always two clues about ONE story, and printing its title twice
+   under two cards is noise that clips at this width into the bargain. "A CLUE" stays: that is
+   the identity, and it is what the pair is a pair OF. */
+.cbPair .ccard.fam-clue .ccSub{display:none}
+.cbPair .ccard.fam-clue .ccFoot{padding-bottom:11px}
+.cbPair .ccard.fam-clue .ccArt,
+.cbPair .ccard.fam-clue .ccGrain{inset:14px 16px 24%}
+.cbLines{margin-top:11px;text-align:left;display:flex;flex-direction:column;gap:6px}
+.cbLines p{margin:0;font-size:13px;line-height:1.45;color:var(--text);
+     text-shadow:0 2px 8px rgba(0,0,0,.85)}
+.cbLines p::before{content:"\25b8";color:var(--teal);margin-right:7px}
+
+/* A clue can be HELD. The hint has to be visible without competing with the sentence on the
+   card, hence muted and small; it is replaced by the Collect button the moment it is used. */
+.cbHint{margin-top:10px;font-size:12px;color:var(--muted);pointer-events:none;
+     text-shadow:0 2px 8px rgba(0,0,0,.85);animation:cbHintIn .3s ease .9s both}
+@keyframes cbHintIn{from{opacity:0}to{opacity:1}}
+.centerfx.holdable .ccard{pointer-events:auto;cursor:pointer}
+/* Centred by AUTO MARGINS, not by the parent's text-align. .btn is inline-flex, so it ought to
+   centre on #centerFx's text-align — but the beat appends this button as a sibling of blocks
+   that set their own alignment (.cbLines is left-aligned so two clue sentences read as a list),
+   and it came out hard against the left edge. A block with auto side margins does not care what
+   anything around it aligns to. */
+.cbCollect{pointer-events:auto;display:flex;justify-content:center;
+     margin:12px auto 0;min-width:150px}
+
+/* The line under a converted card: what the third copy just bought. */
+.ccWon{margin-top:10px;text-align:center;font-size:15px;font-weight:800;color:var(--gold);
+  text-shadow:0 2px 8px rgba(0,0,0,.6)}
+
+/* The page of cards kept from content this build no longer defines (js/ui/album.js). */
+.albDot.kept{border-color:rgba(255,203,92,.55)}
+.albDot.kept.sel{background:var(--gold)}

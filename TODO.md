@@ -7,64 +7,73 @@ Most of these came out of mapping `economy model v3.xlsx` onto the code. Where t
 and the game disagree about the SHAPE of a mechanic (not just a number), the disagreement is
 recorded here rather than silently resolved.
 
+**This is the `collectible_version` branch**, now rebuilt to the Game Design Document: one draw
+system with many pools, clues as the story gate, a 150-card Season catalogue, Status as a level,
+and the Status Estate at the board's centre. Items written against the builder loop are marked
+*(builder loop)* and are about `main`, not about this branch — they are kept because the two
+branches are alternatives and whichever wins inherits this list.
+
 ---
 
 ## Prediction
 
-### The correct answer is always the shortest-odds one
-**Live exploit, content bug, no code change needed.**
+### ~~The correct answer is always the shortest-odds one~~ — GONE, by removing the odds
 
-In all 18 episode files `correct` points at the lowest-odds answer. Display order is shuffled
-(`js/ui/prediction.js`), but each answer's odds travel with it, so the shortest odds is still
-visibly identifiable — and always right.
+In all 18 episode files `correct` points at the lowest-odds answer, and the odds travelled with
+the answer through the shuffle — so tapping the lowest number won 100% of the time at mean odds
+1.674. A guaranteed +67.4% per bet against a model built around +0.23.
 
-A player who always taps the lowest number wins **100%** of the time at mean odds **1.674**, a
-guaranteed **+67.4%** per bet. The wager slider goes to the full balance, so 1,000 coins
-compounds to ~9.3M across the 18 episodes. The economy model is built around a +0.23 edge.
+**GDD §7.3 removed the mechanism.** Odds are flat: every answer pays `Economy.flatMultiplier()`,
+and `answers[].odds` is read by nothing. There is no number beside an answer to read a tell off.
 
-Root cause is authoring, not logic: odds were written to express *how plausible an answer is*,
-and the correct answer is naturally the most plausible-sounding. That makes the odds a label
-reading "pick me".
+The *authoring* habit underneath it survives — the correct answer is still usually the most
+plausible-sounding one — but that is now a question of how well the questions are written rather
+than an arithmetic exploit. **Still worth doing:** make the correct answer sometimes the
+counter-intuitive one across the library, and fix the `episode-prediction-questions` skill that
+generates these files, or episode 19 arrives with the same habit.
 
-**Done when:** the correct answer is sometimes the longshot across the library, *and* the
-`episode-prediction-questions` skill that generates these files is fixed — otherwise episode 19
-arrives with the same bug.
+### ~~Wager sizing is in the wrong unit~~ — DONE
+The model has three tiers as a share of balance (safe 5 / confident 10 / max 20) and the 20% cap
+is explicitly the anti-bankruptcy guard. The game had one absolute slider to 100% of the balance.
 
-### Wager sizing is in the wrong unit
-The model has three tiers as a % of balance (safe 5 / confident 10 / max 20) and a 95%
-participation rate. The 20% cap is explicitly the anti-bankruptcy guard.
+`Economy.wagerTiers(balance)` prices the three, `cfg.minWager` is the floor under all of them,
+and the prediction screen offers exactly those three buttons — Confident preselected, because it
+is the tier the workbook's projections assume.
 
-The code has one absolute slider from `cfg.minWager` to **100% of the balance**, no cap, no
-participation concept. The model's risk figure (a 3-miss streak costing 48.8% of balance) does
-not describe the game at all.
-
-**Done when:** wagering is a percentage of balance with a real cap, or the model is re-derived
-against an absolute wager. Not both.
+**Still undecided: participation** — see the auto-policy note below.
 
 ### What should clues do in MANUAL play?
-Clues are wired: they accumulate in `state.cycleClues`, set the accuracy via
-`Economy.accuracyFor`, and are spent and reset by `resolvePrediction`. But accuracy only decides
-the outcome in **auto** runs — a manual pick still wins on its merits (`sel === correct`), which
-is the right call for a game and leaves the model's accuracy curve half-used.
+Clues are wired end to end: they are the gate (four of an episode's eight unlock it) and they set
+the modelled accuracy (`Economy.accuracyFor(Clues.countFor(id))`), and the wager screen shows the
+ones you hold under **Review the evidence**. But accuracy only decides the outcome in **auto**
+runs — a manual pick still wins on its merits (`sel === correct`), which is the right call for a
+game and leaves the model's accuracy curve half-used.
 
-Options: accuracy only ever models auto runs (today); clues buy a hint or narrow the options;
-clues grant a re-roll on a loss. This is a design decision, not a config change.
+What the player gets today is *information*: the evidence is on screen, and reading it is
+supposed to be what makes the guess better. Whether that is enough is the open question.
 
-### Prediction is unreachable from the balancing tool
-`openPrediction()` has exactly one caller — the Predict & watch button. An auto-play run
-executes zero predictions, so the model's prediction EV (80.23 per prediction, 324 coins/day
-engaged) can never be observed in the tool built to validate it.
+Options: accuracy only ever models auto runs (today); holding more than the required four buys a
+hint or eliminates an answer; clues grant a re-roll on a loss. A design decision, not a config
+change.
 
-Deliberately left as-is for now. **Done when:** auto-play runs predictions under a stated policy
-for wager tier, participation and clue spend.
+### ~~Prediction is unreachable from the balancing tool~~ — MOSTLY DONE
+An auto-play run used to execute zero predictions, so the model's prediction EV (80.23 per
+prediction, 324 coins/day engaged) could never be observed in the tool built to validate it.
 
-Two of those three now exist to be pointed at: `Economy.wagerTiers(balance)` gives the policy a
-tier to name (Confident is `Economy.DEFAULT_TIER`, the one the workbook assumes), and the clue
-spend is already `Economy.accuracyFor(state.cycleClues)`. What is still undecided is
-participation — `prediction.participation` is 0.95 in the model and is deliberately not
-projected onto `cfg`, because for a human it is an outcome rather than an input. An auto policy
-is the one place where it *would* be an input, so wiring it belongs to this item, not to the
-wager work.
+It now runs them. `autoWatch()` in `js/ui/main.js` settles every playable episode with no modal
+and no video: the stake is `Economy.DEFAULT_TIER` (Confident, the one the workbook assumes), the
+outcome is `resolvePrediction`'s auto path (`Economy.accuracyFor(state.cycleClues)`, which the
+clue cards raise), and the payout is priced at `cfg.avgOdds` — the model's own average, and that
+knob's first honest call site.
+
+It had to happen: on this branch a set is finished when its episodes have been **watched**, so a
+batch run that never watched would fill set 1 and then roll forever.
+
+**Still undecided: participation.** `prediction.participation` is 0.95 in the model and is
+deliberately not projected onto `cfg`, because for a human it is an outcome rather than an input.
+An auto policy is the one place where it *would* be an input — today `autoWatch` stakes on 100%
+of predictions it can afford, where the model expects 95%. **Done when:** the auto policy skips
+the stake on `1 - participation` of them.
 
 ---
 
@@ -105,6 +114,10 @@ Imported from `Inputs!C9`, in the drawer, read by nothing. In-game time only mov
 `advanceSession()`, so there is no quantity to compare it against. The model uses it to derive
 "active minutes per session" (3.01) against a 3–7 minute Dashboard target band.
 
+It is now the *only* dead knob. `avgOdds` used to be the other one; it is the **flat payout
+multiplier** now (GDD §7.3), read on every prediction a human makes as well as every one the
+batch tool settles — which is about as honest a call site as a number gets.
+
 ---
 
 ## Board & tiles
@@ -124,48 +137,162 @@ What made the decision concrete: each of the two outcomes now opens its own bonu
 just a distribution.
 
 ### The large bonus's prize ladder pays 2/3 of what the model says
-The large bonus is presented as a three-rung ladder (`minigames/gala-match3.html`). The model has
-only ONE number for it, so the design is: **top rung = `cfg.trainLarge`, the two lower rungs are
+The large bonus is presented as a three-rung ladder (`minigames/gala-match3.html`). It lives on a
+**pool row** now rather than on a tile of its own — the `bonus` table's "The good table" carries
+`game` and `ladder`, so the amount there is a ceiling and the winning rung is picked before the
+game opens. The model has only ONE number for it, so the design is: **top rung = `cfg.trainLarge`, the two lower rungs are
 exactly 1/3 and 2/3 of it, and the winning rung is an even pick of the three.**
 
 An even pick of 1/3, 2/3 and 1 averages **2/3**. So:
 
 | | model | board |
 |---|---|---|
-| one large bonus | 315 | **210** |
-| per train landing | 149.25 (`Economy.trainEV`) | **112.5** (`Economy.trainRealEV`) |
+| one large bonus | 315 | **2/3 of the row's ceiling** |
+| per arrival landing | 149.25 (`Economy.trainEV`) | `Economy.trainRealEV` |
 
-That is a **25% cut** to the train's output, which slows the builder curve. It is deliberate and
-measured rather than hidden — both numbers are computed and the tests assert the gap — but it is
-not reconciled with the spreadsheet.
+That is a **25% cut** to the arrivals' output. It is deliberate and measured rather than hidden —
+both numbers are computed and the tests assert the gap — but it is not reconciled with the
+spreadsheet, and the row's `amount` in `assets/pools/pools.js` was raised to 690 by hand to
+compensate rather than by anything the model says.
 
 **Done when:** either the ladder is anchored on its MEAN instead of its top (multiply all three
 rungs by 1.5 — the top rung becomes 472 and the EV returns to exactly 315), or the workbook gains
 real cells for the three rungs and their odds, and `EconomyImport` learns to read them.
 
 ### Advance-to-Start pays double what the model prices
-`Tile.advanceToStart` pays `startPass + startLand` (200) and re-seeds the VIP pool. The workbook
-says the Advance card "collects the pass bonus" and prices the Premiere row at 100. Both the
-Premiere corner and the deck's Advance card share that one helper, so the decision moves two
-board rows together.
+`Tile.advanceToStart` pays `startPass + startLand` (200) and re-seeds the Gala pot. The workbook
+says the Advance card "collects the pass bonus" and prices it at 100.
 
-### Board composition is not configurable
-`Inputs!C20–C24` (40 tiles: 26 standard / 4 train / 6 deck / 4 corner) matches the code exactly,
-but the code's version is `const` data in `js/board-model.js` with `40` written into three
-separate loops. The importer therefore does not read those cells. Changing the tile mix in the
-spreadsheet has no landing point.
+On this branch it has two callers again: the Premiere corner's own landing, and the Mixed pool's
+`move: "start"` row — which is the plot-twist deck's Advance card, back as a table row.
 
-### Standard tiles are position-weighted here and flat in the model
-`js/board-model.js` builds a mean-1 ramp printing 22…56 coins across the 26 standard indices.
-Uniform-landing EV is identical (40) so the model is not wrong, but it has no column for a
-per-tile value and so cannot express which tiles are the good ones. Realized mean is ~39.6
-because teleports over-weight the cheap early tiles.
+### ~~Board composition is not configurable~~ — DONE
+The ring is data now: `assets/board/board.js` declares each Season's tiles and
+`js/board-model.js` reads it, with nothing assuming 40. `Inputs!C20–C24` still describes the OLD
+mix (26 standard / 4 train / 6 deck / 4 corner) rather than GDD §3.1's (20 standard / 6 NPC /
+4 arrival / 6 twist / 4 corner), so the importer still has no landing point — but the landing
+point now exists on the code side, which is the half that used to be missing.
 
-### VIP is a jackpot here and a smooth rebate in the model
-The pool only pays out when the token lands on index 20 (p = 0.025/roll). Same long-run EV,
+**Done when:** the workbook's tile-mix cells match the Season's types and `EconomyImport` writes
+them into a board entry.
+
+### ~~Standard tiles are position-weighted here and flat in the model~~ — GONE
+`stdWeights` printed a mean-1 ramp of 22…56 coins across the standard indices. Every landing
+draws from a weighted pool now (GDD §3.2), so a tile has no printed value at all and `stdWeights`
+is deleted. The model's flat `stdBase` is correspondingly unread — see "Known dead config" in
+CLAUDE.md.
+
+### The Gala is a jackpot here and a smooth rebate in the model
+The pot only pays out when the token lands on the Gala corner (p = 0.025/roll). Same long-run EV,
 completely different variance, and the model has no pool balance at all.
 
+What changed on this branch is that the pot is now *fed by the player's losses* as well as by a
+per-lap seed: a negative Plot Twist takes coins and puts them in the Gala (GDD §3.4). That makes
+the variance load-bearing rather than incidental — the Gala is the reason a twist is bearable —
+but it also means the model's smooth rebate is further from the felt shape than it was.
+
+**Done when:** the workbook prices the twist's take and the Gala's payout as one loop, or the
+Gala is re-derived as a rebate and the twists stop feeding it.
+
 ---
+
+## The collection *(this branch)*
+
+### The drop tables and the pools are not in the economy model
+`boxTiers` and `deckBoxes` live in `js/config.js`, and the four weighted pools live in
+`assets/pools/pools.js`. Neither is described by `economy model v3.xlsx`, so `Economy.apply()`
+does not own them and `loadConfig()` treats the tier list like a camera setting — it survives a
+model change rather than being replaced by it.
+
+That means the two things this loop's pacing actually depends on — how often a **card** drops and
+how often a **clue** does — are the two things the workbook cannot say. Days-to-unlock an episode
+is `Clues.expectedDraws()` (about five draws for four of eight) divided by the board's clue rate,
+and the board's clue rate is `Pools.boardShareOf("clue")`, which is authored by hand.
+
+GDD §4.6 says as much: these are "a coherent starting shape for the simulation to tune, not tuned
+values". The tuning drawer prints both the per-pool and the per-board share so at least the two
+numbers are visible.
+
+**Done when:** the workbook grows a Pools tab and a Packs tab, the importer reads them, and
+`Economy.OWNED_CFG_KEYS` grows them — at which point the identity guard in `loadConfig()` can be
+dropped, because the model would be the source of truth again.
+
+### The duplicate rate is unmodelled, and it is most of the run
+A Season catalogue of 150 drawn by rarity needs far more than 150 draws to complete — and GDD
+§4.3 makes that *deliberate*, because the third copy of a card is what converts it into a
+Collectible. So duplicates are not waste here; they are the mechanism. But the workbook has no
+cell for any of it: not the conversion, not the trickle past the third copy, not the coin refund
+on a copy that did neither.
+
+That coin refund is a large faucet — `cfg.dupCoins × rarity.dup`, up to ×25 on a Legendary — and
+nothing in the model accounts for it.
+
+**Done when:** the model prices a Season in DRAWS rather than in cards, with conversion and the
+duplicate refund as lines in it. Until then `dupCoins` is a feel number.
+
+### ~~Only board 1 is authored~~ — GONE, and replaced by a different gap
+Sets used to be per-board card requirements, and sets 2 and 3 were set 1's cast wearing different
+episode numbers. The catalogue is Season-wide now (150 cards, 15 sets of ten), so there is nothing
+to re-author per set and the loop cannot dead-end.
+
+**What replaced it:** only Season 1 is authored. `Status.advanceSeason()` is written and tested
+and refuses to run, because `BOARD_SEASONS[1]` and `CARD_SEASONS[1]` do not exist — so reaching
+level 30 holds at the gate rather than turning over. That is the honest behaviour, and it means
+the Season reset is code without content.
+
+**Done when:** a second Season exists — a board entry, a 150-card catalogue with fresh ids, and a
+cast. It is content, not code: nothing in `js/status.js` or `js/cards.js` changes.
+
+### ~~Episodes 013–018 are written but not loaded~~ — DONE
+All eighteen episode files carry a `<script>` tag in `index.html`, so **the run is eighteen**.
+The question this entry asked — 12 or 18 — was answered by the Season gate being solved against
+eighteen: `cfg.statusTotal` (5800) is what makes the last episode and level 30 land together,
+which is §8.2's requirement, and that solve assumed the full run. Re-cutting to twelve would mean
+re-solving the gate, not just deleting six tags.
+
+### ~~Status points and the shelf are not in the model either~~ — DONE
+`economy.status` now holds the Season's levels, its opening climb, its **total** — the Season
+gate, which GDD §5.4 calls "the single most important value in the game" — and the two per-source
+inflows the collection cannot pay for you. `Economy.apply()` projects them and
+`OWNED_CFG_KEYS` owns them, so a model version bump replaces them rather than letting a stale
+save outvote them.
+
+**What is still hand-set:** the ten items' prices and their points, and the rarity table's
+`status` / `trickle` / `dup` columns. Those are the *other* two inflows, and they live in content
+files rather than in the model.
+
+**Done when:** the workbook's Status tab covers the rarity ladder and the shelf too, and §5.4's
+"expected daily contribution per archetype" is something the drawer can print rather than
+something a person works out.
+
+### The store's dollar prices buy nothing
+Coins carry `$` labels and tapping one grants them without charging anything — it is a simulator,
+and there is no payment path. GDD §8.4 narrowed this usefully: **coins are the only thing with a
+dollar price now**, because real money must never buy packs directly. So there is exactly one
+conversion to model rather than five.
+
+But the labels are still not derived from anything: they are not in the model, so ARPU cannot be
+read off a run.
+
+**Done when:** the model carries a price list and a conversion assumption, and the store reports
+what a run would have cost.
+
+---
+
+### `Estate3D.validate()` is written but never called
+Every other content check in the project runs twice — once in the boot sweep at the foot of
+`js/ui/main.js`, once in the tuning drawer — so a mis-authored board, pool, clue or catalogue
+reports itself the moment you open the game. The estate's does neither, so a tier that opened at
+a level no status band opens at would go through silently, and the house and the title would
+change on different rolls: exactly what §3.5's pairing exists to prevent. (Today's six tiers do
+line up, which is why nothing has gone wrong yet.)
+
+The reason is structural rather than an oversight in the list: `Estate3D` is an ES module export
+and `main.js` is a classic script, so the name is simply not in scope there. Every other
+validator belongs to a global.
+
+**Done when:** `Board3D` — which is on `window` and already imports the module — forwards it, and
+`main.js`'s sweep and `drawer.js`'s panel both include "The estate" beside the others.
 
 ## Economy plumbing
 
@@ -179,7 +306,13 @@ together, so it is a pure currency redenomination with no pacing effect.
 **Done when:** each knob has a decided call site, and it is stated whether `boardScale` survives
 alongside them.
 
-### Box income is delayed here, guaranteed in the model — but it is NOT capped
+### ~~Box income is delayed here~~ — GONE ON THIS BRANCH *(builder loop)*
+Nothing sits on a tile any more, so there is no placement to saturate and no delay between
+earning a box and collecting it: a box is handed over and opened on the spot. The analysis below
+is kept because it is about `main`'s loop, and because the simulation in it is the sort of thing
+that is annoying to re-derive.
+
+### Box income is delayed here, guaranteed in the model — but it is NOT capped *(builder loop)*
 The model's Builder-net column credits 889.6 coins/builder (5 boxes × 80 coins + 1 energy, the
 energy valued at `coinsPerRoll / (1 - energyPerRoll)` = 97.9). In the code a box is a marker on
 a **free standard tile** — 26 slots, no stacking (`state.boxes` is a Set), and `spawn` silently
@@ -229,3 +362,62 @@ them from `ECONOMY_DEFAULT`.
 An imported model lives only in `localStorage` (`pmdrama.econ.v1`), so it is per-browser and
 per-machine, and clearing site data loses it. The slot keeps the version string and the source
 filename so at least it is identifiable. Revisit when there is a backend.
+
+---
+
+## Status & the Season
+
+### The Season gate is unreachable from the interface
+
+GDD §5.2 gives the Status Level exactly one job — *"Gates the next Season"* — and §5.4 calls the
+gate **"the single most important value in the game"**. `js/status.js` implements it correctly:
+`seasonReady()` at the cap, and `advanceSeason()` moves `state.seasonFrom` so Status reads zero
+while the collection, the Showcase and the lifetime record all persist (§5.3).
+
+**Nothing in `js/ui/` ever calls it.** `grep -rn "seasonReady\|advanceSeason\|hasNextSeason"
+js/ui/` returns nothing. Reaching level 30 shows "Season complete" on the profile and the run
+simply stops there.
+
+It is dormant rather than broken, for a legitimate reason: **only one Season is authored**
+(`CARD_SEASONS.length === 1`, `BOARD_SEASONS.length === 1`), so `hasNextSeason()` is false and
+`advanceSeason()` would refuse anyway. The profile now says so in as many words rather than
+implying something waits behind the gate.
+
+**Done looks like:** a second Season's content exists (a board entry, a card catalogue, a cast,
+episodes), and reaching the cap plays a turnover beat — the Season's report card (§9's Season
+Report Card is the obvious shape), then the new board. The engine side needs nothing; this is
+content plus one screen.
+
+**Worth knowing before starting:** the turnover is the one moment where "Status resets" and
+"nothing is deleted" have to be visibly true at the same time. `state.seasonFrom` is what makes
+that honest — the line moves, the record does not. A turnover screen that reads as *losing* the
+Season is the failure mode.
+
+### Episode 60 and the gate are supposed to land together
+
+§8.2: *"Season gate and episode 60 land within a few days of each other for the engaged
+archetype."* §8.3 names the failure it prevents: a player who runs out of episodes long before
+the gate is *"left staring at a wall she cannot influence, which is the worst churn moment the
+design can produce."*
+
+This build satisfies it — measured, at 18 episodes and `statusTotal: 5800`, the last episode and
+level 30 both land around session 6. **It is not self-maintaining.** Any change to the clue rate,
+the episode count or the per-copy Status value moves the two independently, and the sim in
+`tools/` is the only thing that will notice. Re-measure both numbers together after any of them
+moves, not just the one that changed.
+
+### The villa's climax reads smaller than its opening
+
+`MODEL` bounds the estate by **height and span**, and the span is what binds for tier 6: measured
+across levels 26 to 30 the width sits at 4.7–4.9 throughout while the height falls from 2.51 at
+level 27 to **1.78** at level 30. The last two levels earn a second building and gardens, the
+footprint grows, and the fit scales the whole plot down to keep it in frame — so the house itself
+is at its shortest exactly where the Season ends. The progression inverts at the moment it should
+peak.
+
+It is cosmetic and the build is playable with it. Three ways out, in rough order of appeal: fit
+the **main building** rather than the whole plot, so outbuildings are allowed to overflow the span;
+raise `MODEL.span` for tier 6 only, since a per-tier `scale` is already supported in the manifest;
+or author the late levels to grow **upward** rather than outward, which is a prompt change and no
+code at all. The third is the cheapest and would want doing before tier 5's levels are generated,
+since they will hit the same wall.

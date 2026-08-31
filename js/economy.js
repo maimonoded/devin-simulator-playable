@@ -54,11 +54,27 @@
 const ECONOMY_DEFAULT = {
   /* Identity — Guide!B2 of the workbook this came from, or the model this was transcribed
      from when nothing has been imported. */
-  version: "Economy Model v3.13 - segmented cost curve, 240 builders / 240 episodes",
+  /* The version stamp is what makes an old saved config drop the keys this model owns
+     (js/storage.js). Bump it whenever an owned value changes, or a save from before the
+     change quietly outvotes the new number — which is exactly how the Status track spent an
+     afternoon paying 2 points an episode instead of 50. */
+  version: "Economy Model v3.16 - Collectibles: 48-card catalogue, Season gate re-solved to 5800",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
-  energy: { cap: 30, regenMin: 3, sessionsPerDay: 2.5, dailyAllowance: 240, secPerRoll: 5 },
+  /* cap 40 for the DEMO build, and the FIRST session is a grant on top of it (cfg.startEnergy).
+     The two pacing targets pull against each other at any single cap: eight earned episodes
+     inside session one wants a big tank (a hundred rolls covers it in 88% of runs), while
+     finishing all sixteen in three or four sessions wants a small one. A generous first sitting
+     and a normal cap afterwards satisfies both, and it is where an FTUE puts its generosity
+     anyway. Measured over 25 full runs through the real tile code: 78 rolls to eight episodes,
+     155 to sixteen.
+
+     energyCap is economy-OWNED (OWNED_CFG_KEYS below), so it moves HERE, not on cfg — setting
+     it on cfg alone is silently reverted by Economy.apply() at every boot, which is exactly
+     what the config test catches. startEnergy is deliberately NOT owned: no workbook describes
+     it, so it survives a model change the way the camera settings do. */
+  energy: { cap: 40, regenMin: 3, sessionsPerDay: 2.5, dailyAllowance: 240, secPerRoll: 5 },
 
   structure: { totalBuilders: 240, levelsPerBuilder: 5, episodesPerSeries: 60 },
 
@@ -117,7 +133,33 @@ const ECONOMY_DEFAULT = {
     participation: 0.95,
     wagerSafe: 0.05, wagerConfident: 0.10, wagerMax: 0.20,
     baseAccuracy: 0.55, accuracyPerClue: 0.04, maxAccuracy: 0.70,
+    /* Flat now (GDD 7.3): every answer pays this. It was already the model's own average. */
     avgOdds: 1.8, clueAlbumSize: 300,
+  },
+
+  /* THE STATUS TRACK (GDD 5.4), which asks for exactly this: a tab of its own, and each
+     source's expected contribution. It is here rather than in cfg because the Season gate is
+     "the single most important value in the game" — the one number that decides how long a
+     Season takes — and a number like that belongs beside the cost curve, in something with a
+     version stamp, not in a scalar a saved config can quietly outvote.
+
+     `total` is authoritative and `first` is the opening climb; the step between levels is
+     SOLVED from the two (Economy.statusStep). The four per-source values are 5.1's inflows:
+     the two card ones live on the rarity table and setBonusStatus, and these are the two the
+     collection cannot pay for you. */
+  /* THE SEASON GATE, and for this build a DEMO gate. 30,000 over 30 days was the real economy;
+     a three-session demo earns about 4,100, measured through the real tile code over fifteen
+     full runs, so the track would have died around level 22 and never turned over. 4,000 puts
+     level 23 at the end of session one, 28 at session two and 30 at session three — without
+     the player having to spend a coin, so anything bought is headroom rather than a
+     requirement.
+
+     first is the LEVEL 2 climb and it is not independent of the total: 29 climbs summing to
+     4,000 average 138, so an opening of 25 gives a ramp of roughly 10x across the Season, which
+     is the shape §5.4 asks for. */
+  status: {
+    levels: 30, first: 25, total: 5800,
+    perEpisode: 50, perPrediction: 150, perTrophy: 120,
   },
 
   /* Relative knobs, all 1.00x. They scale whole groups so the economy can move proportionally
@@ -301,7 +343,74 @@ const Economy = {
     return (s ? s.from : 1) + bIdx;
   },
 
+  /* ---------------- the status curve (GDD 5.4) ----------------
+
+     Thirty levels a Season, and reaching the top is the Season gate. 5.4 calls that "the single
+     most important value in the game", which is why the curve lives here beside the cost curve
+     rather than as a scalar in cfg.
+
+     THE TOTAL IS THE AUTHORITATIVE KNOB. Per-level costs ramp linearly from cfg.statusFirst, and
+     the step is SOLVED so the whole ramp sums to exactly cfg.statusTotal:
+
+       total = (L−1)·first + step·(L−2)(L−1)/2   →   step = (total − (L−1)·first) / ((L−2)(L−1)/2)
+
+     L−1 rather than L because level 1 is free: thirty levels are twenty-nine climbs.
+
+     So moving statusTotal moves how long a Season takes and nothing else has to be re-derived —
+     which is what you want from the one number the whole schedule hangs on. A step that comes
+     out negative (a total too small for the opening cost) is clamped to a flat ramp rather than
+     producing levels that get cheaper, which would read as a bug to anyone watching the bar.
+
+     Returns CUMULATIVE thresholds, [0, c1, c1+c2, …], so index n is the points needed to be at
+     level n+1. Length is levels; the last entry is the Season gate. */
+  statusLevels() { return Math.max(2, Math.round(+cfg.statusLevels || 2)); },
+  /* The total the curve is actually built to. A total smaller than the opening climb × the
+     number of climbs cannot be spent on a ramp that never goes backwards, so it is raised to the
+     flat floor rather than producing levels that get cheaper — which would read as a bug to
+     anyone watching the bar. The drawer prints statusGate(), so what it shows is this. */
+  statusTotalTarget() {
+    const L = this.statusLevels(), first = Math.max(1, +cfg.statusFirst || 1);
+    return Math.max((L - 1) * first, +cfg.statusTotal || 0);
+  },
+  statusStep() {
+    const L = this.statusLevels(), first = Math.max(1, +cfg.statusFirst || 1);
+    const climbs = L - 1;
+    if (climbs < 2) return 0;
+    return Math.max(0, (this.statusTotalTarget() - climbs * first) / ((climbs - 1) * climbs / 2));
+  },
+  /* What level n→n+1 costs on its own. Level 1 is free — everyone starts there.
+
+     THE LAST CLIMB ABSORBS THE ROUNDING. Every cost is rounded to a whole number, and
+     twenty-nine roundings drift by up to fourteen points — small, but it would mean the gate
+     printed in the drawer and the gate the player actually has to clear were different numbers,
+     and the whole point of statusTotal is that it IS the gate. So the final climb is whatever is
+     left, and statusGate() lands on statusTotal exactly. */
+  statusCostOf(level) {
+    const L = this.statusLevels();
+    if (!(level >= 1) || level >= L) return 0;
+    if (level === L - 1) {
+      let below = 0;
+      for (let n = 1; n < L - 1; n++) below += this.statusCostOf(n);
+      return Math.max(1, Math.round(this.statusTotalTarget() - below));
+    }
+    return Math.max(1, Math.round((+cfg.statusFirst || 1) + (level - 1) * this.statusStep()));
+  },
+  statusCurve() {
+    const L = this.statusLevels(), out = [0];
+    for (let n = 1; n < L; n++) out.push(out[n - 1] + this.statusCostOf(n));
+    return out;
+  },
+  /* The Season gate: points to reach the top level. */
+  statusGate() { const c = this.statusCurve(); return c[c.length - 1]; },
+
   /* ---------------- prediction ---------------- */
+
+  /* THE FLAT PAYOUT MULTIPLIER (GDD 7.3). Every answer pays this, whichever one is picked.
+     Per-answer odds leaked the answer — a 1.5 beside a 3.2 tells you which one the writers think
+     is true before you have read either — and made the screen read as a betting market rather
+     than a guess about a story. This number was already the model's own average, and already
+     what the auto-play session priced its payouts at, so nothing in the spreadsheet moves. */
+  flatMultiplier() { return Math.max(1, +cfg.avgOdds || 1); },
 
   /* The workbook's clue edge: every clue banked this cycle buys accuracy, up to a cap.
      Reads cfg rather than the model so the drawer can sweep it live; apply() seeds those
@@ -404,7 +513,9 @@ const Economy = {
                    "startPass", "startLand", "spaEnergy", "vipSeed",
                    "boardScale", "boxesPerUpgrade", "boxCoins", "buildings",
                    "accuracy", "accuracyPerClue", "accuracyMax", "avgOdds",
-                   "wagerSafe", "wagerConfident", "wagerMax", "clueAlbumSize"],
+                   "wagerSafe", "wagerConfident", "wagerMax", "clueAlbumSize",
+                   "statusLevels", "statusFirst", "statusTotal",
+                   "statusPerEpisode", "statusPerPrediction", "trophyStatus"],
 
   /* Push the model's flat values onto the live tuning surface and rebuild the editable tables.
      Everything downstream keeps reading cfg/deck/boxTable exactly as before. */
@@ -445,6 +556,14 @@ const Economy = {
     cfg.wagerConfident = e.prediction.wagerConfident;
     cfg.wagerMax = e.prediction.wagerMax;
     cfg.clueAlbumSize = e.prediction.clueAlbumSize;
+
+    /* The Status track. See economy.status above on why the Season gate lives in the model. */
+    cfg.statusLevels = e.status.levels;
+    cfg.statusFirst = e.status.first;
+    cfg.statusTotal = e.status.total;
+    cfg.statusPerEpisode = e.status.perEpisode;
+    cfg.statusPerPrediction = e.status.perPrediction;
+    cfg.trophyStatus = e.status.perTrophy;
     /* prediction.participation is deliberately NOT projected. It is the share of predictions
        the model expects a stake on (0.95), which in a game a human plays is an OUTCOME, not an
        input — forcing a 5% random skip would be modelling the player rather than the economy.

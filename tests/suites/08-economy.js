@@ -120,8 +120,8 @@ test("a later series prices and unlocks from its global builder number", () => {
   if (shape[1] && shape[1].builders > 0) {
     state.series = 1;
     eq(Economy.globalOf(0), shape[1].from);
-    near(Builders.cost(0, 0), Economy.costFor(shape[1].from, 1), 1e-9,
-         "series 2's first builder is priced as its global number, not as builder 1");
+    near(Economy.costFor(Economy.globalOf(0), 1), Economy.costFor(shape[1].from, 1), 1e-9,
+         "series 2's first entry is priced as its global number, not as number 1");
     state.series = 0;
   } else {
     // only one series has content in this library, which is itself the documented behaviour
@@ -207,21 +207,23 @@ test("accuracy rises per clue and stops at the cap", () => {
   near(Economy.accuracyFor(-5), 0.55, 1e-9, "a negative count cannot lower it");
 });
 
-test("a prediction spends the cycle's clues and resets the flow, leaving the album alone", () => {
+test("a prediction is priced on THIS episode's evidence, and does not delete it", () => {
   freshRun();
   state.coins = 1e6;
-  state.clues = 9; state.cycleClues = 3;
+  /* Three clues on the episode being bet, and a fourth on a different one — which must not
+     count. The edge is what you know about THIS story beat, not a running balance. */
+  state.clues = { "001": ["c1", "c2", "c3"], "002": ["c1"] };
   state.epQueue.push("001");
-  const r = resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
-  eq(r.cluesSpent, 3);
+  const r = resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false, id: "001" });
+  eq(r.cluesSpent, 3, "another episode's clues are not evidence for this one");
   near(r.accuracy, 0.67, 1e-9, "the outcome was modelled at the clued accuracy");
-  eq(state.cycleClues, 0, "the flow resets for the next builder");
-  eq(state.clues, 9, "the album is cosmetic and untouched");
+  deepEq(state.clues["001"], ["c1", "c2", "c3"],
+         "the evidence survives — Review Evidence would be empty otherwise");
 });
 
 test("clues only decide the outcome in auto runs — a manual pick still wins on its merits", () => {
   freshRun();
-  state.coins = 1e6; state.cycleClues = 0;   // accuracy floor, 0.55
+  state.coins = 1e6;                         // no evidence: the 0.55 accuracy floor
   state.epQueue.push("001");
   eq(resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false }).won, true,
      "the right answer wins regardless of the modelled accuracy");
@@ -245,16 +247,30 @@ test("apply pushes the model's numbers onto the live tuning surface", () => {
   resetCfg();
 });
 
-test("the shipped config defaults already match the built-in model", () => {
+/* EVERY owned key, not a hand-picked seven.
+
+   This used to name seven keys and check those. It missed statusTotal, and so it sat green
+   while the shipped default said 7,500 and the model said 30,000 — which meant the Season gate
+   the game actually ran was four times the one anybody had balanced, because Economy.apply()
+   overwrites the default at every boot. A whole afternoon of tuning went into a number that was
+   discarded on the next page load.
+
+   The invariant is exactly this: for every key the model OWNS, the shipped default must already
+   be what apply() would write. Enumerating OWNED_CFG_KEYS rather than listing keys by hand
+   means a new owned value cannot be added without this noticing. */
+test("the shipped config defaults already match the built-in model, for EVERY owned key", () => {
+  resetCfg();
+  Economy.apply();
+  const mismatched = Economy.OWNED_CFG_KEYS.filter(k =>
+    JSON.stringify(DEFAULTS[k]) !== JSON.stringify(cfg[k]));
+  eq(mismatched.length, 0,
+     mismatched.map(k => `${k}: ships ${JSON.stringify(DEFAULTS[k])}, model says ${JSON.stringify(cfg[k])}`)
+               .join(" · ") || "all owned keys agree");
+});
+
+test("the model's own tables ship as the defaults", () => {
   resetCfg();
   const e = ECONOMY_DEFAULT;
-  eq(DEFAULTS.energyCap, e.energy.cap);
-  eq(DEFAULTS.stdBase, e.tiles.stdBase);
-  eq(DEFAULTS.vipSeed, e.tiles.vipSeed);
-  eq(DEFAULTS.boxCoins, e.box.item1Coins);
-  eq(DEFAULTS.accuracy, e.prediction.baseAccuracy);
-  eq(DEFAULTS.accuracyPerClue, e.prediction.accuracyPerClue);
-  eq(DEFAULTS.accuracyMax, e.prediction.maxAccuracy);
   eq(defBox.length, e.box.item2.length, "the box table ships as the model's item 2");
   eq(defDeck.filter(c => c.clues > 0).length, 0, "and the deck ships with no clue card");
 });
@@ -404,4 +420,48 @@ test("nonsense that parses is still refused", () => {
   ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C5", 0)), "x.xlsx", null).ok, "zero energy cap");
   ok(!EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Inputs", "C54", 0.1)), "x.xlsx", null).ok,
      "an accuracy cap below the floor would make clues harmful");
+});
+
+suite("economy: the status track (GDD 5.4)");
+
+test("the model owns the Season gate, and apply() projects it", () => {
+  resetCfg();
+  Economy.apply();
+  const st = Economy.model().status;
+  eq(cfg.statusLevels, st.levels);
+  eq(cfg.statusFirst, st.first);
+  eq(cfg.statusTotal, st.total);
+  eq(cfg.statusPerEpisode, st.perEpisode);
+  eq(cfg.statusPerPrediction, st.perPrediction);
+  eq(cfg.trophyStatus, st.perTrophy);
+});
+
+test("every status key the model sets is on OWNED_CFG_KEYS", () => {
+  /* This is the list js/storage.js uses to decide what a saved config may override. A key the
+     model sets but does not own is a number a stale save can quietly outvote — which is exactly
+     how the track spent an afternoon paying 2 points an episode instead of 50. */
+  ["statusLevels", "statusFirst", "statusTotal",
+   "statusPerEpisode", "statusPerPrediction", "trophyStatus"].forEach(k =>
+    ok(Economy.OWNED_CFG_KEYS.includes(k), k + " is projected but not owned"));
+});
+
+test("the curve sums to the total, whatever the total is", () => {
+  resetCfg();
+  [30000, 12000, 90000].forEach(total => {
+    cfg.statusTotal = total;
+    eq(Economy.statusGate(), total, "the TOTAL is the authoritative knob");
+    eq(Economy.statusCurve().length, cfg.statusLevels);
+  });
+  resetCfg();
+});
+
+test("a total too small for the opening climb flattens rather than going backwards", () => {
+  resetCfg();
+  cfg.statusFirst = 1000; cfg.statusTotal = 100;      // 29 climbs of 1000 cannot fit in 100
+  eq(Economy.statusStep(), 0, "a negative step would make later levels CHEAPER");
+  for (let n = 2; n < cfg.statusLevels; n++)
+    ok(Economy.statusCostOf(n) >= Economy.statusCostOf(n - 1), `level ${n} got cheaper`);
+  eq(Economy.statusGate(), (cfg.statusLevels - 1) * cfg.statusFirst,
+     "the gate is raised to the flat floor rather than the curve being bent");
+  resetCfg();
 });

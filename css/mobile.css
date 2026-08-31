@@ -88,8 +88,10 @@ html.viewMobile .avatarBtn { width: 34px; height: 34px; font-size: 16px; }
 html.viewMobile .hud .pill { padding: 4px 8px; gap: 5px; min-width: 0; }
 html.viewMobile .hud .pill .lb { display: none; }
 html.viewMobile .hud .pill .v { font-size: 13px; }
-html.viewMobile .hud .pill .ic { font-size: 13px; }
-html.viewMobile .hud .energywrap { min-width: 0; flex: 1 1 auto; }
+/* 19, not 13. The pills lose their captions here so there is room, and 13px of illustrated icon
+   is a smudge — see the note in css/base.css. */
+html.viewMobile .hud .pill .ic { width: 19px; height: 19px; }
+/* .energywrap is gone — energy moved onto the Roll button. */
 html.viewMobile .hud .ebar { height: 5px; margin-top: 3px; }
 /* Day and clock are simulator instrumentation — a player has no session counter on screen.
    Dropping it also gives the four balance pills the whole width. */
@@ -97,14 +99,16 @@ html.viewMobile .daychip { display: none; }
 
 /* Below the HUD strip rather than under it. The HUD sits at top:10 and runs ~55px tall once
    the pills are compacted, so this clears it with a small gap. Both are absolute inside the
-   same frame, so if the HUD ever grows a row this is the number to move.
-   Back and the builders-view header clear it the same way, which puts the three of them on one
-   line: back left, title centred, store right. */
-html.viewMobile .storeBtn { top: calc(74px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
-html.viewMobile .navBtn.back { top: calc(74px + var(--safeT)); left: 12px; width: 44px; height: 44px; }
-html.viewMobile .buildersHead { top: calc(80px + var(--safeT)); }
-/* Under the store button, which is itself pushed clear of the HUD here. */
-html.viewMobile .boxCounter { top: calc(120px + var(--safeT)); right: 12px; }
+   same frame, so if the HUD ever grows a row this is the number to move. */
+/* The objective tracker takes the strip under the HUD (css/collection.css .epTrack), so the
+   store button moves below it rather than sitting on top of the episode title. Both are absolute
+   in the same frame; if the HUD or the tracker ever grows a row, these are the two numbers. */
+/* FLUSH TO THE TOOLBAR, by tucking under it. The HUD sits at top:10 and runs ~52px, so the
+   tracker starts 10px INSIDE that and hides the overlap behind the HUD's own z-index — no gap to
+   misjudge and no seam where two rounded corners would otherwise meet. Its padding-top carries
+   the same 10px so the text lands where it would have anyway. */
+html.viewMobile .epTrack { top: calc(52px + var(--safeT)); }
+html.viewMobile .storeBtn { top: calc(104px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
 
 /* ---- notch and home indicator ----
    The frame runs edge to edge (viewport-fit=cover in index.html), which is what we want for the
@@ -115,9 +119,13 @@ html.viewMobile {
   --safeT: env(safe-area-inset-top, 0px);
   --safeB: env(safe-area-inset-bottom, 0px);
 }
-html.viewMobile .playbar,
-html.viewMobile .buildersBar,
-html.viewMobile .bingeBtn { bottom: calc(14px + var(--safeB)); }
-html.viewMobile .bingeBtn { bottom: calc(78px + var(--safeB)); }
-/* Library clears the HUD strip, level with Back and the Store button. */
-html.viewMobile .libBtn { top: calc(74px + var(--safeT)); width: 44px; height: 44px; font-size: 19px; }
+/* This file was committed TRUNCATED: it ended on the dangling selector "html.viewMobile
+   .playbar," with no block. Braces balanced 20/20 so nothing looked wrong, and a CSS parser
+   silently discards a trailing selector — so --safeB was declared directly above and then used
+   by nothing at all. The play controls sat at bottom:14px, under the home indicator, on every
+   notched phone. The rule below is what was missing. */
+html.viewMobile .playbar { bottom: calc(14px + var(--safeB)); }
+/* The modal is a flex box centred in a fixed, inset:0 scrim, so its footer sits wherever the
+   bottom edge is — which on a notched phone is under the home indicator. Padding the scrim
+   moves the whole dialog up rather than clipping it. */
+html.viewMobile .scrim { padding-bottom: calc(20px + var(--safeB)); }
