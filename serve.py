@@ -24,20 +24,67 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8125
 
 
-# Binary art: big, and changed by dropping in a new file rather than by editing.
-# `no-cache` still forces a revalidation on every load, so a replaced asset shows up
-# immediately -- but an unchanged one comes back 304 with no body, instead of re-sending
-# megabytes. The player piece alone is 5 MB, and every tile is another 2 MB.
-CACHEABLE = re.compile(r"^/(assets|vendor|episodes)/")
+# ---------------------------------------------------------------------------------------
+# THREE CACHE POLICIES, because the three kinds of file here have nothing in common.
+#
+# The numbers that decided this, measured on one page load:
+#
+#     .glb models   45 requests   43.1 MB     <- the whole problem
+#     code + markup 84 requests    2.0 MB
+#     .webp art      ~5 MB across the album and the box popups
+#     three.js                     1.3 MB
+#
+# `no-cache` was on all of it, which sounds cached and is not: it forces a REVALIDATION on
+# every single load. On localhost that is free. Over Tailscale to a phone it is 170 round
+# trips, and worse -- 45 MB overflows the browser's cache, so most of it is evicted before
+# the next load and comes back in full. Only the last eight GLBs survived, which is what a
+# cache thrashing looks like.
+#
+# So: art and vendored libraries get a REAL max-age and are not asked about again. Code keeps
+# no-store, because it is edited constantly and a stale bundle is a debugging afternoon.
+IMMUTABLE = re.compile(r"^/vendor/")                       # version-pinned, never edited
+ART = re.compile(r"^/(assets|episodes)/.*\.(webp|png|jpg|jpeg|glb|gltf|bin|mp4|woff2?)$", re.I)
+
+ART_MAX_AGE = 7 * 24 * 3600        # a week
+VENDOR_MAX_AGE = 365 * 24 * 3600   # a year; three.js is pinned at r169 in the repo
+
+# THE ESCAPE HATCH. Art changes by a file being REPLACED, not edited -- and a cached file will
+# not notice. While iterating on art, run:  FRESH=1 python3 serve.py
+# and everything falls back to revalidate-always, which is what this server did before.
+FRESH = os.environ.get("FRESH", "").strip() not in ("", "0", "false", "no")
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    # HTTP/1.1, for KEEP-ALIVE. Python defaults to 1.0, which closes the socket after every
+    # response -- and a page load here is ~170 requests, so that is 170 TCP handshakes. On
+    # localhost the cost is invisible; over Tailscale to a phone it is the whole page load.
+    #
+    # Safe because every response this handler produces carries an accurate Content-Length:
+    # the base class sets it for files and errors, and the 206 branch below sets its own. A
+    # keep-alive response WITHOUT one would hang the connection until it timed out, which is
+    # the trap this setting is usually blamed for.
+    protocol_version = "HTTP/1.1"
+    # An idle keep-alive socket holds a thread in ThreadingHTTPServer. The threads are daemons
+    # so they never block shutdown, but without a timeout a walked-away-from tab pins one
+    # indefinitely.
+    timeout = 30
+
     def end_headers(self):
-        # no-store for code and markup: those are edited constantly and must never be reused.
-        cacheable = CACHEABLE.match(self.path.split("?")[0])
-        self.send_header("Cache-Control", "no-cache" if cacheable else "no-store, must-revalidate")
+        self.send_header("Cache-Control", self._cache_control())
         self.send_header("Accept-Ranges", "bytes")
         super().end_headers()
+
+    def _cache_control(self):
+        path = self.path.split("?")[0]
+        if FRESH:
+            # Everything revalidates. Slower, but a replaced file is visible on the next load.
+            return "no-cache" if (IMMUTABLE.match(path) or ART.match(path)) else "no-store, must-revalidate"
+        if IMMUTABLE.match(path):
+            return f"public, max-age={VENDOR_MAX_AGE}, immutable"
+        if ART.match(path):
+            return f"public, max-age={ART_MAX_AGE}"
+        # Code and markup: edited constantly, and a stale one is never worth the bytes it saves.
+        return "no-store, must-revalidate"
 
     def do_GET(self):
         rng = self.headers.get("Range")

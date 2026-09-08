@@ -5,7 +5,7 @@ node tests/run.js            # all suites
 node tests/run.js tiles      # only suite files matching "tiles"
 ```
 
-Exit code is non-zero on failure. **130 assertions, no dependencies, no framework.**
+Exit code is non-zero on failure. **292 assertions, no dependencies, no framework.**
 
 ## How it works
 
@@ -25,23 +25,35 @@ sequence and always restores it. Weighted tables are steered by temporarily zero
 (`forceCard`, `forceDrop`) rather than by stubbing `weighted()`.
 
 Helpers available in suites: `suite`, `test`, `ok`, `eq`, `near`, `deepEq`, `throws`,
-`withRandom`, `withQuietConsole`, `freshRun()`, `resetCfg()`.
+`withRandom`, `withQuietConsole`, `freshRun()`, `resetCfg()`, `forceBox()`, `forcePool()`.
+
+`forcePool(key, match, fn)` pins a pool to one row and always restores it. Every landing is a
+weighted draw now, so a test that wants "a clue off an NPC tile" has to say so — rolling for it
+and hoping would test the random number generator, not the tile.
 
 ## What's covered
 
 | Suite | Covers |
 |---|---|
-| [01-core](suites/01-core.js) | `util` (fmt, rand, chance, weighted, shuffle), config invariants (every tuning key has a default, train EV normalises to 1), `board-model` (tile types, grid uniqueness/adjacency, Start at the bottom vertex, stdWeights mean, pathToStart) |
-| [02-episodes](suites/02-episodes.js) | Every shipped episode file validated against the schema; registry lookups; id→builder/video derivation; builder cycling past the last episode; the full `difficulty` normalisation matrix |
-| [03-builders](suites/03-builders.js) | Cost curve vs the formula, `nextCost`/`canAfford`/`cheapest`, reshape, and the upgrade transaction — refusals, coin deduction, box spawning, **episodes only on builder completion**, series end |
+| [01-core](suites/01-core.js) | `util` (fmt, rand, chance, weighted, shuffle), config invariants (every tuning key has a default, train EV normalises to 1), `board-model` — the shipped Season validating clean, GDD §3.1's tile budget, corners one per side, arrivals at the side midpoints, `validateBoard` reporting every problem at once, and geometry (grid uniqueness/adjacency, Start at the bottom vertex, `pathToStart`) asserted against `boardSize()` rather than a hardcoded 40 |
+| [02-episodes](suites/02-episodes.js) | Every shipped episode file validated against the schema; registry lookups; id→video derivation; cycling past the last episode; the full `difficulty` normalisation matrix |
+| [03-collection](suites/03-collection.js) | The arc's shape and that the shipped one validates clean; per-arc albums; unlocking; **watching in strict story order**, across arcs and not only within one; an arc finishing on the last watch rather than the last card; box drops per tier, duplicate consolation, and energy that never drains an overflow; **that a box never hands over a Collectible directly — it pays cards (§4.5)**, and that a box's cards unlock nothing while the clue in it can; a card drawn off a tile going through the same banking as one out of a box; and the three card beats — a new one holds, a plain copy floats, the converting copy holds |
 | [04-game](suites/04-game.js) | Dice bounds, `spendRoll`, lap bonus, prediction resolution (correct/wrong, streaks, queue consumption, zero-wager, manual vs auto accuracy), session/time (refill, day rollover, login rewards, multi-day skips, over-cap energy) |
-| [05-tiles](suites/05-tiles.js) | `BoardActor` reward + presentation builders, the tile registry, and every tile's landing behaviour asserted on returned event lists — including train EV over 4,000 draws and all five deck-card branches |
-| [06-overlays-storage](suites/06-overlays-storage.js) | Mystery-box eligibility/spawn/consume and drop kinds, overlay-before-tile dispatch order, and storage: serialize/restore round-trip, over-cap energy, legacy-queue migration, corrupt data, config merge onto `DEFAULTS` |
+| [05-tiles](suites/05-tiles.js) | `BoardActor` reward + presentation builders; the registry (the four pooled types being **one class**, only the corners flagged as corners, nothing printing a value); the draw — a tile reaching its own pool and no other, a loss feeding the Gala pot and never digging below zero, a duplicate paying instead of blocking, a bonus row banking before the game opens and a ladder row's amount being a ceiling; and the four corners, including the Scoop teleporting in **one step** so no lap bonus is paid, and every NPC tile being reachable from it |
+| [11-clues](suites/11-clues.js) | `clues`: every episode having enough to be unlockable and the pool being BIGGER than the requirement (what makes evidence personal); a clue banking against a specific episode and unlocking being derived; clues always going to the first episode not yet unlocked; a duplicate paying coins; the evidence reading back in authored order; the catch-up valve doing nothing for a player who is progressing, easing by one a day after the grace period, never below one, and only starting its clock once a clue has landed |
+| [12-cards](suites/12-cards.js) | `cards`: the catalogue validating clean and **sized to the content** — 48 cards, four sets of twelve, 29/12/6/1 — against §4.2's 60/25/12/3 weights, and **every set mixing the memory and the trophy** (§4.1's two kinds); rarer being worth more on every axis; a card knowing its set without storing it; **three copies converting** and the third paying the status; copies past that trickling; `add(id, 5)` paying exactly what five separate calls would; draws following the weights over 20,000 rolls; a rarity **floor** never being undershot, not capping the draw at itself, and falling DOWN when nothing is authored above it; a set completing on the last card OWNED; the bonus paying once; and the `cardMeta` record keeping a forgotten card's name, rarity and therefore its Status |
+| [13-status](suites/13-status.js) | `status`: the four inflows and that **nothing is stored** but a baseline; the level curve coming from the economy model and the TOTAL being the authoritative knob; levels getting dearer and never cheaper; the top level holding; bands five levels apart; milestones paying once, a clue cache actually advancing the story, an energy milestone not draining an overflow, and the sweep being idempotent; a Season turn moving the baseline and **deleting nothing**; and the Collectibles — **three copies materialising one and nothing else doing so**, the list being derived and ordered by the catalogue, and a set's display piece being its centrepiece (§4.4) |
+| [10-pools](suites/10-pools.js) | `pools`: the shipped tables validating clean, weights summing to 100, every board type pointing at a table that exists, **no pool being pure**, only the Mixed pool taking money away, 20,000 draws matching the authored weights, board share vs pool share, the card/clue rates landing near GDD §4.6 and §6.6, and `validate()` catching a zero-weight table, a nameless row, an unknown kind, a payload-less kind and a tile pointing at a pool that does not exist |
+| [06-storage](suites/06-storage.js) | Landing dispatch — including a board type nobody registered being a quiet nothing rather than a throw that would leave `state.animating` stuck — and storage: serialize/restore round-trip, a finished set surviving a reload, **a card this build no longer defines is kept while a pre-change save's shelf is ignored rather than revived**, corrupt albums degrading rather than poisoning, over-cap energy, legacy-queue migration, a sealed reveal surviving a reload, the box tables round-tripping and a wrong-shaped one being refused, config merge onto `DEFAULTS` |
 | [08-economy](suites/08-economy.js) | `economy`: the solved exponent, the shipped curve reproducing the workbook's builder-1 prices, segment selection, `bIndex`/`baseMode` boundary behaviour, explicit segments, series planning and clamping to available episodes, global builder numbering, the clue→accuracy arc and its spend-and-reset, and the projection onto `cfg`. `economy-import`: the structural gate — missing sheets, an empty or already-loaded version, a moved label, a non-numeric value, an unpayable box outcome, a deck without exactly one advance card, and the all-errors-at-once contract |
 | [07-env](suites/07-env.js) | `env-model`: the screen-space axes, the region visible at every window aspect, the sight-line height budget (including the case a corner-based budget gets wrong), and the placement manifest — datum resolution, deck scaling from the board plus its border, quarter-turn-only deck yaw, the problem list, `repeat` expansion, and a check that the shipped `assets/env/scene.js` places every piece legally |
 
 The suite is regression-checked: reintroducing the energy-cap clamp, unlocking episodes per level
-instead of per completion, or rotating the board back all produce failures.
+instead of per completion, rotating the board back, bringing back `stdWeights`, walking the
+Scoop's teleport instead of jumping it, or putting a Collectible back in a box's drop table all
+produce failures. That last one is the newest guard and the one worth knowing about: a
+Collectible has exactly one way in (§4.3, the third copy of a card), and a shelf of items a box
+could pay directly is the mistake it exists to catch a second time.
 
 ---
 
@@ -72,10 +84,10 @@ rendering.
 | B2 | `playEpisode()` — same file | Result classification: win/loss text, the payout line, and *when the true answer is revealed*. Interleaved with `innerHTML` writes and an `await playVideo()`. |
 | B3 | `openStore()` — [js/ui/store.js](../js/ui/store.js) | The actual grant (`state.coins += amt` / `state.energy += amt`) lives in a click handler. A `grantPack(kind, amt)` function would be a two-line unit test — and it's the code path the energy-overflow invariant depends on. |
 | B4 | `uiUpgrade()` / `nextSession()` — [js/ui/main.js](../js/ui/main.js) | Which log lines and toasts fire for a given upgrade result. The decisions are simple; they're just fused to `log()`/`toast()`/`renderAll()`. |
-| B5 | `renderBuilderList()` — [js/ui/render.js](../js/ui/render.js) | Per-row enable/disable rules (`afford && live`, where `live` depends on `autoMode === "roll"`), and the series-progress percentages. Pure arithmetic and predicates, embedded in DOM construction. |
+| B5 | `Case3D.sync()` / `_panelTexture()` — [js/ui/case3d.js](../js/ui/case3d.js) | The four panel states (seen / next / held / collecting) are decided in the middle of a canvas-painting function, and the signature that decides whether to repaint is string concatenation. Both are pure predicates over the collection and would test cleanly if they returned data instead of pixels. |
 | B6 | `renderAll()` button gating — same file | The enable/disable matrix for Roll / auto buttons / multiplier / store across `animating` × `autoMode` × energy × `seriesDone`. This is real state-machine logic and exactly the sort of thing that regressed twice during development. |
 | B7 | `resetUser()` / `resetDefaults()` — [js/ui/drawer.js](../js/ui/drawer.js) | State reset is correct and testable, but it's fused to `buildTuning()`, `buildBoard()` and toasts. Also `armUserReset()`'s two-click confirm window is pure timer logic wrapped around a button element. |
-| B8 | Globals as coupling | `showCollect()` and `playVideo()` read the `autoMode` global directly instead of receiving it. `Builders.upgrade()` checks `state.animating`, a UI concern, inside the logic layer. Passing these in would remove the hidden dependency. |
+| B8 | Globals as coupling | `showCollect()`, `showPack()` and `playVideo()` read the `autoMode` global directly instead of receiving it. `openStore()` and `buyBox()` check `state.animating`, a UI concern, from the logic they wrap. Passing these in would remove the hidden dependency. |
 
 **Suggested priority if we act on this:** B3 and B1 are the cheapest wins (pure extractions, no
 behaviour change). B6 is the highest value given it has regressed before. A1 is the largest gap

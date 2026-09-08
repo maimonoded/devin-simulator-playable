@@ -1,0 +1,137 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Harbour Heights — card specimens</title>
+<!-- A LIVING SPECIMEN SHEET.
+
+     It renders through the game's real cardFace()/dropFace() and the game's real stylesheets,
+     so it cannot drift from what the player actually sees. A folder of exported PNGs would be
+     wrong the first time anyone touched a border colour; this is wrong never.
+
+     Open it the same way as the game: python3 serve.py, then /docs/card-specimens.html -->
+<!-- Everything below resolves from the REPO ROOT, exactly as the game does, so Cards.artFor()
+     hands back a path that works here too. Without it the cards render but every picture 404s,
+     which looks like "the art is broken" rather than "the page is in a subfolder". -->
+<base href="../">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/overlay.css">
+<link rel="stylesheet" href="css/collection.css">
+<style>
+  body{padding:28px 32px;background:#0b0e24;color:#e8ecff;font-family:'Segoe UI',system-ui,sans-serif}
+  h1{font-family:Georgia,serif;font-size:26px;margin:0 0 4px}
+  .lede{color:#9098c9;font-size:13px;max-width:70ch;margin:0 0 26px;line-height:1.55}
+  h2{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#ffcb5c;
+     margin:30px 0 4px;border-top:1px solid #2a3160;padding-top:14px}
+  h2 .n{color:#9098c9;text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+  .note{color:#9098c9;font-size:12.5px;max-width:72ch;margin:0 0 14px;line-height:1.5}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .spec{width:180px}
+  .spec .cap{margin-top:7px;font-size:11px;color:#9098c9;text-align:center;line-height:1.35}
+  .spec .cap b{color:#e8ecff;display:block;font-size:12px}
+</style>
+<h1>Card specimens</h1>
+<p class="lede">Every face the game can draw, rendered by the same <code>cardFace()</code> and
+<code>dropFace()</code> the board uses, under the same stylesheet. Two independent axes:
+the <b>family</b> decides the frame and the ground, the <b>rarity</b> decides the star badge and
+the halo. The three families are ranked by how much the player wants them: a clue is a
+photograph, a collection card is gilt art, and a <b>Collectible</b> — what three copies of a card
+become — is a number on a plaque. One card wears two of those faces. Written up in
+<a href="docs/CARDS.md" style="color:#2dd4bf">CARDS.md</a>.</p>
+<div id="out"></div>
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/content.js"></script>
+<script src="js/episodes.js"></script>
+<script src="episodes/001.js"></script>
+<script src="assets/cards/cards.js"></script>
+<script src="assets/status/status.js"></script>
+<script src="js/cards.js"></script>
+<!-- For Status.trophyOf() alone. The trophy is the one thing on this page that is not a card,
+     and it is derived from the episode list, so 001.js above is all the content it needs. -->
+<script src="js/status.js"></script>
+<script src="js/ui/cardface.js"></script>
+<script>
+/* A minimal stand-in for the pieces cardFace() reaches for. The real game supplies these from
+   state.js; a specimen sheet only needs them to exist. `cardMeta` is here because Cards.get()
+   falls through to it for a card the catalogue has forgotten — nothing on this page is
+   forgotten, but an undefined bag would throw on the way past. */
+var state={cards:{},cardMeta:{},trophies:{},season:0,day:1};
+Object.assign(cfg,DEFAULTS);
+
+const out=document.getElementById("out");
+function section(title,count,note,items){
+  const h=document.createElement("h2");
+  h.innerHTML=title+(count?`<span class="n">${count}</span>`:"");
+  out.appendChild(h);
+  if(note){ const p=document.createElement("p"); p.className="note"; p.textContent=note; out.appendChild(p); }
+  const row=document.createElement("div"); row.className="row";
+  items.forEach(([html,name,sub])=>{
+    const d=document.createElement("div"); d.className="spec";
+    d.innerHTML=html+`<div class="cap"><b>${name}</b>${sub||""}</div>`;
+    row.appendChild(d);
+  });
+  out.appendChild(row);
+}
+
+const pick=k=>Cards.all().find(c=>c.rarity===k&&c.art)||Cards.all().find(c=>c.rarity===k);
+/* Prefer a painted card wherever one exists, and fall back to stripping the art off a real one
+   if a Season is ever fully painted — the fallback face still has to be demonstrable then. */
+const painted=Cards.all().filter(c=>c.art).length;
+const anyNoArt=Cards.all().find(c=>!c.art);
+const noArt=anyNoArt||Object.assign({},Cards.all()[0],{art:null});
+
+section("Collection · one per rarity, 1★ to 4★", `${Cards.all().length} cards a Season`,
+  "Same gilt frame and warm plum ground on all four. Rarity names itself on the badge and widens the halo; it never touches the border.",
+  Cards.rarities().map(r=>{
+    const c=pick(r.key);
+    return [cardFace(c,{owned:true,count:1,size:"md"}), r.name, `<br>${c.name}`];
+  }));
+
+section("Collection · the three states", null,
+  "The gap between these is the whole reward loop: a card you did not have, a copy that pays coins, and the third copy that converts it into its Collectible.",
+  [[cardFace(pick("epic"),{owned:false,size:"md"}),"Locked","<br>silhouetted, but named"],
+   [cardFace(pick("epic"),{owned:true,count:2,size:"md"}),"Held 2/3","<br>the count is the progress bar"],
+   [cardFace(pick("epic"),{owned:true,count:3,converted:true,size:"md"}),"Converted ★","<br>the gilt lights up"],
+   [cardFace(pick("rare"),{owned:true,count:2,dup:120,size:"md"}),"Duplicate","<br>as it pays out of a box"]]);
+
+section("Collection · the procedural fallback",
+  anyNoArt ? `${Cards.all().length-painted} of ${Cards.all().length} unpainted` : `all ${Cards.all().length} painted`,
+  anyNoArt
+    ? "A procedural face hashed off the card id — same card, same colours, every time. This is what a Season looks like between being authored and being drawn, which is the order those two jobs happen in."
+    : "Every card in this Season is painted, so this is a REAL card with its art stripped off. The fallback still matters: a new Season opens with an unpainted catalogue and looks like this until the art lands.",
+  [[cardFace(noArt,{owned:true,count:1,size:"md"}),"Procedural","<br>"+noArt.name]]);
+
+section("Clue · the case photograph", "8 per episode",
+  "The card the player is actually playing for — four of them buy the next episode. A photograph, picked by hashing the clue's own id from a library of twelve, with the line typed on a slip over it. The paper, the crooked angle and the tape survive from the old evidence tag; the plainness does not.",
+  ["c1","c3","c6"].map((cid,n)=>[dropFace({kind:"clue",isNew:true,ep:"001",clue:{id:cid,
+     text:["A city-centre lock-up in his name is still paid up, monthly, in cash.",
+           "There is a dictaphone in his coat, and the tapes are labelled by surname.",
+           "The shelter is holding letters for him from a law firm, unopened."][n]}},{size:"md"}),
+    "New","<br>clue "+cid+" of episode 001"])
+  .concat([[dropFace({kind:"clue",isNew:false,ep:"001",coins:150,clue:{id:"c2",text:""}},{size:"md"}),
+            "Already known","<br>pays coins instead"]]));
+
+/* THE PLAQUE IS THE FAR SIDE OF A CONVERSION, not a second kind of content. Every specimen in
+   this row but the last is a card from the row at the top of the page, on its THIRD copy — same
+   id, same rarity, different face. Collectibles are synthesised by Cards.collectibleOf() and
+   nothing about them is stored; the trophy is Status.trophyOf(), derived from the episode list.
+
+   This section used to read STATUS_ITEMS: ten hand-authored objects that shared an id with no
+   card, belonged to no set, and could be bought outright. They are gone (GDD §8.1), and the
+   page would have thrown on them. */
+const EP=Episodes.ids()[0];
+section("Status · the Showcase", "converted cards, and the trophies",
+  "A plaque, and the number is the hero. Nobody reads what a Showcase piece IS; they read what it was worth — so the points are set large and the picture is pushed back behind them to a stamp. Gold and corner ticks, but no halo: it was the loudest thing on screen, for the card the player cares least about looking at. No star badge either, because by the time a card converts the player has seen its stars three times already.",
+  Cards.rarities().map(r=>{
+    const it=Cards.collectibleOf(pick(r.key).id);
+    return [dropFace({kind:"status",item:it},{size:"md"}),it.name,
+            `<br>+${it.points} · ${r.name} of ${it.setName}`];
+  }).concat([[dropFace({kind:"status",item:Status.trophyOf(EP)},{size:"md"}),
+              "Called it",`<br>+${cfg.trophyStatus} · the one piece a box cannot contain`]]));
+
+section("The payouts that are not cards", null,
+  "Same silhouette so a box's contents read as one row of things rather than cards plus a paragraph.",
+  [[dropFace({kind:"coins",amount:1500},{size:"md"}),"Coins",""],
+   [dropFace({kind:"energy",amount:12},{size:"md"}),"Energy",""],
+   [cardFace(null,{size:"md"}),"Unknown","<br>an id this build cannot explain"]]);
+</script>

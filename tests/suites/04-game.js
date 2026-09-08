@@ -54,15 +54,77 @@ function setupPrediction(coins = 10000) {
   return state;
 }
 
-test("a correct pick wins and pays wager x odds", () => {
+test("a correct pick wins and pays the FLAT multiplier, whatever was passed", () => {
   setupPrediction();
   const before = state.coins;
-  const r = resolvePrediction({ wager: 1000, odds: 2.2, sel: 0, correct: 0, auto: false });
+  const flat = Economy.flatMultiplier();
+  /* `odds` is passed here on purpose: it used to come off the answer, and the point of GDD 7.3
+     is that it no longer can. An answer that could set its own multiplier would leak which one
+     the writers think is true. */
+  const r = resolvePrediction({ wager: 1000, odds: 2.2, sel: 0, correct: 0, auto: false, id: "001" });
   eq(r.won, true);
-  near(r.payout, 2200, 1e-9);
-  near(state.coins, before - 1000 + 2200, 1e-9, "stake out, payout in");
+  eq(r.odds, flat, "the multiplier is the model's, not the answer's");
+  eq(r.payout, Math.round(1000 * flat));
+  /* EVERY prediction also pays a Collectible (GDD 7.4), and every card now pays a little money
+     on top of the wager — so the balance is stake out, payout in, PLUS the card's coins. The
+     reward card is why this is not just the wager arithmetic. */
+  const cardCoins = r.reward.card ? r.reward.card.coins : 0;
+  eq(state.coins, before - 1000 + r.payout + cardCoins, "stake out, payout in, plus the card");
   eq(state.predWins, 1);
   eq(state.streak, 1);
+});
+
+test("every answer pays the same, so the screen cannot leak the truth", () => {
+  const ep = Episodes.get("001");
+  const seen = new Set();
+  ep.answers.forEach((_, i) => {
+    setupPrediction();
+    seen.add(resolvePrediction({ wager: 500, sel: i, correct: 0, auto: false, id: "001" }).odds);
+  });
+  eq(seen.size, 1, "two answers with two multipliers is a tell");
+});
+
+test("GDD 7.4: every prediction pays a Collectible, won, lost or skipped", () => {
+  ["won", "lost", "skipped"].forEach(kind => {
+    setupPrediction();
+    const before = Cards.owned();
+    const r = resolvePrediction({ wager: kind === "skipped" ? 0 : 500,
+                                  sel: kind === "skipped" ? null : (kind === "won" ? 0 : 1),
+                                  correct: 0, auto: false, id: "001" });
+    ok(r.reward.card, `${kind}: a round must never give nothing`);
+    eq(Cards.owned() > before || Cards.count(r.reward.card.id) > 1, true, `${kind}: and it is banked`);
+  });
+});
+
+test("a correct call pays a better card and a trophy; a wrong one pays neither", () => {
+  setupPrediction();
+  const win = resolvePrediction({ wager: 500, sel: 0, correct: 0, auto: false, id: "001" });
+  ok(win.reward.trophy, "the only thing in the game a box cannot contain");
+  eq(win.reward.trophy.ep, "001");
+  ok(Cards.rarity(win.reward.card.card.rarity).rank >= Cards.rarity(cfg.predRewardFloor).rank,
+     "a correct call clears the reward floor");
+  setupPrediction();
+  const lose = resolvePrediction({ wager: 500, sel: 1, correct: 0, auto: false, id: "001" });
+  eq(lose.reward.trophy, null);
+  ok(lose.reward.card, "…but the card still lands");
+});
+
+test("a trophy is unique to its episode and can only be won once", () => {
+  setupPrediction();
+  eq(Status.hasTrophy("001"), false);
+  resolvePrediction({ wager: 0, sel: 0, correct: 0, auto: false, id: "001" });
+  ok(Status.hasTrophy("001"));
+  const pts = Status.points();
+  state.epQueue.push("001");
+  const second = resolvePrediction({ wager: 0, sel: 0, correct: 0, auto: false, id: "001" });
+  eq(second.reward.trophy, null, "already won");
+  /* The second call pays the episode and the win, and NOT the trophy. It also pays another
+     Collectible, and a card you have not seen before now moves the track — so the reward card's
+     own status is counted here, or this reads as the trophy paying twice when it has not. */
+  eq(Status.points(),
+     pts + cfg.statusPerEpisode + cfg.statusPerPrediction
+         + (second.reward.card ? second.reward.card.status : 0),
+     "the trophy is not paid twice");
 });
 
 test("a wrong pick loses the stake and resets the streak", () => {
@@ -99,15 +161,35 @@ test("watching consumes exactly one queued episode and counts it", () => {
   eq(state.predsMade, 1);
 });
 
-test("a zero wager changes no coins but still resolves and counts", () => {
+test("a zero wager changes no coins but the call still goes on the record", () => {
   setupPrediction();
   const before = state.coins;
   const r = resolvePrediction({ wager: 0, odds: 2, sel: 1, correct: 0, auto: false });
   eq(state.coins, before, "no stake, no payout");
   eq(r.won, false);
-  eq(state.predWins, 0);
-  eq(state.predLoss, 0, "unwagered results must not pollute accuracy");
+  eq(r.called, true);
+  eq(state.predLoss, 1, "a wrong call is a wrong call whether or not it was staked");
   eq(state.epsWatched, 1);
+});
+
+test("a correct call with no stake pays status and counts as a win", () => {
+  setupPrediction();
+  const before = Status.points();
+  const r = resolvePrediction({ wager: 0, odds: 2, sel: 0, correct: 0, auto: false });
+  eq(r.won, true);
+  eq(state.predWins, 1);
+  eq(state.coins, 1e4, "…but there is still no payout without a stake");
+  eq(Status.points(), before + cfg.statusPerPrediction + cfg.statusPerEpisode,
+     "two of GDD 5.1's inflows at once — it was watched AND called right");
+});
+
+test("a SKIP is not a call, and lands on neither side of the record", () => {
+  setupPrediction();
+  const r = resolvePrediction({ wager: 0, odds: 2, sel: null, correct: 0, auto: false });
+  eq(r.called, false);
+  eq(state.predWins, 0);
+  eq(state.predLoss, 0, "a null pick would otherwise read as a loss");
+  eq(state.epsWatched, 1, "it was still watched");
 });
 
 test("an id consumes THAT episode, not whichever is at the front", () => {
@@ -227,4 +309,62 @@ test("the gap is the greater of a full refill and one session slot", () => {
   advanceSession();
   eq(state.clock - before, 720, "session slot dominates a short refill");
   resetCfg();
+});
+
+suite("prediction: a skip is not a call");
+
+/* THE GUARD WAS RIGHT AND THE CALLER DEFEATED IT.
+
+   resolvePrediction decides with `called = auto || sel != null` (js/game.js), precisely so that
+   watching without guessing lands on neither side of the record — a null pick would otherwise
+   read as a loss. But js/ui/prediction.js's "Skip & watch" handler used to substitute index 0
+   for a null pick, under a stale comment claiming a zero wager made the substitution harmless.
+   That stopped being true when the record moved off the stake and onto the call.
+
+   Index 0 is not null, so every skip became a real call on a coin flip: 194 wins, 206 losses
+   and 194 "Called it" trophies across 400 skips with nothing picked. The one button a stuck
+   player can press was gambling with their lifetime record and paying trophies for it.
+
+   These tests hold the ENGINE's contract. The caller is DOM code the suite cannot reach, so
+   the comment on that handler carries the other half. */
+test("watching with no answer picked scores neither a win nor a loss", () => {
+  freshRun();
+  const id = Episodes.ids()[0], ep = Episodes.get(id);
+  state.epQueue = [id];
+  let wins = 0, losses = 0, trophies = 0;
+  for (let i = 0; i < 200; i++) {
+    freshRun();
+    state.epQueue = [id];
+    resolvePrediction({ wager: 0, sel: null, correct: ep.correct, id, auto: false });
+    wins += state.predWins; losses += state.predLoss; trophies += Status.trophyIds().length;
+  }
+  eq(wins, 0, "no wins");
+  eq(losses, 0, "no losses");
+  eq(trophies, 0, "and no 'Called it' trophy — that is the one thing a box cannot contain");
+});
+
+test("...but the episode is still watched, and still pays a Collectible (§7.4)", () => {
+  /* Neutral on the RECORD is not the same as nothing happened. A round must never give nothing. */
+  freshRun();
+  const id = Episodes.ids()[0], ep = Episodes.get(id);
+  state.epQueue = [id];
+  const r = resolvePrediction({ wager: 0, sel: null, correct: ep.correct, id, auto: false });
+  eq(state.epsWatched, 1, "it counts as watched");
+  eq(state.epQueue.includes(id), false, "and leaves the queue");
+  ok(r.reward.card, "and still pays a card");
+  eq(r.called, false, "while reporting that it was not a call");
+});
+
+test("a skip AFTER picking IS a call — the record counts a call, not a stake", () => {
+  /* The other half, and the reason this cannot be fixed by ignoring sel whenever wager is 0.
+     "Skip & watch" is always offered, and a player who declines the bet and calls it right has
+     still called it right (CLAUDE.md, GDD §7.4). */
+  freshRun();
+  const id = Episodes.ids()[0], ep = Episodes.get(id);
+  state.epQueue = [id];
+  const r = resolvePrediction({ wager: 0, sel: ep.correct, correct: ep.correct, id, auto: false });
+  eq(r.called, true);
+  eq(r.won, true);
+  eq(state.predWins, 1, "a right call with no money on it still goes on the record");
+  ok(Status.hasTrophy(id), "and still pays the trophy");
 });

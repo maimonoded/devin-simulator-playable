@@ -2,7 +2,7 @@
 /* Persistence — the economy model, tuning config and player progress are saved to localStorage
    so all three survive a reload. Three independent slots:
      pmdrama.econ.v1   → the imported economy model   (Reset economy / re-import)
-     pmdrama.cfg.v1    → cfg + deck + boxTable        (Reset config)
+     pmdrama.cfg.v1    → cfg + the box tables         (Reset config)
      pmdrama.state.v1  → run progress                 (Reset user)
    There is no server yet, so the browser IS the database: an imported workbook lives only
    here, which is why the slot keeps the version string and the filename it came from.
@@ -47,7 +47,7 @@ function clearEconomy(){ if(!storageOK) return; try{ localStorage.removeItem(LS_
 /* Stamped with the economy version the values were edited against — see loadConfig. */
 function saveConfig(){
   if(!storageOK) return;
-  try{ localStorage.setItem(LS_CFG,JSON.stringify({v:1,econVersion:Economy.version(),cfg,deck,boxTable})); }catch(e){ storageOK=false; }
+  try{ localStorage.setItem(LS_CFG,JSON.stringify({v:2,econVersion:Economy.version(),cfg,deck,boxTable,boxTiers,deckBoxes})); }catch(e){ storageOK=false; }
 }
 /* Overlay the saved tuning onto whatever the economy model just projected.
    The version stamp decides how much of it survives: tuning edited against the model that is
@@ -74,6 +74,21 @@ function loadConfig(){
       if(Array.isArray(d.deck)&&d.deck.length) deck=d.deck;
       if(Array.isArray(d.boxTable)&&d.boxTable.length) boxTable=d.boxTable;
     }
+    /* The pack tables are NOT economy-owned — no workbook describes them yet — so they survive
+       a model change the way the camera settings do. Guarded on IDENTITY rather than shape: the
+       stored list has to name exactly the packs this build ships.
+
+       Shape alone was not enough, and the way it failed is worth remembering. The three tiers
+       were once silver/gold/diamond and are now standard/premium/insider; a saved list of three
+       tables each with rows passed a shape check and quietly replaced the shipped packs with
+       ones whose keys nothing else in the game recognises — the store still drew, and every
+       button opened nothing. A list from another build is not a tuning, it is a different game's
+       config, and the right thing to do with it is drop it. */
+    const shippedTiers=boxTiers.map(t=>t.key).join(",");
+    if(Array.isArray(d.boxTiers)&&d.boxTiers.map(t=>t&&t.key).join(",")===shippedTiers
+       && d.boxTiers.every(t=>t&&Array.isArray(t.table)&&t.table.length)) boxTiers=d.boxTiers;
+    const shippedDeck=deckBoxes.map(t=>t.key).join(",");
+    if(Array.isArray(d.deckBoxes)&&d.deckBoxes.map(t=>t&&t.key).join(",")===shippedDeck) deckBoxes=d.deckBoxes;
     return true;
   }catch(e){ return false; }
 }
@@ -82,13 +97,16 @@ function clearConfig(){ if(!storageOK) return; try{ localStorage.removeItem(LS_C
 /* ---------------- player slot ---------------- */
 /* Explicit field list: transient bits (animating, tween baselines) are never persisted. */
 function serializeState(){
-  return {v:1,
+  return {v:2,
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
-    energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
-    pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
-    /* [tile, contents] pairs — the contents were decided when the box was placed, so they have
-       to survive a reload or a gold box would reopen as something else. */
-    builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes], pendingBoxes:state.pendingBoxes,
+    energy:state.energy, coins:state.coins, clues:state.clues, clueDay:state.clueDay, vip:state.vip,
+    pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series, season:state.season,
+    /* The collection, the finished sets and the shelf. All plain objects keyed by id, so they
+       serialise as they stand — no Map to spread, and a card or item the content no longer
+       defines simply sits there harmlessly until it is defined again. */
+    cards:state.cards, cardMeta:state.cardMeta, setsDone:state.setsDone,
+    seasonFrom:state.seasonFrom, seasonsDone:state.seasonsDone, statusMilestones:state.statusMilestones,
+    trophies:state.trophies, insiderBought:state.insiderBought,
     epQueue:[...state.epQueue], epsWatched:state.epsWatched,
     pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
     boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
@@ -110,43 +128,134 @@ function loadState(){
     const d=JSON.parse(raw);
     if(typeof d!=="object"||d===null) return false;
     Object.keys(serializeState()).forEach(k=>{ if(k!=="v"&&d[k]!==undefined) state[k]=d[k]; });
-    /* The series index is restored before the builder array, because cfg.buildings depends on
-       it: a save from a longer content library must not leave the run pointing at a series
-       that no longer has episodes. */
+    /* The series index is restored before anything that depends on cfg.buildings: a save from
+       a longer content library must not leave the run pointing at a series that no longer has
+       episodes. */
     const playable=Economy.playableSeries().length;
     if(!(state.series>=0&&state.series<playable)) state.series=0;
     Economy.apply();
-    state.builder=Array.isArray(d.builder)&&d.builder.length
-      ? d.builder.map(b=>({tier:Math.min(Math.max(0,b.tier|0),Builders.maxTier())}))
-      : Builders.fresh();
-    if(state.builder.length!==Builders.count()) Builders.reshape();
-    /* Saves from before contents were decided at spawn stored bare tile indices. Accept both:
-       a number becomes a box with nothing known about it, and onLand draws for it then — which
-       is exactly what the old code did. */
-    state.boxes=new Map((Array.isArray(d.boxes)?d.boxes:[])
-      .map(e=>Array.isArray(e)?[e[0],e[1]]:[e,null])
-      .filter(([i])=>Number.isInteger(i)&&i>=0&&i<40));
-    /* Boxes bought but never thrown survive a reload — they are paid for, so losing them would
-       be losing a reward. They land the next time the player leaves the builders view. */
-    state.pendingBoxes=Math.max(0,Math.floor(+d.pendingBoxes||0));
+    /* THE COLLECTION. Sanitised rather than trusted: a board key has to be a positive integer
+       a count has to be a positive integer, but the card IDS are deliberately NOT filtered
+       against the current catalogue. A Season's cards are authored data that can be rewritten
+       between versions, and throwing away a card because this build has not heard of it would
+       quietly delete a collection. An unknown id is invisible in the collection (Cards.get
+       returns null for it) and comes back the moment the content does. */
+    state.cards={};
+    const rawCards=(d.cards&&typeof d.cards==="object")?d.cards:{};
+    Object.keys(rawCards).forEach(id=>{ const c=Math.floor(+rawCards[id]||0); if(c>0) state.cards[id]=c; });
+    /* WHAT EACH CARD WAS. Sanitised but NEVER filtered against the catalogue — the whole point
+       of it is to answer for cards the catalogue no longer defines. An unknown rarity falls back
+       to the commonest rather than dropping the record, because a card remembered by name is
+       still worth more than one remembered not at all. */
+    state.cardMeta={};
+    const rawMeta=(d.cardMeta&&typeof d.cardMeta==="object")?d.cardMeta:{};
+    Object.keys(rawMeta).forEach(id=>{
+      const m=rawMeta[id]; if(!m||typeof m!=="object") return;
+      const r=CARD_RARITIES.some(x=>x.key===m.r)?m.r:CARD_RARITIES[0].key;
+      state.cardMeta[id]={r,name:String(m.name||id),set:String(m.set||"")};
+    });
+    /* A save from before the record existed still has its cards. Re-derive what can be derived,
+       so an old collection is covered the moment it is loaded rather than only from the next
+       card banked. */
+    Object.keys(state.cards).forEach(id=>{ if(!state.cardMeta[id]) Cards.remember(id); });
+    /* Finished sets: only keys this build's catalogue still defines. Unlike a card, a set that
+       no longer exists is a bonus nothing can explain and a row the collection cannot draw. */
+    state.setsDone={};
+    const rawSets=(d.setsDone&&typeof d.setsDone==="object")?d.setsDone:{};
+    Object.keys(rawSets).forEach(k=>{ if(Cards.setOf(k)) state.setsDone[k]=Math.max(1,Math.floor(+rawSets[k]||1)); });
+    /* THE EVIDENCE. Sanitised the same way and for the same reason as the albums: the episode
+       keys are checked but the CLUE IDS are not, because an episode's clue list is authored
+       content that can be rewritten, and dropping a clue this build has not heard of would
+       silently re-lock an episode the player had already bought.
+
+       A save from before clues were per-episode has a NUMBER here. There is no honest way to
+       spread a total across episodes, so it is dropped — better an obvious reset than an
+       invented set of holdings that unlocks the wrong thing. */
+    state.clues={}; state.clueDay={};
+    const rawClues=(d.clues&&typeof d.clues==="object")?d.clues:{};
+    Object.keys(rawClues).forEach(id=>{
+      const held=Array.isArray(rawClues[id])?rawClues[id]:[];
+      const out=[]; held.forEach(c=>{ if(typeof c==="string"&&c&&!out.includes(c)) out.push(c); });
+      if(out.length) state.clues[id]=out;
+    });
+    const rawDay=(d.clueDay&&typeof d.clueDay==="object")?d.clueDay:{};
+    Object.keys(state.clues).forEach(id=>{
+      const day=Math.floor(+rawDay[id]);
+      state.clueDay[id]=day>=1?day:1;
+    });
+    /* Clamped to a Season that actually exists: a save from a build with more Seasons than
+       this one would otherwise leave the board empty and every tile undefined. */
+    state.season=Math.min(Math.max(0,Math.floor(+d.season||0)),BOARD_SEASONS.length-1);
+    state.boardNum=Math.max(1,Math.floor(+d.boardNum||1));
+    /* THE SEASON BASELINE and the milestones already paid. The baseline is clamped at zero and
+       the milestone keys are checked against this build's list — a milestone that no longer
+       exists is a payment nothing can explain, and leaving it in would only suppress a real one
+       if the levels were ever renumbered. */
+    state.seasonFrom=Math.max(0,Math.floor(+d.seasonFrom||0));
+    state.seasonsDone=Math.max(0,Math.floor(+d.seasonsDone||0));
+    state.statusMilestones={};
+    const rawMs=(d.statusMilestones&&typeof d.statusMilestones==="object")?d.statusMilestones:{};
+    Object.keys(rawMs).forEach(k=>{
+      if(STATUS_MILESTONES.some(m=>String(m.level)===String(k)))
+        state.statusMilestones[String(k)]=Math.max(1,Math.floor(+rawMs[k]||1));
+    });
+    /* THE TROPHIES. Only episodes this build has files for — unlike a card, a trophy for an
+       episode that does not exist is a Showcase row with no title to print on it. */
+    state.trophies={};
+    const rawT=(d.trophies&&typeof d.trophies==="object")?d.trophies:{};
+    Object.keys(rawT).forEach(id=>{ if(Episodes.has(id)) state.trophies[id]=Math.max(1,Math.floor(+rawT[id]||1)); });
+    /* THE SHELF IS GONE, and a save that predates its removal carries `status` we deliberately
+       do not read. Those ten items are cards now (GDD 4.1), so a Collectible is derived from
+       state.cards like everything else — there is nothing left to rehydrate, and reviving the
+       bag would pay points for objects the catalogue can no longer describe.
+
+       A pre-change save therefore loses up to 250 points while `seasonFrom` stays where it was,
+       which reads as the Status track going BACKWARDS. Reset user is the honest fix; this is a
+       demo build and no live save is worth a migration for it. */
     // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
     const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
-    state.epQueue=rawQueue.filter(x=>Episodes.has(x));
+    /* The queue is what is UNLOCKED AND UNWATCHED, so it can only ever hold episodes that are
+       currently unlocked — an invariant worth enforcing here rather than trusting, because two
+       things can break it between saves: raising cfg.cluesPerEpisode in the drawer, and a save
+       written when episodes were unlocked by cards. Leaving a stale id in would offer a
+       "Predict & watch" for an episode the player has not actually bought. */
+    const unlocked=Clues.unlockedIds();
+    state.epQueue=rawQueue.filter(x=>Episodes.has(x)&&unlocked.includes(x));
     /* A sealed reveal is only worth restoring if its episode still exists and it still carries
        a decided outcome — anything else would leave the player stuck being told to finish an
        episode that cannot play. */
     const pr=d.pendingReveal;
     state.pendingReveal=(pr&&typeof pr==="object"&&Episodes.has(pr.id)&&typeof pr.won==="boolean")
-      ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0}
+      ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0,
+         /* The reward was banked when the bet was locked, so it rides along and is announced
+            when the reveal finally plays — a trophy arriving with no explanation is worse than
+            one arriving late. */
+         cardId:typeof pr.cardId==="string"?pr.cardId:null, trophy:!!pr.trophy,
+         /* `called` decides whether the result screen judges the guess or says the player sat
+            this one out. It is the one field here that can legitimately be ABSENT — a reveal
+            sealed before it existed — and absent has to keep meaning "called", so it is only
+            written when the save actually says false. Defaulting it to true instead would be
+            the same thing until someone reads it as a boolean and finds it always true. */
+         ...(pr.called===false?{called:false}:{}),
+         /* The drop, so the reward can be opened out of a box rather than printed. Rebuilt
+            defensively: everything is re-coerced and the catalogue object is deliberately NOT
+            stored, so a Season that no longer defines this card falls back to the cardId path
+            rather than reviving a stale face. */
+         cardDrop:(pr.cardDrop&&typeof pr.cardDrop==="object"&&typeof pr.cardDrop.id==="string")
+           ? {kind:"card",id:pr.cardDrop.id,isNew:!!pr.cardDrop.isNew,
+              converted:!!pr.cardDrop.converted,count:pr.cardDrop.count|0,
+              coins:pr.cardDrop.coins|0,status:pr.cardDrop.status|0}
+           : null}
       : null;
-    /* Nothing to restore for the library: Builders.unlockedEpisodeIds() derives it from the
-       builder tiers just restored above. That is what makes an OLD save work — a run that had
-       four episodes unlocked and three of them watched still shows four, where a stored list
-       would have needed migrating and a fallback to the queue showed only the one unwatched. */
+    /* Nothing to restore for the library: Collection.unlockedEpisodeIds() derives it from the
+       evidence restored above. That is what makes an OLD save work — a run with four episodes
+       unlocked and three of them watched still shows four, where a stored list would have
+       needed migrating and a fallback to the queue showed only the one unwatched. */
     // no cap clamp on restore — purchased energy may legitimately exceed cfg.energyCap
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero
-    state.lastCoins=state.coins; state.lastClues=state.clues; state.lastEnergy=state.energy;
+    state.lastCoins=state.coins; state.lastEnergy=state.energy;
+    state.lastCards=Cards.owned(); state.lastStatus=Status.points();
     return true;
   }catch(e){ return false; }
 }

@@ -2,11 +2,35 @@
 
 Two ways to skin a tile, both drop-in — no config, no registration, no code change:
 
-- **`models/N.glb`** — a 3D model, used by the WebGL board. **This is the one to use.**
-- **`N.png`** — flat artwork, used by the legacy CSS board (`cfg.board3d = 0`). Documented from
-  [Naming](#naming) down.
+- **`models/N.glb`** — a 3D model standing on the slab. For a tile whose subject is an *object*.
+- **`N.png`** — a picture printed on the slab's **top face**. For a tile whose subject is an
+  *image*: the six NPC tiles are character portraits this way, because a person cannot be a low
+  prop and a portrait can be a floor.
 
-A model wins where both exist. Missing files are normal — the tile keeps its plain slab.
+**Both work on the WebGL board**, and both apply if both exist — the model stands on top of the
+picture, which is almost never what you want. Pick one per tile. (This README used to call the
+PNG "legacy CSS board only". That was wrong: `_loadArt()` in
+[../../js/ui/board3d.js](../../js/ui/board3d.js) has always textured the 3D slab with it.)
+
+Missing files are normal — the tile keeps its plain slab.
+
+### A tile PNG is turned by the engine, so draw it upright
+
+The slab is an unrotated box, so its top face maps u to world +X and v to world −Z — and the
+camera's fixed 45° azimuth renders both of those as screen **diagonals**. Art applied straight
+comes out as a lozenge.
+
+`_loadArt()` corrects it once for every tile PNG there will ever be, by rotating the UVs by the
+camera azimuth. So **author the image upright** and it lands upright.
+
+Two consequences for the art:
+
+- **Full bleed, square.** The image fills the whole face and the tile's diamond outline crops it.
+  Do not inset the picture to dodge that crop — it reads as a stamp floating on a cream margin
+  rather than as the tile's face.
+- **Nothing important in the corners.** The face's four corners sample outside the image and are
+  edge-clamped; those corners are the diamond's points, and the edge pixels continue into them.
+  A centred subject is invisible-seam; a subject running into a corner is not.
 
 ## 3D models (`models/`)
 

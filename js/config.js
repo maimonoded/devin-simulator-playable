@@ -1,9 +1,51 @@
 "use strict";
 /* Economy configuration — every value here is editable live via the tuning drawer. */
 const DEFAULTS={
-  energyCap:30, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
+  energyCap:40,
+  /* THE FIRST SESSION IS BIGGER THAN THE CAP, and that is allowed: CLAUDE.md's rule is that
+     energy may exceed cfg.energyCap and nothing may clamp it downward. A new player starts with
+     this much, which is about the hundred rolls that puts eight earned episodes inside session
+     one; every session after that refills to the cap and the pace settles. Not economy-owned —
+     no workbook describes it. */
+  startEnergy:100, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
-  deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
+  /* How long a card is held on the board's centre. Two values, because the two beats are not
+     the same size: a card you did not have is news, and the THIRD copy — the one that converts
+     it into its Collectible (GDD 4.3) — is the payoff the whole collection is aimed at, so it
+     is allowed to sit there longer.
+
+     A card lands on roughly a quarter of all rolls, so every 100ms here is about 25ms on the
+     average roll. Turn them down here if the board starts to feel like it is waiting for you.
+
+     THE HOLD IS NO LONGER THE WHOLE BEAT, which is why the plain memory is the short one. A card
+     is held, then it FLIES into the collection button (cardFlyMs), and then the HUD pill and the
+     estate's sign run (hudStatusMs + hudStatusHoldMs) — so a memory costs about 2.8s in total at
+     a 1s hold, not 1s. The trophy and the converting copy keep their two seconds because they
+     have something to read that the memory does not: a counter at 2 of 3, and a conversion. */
+  cardHoldMs:1000, statusHoldMs:2000, cardConvertMs:2000, clueHoldMs:2500,
+  /* The conversion beat, in three moves: the card is held as a card, it turns edge-on and comes
+     back as the plaque, and only then does the track run. Staged, because two things moving at
+     once means neither is watched. */
+  statusCardMs:620, statusFlipMs:460,
+  /* WHERE A CARD GOES WHEN ITS BEAT ENDS. A clue shrinks into the slot it filled on the
+     objective tracker; every other card shrinks into the collection button, because that is
+     where it now is. Both are one argument: "I was given a thing" and "a counter moved" are two
+     events in two places, and the flight is what makes the player read them as one. */
+  clueFlyMs:460, cardFlyMs:460,
+  /* ...AND ONLY THEN DOES THE HUD TRACK MOVE. Status is banked before the beat that reports it
+     is built, so without a hold the bar has already moved by the time the player looks at the
+     card that paid for it -- the effect arriving before its cause. hudStatusMs is the bar's run
+     and hudStatusHoldMs how long the highlight lingers after it lands. */
+  hudStatusMs:820, hudStatusHoldMs:420,
+  vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
+  /* The Scoop's teleport (js/tiles/scoop-tile.js) is one step, not a walk, so this is the
+     whole journey rather than a per-tile speed. */
+  scoopStepMs:260,
+  /* The two corners that hand something over. galaTier is the rarity FLOOR on the Gala's
+     guaranteed card — GDD 3.4's "Rare or better", set one better than that because a corner
+     reached once a lap should out-pay a tile; premiereBox is the free pack for landing on the
+     Premiere. */
+  galaTier:"epic", premiereBox:"standard",
   fallbackSceneMs:1700, longPressMs:350,
   /* Bonus mini-games — the full-frame games the train tile opens (minigames/, js/ui/minigame.js).
      bonusGames 0 falls back to the plain Collect popup, which is also what happens on its own if
@@ -59,6 +101,11 @@ const DEFAULTS={
      Reset config, or the toggle itself, is the way back for an existing player. */
   npcs:0, npcHeight:0.75, npcStepMs:900, npcPauseMinMs:400, npcPauseMaxMs:2600,
   npcLane:0.3, npcBob:0.05,
+  /* How far SHORT of the camera's aim point the dice land, as a fraction of the visible
+     half-height. 0 lands dead centre, which is where the Estate stands and where the HUD
+     reaches — on a phone the number was unreadable. A fraction rather than a distance so it
+     holds at any zoom and on any pane. */
+  diceDrop:0.35,
   diceRevealMs:500, diceToMoveMs:30,
   /* 3D dice. diceRevealMs doubles as the length of the throw, so the pacing knob that already
      existed keeps meaning the same thing: click to numbers-on-screen. The rest is the throw's
@@ -75,78 +122,247 @@ const DEFAULTS={
   stdBase:40, trainSmall:60, trainLarge:315, trainLargeChance:0.35, trainEV:149.25,
   startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
   boardScale:1,
-  /* Builder shape. The COST CURVE is not here — it is segmented and lives in js/economy.js,
-     because no single formula holds for a whole run. `buildings` is the current series'
-     length, seeded by Economy.apply(). */
-  buildings:12, tiers:5, boxesPerUpgrade:1,
-  /* How many buildings the builders view shows at once. The page only advances once every
-     building on it is maxed, so this is also the size of a "chunk" of the series. */
-  builderPageSize:5,
-  /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
-  boxCoins:60, boxItemGapMs:260,
-  /* ---- the box throw ----
-     Boxes bought in the builders view are thrown onto the board when the player goes back to it,
-     in three phases: pull the camera out, rain the boxes down, put the camera back.
+  /* ---- the arc ----
+     How many episodes a set covers. Nothing about the CARDS is derived from it any more: cards
+     stopped gating episodes (GDD 6.1), so a set is a run of the story and nothing else. */
+  episodesPerBoard:5,
+  /* ---- the collection (js/cards.js) ----
+     cardCopiesToConvert is GDD 4.3's rule: the third copy of a card converts it into that
+     card's Collectible, which is what pays Status. Copies past that trickle Status directly,
+     so no pull is ever dead.
 
-     boxZoomOut is how far the camera pulls back (1 = not at all; 1.45 shows the whole ring).
-     The three times are the three phases, so the whole thing costs
-     boxZoomOutMs + boxThrowMs + boxZoomInMs whatever it is tuned to.
+     dupCoins is what a copy that did NOT convert pays instead, multiplied by that rarity's
+     `dup` (CARD_RARITIES) — a duplicate Legendary pays twenty-five times a duplicate Common.
 
-     boxThrowMs is the TOTAL for the throw, not one box: the last box lands exactly on it however
-     many there are. Ten boxes in the same window means they overlap more, not that it runs ten
-     times as long — otherwise a big buy would strand the player watching a downpour. */
-  boxZoomOut:1.45, boxZoomOutMs:420, boxThrowMs:900, boxZoomInMs:420,
+     setBonus* is 4.4's set-completion reward. A set is a collection TARGET and never a gate,
+     so this is generous and nothing anywhere depends on it having been earned. */
+  cardCopiesToConvert:3, dupCoins:40, setBonusCoins:5000, setBonusStatus:250,
+  /* GDD 6.5: every Insider Pack bought since the last episode unlocked costs this much more
+     again, and the count resets when one lands. That is what caps sprint speed BY DESIGN —
+     a player can always buy the next clue, and never buy ten of them cheaply. */
+  insiderStep:0.6,
+  /* ---- status (js/status.js, GDD 5) ----
+     Status is a LEVEL, 1 to statusLevels, and it resets every Season. The two inflows priced
+     here are the two the collection cannot pay for you: an episode WATCHED and a prediction
+     CALLED RIGHT. The other two — converting a card and completing a set — are priced by the
+     rarity table and setBonusStatus above. There is no fifth: the shelf of ten buyable status
+     items is gone, because 8.1 pays a Collectible for converting a card and nothing else, and
+     its ten objects are ordinary cards now.
+
+     statusLevels / statusFirst / statusTotal describe the curve, which is built in
+     js/economy.js beside the cost curve because 5.4 calls the Season gate "the single most
+     important value in the game". THE TOTAL IS THE AUTHORITATIVE KNOB: the per-level costs ramp
+     linearly from statusFirst and are solved so they sum to exactly statusTotal, so moving the
+     total moves how long a Season takes and nothing else has to be re-derived. Like the rest of
+     the economy-owned values these three mirror ECONOMY_DEFAULT, and why the gate is 4,000
+     rather than 5.4's 30,000 is argued where the model holds it — js/economy.js.
+
+     statusBarMs is how long the track takes to move when status is earned and statusUpMs how
+     long the result is held afterwards — the beat blocks the roll loop, so both are pacing and
+     both belong in the drawer.
+
+     estatePromoMs is the same beat when the change is a PROMOTION — a new tier, five levels
+     apart, the moment the title and the house turn over together. It is longer than estateFogMs
+     because it carries more: the cloud is bigger, there is a burst of light and a ring across the
+     plot, and the new place arrives with a spring. A step inside a band is a small improvement
+     and should stay small; crossing a band is the event the Season is built around, and the two
+     reading identically was what made every level feel the same.
+
+     estateFogMs is the weather over the board's centre when the estate changes tier. It does
+     NOT block the roll loop: it plays behind the status ribbon, which is where the player is
+     looking, and the swap it hides happens at its thickest point. Long enough to read as
+     weather rather than a wipe; short enough that a fast run does not spend its life in cloud. */
+  statusPerEpisode:50, statusPerPrediction:150,
+  statusLevels:30, statusFirst:25, statusTotal:5800,
+  statusBarMs:900, statusUpMs:1500,
+  estateFog:1, estateFogMs:1500, estatePromoMs:2800,
+  /* What a box's `coins` outcome pays when its table row does not name an amount. */
+  boxCoins:60,
+  /* Still projected by js/economy.js, which counts a series in "builders" — which is now simply
+     its episode count. Nothing in the game reads these; they are the model's bookkeeping. */
+  buildings:18, tiers:5, boxesPerUpgrade:1,   /* the model's value; see OWNED_CFG_KEYS */
   /* ---- opening a box ----
-     Landing on one lifts it off its tile, floats it to the middle of the view swelling as it
-     goes, then pops it. boxRiseMs is the trip to the centre, boxSwellMs the last inflate before
-     it goes, boxOpenScale how many times its board size it reaches.
-     The pop is followed by the SPOILS: what was just won, held in the middle of the screen.
-     Floats over the token are too small and too far from where the player is looking after a
-     burst in the centre — the numbers have to appear where the box was.
-     boxSpoilsMs is that hold, and boxCluePopupMs is counted from the moment the spoils appear,
-     so the clue sheet follows the numbers rather than racing them. On a clue box the spoils stay
-     up until the sheet arrives, so the two never leave a blank gap between them. */
-  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxSpoilsMs:1200, boxCluePopupMs:2000,
-  /* ---- the gold (clue) box ----
-     A box is only a target if it can be picked out from across the board, and at tile size that
-     is a matter of pixels: colour alone loses against a pale cream board. So the gold one is also
-     bigger, self-lit, wrapped in a glow, and — the part that actually catches the eye — moving.
-     boxGoldGlow 0 turns the halo off, boxGoldSpinMs is one full turn. */
-  boxGoldScale:1.22, boxGoldGlow:0.7, boxGoldEmissive:0.45, boxGoldSpinMs:4200, boxGoldBob:0.09,
-  /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
-     gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
-     this long if the player doesn't tap Collect. */
-  clueCollectMs:3000,
+     Every box is opened the moment it is won (js/boxes.js, js/ui/pack.js) — none of them sit on
+     a tile any more, so there is no throw to tune and no gold box to pick out from across the
+     board. What is left is the popup's pacing.
+
+     packAutoOpenMs is the promise the loop is built on: the player may tap the box to open it,
+     and if they do not it opens itself after this. Five seconds is long enough to feel like a
+     choice and short enough that an idle session keeps moving.
+     packFlipMs is the card's flip, packRevealMs how long it is then held, packItemGapMs the
+     beat between two cards out of the same box, and packCloseMs the wait after the last one.
+     So a Diamond Box (items: 3) costs at worst
+     packAutoOpenMs + 3 x (packFlipMs + packRevealMs + packItemGapMs) + packCloseMs,
+     which is why the big tiers are bought rather than landed on.
+     packDupMs is the extra beat a duplicate holds while its coin consolation lands. */
+  packAutoOpenMs:5000, packFlipMs:420, packRevealMs:1500, packItemGapMs:420,
+  packCloseMs:600, packDupMs:900,
+  /* The box itself, as an object on the board. packBoxSize is its edge in tiles and packSwellMs
+     the strain before it bursts, packPopScale how far it inflates first.
+
+     A REVEALED CARD IS MEASURED AGAINST THE VIEW, NOT THE BOARD. packCardScreen is its height
+     as a fraction of what the camera can see, and packCardSpacing the space between two of them
+     as a fraction of a card's width. packCardSize used to be a height in TILES, on the reasoning
+     that the cards hang in the world beside the board. True about where they are, wrong about
+     what they are — the board zooms to fit its ring, so on a phone 2.2 tiles came out around
+     sixty pixels and a card out of a box was a fifth the size of the same card off a tile
+     landing. A card is a thing you read.
+
+     BOTH ARE NEW NAMES, AND THAT IS THE POINT. The first attempt kept `packCardGap` and simply
+     changed what its number meant, tiles to a share of a card — and every save in existence
+     still held 1.25, which as a share is seven times the intended gap. loadConfig merges saved
+     values over DEFAULTS, so the old number silently won and the row came out a third of the
+     size it should have been. A key whose UNITS change has to change its name; there is no
+     version gate on presentation settings to catch it, unlike the economy-owned ones.
+
+     packCardSize survives as the fallback for a run with no WebGL board to measure.
+     packCardGap is dead and left to rot harmlessly in old saves. */
+  packBoxSize:2.3, packSwellMs:300, packPopScale:1.55,
+  packCardScreen:0.42, packCardSpacing:0.18, packCardSize:2.2,
+  /* How long a completed CARD SET is held on screen. Shorter than a set of episodes
+     finishing, on purpose: it is a reward, not a chapter ending. */
+  setDoneMs:2600,
+  /* A skip button on the video player that counts the episode as WATCHED — not as walked out
+     of. A demo build is tested far more than it is played and the footage is 30-60s a go; this
+     is the switch that takes it away for a real audience. */
+  videoSkip:1,
   /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
      accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
+  /* GDD 7.3: FLAT ODDS. Every answer pays the same multiplier, because per-answer odds leak the
+     answer — a 1.5 against a 3.2 tells you which one the writers think is true before you have
+     read either — and they make the screen read as a betting market rather than a guess. avgOdds
+     is that multiplier: it was already the model's own average, and it was already what the
+     auto-play session priced its payouts at. */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
+  /* GDD 7.4: every prediction pays a Collectible, win or lose or skip, so a bet is never a
+     round that gave you nothing. A CORRECT call also pays a trophy unique to that episode —
+     predRewardFloor is the rarity floor on the card a correct call earns, and trophyStatus is
+     what the trophy is worth on the Status track. */
+  predRewardFloor:"rare", trophyStatus:120,
   /* Wagers are a share of the player's balance, not a flat amount — three tiers, Confident
      being the one the economy model's projections assume (Economy.wagerTiers). minWager is
      the floor underneath all three. clueAlbumSize is the cosmetic album target. */
   wagerSafe:0.05, wagerConfident:0.10, wagerMax:0.20, clueAlbumSize:300,
+  /* ---- clues (js/clues.js) ----
+     cluesPerEpisode is how many of an episode's authored eight it takes to unlock it —
+     GDD 6.2 wants that FIXED within a Season and stepped between them, which is
+     clueSeasonStep. clueStuckDays is the catch-up valve (6.7): after this many days on
+     the same episode the requirement decays by one a day, so an unlucky run of duplicate
+     clues cannot wall a player out of the story. dupClueCoins is what a duplicate pays,
+     because a draw that pays nothing reads as the game misfiring. */
+  /* A new card pays this FRACTION of what converting it pays, so the track moves on every pull
+     and a Legendary still lands harder than a Common. cardCoins is what every copy pays in
+     money, before the roll stake multiplies it. Neither is economy-owned — no workbook has a
+     column for them. */
+  /* What ONE copy of a card pays, as a share of what the whole Collectible is worth — and all
+     three copies pay it, so three thirds come to the rarity's `status` value.
+
+     A NEW NAME because the MEANING changed, not just the number. statusFirstCopy was the share
+     the FIRST copy paid ON TOP of a full-value third copy; this is the share EVERY copy pays
+     and there is no separate conversion payment. Reusing the old name would have let a saved
+     0.25 quietly cut every card's worth by a quarter — the same trap packCardGap fell into, and
+     presentation and collection knobs have no version gate to catch it. statusFirstCopy is dead
+     and left to rot harmlessly in old saves. */
+  statusCopyShare:1/3, statusFirstCopy:0.25, cardCoins:25,
+  cluesPerEpisode:4, clueSeasonStep:0, clueStuckDays:3, dupClueCoins:150,
 };
 let cfg=Object.assign({},DEFAULTS);
 /* Roll stakes in cycle order. One button steps through these and wraps, so the order here IS
    the order the player sees. A stake costs that much energy per roll and multiplies the coins. */
 const MULTIPLIERS=[1,2,3,5,10];
+/* ---- the economy model's own tables ----
+   Both are still written by Economy.apply() from the loaded workbook, and both are still saved
+   and restored, because they are what the MODEL says the deck tile and the mystery box pay.
+   Neither is read by the game any more: the deck tile hands over a box (js/tiles/deck-tile.js)
+   and a box's contents come from boxTiers below. They are kept rather than deleted so an
+   imported workbook still round-trips, and so the numbers the collection loop replaced can be
+   compared against it. See "Known dead config" in CLAUDE.md. */
 let deck=[
   {name:"Small coins",weight:40,coins:30,energy:0,clues:0,vip:0},
   {name:"Medium coins",weight:15,coins:80,energy:0,clues:0,vip:0},
   {name:"Windfall",weight:5,coins:300,energy:0,clues:0,vip:0},
   {name:"Small energy",weight:15,coins:0,energy:2,clues:0,vip:0},
-  /* No clue card: all clues come from the Mystery Box, so the box's weights alone
-     set the rate a prediction runs on. */
   {name:"Insider tip",weight:10,coins:50,energy:0,clues:0,vip:0},
   {name:"Fine / Paparazzi",weight:10,coins:-80,energy:0,clues:0,vip:80},
   {name:"Advance to Start",weight:5,coins:0,energy:0,clues:0,vip:0,advance:true},
 ];
-/* The mystery box's SECOND item. Item 1 is always cfg.boxCoins. */
 let boxTable=[
   {name:"Coins",weight:33,amount:60,kind:"coins"},
   {name:"Energy",weight:33,amount:3,kind:"energy"},
   {name:"Clues",weight:33,amount:2,kind:"clues"},
 ];
+
+/* ---- the packs (GDD 4.5) ----
+   Three of them, and a pack is TWO things at once: how many cards it draws (`items`) and how the
+   table those draws come from is weighted. Premium is not Standard with better odds — it is more
+   draws against a table with a rarity floor on some of them, which is what makes the tiers feel
+   different rather than merely priced differently.
+
+   NO DOLLAR PRICES HERE. GDD 8.4 is a standing constraint: real money buys Money, and only Money
+   buys packs. A paid loot box sitting beside a wagering mechanic draws regulatory attention well
+   beyond either alone, and the separation costs the design nothing — the store still sells coins
+   for dollars, and coins still buy everything.
+
+   `kind` in a row is resolved by js/boxes.js:
+     card    one card from the Season catalogue (js/cards.js). `floor` is a rarity GUARANTEE —
+             the draw comes out at that rarity or better
+     clue    one clue for the episode being worked on (js/clues.js)
+     coins   `amount`, scaled by cfg.boardScale
+     energy  `amount`, topped up toward the cap, never reducing a purchased overflow
+
+   THERE IS NO `status` ROW ANY MORE. A box used to hand over a whole status item, which made it
+   a second way to mint a Collectible — 8.1 says converting a card is the way. Each tier's status
+   weight went to that tier's CARD rows, in proportion, so the totals and each tier's character
+   are what they were: the pull that used to pay an object off the shelf now pays the card that
+   object became.
+
+   `clue: "fresh"` on the tier itself is the Insider's guarantee (6.5): one clue you do not
+   already hold, on top of its draws. `escalates` makes its price climb with every Insider bought
+   since the last unlock and reset when one lands — which is what caps sprint speed by design
+   rather than by a cooldown. */
+let boxTiers=[
+  { key:"standard", name:"Standard Pack", icon:"\ud83c\udf81", rank:1, items:1, skin:"silver",
+    art:"assets/boxes/silver.webp", coins:2500,
+    table:[
+      {name:"A card",       kind:"card",                 weight:53},
+      {name:"Rare or up",   kind:"card",  floor:"rare",  weight:6},
+      {name:"A clue",       kind:"clue",                 weight:21},
+      {name:"Coins",        kind:"coins",  amount:120,   weight:12},
+      {name:"Energy",       kind:"energy", amount:3,     weight:8},
+    ]},
+  { key:"premium", name:"Premium Pack", icon:"\ud83c\udf81", rank:2, items:3, skin:"gold",
+    art:"assets/boxes/gold.webp", coins:12000,
+    table:[
+      {name:"A card",       kind:"card",                  weight:32},
+      {name:"Rare or up",   kind:"card",  floor:"rare",   weight:26},
+      {name:"Epic or up",   kind:"card",  floor:"epic",   weight:4},
+      {name:"A clue",       kind:"clue",                  weight:22},
+      {name:"Coins",        kind:"coins",  amount:400,    weight:10},
+      {name:"Energy",       kind:"energy", amount:6,      weight:6},
+    ]},
+  { key:"insider", name:"Insider Pack", icon:"\ud83d\uddc2", rank:3, items:3, skin:"diamond",
+    art:"assets/boxes/insider.webp", coins:20000, clue:"fresh", escalates:true,
+    table:[
+      {name:"A card",       kind:"card",                     weight:10},
+      {name:"Rare or up",   kind:"card",  floor:"rare",      weight:40},
+      {name:"Epic or up",   kind:"card",  floor:"epic",      weight:24},
+      {name:"Legendary",    kind:"card",  floor:"legendary", weight:2},
+      {name:"A clue",       kind:"clue",                     weight:14},
+      {name:"Coins",        kind:"coins",  amount:1500,      weight:6},
+      {name:"Energy",       kind:"energy", amount:12,        weight:4},
+    ]},
+];
+/* Which pack the Premiere corner hands over. Mostly Standard, so a Premium off the board is a
+   good turn and an Insider is a story — the bought tiers stay worth buying. */
+let deckBoxes=[
+  { key:"standard", weight:80 },
+  { key:"premium",  weight:17 },
+  { key:"insider",  weight:3 },
+];
+
 const defDeck=JSON.parse(JSON.stringify(deck));
+const defBoxTiers=JSON.parse(JSON.stringify(boxTiers));
+const defDeckBoxes=JSON.parse(JSON.stringify(deckBoxes));
 const defBox=JSON.parse(JSON.stringify(boxTable));
 
 /* The train's five-rung TRAIN_MULT spread used to live here, normalised so its mean landed on
@@ -169,48 +385,53 @@ const TUNING=[
    ["collectMaxSec","Train collect auto-close max (s)",1],
    ["autoCollectMs","Train collect during auto-play (ms)",50],
    ["fallbackSceneMs","Episode w/o video: placeholder (ms)",100],
+   ["videoSkip","Video: skip button (counts as watched)",1,{min:0,max:1}],
    ["longPressMs","Video: hold for 2× after (ms)",25],
    ["autoRollHoldMs","Roll: hold this long for auto-roll (ms)",100],
    ["bonusGames","Bonus mini-games (0/1)",1],
    ["bonusLoadMs","Bonus game: opening animation (ms)",100],
    ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
-   ["boxItemGapMs","Mystery box: gap between its two items (ms)",20],
-   ["clueCollectMs","Clue popup: auto-close after (ms)",100],
-   ["deckCardMs","Deck: card on screen (ms)",100],
-   ["vipRevealMs","VIP: dwell before moving on (ms)",100],
+   ["cardHoldMs","Memory card held (ms)",100],
+   ["statusHoldMs","Status card, not yet a Collectible (ms)",100],
+   ["cardConvertMs","…and its third copy, out of a box (ms)",100],
+   ["clueHoldMs","Clue card held — tap it to hold (ms)",100],
+   ["clueFlyMs","Clue flies into the tracker (ms)",20],
+   ["cardFlyMs","Card flies into the collection (ms)",20],
+   ["hudStatusMs","HUD track: the bar moves (ms)",20],
+   ["hudStatusHoldMs","HUD track: highlight lingers (ms)",20],
+   ["statusCardMs","Convert: card held before the turn (ms)",20],
+   ["statusFlipMs","Convert: the turn itself (ms)",20],
+   ["vipRevealMs","Gala: dwell before moving on (ms)",100],
+   ["scoopStepMs","Scoop: teleport (ms)",20],
    ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
-   ["startRevealMs","Start: dwell on tile (ms)",50]]},
+   ["startRevealMs","Premiere: dwell on tile (ms)",50]]},
  {group:"Tile values (base coins)",items:[
    ["stdBase","Standard base coins (avg)",1],
    /* The train's two outcomes, straight from the model. cfg.trainEV is derived from them
       and so is deliberately not editable here. */
    ["trainSmall","Train: small bonus",5],["trainLarge","Train: large bonus",5],
    ["trainLargeChance","Train: chance of the large bonus",0.05],
-   ["startPass","Start pass bonus",10],["startLand","Start landing extra",10],
-   ["spaEnergy","Spa Day energy grant",1],["vipSeed","VIP seed per lap",5],
+   ["startPass","Premiere pass bonus",10],["startLand","Premiere landing extra",10],
+   ["spaEnergy","Spa Day energy grant",1],["vipSeed","Gala pot seed per lap",5],
    ["boardScale","Board scale",0.1],
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],
    ["board3d","3D board (0/1) — reload to apply",1]]},
- /* The three phases of the box throw, each its own knob so the pacing can be tuned by feel
-    rather than by one number that moves all of it at once. */
- {group:"Mystery box throw",items:[
-   ["boxZoomOut","Camera zoom out (x, 1 = none)",0.05],
-   ["boxZoomOutMs","1 · Zoom out (ms)",20],
-   ["boxThrowMs","2 · Throwing the boxes, total (ms)",20],
-   ["boxZoomInMs","3 · Zoom back in (ms)",20]]},
- {group:"Mystery box opening",items:[
-   ["boxRiseMs","1 · Float to the centre (ms)",20],
-   ["boxSwellMs","2 · Swell before the pop (ms)",20],
-   ["boxOpenScale","Size it reaches (x board size)",0.25],
-   ["boxSpoilsMs","3 · Winnings held on screen (ms)",50],
-   ["boxCluePopupMs","4 · Clue sheet, after the winnings (ms)",50]]},
- {group:"Gold (clue) box",items:[
-   ["boxGoldScale","Size vs a plain box (x)",0.02],
-   ["boxGoldEmissive","Self-lit glow on the model",0.05],
-   ["boxGoldGlow","Halo around it (0 = off)",0.05],
-   ["boxGoldSpinMs","One full turn (ms)",100],
-   ["boxGoldBob","Bob height (tile units)",0.01]]},
+ /* Opening a box. The one knob the loop is actually built on is packAutoOpenMs: the player
+    may tap the box, and if they do not it opens itself after this. */
+ {group:"Opening a box",items:[
+   ["packAutoOpenMs","Opens itself after (ms)",250,{min:0,max:20000}],
+   ["packFlipMs","1 · Card flip (ms)",20],
+   ["packRevealMs","2 · Card held (ms)",50],
+   ["packItemGapMs","3 · Gap between two cards (ms)",20],
+   ["packDupMs","Duplicate: extra beat (ms)",50],
+   ["packBoxSize","Box size (tiles)",0.05,{min:0.4,max:4}],
+   ["packSwellMs","Swell before it bursts (ms)",20],
+   ["packPopScale","How far it inflates (×)",0.05,{min:1,max:3}],
+   ["packCardScreen","Revealed card height (share of view)",0.01,{min:0.05,max:0.9}],
+   ["packCardSpacing","Gap between cards (share of a card)",0.01,{min:0,max:1}],
+   ["packCloseMs","4 · After the last card (ms)",50],
+   ["setDoneMs","Card set complete: hold (ms)",100]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —
@@ -245,14 +466,31 @@ const TUNING=[
       "click → numbers" window the DOM dice used, so it stays where it always was. */
    ["dice3d","Throw them on the board (0/1)",1],
    ["diceSize","Size — edge in tiles",0.05,{min:0.3,max:2}],
+   ["diceDrop","Land below centre (0..1 of half-height)",0.05,{min:0,max:0.9}],
    ["diceSpread","How far apart they land",0.1,{min:0,max:5}],
    ["diceThrowFrom","Thrown from (tiles toward camera)",0.25,{min:0,max:10}],
    ["diceArc","Throw height",0.1,{min:0,max:8}]]},
- {group:"Builders & series",items:[
-   /* The cost curve is not here: it is segmented and belongs to the loaded economy model.
-      The drawer shows it read-only in the Economy panel (js/ui/economy-panel.js). */
-   ["boxesPerUpgrade","Boxes per upgrade",1],["boxCoins","Box item 1: coins",10],
-   ["buildings","Builders in this series",1],["tiers","Levels per builder",1]]},
+ /* The collection. episodesPerBoard and collectiblesPerEpisode are the SHAPE of a board, and
+    the board content has to match them — Collection.validate() is what checks that, and the
+    Collection panel in this drawer prints what it finds. */
+ {group:"The collection",items:[
+   ["episodesPerBoard","Episodes per set",1,{min:1,max:20}],
+   ["cardCopiesToConvert","Copies that convert a card",1,{min:1,max:10}],
+   ["dupCoins","Duplicate card: coins (x its rarity)",5],
+   ["setBonusCoins","Card set completed: coins",100,{min:0}],
+   ["setBonusStatus","Card set completed: status",10,{min:0}],
+   ["boxCoins","Box: coins when the row says none",10]]},
+ {group:"Status",items:[
+   ["statusPerEpisode","Status per episode watched",5],
+   ["statusPerPrediction","Status per correct prediction",5],
+   ["statusLevels","Levels in a Season",1,{min:2,max:99}],
+   ["statusFirst","Status for level 2",10,{min:1}],
+   ["statusTotal","Status for the whole Season",500,{min:100}],
+   ["statusBarMs","Earned: track moves (ms)",50],
+   ["statusUpMs","Earned: held afterwards (ms)",50],
+   ["estateFog","Fog over the estate when it changes (0/1)",1],
+   ["estateFogMs","Estate fog — whole beat (ms)",100,{min:0,max:6000}],
+   ["estatePromoMs","Estate promotion — whole beat (ms)",100,{min:0,max:8000}]]},
  {group:"Prediction & wager",items:[
    ["minWager","Minimum wager (floor under every tier)",10],
    ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],
@@ -262,5 +500,13 @@ const TUNING=[
    ["accuracyPerClue","Accuracy gained per clue",0.01,{min:0,max:0.2}],
    ["accuracyMax","Accuracy cap",0.01,{min:0,max:1}],
    ["clueAlbumSize","Clue album size (cosmetic target)",10,{min:1}],
-   ["avgOdds","Avg odds (reference)",0.1]]},
+   ["cluesPerEpisode","Clues needed to unlock an episode",1,{min:1}],
+   ["clueSeasonStep","…and how many more each Season",1,{min:0}],
+   ["clueStuckDays","Catch-up valve: days before it eases",1,{min:0}],
+   ["dupClueCoins","Duplicate clue: coins",10,{min:0}],
+   ["statusCopyShare","Each copy: share of the Collectible's worth",0.01,{min:0.01,max:1}],
+   ["cardCoins","Any card: coins (x stake)",5,{min:0}],
+   ["startEnergy","First session: energy granted",5,{min:0}],
+   ["avgOdds","Payout multiplier (flat)",0.1],
+   ["trophyStatus","Called-It trophy: status",10,{min:0}]]},
 ];

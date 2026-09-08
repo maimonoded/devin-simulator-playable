@@ -125,3 +125,59 @@ test("the throw arc starts and ends on the table", () => {
   ok(bounce > 0, "there is a bounce");
   ok(bounce < 0.25, "the bounce is a bounce, not a second throw");
 });
+
+/* ---- the drop into the lower half ---------------------------------------------------------
+   The dice used to land on the camera's aim point, which is the centre of the screen — the one
+   place the Status Estate stands and the HUD reaches down to. These hold the geometry that
+   moves them below it, because the failure mode is a SIGN: throwing up-screen instead of down
+   puts them behind the HUD, looks entirely reasonable in the source, and is invisible until
+   somebody rolls on a phone. */
+
+/* Project a ground offset onto the screen's vertical axis. Positive = DOWN the screen.
+   Derived independently of diceDrop() so the test is a check rather than an echo: for a camera
+   at elevation θ looking down, screen-up is (ŷcosθ − t̂sinθ) where t̂ is the horizontal
+   direction toward the camera, so a ground step along t̂ moves DOWN the screen by sinθ. */
+function screenDownOf(off, elevationDeg) {
+  const el = elevationDeg * Math.PI / 180;
+  const toward = DIE_SCREEN_TOWARD;                       // t̂, horizontal, toward the camera
+  const along = off.x * toward[0] + off.z * toward[2];     // ground distance along t̂
+  return along * Math.sin(el);
+}
+
+test("diceDrop moves the landing spot DOWN the screen, never up", () => {
+  const off = diceDrop(10, 0.35, 38);
+  ok(screenDownOf(off, 38) > 0, "a positive drop must fall toward the bottom of the frame");
+  /* And it lands where it says: 0.35 of a half-height of 10 is 3.5 screen units down. */
+  eq(+screenDownOf(off, 38).toFixed(6), +(10 * 0.35).toFixed(6));
+});
+
+test("the drop is a fraction of the half-height, so it holds at any zoom", () => {
+  const near = diceDrop(4, 0.35, 38), far = diceDrop(20, 0.35, 38);
+  /* Five times the frustum, five times the offset — the dice sit at the same place on screen
+     whatever the camera is zoomed to, which is the whole reason this is not a tile count. */
+  eq(+(screenDownOf(far, 38) / screenDownOf(near, 38)).toFixed(6), 5);
+});
+
+test("it compensates for the camera looking down, not straight on", () => {
+  /* A metre of ground toward the camera is only sin(38°) of a metre down the screen, so the
+     ground offset has to be LONGER than the screen distance it buys. Skipping this division is
+     the quiet bug: everything moves, just a third less than asked. */
+  const off = diceDrop(10, 0.5, 38);
+  const ground = Math.hypot(off.x, off.z);
+  ok(ground > 5, `ground travel ${ground.toFixed(2)} must exceed the 5 units of screen it buys`);
+  eq(+ground.toFixed(4), +(5 / Math.sin(38 * Math.PI / 180)).toFixed(4));
+});
+
+test("a zero or nonsense drop is simply no offset", () => {
+  deepEq(diceDrop(10, 0, 38), { x: 0, z: 0 });
+  deepEq(diceDrop(0, 0.5, 38), { x: 0, z: 0 }, "no frustum yet, at boot");
+  deepEq(diceDrop(10, undefined, 38), { x: 0, z: 0 });
+  deepEq(diceDrop(10, 0.5, 0), { x: 0, z: 0 }, "a camera on the horizon has no down-screen");
+  ok(Math.hypot(...Object.values(diceDrop(10, 5, 38))) > 0, "an over-large drop clamps, not throws");
+});
+
+test("the drop stays on the screen's vertical axis — it must not drift sideways", () => {
+  const off = diceDrop(10, 0.4, 38);
+  const sideways = off.x * DIE_SCREEN_RIGHT[0] + off.z * DIE_SCREEN_RIGHT[2];
+  eq(+sideways.toFixed(9), 0, "dropping down-screen must not also slide the dice across it");
+});

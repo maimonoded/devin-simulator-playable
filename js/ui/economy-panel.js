@@ -104,7 +104,6 @@ async function importEconomyFile(f){
   /* A new model means a new series shape, so the run may be pointing past the end of it. */
   if(state.series>=Economy.playableSeries().length) state.series=0;
   Economy.apply();
-  Builders.reshape();
   saveEconomy(); saveConfig();
   afterEconomyChange();
   const warn=res.warnings.length
@@ -118,7 +117,7 @@ async function importEconomyFile(f){
    message it just wrote has to be re-applied by the caller if it should survive. */
 function afterEconomyChange(){
   const keep=$("#econMsg")?$("#econMsg").innerHTML:"";
-  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); renderAll();
+  buildTuning(); buildBoard(); onCfgChange(); renderAll();
   if(keep&&$("#econMsg")) $("#econMsg").innerHTML=keep;
 }
 

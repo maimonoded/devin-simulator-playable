@@ -31,7 +31,9 @@ function playerMarkup(id){
       <div class="vbar"><div class="vfill" id="vFill"></div></div>
       <div class="vtime" id="vTime">0:00</div>
     </div>
-    <div class="vctrl"><button class="btn ghost speedBtn" id="speedBtn">⏩ 2× speed</button></div>`;
+    <div class="vctrl"><button class="btn ghost speedBtn" id="speedBtn">⏩ 2× speed</button>${
+      cfg.videoSkip?`<button class="btn ghost" id="skipVideo">⏭ Skip \u2014 count as watched</button>`:""
+    }</div>`;
 }
 
 /* Drive the player. Resolves when the episode ends (or the fallback elapses). */
@@ -83,6 +85,16 @@ function playVideo(id){
     /* stopPropagation, or the click also reaches the wrap's pause toggle underneath. */
     const closeBtn=$("#vClose");
     if(closeBtn) closeBtn.onclick=(e)=>{ e.stopPropagation(); finish(false); };   // walked out
+    /* SKIP IS NOT CLOSE, and the two sit inches apart, so the label says which is which.
+       ✕ resolves completed:false — the video IS the reveal, so walking out forfeits the result.
+       This resolves completed:TRUE: it means "I have seen it", and the episode counts as
+       watched, pays its status and shows its result exactly as sitting through it would.
+
+       It exists because a build is tested far more often than it is played, and ninety seconds
+       of footage a roll makes a balancing pass unbearable. cfg.videoSkip is how it goes away for
+       a real audience — one switch in the tuning drawer, not a code change. */
+    const skipBtn=$("#skipVideo");
+    if(skipBtn) skipBtn.onclick=(e)=>{ e.stopPropagation(); finish(true); };
     v.addEventListener("contextmenu",e=>e.preventDefault());   // hide download / speed menu
 
     const fill=$("#vFill"), time=$("#vTime");

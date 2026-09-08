@@ -1,108 +1,186 @@
 "use strict";
-/* The clue album — what a clue actually IS.
+/* Clues — the gate on the story, and the evidence you bet on.
 
-   Until now a clue was a bare integer. state.clues counted them, cfg.clueAlbumSize promised an
-   album of 300, and nothing anywhere said what those 300 were. This file is that content.
+   GDD §6. A clue does two jobs that would normally need two systems, and doing them with one
+   object is the whole idea: collect enough of an episode's clues and it UNLOCKS, and the ones
+   you happen to hold are the EVIDENCE shown at the wager screen. Progress and information are
+   the same currency, so there is never a moment where you are grinding one and ignoring the
+   other.
 
-   TWO COUNTERS, ONE OF THEM IS THE ALBUM:
-     state.clues      lifetime total, never spent — this IS the album's progress
-     state.cycleClues the flow banked since the last prediction, spent to buy accuracy
-   So the album needs no state of its own: the clues you own are the first state.clues of them,
-   filled in order. Same reasoning as the episode library — derive it, don't keep a second
-   counter that can drift from the first.
+   ---- specific, and per-episode ----
 
-   Filling in order rather than at random is deliberate. A random fill would make the album a
-   slot machine you cannot reason about ("how close am I to finishing this set?"); in order, the
-   next clue is always the next slot and a set completes when you reach it.
+   `state.clues` is `{ "005": ["c3","c7"] }` — which clues, for which episode, not how many in
+   total. That matters because the requirement (four) sits well below the authored pool (eight),
+   so two players reach the same prediction holding DIFFERENT evidence. A counter could not
+   express that, and without it "review the evidence" would show everyone the same screen.
 
-   CONTENT. Sets below are named; cfg.clueAlbumSize (from the economy model) is the album's real
-   size, so any slot past the named ones is a numbered placeholder rather than a missing entry.
-   That way the model stays authoritative about how big the album is and content can land later
-   without a code change — add names here and the placeholders become real. */
+   ---- a duplicate is possible, and that is the point ----
 
-const CLUE_SETS = [
-  { name: "The Street",      icon: "🏙", clues: [
-    "A cardboard sign, lettered in a steady hand",
-    "Shoes worth more than the coat",
-    "A bank card, unused, six months expired",
-    "The bench he never sleeps on",
-    "A phone that only ever receives",
-  ]},
-  { name: "The Family",      icon: "👔", clues: [
-    "A will with one name struck through",
-    "The brother who took the meeting",
-    "A photograph cropped to two people",
-    "Legal fees paid in cash",
-    "A signature that leans the wrong way",
-  ]},
-  { name: "The Wedding",     icon: "💍", clues: [
-    "A dress altered twice",
-    "The seat left empty at the top table",
-    "An invitation returned unopened",
-    "Rings bought on a company card",
-    "A toast nobody recorded",
-  ]},
-  { name: "The Office",      icon: "🏢", clues: [
-    "A badge that still opens the door",
-    "Minutes missing from the file",
-    "The intern who signed for the delivery",
-    "A resignation dated on a Sunday",
-    "Two sets of quarterly numbers",
-  ]},
-  { name: "The Hospital",    icon: "🏥", clues: [
-    "A chart with the surname redacted",
-    "Visiting hours nobody kept",
-    "A prescription in another city",
-    "The nurse who recognised him",
-    "An ambulance called from a landline",
-  ]},
-  { name: "The Reveal",      icon: "🎬", clues: [
-    "A recording made without consent",
-    "The lawyer's second phone",
-    "A hotel key from the wrong year",
-    "Testimony that contradicts the date",
-    "The name on the deed",
-  ]},
-];
+   A draw picks uniformly from the episode's eight. Four distinct ones therefore take about five
+   draws, not four, and an unlucky run can take many more. That is what the catch-up valve
+   (§6.7) exists for, and it is why a duplicate still pays coins — GDD §12's first rule about
+   variance is that a duplicate must always convert to something.
+
+   ---- nothing here is stored twice ----
+
+   "Unlocked" is DERIVED: an episode is unlocked when the clues held for it reach the
+   requirement. There is no flag, so there is nothing to drift. The clues are never cleared
+   either — §6.4 calls them consumed at unlock, which they are in the sense that they buy that
+   episode and nothing else, but the record has to survive or the evidence screen would be empty
+   the moment it became reachable. */
 
 const Clues = {
-  /* The album's size comes from the economy model, not from how much content exists — the model
-     is what says how big the collection is meant to be. */
-  total(){ return Math.max(0, Math.round(cfg.clueAlbumSize || 0)); },
-  /* How many are in a set. Sets are equal-sized so the grid is regular. */
-  setSize(){ return CLUE_SETS[0] ? CLUE_SETS[0].clues.length : 5; },
-  setCount(){ return Math.max(1, Math.ceil(this.total() / this.setSize())); },
+  /* ---------------- the authored content ---------------- */
+  authoredFor(id) {
+    const ep = Episodes.get(id);
+    return (ep && Array.isArray(ep.clues)) ? ep.clues : [];
+  },
+  clueOf(id, clueId) { return this.authoredFor(id).find(c => c.id === clueId) || null; },
 
-  /* Owned = the first state.clues slots. Nothing to persist. */
-  collected(){ return Math.min(this.total(), Math.max(0, Math.floor(state.clues || 0))); },
-  has(i){ return i < this.collected(); },
+  /* ---------------- how many it takes ----------------
+     Fixed within a Season and stepped between them (§6.2) — one knob, not a curve, because the
+     thing that should get harder across Seasons is the requirement, not its shape. */
+  baseRequired() {
+    const step = (state.season | 0) * (+cfg.clueSeasonStep || 0);
+    return Math.max(1, Math.round((+cfg.cluesPerEpisode || 1) + step));
+  },
+  /* THE CATCH-UP VALVE (§6.7). Once an episode has been the current one for cfg.clueStuckDays,
+     the requirement decays by one a day. Invisible to anyone progressing normally — it only
+     ever fires for a player the draw has been unkind to, and it can never fall below one. */
+  requiredFor(id) {
+    const base = Math.min(this.baseRequired(), this.authoredFor(id).length || this.baseRequired());
+    const days = this.daysOn(id);
+    const decay = Math.max(0, days - Math.max(0, Math.round(+cfg.clueStuckDays || 0)));
+    return Math.max(1, base - decay);
+  },
+  /* How long this episode has been the one being worked on. Stamped by grant(), because a
+     player with no clues at all for it has not been unlucky — they have just arrived. */
+  daysOn(id) {
+    const from = (state.clueDay || {})[id];
+    if (from == null) return 0;
+    return Math.max(0, (state.day | 0) - (from | 0));
+  },
 
-  /* Set metadata, cycling the authored names once the album runs past them so a 300-slot album
-     never shows a blank heading. */
-  setOf(i){ return Math.floor(i / this.setSize()); },
-  setMeta(s){
-    const authored = CLUE_SETS[s];
-    if (authored) return { name: authored.name, icon: authored.icon };
-    return { name: `Case File ${s + 1}`, icon: "🗂" };
+  /* ---------------- what is held ---------------- */
+  heldFor(id) {
+    const held = (state.clues || {})[id];
+    return Array.isArray(held) ? held : [];
   },
-  /* A clue's name, or a numbered placeholder where no content has been written yet. */
-  nameOf(i){
-    const s = CLUE_SETS[this.setOf(i)];
-    const within = i % this.setSize();
-    return (s && s.clues[within]) || `Clue #${String(i + 1).padStart(3, "0")}`;
+  countFor(id) { return this.heldFor(id).length; },
+  has(id, clueId) { return this.heldFor(id).includes(clueId); },
+  /* The evidence, resolved to its text, in authored order — what §7.2's Review Evidence lists. */
+  evidenceFor(id) {
+    const held = this.heldFor(id);
+    return this.authoredFor(id).filter(c => held.includes(c.id));
   },
-  /* [collectedInSet, sizeOfSet] — the size is clamped so a short final set reports honestly. */
-  setProgress(s){
-    const size = this.setSize(), from = s * size;
-    const slots = Math.max(0, Math.min(size, this.total() - from));
-    const got = Math.max(0, Math.min(slots, this.collected() - from));
-    return [got, slots];
+  /* THE DROP SHAPE, BUILT IN ONE PLACE.
+
+     A clue is drawn by dropFace() (js/ui/cardface.js) as a contact sheet, and three different
+     things need to hand it one: a box paying a clue, a tile landing on a clue row, and the
+     evidence board on the wager screen. They were building the object separately, and a field
+     drifting between them would mean the same clue looked like two different cards depending on
+     where you met it — which is the one thing a collection cannot do.
+
+     `isNew` is what the face keys on to decide between printing the SENTENCE and printing "You
+     knew that one" over a duplicate's coin value. Held evidence is neither of those things: it
+     is a clue you own and are re-reading, so it renders as the sentence. Hence the default. */
+  dropFor(id, clue, opts) {
+    const o = opts || {};
+    return { kind: "clue", ep: id, clue,
+             isNew: o.isNew !== false, coins: +o.coins || 0 };
   },
-  setComplete(s){ const [g, n] = this.setProgress(s); return n > 0 && g === n; },
-  /* Sets with at least one slot — what the album renders. */
-  sets(){
-    const out = [];
-    for (let s = 0; s < this.setCount(); s++) if (this.setProgress(s)[1] > 0) out.push(s);
-    return out;
+
+  /* Lifetime clues collected, derived. The HUD's running total. */
+  total() {
+    return Object.keys(state.clues || {}).reduce((a, id) => a + this.countFor(id), 0);
+  },
+
+  /* ---------------- unlocking, derived ---------------- */
+  isUnlocked(id) {
+    const need = this.requiredFor(id);
+    return this.authoredFor(id).length > 0 && this.countFor(id) >= need;
+  },
+  /* Every unlocked episode, in story order. */
+  unlockedIds() { return Episodes.ids().filter(id => this.isUnlocked(id)); },
+  progressFor(id) { return [this.countFor(id), this.requiredFor(id)]; },
+
+  /* THE EPISODE A CLUE GOES TO: the first one in story order that is not unlocked yet.
+     Clues therefore always push the story forward, and never arrive for something already
+     bought. Null when every episode in the library is unlocked. */
+  currentId() {
+    for (const id of Episodes.ids()) if (!this.isUnlocked(id)) return id;
+    return null;
+  },
+
+  /* ---------------- granting ----------------
+     Returns {id, clue, isNew, coins} — or null when there is nothing left to unlock, which is
+     a real state (the collection has caught up with the content) and not an error. The caller
+     turns that into events; nothing here touches the DOM. */
+  grant(opts) {
+    const id = this.currentId();
+    if (id == null) return null;
+    const all = this.authoredFor(id);
+    if (!all.length) return null;
+    /* `fresh` is the Insider pack's guarantee (GDD 6.5): one clue you do not already hold, so
+       the pack that costs the most is the one that can never be a dud. Everything else draws
+       from the whole eight and may repeat — which is what makes holding four of eight a
+       different hand from anyone else's. */
+    let pool = all;
+    if (opts && opts.fresh) {
+      const missing = all.filter(c => !this.has(id, c.id));
+      if (missing.length) pool = missing;
+    }
+    const clue = pool[Math.floor(rand(0, pool.length))];
+    if (this.has(id, clue.id)) {
+      /* A duplicate always converts to something (§12). It is the same rule a duplicate card
+         follows, for the same reason: a draw that pays nothing reads as the game misfiring. */
+      const coins = Math.round((+cfg.dupClueCoins || 0) * (+cfg.boardScale || 1));
+      state.coins += coins;
+      return { id, clue, isNew: false, coins };
+    }
+    if (!state.clues) state.clues = {};
+    if (!Array.isArray(state.clues[id])) state.clues[id] = [];
+    state.clues[id].push(clue.id);
+    /* Stamp the day this episode started costing clues, so the valve has something to measure
+       from. Only the first one stamps it. */
+    if (!state.clueDay) state.clueDay = {};
+    if (state.clueDay[id] == null) state.clueDay[id] = state.day | 0;
+    return { id, clue, isNew: true, coins: 0 };
+  },
+
+  /* How many clue draws an episode actually costs, on average. A coupon-collector sum: with a
+     pool of P and a requirement of R, the k-th new clue takes P/(P-k+1) draws. Four of eight is
+     five draws, not four — which is the number anyone tuning §6.6's pacing needs, and the reason
+     the catch-up valve exists at all. Printed in the tuning drawer. */
+  expectedDraws(id) {
+    const pool = this.authoredFor(id || Episodes.ids()[0]).length;
+    const need = Math.min(this.baseRequired(), pool);
+    let sum = 0;
+    for (let k = 0; k < need; k++) sum += pool / (pool - k);
+    return sum;
+  },
+
+  /* ---------------- validation ----------------
+     Every problem at once, in the house style. Read at boot and by the tuning drawer, because
+     an episode with too few clues to ever unlock is invisible in play — it looks like a long
+     run of bad luck, and the player waits forever. */
+  validate() {
+    const errs = [];
+    const need = this.baseRequired();
+    Episodes.ids().forEach(id => {
+      const cs = this.authoredFor(id);
+      const where = `Episode ${id} ("${Episodes.titleOf(id)}")`;
+      if (!cs.length) return errs.push(`${where} has no clues, so it can never be unlocked.`);
+      if (cs.length < need)
+        errs.push(`${where} has ${cs.length} clues but ${need} are needed to unlock it.`);
+      const seen = new Set();
+      cs.forEach((c, k) => {
+        if (!c || !c.id) return errs.push(`${where} clue ${k} has no id.`);
+        if (seen.has(c.id)) errs.push(`${where} has two clues called "${c.id}".`);
+        seen.add(c.id);
+        if (!c.text) errs.push(`${where} clue "${c.id}" has no text — the evidence screen prints it.`);
+      });
+    });
+    return errs;
   },
 };

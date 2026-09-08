@@ -1,5 +1,10 @@
 "use strict";
-/* Spa corner — grants energy (cap-clamped). */
+/* Spa Day — a rest beat, and GDD §3.4 is explicit that it is NEVER a penalty.
+
+   That matters more than it sounds. On a board where a plot twist can take money, a corner that
+   also took something would make a quarter of the ring feel hostile; the Spa is the tile you are
+   pleased to land on when nothing else went right. Energy only, topped up toward the cap and
+   never reducing a purchased overflow (js/board-actor.js). */
 class SpaTile extends Tile {
   get icon(){ return "💆"; }
   get corner(){ return true; }

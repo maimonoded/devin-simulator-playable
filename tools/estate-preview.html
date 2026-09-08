@@ -1,0 +1,84 @@
+<!doctype html><meta charset="utf-8"><title>Estate preview — pick a tier's yaw</title>
+<!-- Renders one estate GLB at several yaws under THE GAME'S OWN camera and lights, so the turn a
+     tier needs is chosen by looking rather than by reloading the game once per guess.
+
+     Why it exists: image-to-3D returns a mesh in its reference image's frame, so every tier
+     arrives pointing somewhere slightly different, and "which way does this house face" is not a
+     question the engine can answer for you. Eight small renders answer it in one screenshot.
+
+       python3 serve.py
+       http://localhost:8125/tools/estate-preview.html                       — all eight
+       http://localhost:8125/tools/estate-preview.html?a=350,335,320&c=3     — a shortlist, larger
+       http://localhost:8125/tools/estate-preview.html?m=../assets/estate/models/tier2.glb
+
+     The angle you pick is the WHOLE turn. MODEL_YAW in js/ui/estate3d.js already applies 45 deg
+     to every tier, so the tier's own `yaw` in assets/estate/estate.js is your angle MINUS 45 deg,
+     in radians — and is zero when you land on 45. The footer prints the raw bounding box, which
+     is the other thing worth a look: a mesh much deeper than it is wide came back lying down. -->
+<style>body{margin:0;background:#cdbfa2;font:12px system-ui;color:#222}
+#grid{display:grid;grid-template-columns:repeat(var(--c,4),1fr)}
+.cell{position:relative}.cell b{position:absolute;top:4px;left:6px;background:#fff9;padding:1px 4px;border-radius:3px}
+#info{position:fixed;bottom:0;left:0;background:#fff;padding:6px 10px;font:12px monospace}</style>
+<div id="grid"></div><div id="info">loading…</div>
+<script type="importmap">{ "imports": { "three": "../vendor/three.module.js" } }</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "../vendor/loaders/GLTFLoader.js";
+const URL_ = new URLSearchParams(location.search).get("m") || "../assets/estate/models/tier1.glb";
+const CAM_EL = 38, CAM_AZ = 45, H = 3.15, SPAN = 3.90;   // mirrors MODEL in js/ui/estate3d.js
+const Q = new URLSearchParams(location.search);
+const ANGLES = (Q.get("a") || "0,45,90,135,180,225,270,315").split(",").map(Number);
+const COLS = +(Q.get("c") || 4);
+document.getElementById("grid").style.setProperty("--c", COLS);
+const W = Math.floor(innerWidth / COLS), HH = Math.floor(W * 0.82);
+new GLTFLoader().load(URL_, (g) => {
+  const raw = new THREE.Box3().setFromObject(g.scene, true);
+  const rs = raw.getSize(new THREE.Vector3());
+  document.getElementById("info").textContent =
+    `raw size ${rs.x.toFixed(3)} x ${rs.y.toFixed(3)} x ${rs.z.toFixed(3)}  (w x h x d)`;
+  const grid = document.getElementById("grid");
+  for (let i = 0; i < ANGLES.length; i++){
+    const deg = ANGLES[i];
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const lab = document.createElement("b"); lab.textContent = deg + "°";
+    cell.appendChild(lab); grid.appendChild(cell);
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+    const key = new THREE.DirectionalLight(0xffffff, 1.9); key.position.set(12,24,16); scene.add(key);
+    const rim = new THREE.DirectionalLight(0x8b6dff, 0.7); rim.position.set(-8,5,-6); scene.add(rim);
+    scene.add(new THREE.HemisphereLight(0x9fc4ff, 0x14204a, 0.45));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(40,40),
+      new THREE.MeshStandardMaterial({color:0xd8cbb0}));
+    ground.rotation.x = -Math.PI/2; ground.position.y = 0.13; scene.add(ground);
+
+    const holder = new THREE.Group();
+    const m = g.scene.clone(true);
+    holder.add(m);
+    m.rotateOnWorldAxis(new THREE.Vector3(0,1,0), deg * Math.PI/180);
+    holder.updateMatrixWorld(true);
+    let box = new THREE.Box3().setFromObject(holder, true);
+    const sz = box.getSize(new THREE.Vector3());
+    /* Same fit rule as the engine: inside the height AND the ground span. */
+    holder.scale.setScalar(Math.min(H / (sz.y || 1), SPAN / (Math.max(sz.x, sz.z) || 1)));
+    holder.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(holder, true);
+    const c = box.getCenter(new THREE.Vector3());
+    holder.position.x -= c.x; holder.position.z -= c.z;
+    holder.position.y += 0.14 - box.min.y;
+    scene.add(holder);
+
+    const ren = new THREE.WebGLRenderer({antialias:true});
+    ren.setSize(W, HH); ren.setPixelRatio(2);
+    ren.outputColorSpace = THREE.SRGBColorSpace;
+    cell.appendChild(ren.domElement);
+    const halfW = 3.2, halfH = halfW * HH / W;
+    const cam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 200);
+    const az = CAM_AZ*Math.PI/180, el = CAM_EL*Math.PI/180;
+    cam.position.set(Math.cos(el)*Math.sin(az), Math.sin(el), Math.cos(el)*Math.cos(az)).multiplyScalar(40);
+    cam.position.y += 1.3; cam.lookAt(0, 1.3, 0);
+    ren.render(scene, cam);
+  }
+}, undefined, e => { document.getElementById("info").textContent = "FAILED: " + e; });
+</script>

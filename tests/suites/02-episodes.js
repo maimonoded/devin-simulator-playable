@@ -36,26 +36,26 @@ test("get / has / count / ids", () => {
   eq(Episodes.ids().length, Episodes.count());
 });
 
-test("id is the whole identity: builder number and video path derive from it", () => {
-  eq(Episodes.builderOf("001"), 1);
-  eq(Episodes.builderOf("012"), 12);
+test("id is the whole identity: story number and video path derive from it", () => {
+  eq(Episodes.numberOf("001"), 1);
+  eq(Episodes.numberOf("012"), 12);
   eq(Episodes.videoFor("003"), "episodes/003.mp4");
   eq(Episodes.titleOf("001"), Episodes.get("001").title);
   eq(Episodes.titleOf("999"), "999", "unknown id falls back to the id itself");
 });
 
-test("idForBuilder maps builder index to its episode", () => {
-  eq(Episodes.idForBuilder(0), "001");
-  eq(Episodes.idForBuilder(6), "007");
-  eq(Episodes.idForBuilder(11), "012");
+test("idForIndex maps a place in the story to its episode", () => {
+  eq(Episodes.idForIndex(0), "001");
+  eq(Episodes.idForIndex(6), "007");
+  eq(Episodes.idForIndex(11), "012");
 });
 
-test("builders past the last episode cycle instead of failing", () => {
+test("a position past the last episode cycles instead of failing", () => {
   const n = Episodes.count();
-  const id = Episodes.idForBuilder(n);          // one past the end
+  const id = Episodes.idForIndex(n);          // one past the end
   ok(id !== null, "should not return null");
   ok(Episodes.has(id), "cycled id must exist");
-  eq(Episodes.idForBuilder(n + 2), Episodes.ids()[(n + 2) % n]);
+  eq(Episodes.idForIndex(n + 2), Episodes.ids()[(n + 2) % n]);
 });
 
 suite("episodes: difficulty");

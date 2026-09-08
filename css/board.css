@@ -46,12 +46,15 @@ body.board3d .board{display:none}
            transform:rotate(-45deg) rotateX(-52deg)} /* counter board tilt for legibility */
 .tile .ico{transform:rotate(-45deg) rotateX(-52deg)}
 .tile.corner{background:linear-gradient(180deg,var(--panel2),#1a2054);border-color:var(--purple)}
-.tile.start{background:linear-gradient(180deg,#3a3016,#241d0d);border-color:var(--gold)}
+/* The four corners (GDD 3.4) carry a border colour; the pooled types carry a tint.
+   These names come straight from assets/board/board.js — a tile's class IS its type. */
+.tile.premiere{background:linear-gradient(180deg,#3a3016,#241d0d);border-color:var(--gold)}
 .tile.spa{border-color:var(--teal)}
-.tile.vip{border-color:var(--purple)}
-.tile.premiere{border-color:var(--pink)}
-.tile.train{background:linear-gradient(180deg,#2a2f66,#1d2350)}
-.tile.deck{background:linear-gradient(180deg,#2b2560,#1e1a48)}
+.tile.gala{border-color:var(--purple)}
+.tile.scoop{border-color:var(--pink)}
+.tile.arrival{background:linear-gradient(180deg,#2a2f66,#1d2350)}
+.tile.twist{background:linear-gradient(180deg,#2b2560,#1e1a48)}
+.tile.npc{background:linear-gradient(180deg,#243063,#182047)}
 .tile.lit{background:var(--gold);box-shadow:0 0 18px rgba(255,203,92,.8),inset 0 -3px 0 rgba(0,0,0,.2)}
 
 /* Artwork (assets/tiles/N.png). MUST come after the .tile.<type> rules above: those use the
@@ -74,16 +77,6 @@ body.board3d .board{display:none}
            transform:rotate(-45deg) rotateX(-52deg)
                      scale(var(--artScale,1.45)) translateY(calc(var(--artLift,8%) * -1));
            transform-origin:center}
-/* overlay markers (mystery boxes) — .ovl is the shared hook, .box the per-overlay style */
-.ovl{position:absolute;top:1px;left:2px;font-size:12px;
-     transform:rotate(-45deg) rotateX(-52deg)}
-.box{animation:boxpulse 1.2s infinite ease-in-out;filter:drop-shadow(0 0 5px var(--gold))}
-/* The clue box, on the legacy CSS board. The 3D board swaps in a gold model instead; here the
-   emoji is all there is, so it gets a brighter, wider halo to read as the rarer one. */
-.box.gold{filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px var(--gold))}
-@keyframes boxpulse{0%,100%{opacity:.75;transform:rotate(-45deg) rotateX(-52deg) scale(1)}
-                    50%{opacity:1;transform:rotate(-45deg) rotateX(-52deg) scale(1.18)}}
-
 /* token */
 .token{position:absolute;width:9%;height:9%;left:0;top:0;
        transform:translate(-50%,-50%);z-index:20;
@@ -131,100 +124,13 @@ body.board3d .board{display:none}
 .playbar::before{content:"";position:absolute;left:0;right:0;bottom:-14px;height:110px;z-index:-1;
                  background:linear-gradient(180deg,transparent,rgba(9,13,38,.6));pointer-events:none}
 
-/* ---------- builders view ----------
-   Two overlays share the one 3D surface: .boardScene.showBuilders swaps which is on screen,
-   while Board3D.setView() swaps which scene the renderer draws. Keeping the switch in one
-   class means the DOM and the scene can never disagree about which view is up. */
-/* Only the builders view's Back button uses this now — the builders button moved into the
-   play row. */
-.navBtn{position:absolute;left:14px;bottom:14px;z-index:35;width:52px;height:52px;border-radius:16px;
-        background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;font-size:22px;
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 5px 0 rgba(0,0,0,.28);transition:transform .08s}
-.navBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-/* Back sits TOP-left, not bottom-left where the 🏗 button was: the upgrade row owns the whole
-   bottom edge, and five buttons plus a back button do not fit one phone line. */
-.navBtn.back{background:var(--panel2);border:1px solid var(--line);font-size:24px;
-             top:14px;left:14px;bottom:auto}
-/* The board shows nothing about builders now, so this dot is the only nudge that there is
-   something affordable waiting. */
-.navDot{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;
-        background:var(--gold);border:2px solid #10142f;display:none}
-.navDot.on{display:block}
-
-.buildersUi{position:absolute;inset:0;z-index:35;display:none;pointer-events:none}
-.buildersUi>*{pointer-events:auto}
-.boardScene.showBuilders .buildersUi{display:block}
-/* While the builders view is up the board's own layer is not just hidden but inert — a stray
-   tap must not roll the dice behind a screen the player thinks they are on. */
-.boardScene.showBuilders .playbar,
-.boardScene.showBuilders .boardLabels,
-.boardScene.showBuilders #buildersBtn{display:none}
-
-/* Mystery boxes waiting to be thrown onto the board. Top-right of the builders view, clear of
-   the centred header. It is the only feedback a purchase gets while the board is out of sight,
-   so the whole chip pops when the count changes — and the box itself gets a shake, because a
-   number ticking up is easy to miss when you are looking at the price you just paid. */
-/* Directly under the Store button, which already owns the very top of this corner in both
-   layouts (and in ?view=mobile the HUD owns the strip above that). Stacking beneath it keeps the
-   chip in the corner the player is told to look at without either one moving. */
-.boxCounter{position:absolute;right:16px;top:58px;display:none;align-items:center;gap:6px;
-            background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
-            border-radius:999px;padding:6px 12px;font-size:14px;font-weight:800;
-            box-shadow:0 4px 14px rgba(139,109,255,.35);pointer-events:none}
-.boxCounter.on{display:flex}
-.boxCounter .boxIco{font-size:16px;line-height:1}
-.boxCounter.bump{animation:boxBump .5s cubic-bezier(.2,1.4,.4,1)}
-.boxCounter.bump .boxIco{animation:boxShake .5s ease}
-@keyframes boxBump{0%{transform:scale(1)}35%{transform:scale(1.22)}100%{transform:scale(1)}}
-@keyframes boxShake{0%,100%{transform:rotate(0) translateY(0)}
-                    25%{transform:rotate(-14deg) translateY(-3px)}
-                    60%{transform:rotate(12deg) translateY(-1px)}}
-
-.buildersHead{position:absolute;left:0;right:0;top:14px;text-align:center;line-height:1.35;
-              text-shadow:0 2px 6px rgba(0,0,0,.75);pointer-events:none}
-.buildersHead b{display:block;font-size:15px}
-.buildersHead span{font-size:11px;color:var(--muted)}
-
-/* One row, one line, always. Each button takes an equal share of the width and is allowed to
-   shrink (min-width:0), so the row holds whether the page has five buildings or two — and the
-   prices inside are compacted by fmtShort so the text never decides the layout. */
-.buildersBar{position:absolute;left:10px;right:10px;bottom:14px;
-             display:flex;gap:6px;align-items:stretch}
-.upb{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;
-     background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;border-radius:11px;
-     padding:8px 4px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.28);transition:transform .08s}
-.upb:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-.upb .upbName{font-size:9px;opacity:.85;text-transform:uppercase;letter-spacing:.03em;
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.upb .upbCost{font-size:13px;white-space:nowrap}
-/* Can't afford it: still readable, obviously inert. */
-.upb.cant{background:var(--panel2);color:var(--muted);box-shadow:none;border:1px solid var(--line)}
-.upb.max{background:transparent;border:1px solid var(--line);color:var(--gold);box-shadow:none}
-
-/* Banked episodes, sitting just above the upgrade row. The upgrade row is bottom:14 and about
-   50px tall, so this clears it; both track the same safe-area inset so they stay stacked on a
-   notched phone. var(--safeB, 0px) is 0 outside ?view=mobile, where the inset is not defined. */
-.bingeBtn{position:absolute;right:10px;bottom:calc(74px + var(--safeB, 0px));
-          display:none;align-items:center;gap:6px;
-          background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
-          border-radius:999px;padding:8px 14px;font-size:15px;font-weight:800;
-          box-shadow:0 4px 14px rgba(255,111,165,.35)}
-.bingeBtn:active{transform:translateY(2px)}
-.bingeCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px}
-
-/* Library, stacked above the builders button on the board's left edge. Deliberately NOT a
-   .navBtn: css/mobile.css re-anchors every .navBtn:not(.back) to the bottom inset, and that
-   selector out-specifies anything a modifier class here could say. */
-/* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's now. */
-.libBtn{position:absolute;left:14px;top:14px;z-index:35;
-        width:52px;height:52px;border-radius:16px;
-        background:var(--panel2);border:1px solid var(--line);color:#fff;font-size:22px;
-        display:none;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.28)}
-.libBtn.on{display:flex}
-.libBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-/* it belongs to the board's layer, so it goes with the rest of it */
-.boardScene.showBuilders .libBtn{display:none}
+/* ---------- the play row's badge ----------
+   The only thing left of the builders view's chrome. It is now the episodes button's count:
+   how many episodes are unlocked and waiting. */
+.navDot{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;padding:0 4px;
+        border-radius:999px;background:var(--pink);border:2px solid #10142f;color:#fff;
+        font-size:10px;font-weight:800;line-height:13px;text-align:center;display:none}
+.navb.on .navDot{display:block}
 
 /* the library list */
 .libList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;padding-right:4px}

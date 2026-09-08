@@ -1,9 +1,9 @@
 # Episodes
 
-One episode per completed builder — but **not that builder's episode**. Episodes are handed out
-in story order: the first builder you finish earns `001` whichever one it was, the second earns
-`002`, and so on. Builders are bought in whatever order the player can afford, and a serialised
-drama watched out of order spoils itself. Each episode is two files that share the id:
+One episode per **page of the album**: collect the `cfg.collectiblesPerEpisode` cards its page
+names and that episode unlocks. Which cards a page wants is authored data
+([assets/cards/README.md](../assets/cards/README.md)), so which episode a set of five buys is a
+content decision, not a rule in the code. Each episode is two files that share the id:
 
 ```
 episodes/
@@ -26,7 +26,12 @@ Episodes.add({
     { "text": "His family forced him out and seized everything he owned", "odds": 2.22 }
   ],
   "correct": 0,                      // 0-based index into answers
-  "difficulty": 4                    // optional, 1–10 (default 1)
+  "difficulty": 4,                   // optional, 1–10 (default 1)
+  "clues": [                         // 8+ — what unlocks this episode, and the evidence for it
+    { "id": "c1", "text": "A city-centre lock-up in his name is still paid up, in cash." },
+    { "id": "c2", "text": "He turns down casual work that would need identification." }
+    // …six more
+  ]
 });
 ```
 
@@ -38,6 +43,8 @@ Episodes.add({
 | `answers[].text` | Option label. |
 | `answers[].odds` | Payout multiplier if that option is picked **and** it's right — a wager of 500 at ×2.4 returns 1,200. Longer odds should go on less likely answers. |
 | `correct` | Index of the true answer **as listed in this file**. Decides win/loss in manual play. The game reshuffles the answer order on every showing, so the correct answer doesn't sit in a predictable position — you don't need to vary it across files. |
+| `clues[].id` | Unique within this episode. `state.clues` stores these ids, so **do not renumber them** in a shipped episode — a player's evidence is a list of them. |
+| `clues[].text` | One short, concrete, in-world observation. It is printed verbatim on the wager screen under "Review the evidence", so write it to be *read*, not counted. |
 | `difficulty` | **Optional.** How hard the call is, `1`–`10` (10 = hardest). **Defaults to `1`** when absent. Values outside the range are clamped. Informational for now — nothing in the game reads it yet; available as `Episodes.difficultyOf(id)`. |
 
 The payload is plain JSON wrapped in one `Episodes.add(...)` call. That wrapper is what lets the
@@ -52,54 +59,97 @@ JSON-valid, so these can be converted to real `.json` files if the project ever 
    other episode scripts.
 3. Drop `episodes/013.mp4` alongside it when the video exists.
 
-Episodes are handed out in order as builders are completed, so the count that matters is how
-many episode files exist, not which builder finished. If `cfg.buildings` is raised above the
-number of files, later completions cycle back through the existing ones rather than failing.
+## Writing the clues
+
+`cfg.cluesPerEpisode` of them unlocks the episode — four of the eight each file authors. That
+slack is the point (GDD §6.1): two players arrive at the same prediction holding **different**
+evidence, which is why the clues are the wager screen's content and not a number in the HUD.
+
+So write eight that could each stand alone:
+
+- **Concrete and observed.** "There is a dictaphone in his coat, and the tapes are labelled by
+  surname" — not "he seems to be investigating something".
+- **Partial.** Each one narrows the answer without settling it. Any four together should make the
+  correct answer feel earned; no single one should give it away.
+- **True.** A clue that misleads is not a clue, it is a lie, and the player is betting money on
+  it. Ambiguity is fine; falsehood is not.
+- **Short.** One sentence. Eight of them are shown at once.
+
+`Clues.validate()` refuses an episode with fewer clues than the requirement, a duplicate id or a
+clue with no text, and prints the lot in the tuning drawer — an episode that can never unlock is
+invisible in play, because it looks exactly like a long run of bad luck.
+
+A **set** is `cfg.episodesPerBoard` consecutive episodes: set 1 is 001–005, set 2 is 006–010,
+and so on straight down `Episodes.ids()`. So adding files extends the run by a set every five,
+and running out of them is what ends it — `Collection.hasNextBoard()` is false, and the last set
+completed is the finale. Only board 1's cards are authored; later sets reuse its requirements
+over their own episodes until someone authors them.
+
+**`013.js`–`018.js` are written but not loaded.** They have no `<script>` tag in `index.html`, so
+the run is twelve episodes today. Adding the six tags extends it by a set and a bit; they carry
+their clues already.
 
 ## Watch now, or binge later
 
-Completing a builder unlocks an episode and pops **Watch now / Binge later**
+Filling a page unlocks its episode and pops **Watch now / Binge later**
 (`openEpisodeUnlock`, `js/ui/prediction.js`). Declining costs nothing: the id stays in
-`state.epQueue`, and the builders view grows a 🎬 button above the upgrade row, badged with how
-many are waiting, which drops straight into the prediction for the one at the front. That button
-is the only route back to a banked episode in the mobile layout, where the side panel's
-**Predict & watch** is not on screen.
+`state.epQueue`, and the 🎬 button in the play row is badged with how many are waiting and drops
+straight into the prediction for the earliest. That button is the only route back to a banked
+episode in the mobile layout, where the side panel's **Predict & watch** is not on screen.
 
-Two guards on that popup, both in `uiUpgrade` (`js/ui/main.js`):
+The popup arrives as an `{unlock}` event in the roll's event list, which means two things:
 
-- **Never during an auto mode.** A modal would stall the loop, which is the one thing the two
-  auto modes are built not to do.
-- **Never over the finale.** `seriesComplete()` owns the screen when a series ends; the episode
-  is still queued and still reachable from the 🎬 button.
+- **Never during an auto mode.** `showUnlocks()` logs and toasts, then returns without a modal
+  when `autoMode` is set — a modal would stall the loop, which is the one thing the two auto
+  modes are built not to do.
+- **It resolves on the DECISION, not on the episode.** Choosing "watch now" settles the promise
+  the roll loop is waiting on and *then* opens the prediction, so the loop is never held open for
+  the length of a video.
 
 The result screen offers **Next episode →** with a count while the queue is not empty, so a
 binge does not mean closing back to the board between every one.
 
 ## The library
 
-The 🎞 button on the board opens every episode unlocked so far (`js/ui/library.js`). It appears
-once there is something in it.
+The 🎬 button in the play row opens the library once nothing is waiting to be watched
+(`js/ui/library.js`); while something is, it drops into that instead.
 
-**The list is derived, not stored.** `Builders.unlockedEpisodeIds()` is the first N episodes,
-where N is how many builders have been completed (`unlockedCount()` — plus every builder of a
-series already behind you, since a series cannot be left until all of it is maxed).
+**The list is derived, not stored.** `Collection.unlockedEpisodeIds()` walks every album, oldest
+set first, and returns the episodes whose page is complete. Albums are kept per set forever, so a
+set finished twenty sets ago still reports its episodes — and a page can never un-complete, which
+is what makes deriving safe.
 
-**Episodes come off the FRONT of the story, not from the builder that paid for them.** Builders
-are bought in whatever order the player can afford; the drama is serialised. Completing builder
-3 before 1 and 2 still earns **episode 1**. So the unlocked set is always a prefix of the
-library — which is what makes the ordering rule below meaningful.
+**Pages can be completed out of order**, because which cards fall is luck — and that is exactly
+why unlocking and watching are two different gates. See below.
 
-**A first viewing always starts at the earliest unwatched episode.** Tapping episode 5 in the
-library when 4 is unwatched plays 4, with a toast saying so, and the row that will actually play
-is tagged `NEXT`. `Builders.firstUnwatchedId()` is the single answer both the library and the 🎬
-button use, so the two entry points cannot disagree. **Rewatching is unrestricted** — the
-constraint is only about seeing something for the first time.
+**Episodes are watched in story order, full stop.** Filling page 2 before page 1 unlocks episode
+2 — it is in the library and the album shows it collected — but it cannot be *watched* until
+episode 1 has been collected and watched. Episode 2's prediction question gives away episode 1,
+so a drama watched out of order spoils itself.
+
+`Collection.firstUnwatchedId()` is the single answer: the next episode of the story, and only
+once its page is complete. It returns **null** when the story is ahead of the collection, and
+`Collection.blockedBy()` names the episode holding things up so every surface can say so — the
+library tags the blocked row `🔒`, the album's page says which episode comes first, the case board
+in the middle of the play area shows `🔒 EP 2`, and the side panel's hint names it outright.
+
+`openPrediction()` enforces it in **one place**: whatever id a caller passes, what plays is
+`firstUnwatchedId()`, and nothing plays when that is null. So the library, the 🎬 button, the
+album's Watch button and the result screen's "next episode" cannot disagree about it.
+
+**Rewatching is unrestricted** — the constraint is only about seeing something for the first
+time.
+
+**A set is finished when its episodes have been WATCHED**, not when its last card lands
+(`Collection.boardFinished()`). Collecting is the means; the episodes are the point. So the
+celebration and the turn to the next set are owed to whichever episode turns out to be the last
+one seen, and they fire from the end of the prediction flow rather than from a box.
 
 `state.epQueue` is the only thing persisted here, and it holds what is still **unwatched**. It
 shrinks as episodes are watched, so it can never be the library: a run with four unlocked and
 three watched would show one. That is exactly the bug a stored `epUnlocked` list was added to
 fix — and deriving instead fixes it without the list, without a migration, and without a second
-counter that can drift from the builders it counts.
+counter that can drift from the albums it counts.
 
 A row does one of two things, because the two states are genuinely different:
 
