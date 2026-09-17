@@ -30,7 +30,7 @@ class Overlay extends BoardActor {
   /* ---- shared placement/query logic ----
      The occupied tiles are a MAP, not a Set: an overlay may need to remember something about
      each tile it sits on, and the mystery box does — it decides what is inside when it is
-     PLACED, so the board can show a gold box on a tile holding clues before the player gets
+     PLACED, so the board can mark a tile by what is waiting on it before the player gets
      there. Overlays that carry nothing just store null and behave exactly as before. */
   positions(){ return state[this.stateKey]; }
   has(i){ return this.positions().has(i); }

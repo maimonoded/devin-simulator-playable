@@ -207,10 +207,26 @@ const EconomyImport = {
     draft.version = version.trim();
     draft.filename = filename || null;
     draft.loadedAt = new Date().toISOString();
-    draft.deck = deckT.rows.map(r => ({
-      name: r.name, weight: r.weight, coins: r.coins, energy: r.energy, clues: r.clues,
-      vip: r.vip, ...(r.advance ? { advance: true } : {}),
-    }));
+    /* The workbook owns the six columns it prices and NOTHING else. A card can also carry
+       `items` (how many collectibles it grants) and `game` (which bonus mini-game it opens),
+       and neither is in the spreadsheet — so a rebuilt row is merged ONTO the shipped card of
+       the same name rather than replacing it.
+
+       Replacing it was a silent, unwinnable bug: importing any workbook stripped `items` from
+       the only card that grants them, and items are what episode 006 onward is priced in. The
+       run would take the import cleanly, then simply never finish. A model that prices a deck
+       must be able to reprice it without knowing what else a card does. */
+    const shipped = new Map(ECONOMY_DEFAULT.deck.map(c => [c.name, c]));
+    draft.deck = deckT.rows.map(r => {
+      const base = shipped.get(r.name) || {};
+      const card = {
+        ...base,
+        name: r.name, weight: r.weight, coins: r.coins, energy: r.energy, clues: r.clues,
+        vip: r.vip,
+      };
+      if (r.advance) card.advance = true; else delete card.advance;
+      return card;
+    });
     draft.box.item2 = boxT.rows.map(r => ({ name: r.name, kind: r.kind, weight: r.weight, amount: r.amount }));
 
     const anchors = {
@@ -248,8 +264,8 @@ const EconomyImport = {
     if (errors.length) return fail();
 
     /* Warnings: legitimate, but a designer would want to know. */
-    if (draft.structure.totalBuilders > Episodes.count())
-      warnings.push(`The model wants ${draft.structure.totalBuilders} builders but only ${Episodes.count()} episodes exist, so later series stay locked until more content ships.`);
+    if (draft.structure.totalBuilders > Catalog.episodeCount())
+      warnings.push(`The model wants ${draft.structure.totalBuilders} builders but only ${Catalog.episodeCount()} episodes exist, so later series stay locked until more content ships.`);
     if (draft.tiles.boardScale !== 1)
       warnings.push(`Board scale is ${draft.tiles.boardScale}. In this game it scales income AND builder cost together, so it redenominates the currency without changing pacing.`);
 

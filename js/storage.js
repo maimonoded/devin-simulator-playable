@@ -71,8 +71,18 @@ function loadConfig(){
     // projection is what a dropped key should fall back to
     cfg=Object.assign({},DEFAULTS,cfg,saved);
     if(sameModel){
-      if(Array.isArray(d.deck)&&d.deck.length) deck=d.deck;
-      if(Array.isArray(d.boxTable)&&d.boxTable.length) boxTable=d.boxTable;
+      /* The saved tables are filtered on the way back in, exactly as Economy.apply() filters the
+         model's. The economy version has NOT changed — clues were removed from the game, not
+         from the workbook — so a config saved before that change comes back carrying a clue row
+         in the box table and a dead `clues` field on every card. Without this, a returning
+         player's boxes would still draw a payout the game has no concept of. */
+      if(Array.isArray(d.deck)&&d.deck.length)
+        deck=d.deck.map(c=>{ const card=Object.assign({},c); delete card.clues; return card; });
+      if(Array.isArray(d.boxTable)&&d.boxTable.length){
+        const rows=d.boxTable.filter(r=>r.kind!=="clues");
+        // never filter down to nothing: weighted() on an empty table draws nothing at all
+        if(rows.length) boxTable=rows;
+      }
     }
     return true;
   }catch(e){ return false; }
@@ -82,18 +92,18 @@ function clearConfig(){ if(!storageOK) return; try{ localStorage.removeItem(LS_C
 /* ---------------- player slot ---------------- */
 /* Explicit field list: transient bits (animating, tween baselines) are never persisted. */
 function serializeState(){
-  return {v:1,
+  return {v:2,
     day:state.day, clock:state.clock, sessionsToday:state.sessionsToday,
-    energy:state.energy, coins:state.coins, clues:state.clues, cycleClues:state.cycleClues, vip:state.vip,
-    pos:state.pos, mult:state.mult, boardNum:state.boardNum, series:state.series,
+    energy:state.energy, coins:state.coins, vip:state.vip,
+    pos:state.pos, mult:state.mult, boardNum:state.boardNum,
     /* [tile, contents] pairs — the contents were decided when the box was placed, so they have
-       to survive a reload or a gold box would reopen as something else. */
-    builder:state.builder.map(b=>({tier:b.tier})), boxes:[...state.boxes], pendingBoxes:state.pendingBoxes,
-    epQueue:[...state.epQueue], epsWatched:state.epsWatched,
-    pendingReveal:state.pendingReveal?{...state.pendingReveal}:null,
-    boardsDone:state.boardsDone, predWins:state.predWins, predLoss:state.predLoss,
-    streak:state.streak, bestStreak:state.bestStreak, rolls:state.rolls, predsMade:state.predsMade,
-    seriesDone:state.seriesDone,
+       to survive a reload or a box would reopen as something else. */
+    boxes:[...state.boxes], pendingBoxes:state.pendingBoxes,
+    rolls:state.rolls,
+    /* The unlock ledger — see js/state.js. Everything else about an unlock is derived, so these
+       three fields are the entire save: what is owned, what has been paid, what has been seen. */
+    items:Object.assign({},state.items), paid:Object.assign({},state.paid),
+    watched:[...state.watched],
   };
 }
 function saveState(){
@@ -110,43 +120,43 @@ function loadState(){
     const d=JSON.parse(raw);
     if(typeof d!=="object"||d===null) return false;
     Object.keys(serializeState()).forEach(k=>{ if(k!=="v"&&d[k]!==undefined) state[k]=d[k]; });
-    /* The series index is restored before the builder array, because cfg.buildings depends on
-       it: a save from a longer content library must not leave the run pointing at a series
-       that no longer has episodes. */
-    const playable=Economy.playableSeries().length;
-    if(!(state.series>=0&&state.series<playable)) state.series=0;
-    Economy.apply();
-    state.builder=Array.isArray(d.builder)&&d.builder.length
-      ? d.builder.map(b=>({tier:Math.min(Math.max(0,b.tier|0),Builders.maxTier())}))
-      : Builders.fresh();
-    if(state.builder.length!==Builders.count()) Builders.reshape();
+    /* A v1 save carries builders, clues, an episode queue and a sealed prediction. None of
+       those exist any more, and the loop above only copies keys serializeState() still names,
+       so they are simply dropped — an old run comes back as its coins, day, position and
+       boxes. Nothing has to migrate. */
     /* Saves from before contents were decided at spawn stored bare tile indices. Accept both:
        a number becomes a box with nothing known about it, and onLand draws for it then — which
        is exactly what the old code did. */
     state.boxes=new Map((Array.isArray(d.boxes)?d.boxes:[])
       .map(e=>Array.isArray(e)?[e[0],e[1]]:[e,null])
       .filter(([i])=>Number.isInteger(i)&&i>=0&&i<40));
-    /* Boxes bought but never thrown survive a reload — they are paid for, so losing them would
-       be losing a reward. They land the next time the player leaves the builders view. */
+    /* Boxes earned but never thrown survive a reload — they are paid for, so losing them would
+       be losing a reward. They land on the next return to the board (deliverBoxes). */
     state.pendingBoxes=Math.max(0,Math.floor(+d.pendingBoxes||0));
-    // queue holds episode ids; drop anything unknown (e.g. saves from when it held titles)
-    const rawQueue=Array.isArray(d.epQueue)?d.epQueue:[];
-    state.epQueue=rawQueue.filter(x=>Episodes.has(x));
-    /* A sealed reveal is only worth restoring if its episode still exists and it still carries
-       a decided outcome — anything else would leave the player stuck being told to finish an
-       episode that cannot play. */
-    const pr=d.pendingReveal;
-    state.pendingReveal=(pr&&typeof pr==="object"&&Episodes.has(pr.id)&&typeof pr.won==="boolean")
-      ? {id:pr.id,wager:+pr.wager||0,odds:+pr.odds||1,won:!!pr.won,payout:+pr.payout||0}
-      : null;
-    /* Nothing to restore for the library: Builders.unlockedEpisodeIds() derives it from the
-       builder tiers just restored above. That is what makes an OLD save work — a run that had
-       four episodes unlocked and three of them watched still shows four, where a stored list
-       would have needed migrating and a fallback to the queue showed only the one unwatched. */
+    /* The unlock ledger is checked against the catalog on the way in, the way the episode queue
+       used to drop ids it did not recognise. Content is a set of hand-edited data files that can
+       change between two runs, and an item or a paid step whose id has gone is a number nothing
+       can ever spend, show or finish. A count is clamped to the price it belongs to as well — a
+       price that LOST a step must not leave a target paid past its own end. */
+    state.items={};
+    Object.keys(d.items||{}).forEach(id=>{
+      const n=Math.floor(+d.items[id]||0);
+      if(n>0&&Catalog.getItem(id)) state.items[id]=n;
+    });
+    state.paid={};
+    Object.keys(d.paid||{}).forEach(key=>{
+      const at=key.indexOf(":"); if(at<0) return;
+      const t=Catalog.target(key.slice(0,at),key.slice(at+1));
+      if(!t) return;
+      const n=Math.min(t.price.length,Math.floor(+d.paid[key]||0));
+      if(n>0) state.paid[key]=n;
+    });
+    state.watched=(Array.isArray(d.watched)?d.watched:[])
+      .filter((id,i,a)=>Catalog.getEpisode(id)&&a.indexOf(id)===i);
     // no cap clamp on restore — purchased energy may legitimately exceed cfg.energyCap
     state.animating=false;
     // tween baselines start where we left off, so the HUD doesn't count up from zero
-    state.lastCoins=state.coins; state.lastClues=state.clues; state.lastEnergy=state.energy;
+    state.lastCoins=state.coins; state.lastEnergy=state.energy;
     return true;
   }catch(e){ return false; }
 }

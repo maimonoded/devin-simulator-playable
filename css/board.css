@@ -24,7 +24,17 @@
    CSS box always match; letting CSS stretch it would give non-square pixels */
 .boardHost canvas{display:block}
 /* tile labels ride above the canvas in the DOM so text stays crisp at ~47px */
-.boardLabels{position:absolute;inset:0;pointer-events:none;z-index:2}
+/* CLIPPED, and that is load bearing. Labels are placed at each tile's projected screen point, so
+   with cfg.camFollow on, the ones for off-screen tiles land hundreds of px outside the frame.
+   Unclipped they count toward .stage's scrollable width — and a browser scrolling anything into
+   view (focusing a button in a sheet does it) then slides the whole board sideways, which looks
+   like the camera jumping. Clipping here keeps that overflow out of .stage's scroll extent. */
+.boardLabels{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden;
+  transition:opacity .18s ease}
+/* Down for the length of a card pull. The presented card is drawn INTO the canvas, so no
+   z-index on it could ever beat a DOM layer sitting above the canvas — the labels have to get
+   out of the way instead. Set by pullCardAnim() in js/ui/fx.js, which explains the choice. */
+body.carding .boardLabels{opacity:0}
 .blabel{position:absolute;transform:translate(-50%,-50%);text-align:center;line-height:1;
         font-size:15px;white-space:nowrap}
 .blabel .val{display:block;font-size:8px;color:var(--muted);margin-top:1px}
@@ -49,9 +59,16 @@ body.board3d .board{display:none}
 .tile.start{background:linear-gradient(180deg,#3a3016,#241d0d);border-color:var(--gold)}
 .tile.spa{border-color:var(--teal)}
 .tile.vip{border-color:var(--purple)}
-.tile.premiere{border-color:var(--pink)}
-.tile.train{background:linear-gradient(180deg,#2a2f66,#1d2350)}
+.tile.reshoot{border-color:var(--pink)}
 .tile.deck{background:linear-gradient(180deg,#2b2560,#1e1a48)}
+/* The two bills — the only tiles that take, so the only warm ones on a blue ring. Overheads is
+   the deeper red because it is the larger bill; they are never seen side by side (20 tiles
+   apart), so the icon does the telling-apart and the colour only has to say "this one costs".
+   js/ui/board3d.js carries the same two hexes, which is how the two renderers stay alike. */
+.tile.payroll{background:linear-gradient(180deg,#3a1f2a,#251419);border-color:#c04a63}
+.tile.overheads{background:linear-gradient(180deg,#4a1f28,#2b1216);border-color:var(--bad)}
+/* Their printed value is a price, not a payout: read it as one. */
+.tile.payroll .val,.tile.overheads .val{color:var(--bad)}
 .tile.lit{background:var(--gold);box-shadow:0 0 18px rgba(255,203,92,.8),inset 0 -3px 0 rgba(0,0,0,.2)}
 
 /* Artwork (assets/tiles/N.png). MUST come after the .tile.<type> rules above: those use the
@@ -77,10 +94,9 @@ body.board3d .board{display:none}
 /* overlay markers (mystery boxes) — .ovl is the shared hook, .box the per-overlay style */
 .ovl{position:absolute;top:1px;left:2px;font-size:12px;
      transform:rotate(-45deg) rotateX(-52deg)}
+/* One look for every box. There used to be a second, gold one for a box holding clues; with
+   clues gone a box holds coins or energy and there is nothing left to tell apart. */
 .box{animation:boxpulse 1.2s infinite ease-in-out;filter:drop-shadow(0 0 5px var(--gold))}
-/* The clue box, on the legacy CSS board. The 3D board swaps in a gold model instead; here the
-   emoji is all there is, so it gets a brighter, wider halo to read as the rarer one. */
-.box.gold{filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px var(--gold))}
 @keyframes boxpulse{0%,100%{opacity:.75;transform:rotate(-45deg) rotateX(-52deg) scale(1)}
                     50%{opacity:1;transform:rotate(-45deg) rotateX(-52deg) scale(1.18)}}
 
@@ -119,130 +135,12 @@ body.board3d .board{display:none}
    font size, so only the horizontal padding varies. */
 .playbar .btn{min-height:52px;padding-top:0;padding-bottom:0;line-height:1;border-radius:14px}
 .playbar .btn.roll{padding-left:26px;padding-right:26px}
-.playbar .btn.mult,
-.playbar .btn.album,
-.playbar .btn.navb{padding-left:15px;padding-right:15px;min-width:54px;justify-content:center}
-/* Builders. It used to be absolutely positioned in the corner, where it collided with the
-   centred group on a narrow screen — it belongs in the row with everything else. */
-.btn.navb{background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
-          font-size:20px;position:relative}
+.playbar .btn.mult{padding-left:15px;padding-right:15px;min-width:54px;justify-content:center}
 /* The board art runs right under the buttons, so a soft scrim guarantees they stay legible
    over whatever tile happens to be down there. */
 .playbar::before{content:"";position:absolute;left:0;right:0;bottom:-14px;height:110px;z-index:-1;
                  background:linear-gradient(180deg,transparent,rgba(9,13,38,.6));pointer-events:none}
 
-/* ---------- builders view ----------
-   Two overlays share the one 3D surface: .boardScene.showBuilders swaps which is on screen,
-   while Board3D.setView() swaps which scene the renderer draws. Keeping the switch in one
-   class means the DOM and the scene can never disagree about which view is up. */
-/* Only the builders view's Back button uses this now — the builders button moved into the
-   play row. */
-.navBtn{position:absolute;left:14px;bottom:14px;z-index:35;width:52px;height:52px;border-radius:16px;
-        background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;font-size:22px;
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 5px 0 rgba(0,0,0,.28);transition:transform .08s}
-.navBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-/* Back sits TOP-left, not bottom-left where the 🏗 button was: the upgrade row owns the whole
-   bottom edge, and five buttons plus a back button do not fit one phone line. */
-.navBtn.back{background:var(--panel2);border:1px solid var(--line);font-size:24px;
-             top:14px;left:14px;bottom:auto}
-/* The board shows nothing about builders now, so this dot is the only nudge that there is
-   something affordable waiting. */
-.navDot{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;
-        background:var(--gold);border:2px solid #10142f;display:none}
-.navDot.on{display:block}
-
-.buildersUi{position:absolute;inset:0;z-index:35;display:none;pointer-events:none}
-.buildersUi>*{pointer-events:auto}
-.boardScene.showBuilders .buildersUi{display:block}
-/* While the builders view is up the board's own layer is not just hidden but inert — a stray
-   tap must not roll the dice behind a screen the player thinks they are on. */
-.boardScene.showBuilders .playbar,
-.boardScene.showBuilders .boardLabels,
-.boardScene.showBuilders #buildersBtn{display:none}
-
-/* Mystery boxes waiting to be thrown onto the board. Top-right of the builders view, clear of
-   the centred header. It is the only feedback a purchase gets while the board is out of sight,
-   so the whole chip pops when the count changes — and the box itself gets a shake, because a
-   number ticking up is easy to miss when you are looking at the price you just paid. */
-/* Directly under the Store button, which already owns the very top of this corner in both
-   layouts (and in ?view=mobile the HUD owns the strip above that). Stacking beneath it keeps the
-   chip in the corner the player is told to look at without either one moving. */
-.boxCounter{position:absolute;right:16px;top:58px;display:none;align-items:center;gap:6px;
-            background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;
-            border-radius:999px;padding:6px 12px;font-size:14px;font-weight:800;
-            box-shadow:0 4px 14px rgba(139,109,255,.35);pointer-events:none}
-.boxCounter.on{display:flex}
-.boxCounter .boxIco{font-size:16px;line-height:1}
-.boxCounter.bump{animation:boxBump .5s cubic-bezier(.2,1.4,.4,1)}
-.boxCounter.bump .boxIco{animation:boxShake .5s ease}
-@keyframes boxBump{0%{transform:scale(1)}35%{transform:scale(1.22)}100%{transform:scale(1)}}
-@keyframes boxShake{0%,100%{transform:rotate(0) translateY(0)}
-                    25%{transform:rotate(-14deg) translateY(-3px)}
-                    60%{transform:rotate(12deg) translateY(-1px)}}
-
-.buildersHead{position:absolute;left:0;right:0;top:14px;text-align:center;line-height:1.35;
-              text-shadow:0 2px 6px rgba(0,0,0,.75);pointer-events:none}
-.buildersHead b{display:block;font-size:15px}
-.buildersHead span{font-size:11px;color:var(--muted)}
-
-/* One row, one line, always. Each button takes an equal share of the width and is allowed to
-   shrink (min-width:0), so the row holds whether the page has five buildings or two — and the
-   prices inside are compacted by fmtShort so the text never decides the layout. */
-.buildersBar{position:absolute;left:10px;right:10px;bottom:14px;
-             display:flex;gap:6px;align-items:stretch}
-.upb{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;
-     background:linear-gradient(180deg,var(--purple),var(--purple-d));color:#fff;border-radius:11px;
-     padding:8px 4px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.28);transition:transform .08s}
-.upb:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-.upb .upbName{font-size:9px;opacity:.85;text-transform:uppercase;letter-spacing:.03em;
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.upb .upbCost{font-size:13px;white-space:nowrap}
-/* Can't afford it: still readable, obviously inert. */
-.upb.cant{background:var(--panel2);color:var(--muted);box-shadow:none;border:1px solid var(--line)}
-.upb.max{background:transparent;border:1px solid var(--line);color:var(--gold);box-shadow:none}
-
-/* Banked episodes, sitting just above the upgrade row. The upgrade row is bottom:14 and about
-   50px tall, so this clears it; both track the same safe-area inset so they stay stacked on a
-   notched phone. var(--safeB, 0px) is 0 outside ?view=mobile, where the inset is not defined. */
-.bingeBtn{position:absolute;right:10px;bottom:calc(74px + var(--safeB, 0px));
-          display:none;align-items:center;gap:6px;
-          background:linear-gradient(180deg,var(--pink),#d8477d);color:#fff;
-          border-radius:999px;padding:8px 14px;font-size:15px;font-weight:800;
-          box-shadow:0 4px 14px rgba(255,111,165,.35)}
-.bingeBtn:active{transform:translateY(2px)}
-.bingeCount{background:rgba(0,0,0,.28);border-radius:999px;font-size:12px;padding:1px 7px}
-
-/* Library, stacked above the builders button on the board's left edge. Deliberately NOT a
-   .navBtn: css/mobile.css re-anchors every .navBtn:not(.back) to the bottom inset, and that
-   selector out-specifies anything a modifier class here could say. */
-/* Library sits TOP-left, opposite the Store button — the bottom edge is the play row's now. */
-.libBtn{position:absolute;left:14px;top:14px;z-index:35;
-        width:52px;height:52px;border-radius:16px;
-        background:var(--panel2);border:1px solid var(--line);color:#fff;font-size:22px;
-        display:none;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.28)}
-.libBtn.on{display:flex}
-.libBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-/* it belongs to the board's layer, so it goes with the rest of it */
-.boardScene.showBuilders .libBtn{display:none}
-
-/* the library list */
-.libList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;padding-right:4px}
-.libList::-webkit-scrollbar{width:6px}.libList::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
-.libRow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
-        background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
-.libRow:active{transform:translateY(1px)}
-.libRow .libNo{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
-.libRow .libTitle{flex:1;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.libRow .libTag{font-size:10px;color:var(--muted);flex-shrink:0}
-.libRow.new{border-color:var(--pink)}
-.libRow.new .libTag{color:var(--pink);font-weight:800}
-/* The one that will actually play — tapping any unwatched row starts this one. */
-.libRow.next{border-color:var(--gold);background:#2b2b52}
-.libRow.next .libTag{color:var(--gold)}
-/* Bet placed, not yet watched to the end — its result is still owed. */
-.libRow.sealed{border-color:var(--teal);background:#16303a}
-.libRow.sealed .libTag{color:var(--teal);font-weight:800}
 
 /* dice
    The 3D board throws real dice onto the middle of the board, so the DOM pair would be a
@@ -264,15 +162,108 @@ body.dice2d .dice{display:flex}
                  50%{transform:translateY(2px) rotate(10deg)}75%{transform:translateY(-3px) rotate(-6deg)}}
 .pip{border-radius:50%;background:#1b1b2b;width:7px;height:7px;align-self:center;justify-self:center}
 .pip.off{background:transparent}
+/* The Reshoot corner throws the same pair in its own pink. The colour is the mechanic made
+   visible: those throws cost no energy, and a player has to be able to tell them from the roll
+   their stake paid for without being told. Only the 2D fallback is styled here — the 3D pair is
+   tinted from COLORS.dice in js/ui/board3d.js, and the two share the hex deliberately.
+   js/ui/fx.js setDice() sets and clears the class on every write, so the normal pair is white
+   again the moment anything else is rolled. */
+.die.reshoot{background:var(--pink)}
+.die.reshoot .pip{background:#3d0f24}
+/* ...but not the ones that are off. `.die.reshoot .pip` is (0,3,0) and `.pip.off` is (0,2,0),
+   so without this the darker pip colour wins on every pip and a pink die shows all nine. */
+.die.reshoot .pip.off{background:transparent}
 
-/* Clue album, to the right of Roll. Sized like the stake button so the row reads as
-   [stake] [ROLL] [album] with Roll the obvious primary. The dot marks clues banked for the
-   next prediction — the ones about to be spent. */
-.btn.album{background:var(--panel2);border:1px solid var(--line);color:#fff;
-           padding:12px 14px;font-size:17px;min-width:52px;justify-content:center;position:relative}
-.albumDot{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;
-          background:var(--teal);border:2px solid #10142f;display:none}
-.albumDot.on{display:block}
+/* ---------- Reshoot mode (js/ui/fx.js showReshoot) ----------
+   Landing on the jail corner takes the board over: the normal controls go away, a clapperboard
+   announces the delay, and a pink button the player clicks once per throw stands where the
+   playbar was.
+
+   THE PLAYBAR IS HIDDEN BY A CLASS ON <body>, not by setting display on its three buttons.
+   renderAll() re-renders their disabled state constantly and can land anywhere inside the beat;
+   a class it knows nothing about is the one thing it cannot fight, and one line puts all three
+   back — a hidden playbar that never returns is as bad a bug as a promise that never settles.
+   Hiding the STAKE is the point of doing it at all: these throws are free and the multiplier
+   does not scale them, so a stake button still sitting there would be a lie. */
+/* The CONTROLS go, not the bar. The 2D dice pair (#die1/#die2) is a child of .playbar, and on
+   the fallback path — cfg.dice3d off, or die.glb failed — it is the only thing that draws the
+   coloured throws at all; hiding the whole bar made a Reshoot attempt show no dice whatsoever.
+   Roll survives while auto-roll owns the loop, because Roll is that loop's only stop control. */
+body.reshooting .playbar .btn{display:none}
+body.reshooting.reshootAuto .playbar .btn.roll{display:inline-flex}
+
+/* z-index 36 is deliberate: above the playbar it replaces (35) and the tile labels (2), below
+   the floats (40) and the centre reveal (45) — the outcome reveal lands while this is still up
+   and has to be on top of it. pointer-events only on the button, so the rest of the board can
+   still be dragged to pan, exactly as .playbar does it. */
+.reshootUI{position:absolute;inset:0;z-index:36;display:none;pointer-events:none}
+.reshootUI.show{display:block}
+.reshootUI button{pointer-events:auto}
+
+/* 1 · THE DELAY BEAT. Held for cfg.reshootDelayMs before a single die is thrown. The top bar
+   swings shut like a real clapper — the snap IS the announcement, so it is the one piece of
+   motion here that is allowed to overshoot. */
+.rsSlate{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+         width:min(232px,70%);text-align:center}
+.rsSlate.out{animation:rsSlateOut .34s ease forwards}
+.rsClap{filter:drop-shadow(0 14px 30px rgba(0,0,0,.6))}
+.rsClapTop{height:26px;border-radius:6px 6px 0 0;transform-origin:8% 100%;
+  background:repeating-linear-gradient(108deg,#f4f4ff 0 15px,#20143a 15px 30px);
+  animation:rsSnap .52s cubic-bezier(.3,1.7,.5,1) both}
+.rsClapBody{border:1px solid var(--pink);border-top:0;border-radius:0 0 10px 10px;
+  background:linear-gradient(180deg,#2c1d55,#170f33);padding:13px 12px 15px;
+  animation:rsSlateIn .3s ease both}
+.rsCut{font-family:Georgia,serif;font-weight:800;font-size:30px;line-height:1;
+       color:var(--pink);letter-spacing:.06em;text-shadow:0 3px 12px rgba(0,0,0,.7)}
+.rsWhy{margin-top:6px;font-size:11px;color:var(--text);opacity:.85}
+/* A chip rather than bare text: this line lands on the open middle of the board, which can be
+   any colour the environment's ground happens to be — pale sand in the shipped world — and a
+   text-shadow is not enough to carry small type over it. */
+.rsScene{display:inline-block;margin-top:10px;padding:4px 11px;border-radius:999px;
+         background:rgba(9,13,38,.76);font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+         color:#cdd3f5}
+@keyframes rsSnap{0%{transform:rotate(-38deg)}58%{transform:rotate(4deg)}100%{transform:rotate(0)}}
+@keyframes rsSlateIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes rsSlateOut{to{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
+
+/* 2 · THE THROW BAR, standing exactly where the playbar was — same bottom offset, so the two
+   occupy one place and the swap reads as the same control changing mode rather than a second
+   row appearing. It starts invisible and .in brings it on when the slate leaves, so the
+   announcement and the button are never on screen together. */
+/* Edge to edge like .playbar, and the CONTENT is what is capped at a readable width. The
+   obvious alternative — a 420px bar centred with translateX — gives the scrim below sharp
+   vertical edges, which paints a visible box over the board instead of a fade. */
+.rsBar{position:absolute;left:0;right:0;bottom:14px;opacity:0;text-align:center;
+       display:flex;flex-direction:column;align-items:center;gap:7px}
+.rsBar>*{max-width:min(420px,86%)}
+.rsBar.in{animation:rsBarIn .3s ease both}
+@keyframes rsBarIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+/* The same scrim .playbar carries, for the same reason: board art runs right under this, and
+   this bar has two lines of prose to keep legible over whatever tile happens to be down there. */
+.rsBar::before{content:"";position:absolute;left:0;right:0;top:-20px;bottom:-14px;
+               z-index:-1;pointer-events:none;
+               background:linear-gradient(180deg,transparent,rgba(9,13,38,.82) 45%)}
+.rsTag{font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:800;
+       color:var(--pink);text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.rsHint{font-size:11px;line-height:1.35;color:var(--text);opacity:.92;
+        text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.rsHint b{color:var(--gold)}
+/* The dice this throws are pink — .die.reshoot above, and COLORS.dice.reshoot in
+   js/ui/board3d.js for the 3D pair — so the button is too. The control and what it puts on the
+   board are one thing, and neither can be mistaken for the gold Roll the turn's energy paid
+   for. .btn.pink (css/panels.css) already owns the fill; this is only the sizing that matches
+   the Roll button it stands in for, plus a pulse so the board never looks like it is waiting
+   for nothing. The pulse is on filter rather than box-shadow or transform, so it cannot fight
+   .btn:active's press. */
+.btn.rsThrow{min-height:52px;padding:0 26px;font-size:16px;border-radius:14px;line-height:1;
+             box-shadow:0 5px 0 #a5325c,0 12px 26px rgba(255,111,165,.34)}
+.btn.rsThrow:not(:disabled){animation:rsPulse 1.6s ease-in-out infinite}
+@keyframes rsPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.15)}}
+/* Hidden rather than absent while a throw is in flight, so the bar does not change height
+   under the player's finger between throws. */
+.rsCd{font-size:10px;color:var(--muted);visibility:hidden;text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.rsCd.live{visibility:visible}
+.rsCd b{color:var(--pink)}
 
 /* Roll stake — one small button that cycles through MULTIPLIERS and wraps. It replaced a row
    of five, which the 9:16 framing had no room for. Always shows the ACTIVE stake, so it is
@@ -282,8 +273,9 @@ body.dice2d .dice{display:flex}
 /* locked mid-spin / during auto — keep the stake legible rather than greying it out */
 .btn.mult:disabled{opacity:.75;cursor:not-allowed}
 
-/* The row under the board — the balancing tool and the view toggle. These are dev/debug
-   controls, deliberately NOT on the board with the play controls. */
+/* The row under the board — the view toggle, and whatever dev control joins it next. It held
+   the auto-play session button too, until that mode went with the builders it bought. These are
+   dev/debug controls, deliberately NOT on the board with the play controls. */
 .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
 .controls.viewrow{margin-top:14px}
 .controls.viewrow .btn.on{background:var(--purple);color:#fff}

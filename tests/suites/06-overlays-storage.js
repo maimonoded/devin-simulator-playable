@@ -32,7 +32,7 @@ test("spawn never exceeds the number of free tiles", () => {
   freshRun();
   const box = OVERLAY_TYPES.mysteryBox;
   const got = box.spawn(999);
-  eq(got.length, 26, "there are only 26 standard tiles");
+  eq(got.length, 30, "there are only 30 standard tiles — the two bills are not eligible either");
   eq(box.spawn(1).length, 0, "nothing free left");
 });
 
@@ -69,31 +69,32 @@ test("contents are decided when the box is PLACED, not when it is landed on", ()
   box.all().forEach(i => {
     const d = box.dataAt(i);
     ok(d, `tile ${i} must know what it holds the moment it is placed`);
-    ok(["coins", "energy", "clues"].includes(d.kind), d.kind);
+    ok(["coins", "energy"].includes(d.kind), d.kind);
     ok(d.amount > 0);
-  });
-});
-
-test("a box is gold if and only if it holds clues", () => {
-  freshRun();
-  const box = OVERLAY_TYPES.mysteryBox;
-  box.spawn(26);
-  box.all().forEach(i => {
-    eq(box.isGold(i), box.dataAt(i).kind === "clues", `tile ${i}`);
-    eq(box.classAt(i).includes("gold"), box.dataAt(i).kind === "clues", `tile ${i} marker class`);
   });
 });
 
 test("what a box shows is what it pays — the stored draw is honoured, not re-rolled", () => {
   freshRun();
   const box = OVERLAY_TYPES.mysteryBox;
-  state.clues = 0; state.cycleClues = 0;
-  box.positions().set(9, { kind: "clues", amount: 2, name: "Clues" });
-  ok(box.isGold(9), "shown as a clue box");
-  // force the TABLE to coins: a re-roll at landing would pay coins and betray the gold box
+  state.energy = 0;
+  box.positions().set(9, { kind: "energy", amount: 2, name: "Energy" });
+  // force the TABLE to coins: a re-roll at landing would pay coins instead of what was stored
   const [open] = forceDrop("coins", () => box.consume(9));
-  ok(open.boxOpen.clue, "a gold box must open as clues whatever the table now says");
-  eq(state.clues, 2);
+  eq(open.boxOpen.energy, 2, "the box opens as what it was placed holding, not what the table now says");
+  eq(state.energy, 2);
+});
+
+/* A save made while the box table still had a clues row can still be sitting in a browser.
+   Its boxes must open as SOMETHING rather than silently paying nothing. */
+test("a box holding a kind that no longer exists falls back to coins", () => {
+  freshRun();
+  const box = OVERLAY_TYPES.mysteryBox;
+  state.coins = 0;
+  box.positions().set(9, { kind: "clues", amount: 2, name: "Clues" });
+  const ev = box.consume(9);
+  ok(state.coins > 0, "it pays coins rather than nothing at all");
+  ok(ev[0].boxOpen, "and still opens normally");
 });
 
 test("a box saved before contents were decided still opens", () => {
@@ -107,7 +108,7 @@ test("a box saved before contents were decided still opens", () => {
 
 test("item 1 is always coins, whatever item 2 turns out to be", () => {
   freshRun();
-  ["coins", "energy", "clues"].forEach(kind => {
+  ["coins", "energy"].forEach(kind => {
     state.coins = 0;
     forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand());
     ok(state.coins >= cfg.boxCoins * cfg.boardScale, `guaranteed coins still paid on a ${kind} draw`);
@@ -140,46 +141,6 @@ test("an energy drop rains energy as well as the guaranteed coins", () => {
   ok(open.boxOpen.energy > 0, "energy drops get their own shower");
   // item 1 is always coins, so a coin shower fires on every box whatever item 2 was
   ok(open.boxOpen.coins > 0, "the guaranteed coins still rain");
-});
-
-test("a clue drop feeds both the album total and the per-prediction flow", () => {
-  freshRun();
-  state.clues = 0; state.cycleClues = 0;
-  forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand());
-  ok(state.clues > 0, "the album counts it");
-  eq(state.cycleClues, state.clues, "and so does the flow that buys accuracy");
-});
-
-test("a clue drop carries a blocking popup naming the slots it just filled", () => {
-  freshRun();
-  state.clues = 0;
-  // the popup rides on the OPENING, not the payout: it is timed from the start of the pop
-  // (cfg.boxCluePopupMs) so it can slide in while the confetti is still falling
-  const [open] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand(3));
-  const clue = open.boxOpen.clue;
-  ok(clue, "clues get a popup, not just a float — they are the only collectible");
-  eq(clue.count, state.clues);
-  eq(clue.names.length, state.clues, "one name per clue found");
-  // slots fill in order, so the ones named are the ones the album now shows as owned
-  clue.names.forEach((n, k) => eq(n, Clues.nameOf(k)));
-  ok(clue.names.every(n => n && n.length), "never a blank name");
-});
-
-test("a clue drop past the end of the album still reports honestly", () => {
-  freshRun();
-  state.clues = cfg.clueAlbumSize;          // album already full
-  const [open] = forceDrop("clues", () => OVERLAY_TYPES.mysteryBox.onLand(3));
-  ok(open.boxOpen.clue, "still a popup");
-  ok(open.boxOpen.clue.count > 0);
-  deepEq(open.boxOpen.clue.names, [], "no slots left to name, and no fabricated ones");
-});
-
-test("coin and energy drops carry no clue popup", () => {
-  freshRun();
-  ["coins", "energy"].forEach(kind => {
-    const [open] = forceDrop(kind, () => OVERLAY_TYPES.mysteryBox.onLand(3));
-    ok(!open.boxOpen.clue, `${kind} must not open the clue popup`);
-  });
 });
 
 test("an energy drop cannot reduce an over-cap balance", () => {
@@ -235,33 +196,29 @@ test("serializeState captures progress and omits transient fields", () => {
   eq("animating" in s, false, "animating must not be persisted");
   eq("lastCoins" in s, false, "tween baselines must not be persisted");
   ok(Array.isArray(s.boxes), "sets are serialised as arrays");
-  ok(Array.isArray(s.builder));
 });
 
 test("save then load restores a run", () => {
   freshRun();
-  state.coins = 4321; state.clues = 6; state.vip = 99; state.day = 4;
+  state.coins = 4321; state.vip = 99; state.day = 4;
   state.energy = 17; state.pos = 23; state.mult = 5; state.rolls = 12;
-  state.builder[2].tier = 3;
   OVERLAY_TYPES.mysteryBox.clear();
-  OVERLAY_TYPES.mysteryBox.positions().set(9, { kind: "clues", amount: 2, name: "Clues" });
+  OVERLAY_TYPES.mysteryBox.positions().set(9, { kind: "energy", amount: 2, name: "Energy" });
   saveState();
 
   freshRun();                                   // wipe in-memory state
   eq(state.coins, 0);
   ok(loadState(), "loadState should report success");
   eq(state.coins, 4321);
-  eq(state.clues, 6);
   eq(state.vip, 99);
   eq(state.day, 4);
   eq(state.pos, 23);
   eq(state.mult, 5);
   eq(state.rolls, 12);
-  eq(Builders.tier(2), 3);
   ok(state.boxes instanceof Map, "boxes come back as a Map — the contents ride with the tile");
   ok(state.boxes.has(9));
-  // the draw happened when the box was PLACED, so a gold box must reopen as a gold box
-  eq(state.boxes.get(9).kind, "clues", "what was inside survives the round trip");
+  // the draw happened when the box was PLACED, so it must reopen as what it was placed holding
+  eq(state.boxes.get(9).kind, "energy", "what was inside survives the round trip");
   eq(state.animating, false, "always restored idle");
   eq(state.lastCoins, state.coins, "tween baseline starts where we left off");
 });
@@ -295,47 +252,34 @@ test("restore keeps energy bought above the cap", () => {
   eq(state.energy, 900, "no cap clamp on restore");
 });
 
-test("loadState drops queue entries that aren't known episode ids", () => {
+/* A v1 save — written before builders, clues and predictions were removed — is still sitting
+   in browsers. serializeState() no longer names those fields and loadState() only copies keys
+   it names, so they are dropped rather than migrated. What the player keeps is the run: coins,
+   day, clock, position, energy and their boxes. */
+test("a v1 save loads, keeping the run and silently dropping the removed systems", () => {
   freshRun();
-  state.epQueue = ["001"];
+  state.coins = 5000; state.day = 6; state.pos = 17; state.rolls = 40;
   saveState();
-  // hand-edit the saved slot into the legacy format, which stored titles
   const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
-  raw.epQueue = ["The Inheritance", "Rumors at Dawn", "002"];
+  Object.assign(raw, {
+    v: 1,
+    clues: 12, cycleClues: 3, series: 1, seriesDone: false,
+    builder: [{ tier: 5 }, { tier: 2 }],
+    epQueue: ["001", "002"], epsWatched: 4,
+    pendingReveal: { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 },
+    predWins: 3, predLoss: 1, streak: 2, bestStreak: 5, predsMade: 4,
+  });
   localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
 
   freshRun();
-  loadState();
-  deepEq(state.epQueue, ["002"], "unknown titles dropped, real ids kept");
-});
-
-/* The library is no longer persisted at all — it is derived from the completed builders
-   (Builders.unlockedEpisodeIds), so there is nothing here to round-trip. The test that a
-   reload still shows every unlocked episode lives with the derivation, in 03-builders. */
-
-test("a sealed reveal survives a reload — closing the tab cannot duck the bet", () => {
-  freshRun();
-  state.pendingReveal = { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 };
-  saveState();
-  freshRun();
-  eq(state.pendingReveal, null, "gone in memory");
-  loadState();
-  deepEq(state.pendingReveal, { id: "001", wager: 500, odds: 2.4, won: false, payout: 0 },
-         "restored, so the losing bet is still owed a reveal");
-});
-
-test("a sealed reveal for a missing or malformed episode is dropped", () => {
-  freshRun();
-  saveState();
-  const raw = JSON.parse(localStorage.getItem("pmdrama.state.v1"));
-  [{ id: "999", wager: 10, odds: 2, won: true, payout: 20 },   // no such episode
-   { id: "001", wager: 10, odds: 2 },                          // no decided outcome
-   "nonsense", 7].forEach(bad => {
-    raw.pendingReveal = bad;
-    localStorage.setItem("pmdrama.state.v1", JSON.stringify(raw));
-    freshRun(); loadState();
-    eq(state.pendingReveal, null, `must not restore ${JSON.stringify(bad)}`);
-  });
+  ok(loadState(), "an old save must still load, not be refused");
+  eq(state.coins, 5000, "the run survives");
+  eq(state.day, 6);
+  eq(state.pos, 17);
+  eq(state.rolls, 40);
+  ["clues", "cycleClues", "series", "seriesDone", "builder", "epQueue", "epsWatched",
+   "pendingReveal", "predWins", "predLoss", "streak", "bestStreak", "predsMade"]
+    .forEach(k => eq(k in state, false, `${k} must not be resurrected onto state`));
 });
 
 test("loadState reports false when there is nothing saved", () => {
@@ -366,6 +310,29 @@ test("config round-trips, and saved values merge onto DEFAULTS", () => {
   eq(cfg.stdBase, 99, "saved value restored");
   eq(cfg.tokenStepMs, 42);
   eq(cfg.revealMs, DEFAULTS.revealMs, "a key missing from the save falls back to its default");
+  clearConfig();
+  resetCfg();
+});
+
+/* Clues were removed from the GAME, not from the workbook, so the economy version did not
+   change and a config saved before the removal is still treated as current. Its deck and box
+   table therefore come back verbatim unless loadConfig filters them. */
+test("a config saved before clues were removed comes back without them", () => {
+  resetCfg();
+  saveConfig();
+  const raw = JSON.parse(localStorage.getItem("pmdrama.cfg.v1"));
+  raw.deck = [{ name: "Small coins", weight: 40, coins: 30, energy: 0, clues: 0, vip: 0 }];
+  raw.boxTable = [{ name: "Coins", kind: "coins", weight: 33, amount: 60 },
+                  { name: "Energy", kind: "energy", weight: 33, amount: 3 },
+                  { name: "Clues", kind: "clues", weight: 33, amount: 2 }];
+  localStorage.setItem("pmdrama.cfg.v1", JSON.stringify(raw));
+
+  resetCfg();
+  ok(loadConfig());
+  eq(boxTable.filter(r => r.kind === "clues").length, 0, "the clue row is dropped");
+  eq(boxTable.length, 2, "and the other two survive");
+  eq(deck.filter(c => "clues" in c).length, 0, "the dead field is stripped off every card");
+  eq(deck[0].coins, 30, "everything else about the saved card is kept");
   clearConfig();
   resetCfg();
 });

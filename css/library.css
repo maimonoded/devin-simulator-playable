@@ -1,0 +1,214 @@
+/* ---------- the library ----------
+   A streaming shelf, full-bleed inside the board window. The host (.sheet) normally centres a
+   narrow modal; .libMode turns that off so this can fill it, which is what makes ?view=mobile
+   show the library as the whole phone screen rather than a card floating on a board.
+   Palette and radii come from css/base.css — nothing here invents a colour. */
+
+.sheet.libMode{align-items:stretch;justify-content:stretch;padding:0}
+.sheet.libMode .libScreen{width:100%;height:100%}
+
+.libScreen{display:flex;flex-direction:column;background:var(--bg);overflow:hidden;
+  border-radius:inherit}
+
+/* --- top bar: stays put while the shelf scrolls under it --- */
+.libTop{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:linear-gradient(180deg,var(--bg) 70%,transparent);z-index:3}
+.libTopTitle{font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:12px;
+  color:var(--muted)}
+.libX{margin-left:auto;order:3;background:rgba(255,255,255,.08);color:var(--text);border:0;
+  width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1}
+.libX:hover{background:rgba(255,255,255,.16)}
+
+/* The bag sits in the bar because it is a balance, like coins and energy on the HUD. */
+.libBag{order:2;display:flex;gap:6px;flex-wrap:wrap}
+.libItem{display:inline-flex;align-items:center;gap:3px;font-size:13px;line-height:1;
+  padding:4px 7px;border-radius:999px;background:var(--panel);border:1px solid var(--line)}
+.libItem b{font-size:11px;color:var(--gold)}
+.libItem.none{opacity:.4}
+.libItem.none b{color:var(--muted)}
+
+.libScroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.libEmpty{padding:40px 16px;text-align:center;color:var(--muted)}
+
+/* --- billboard --- */
+.libHero{position:relative;isolation:isolate;min-height:38vh;display:flex;align-items:flex-end;
+  margin-bottom:6px}
+.libHeroArt{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.libHeroArt.missing{display:none}
+/* The scrim is what keeps the type legible whatever the art does underneath it. */
+.libHeroShade{position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,rgba(13,16,41,.25) 0%,rgba(13,16,41,.75) 55%,var(--bg) 100%)}
+.libHeroIn{padding:16px 16px 14px;width:100%}
+.libKicker{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);
+  font-weight:700}
+.libHeroTitle{margin:4px 0 6px;font-size:26px;line-height:1.1;letter-spacing:-.01em}
+.libHeroBlurb{margin:0;color:var(--text);opacity:.82;font-size:12.5px;line-height:1.45;
+  max-width:52ch;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+/* --- the one payable thing --- */
+.libCta{margin-top:12px;padding:10px 12px;border-radius:var(--r);
+  background:rgba(27,32,80,.72);border:1px solid var(--line);backdrop-filter:blur(6px);
+  cursor:pointer;max-width:520px}
+.libCta:hover{border-color:var(--gold-d)}
+.libCtaHead{font-size:12px;color:var(--muted);margin-bottom:8px}
+.libCtaHead b{color:var(--text)}
+.libCtaRow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+/* Its own button rather than .btn.roll: that one carries the hold-to-auto-roll progress bar in
+   an ::after, and borrowing it here would mean inheriting machinery this button has no use for. */
+.libCtaBtn{margin-left:auto;padding:9px 18px;font-size:13px;font-weight:800;border:0;
+  border-radius:11px;cursor:pointer;white-space:nowrap;
+  background:linear-gradient(180deg,var(--gold),var(--gold-d));color:#2a2205;
+  box-shadow:0 3px 0 rgba(0,0,0,.28)}
+.libCtaBtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.28)}
+.libCtaNote{margin-top:6px;font-size:11px;color:var(--muted)}
+
+/* --- cost chips: shared by the billboard, the rails and the cards --- */
+.libChip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
+  padding:4px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--muted);white-space:nowrap}
+.libChip.met{color:var(--gold);border-color:var(--gold-d);background:rgba(255,203,92,.12)}
+
+/* --- rails --- */
+.libRail{padding:10px 0 14px}
+.libRailHead{display:flex;align-items:center;gap:8px;padding:0 16px 8px;flex-wrap:wrap}
+.libRailHead h2{margin:0;font-size:15px;letter-spacing:.01em}
+.libRailNote{font-size:11px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.libRail.is-locked .libRailHead h2{color:var(--muted)}
+.libRailBlurb{margin:8px 16px 0;font-size:11.5px;color:var(--muted);opacity:.8}
+
+/* The horizontal scroller. Padding rather than margin on the ends so the first and last card
+   can sit clear of the frame edge while still scrolling under it. */
+.libRow{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:2px 16px 4px;
+  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.libRow::-webkit-scrollbar{display:none}
+
+/* --- a card --- */
+.libCard{flex:0 0 auto;width:118px;scroll-snap-align:start;background:none;border:0;padding:0;
+  color:var(--text);text-align:left;cursor:pointer;font:inherit;display:flex;
+  flex-direction:column;gap:6px}
+.libCardArt{position:relative;display:block;width:100%;aspect-ratio:2/3;border-radius:10px;
+  overflow:hidden;background:linear-gradient(160deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);transition:transform .14s ease,border-color .14s ease}
+.libCard:hover .libCardArt{transform:translateY(-3px);border-color:var(--purple)}
+.libPoster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.libPoster.missing{display:none}
+/* Uncovered when the poster is absent: the episode number, set large, as a plate. */
+.libPlate{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:34px;font-weight:800;color:var(--line);z-index:0}
+
+.libCardName{font-size:11.5px;line-height:1.3;color:var(--text);opacity:.9;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.libCardName b{color:var(--muted);font-weight:700}
+/* The price under a locked card. Chips are smaller here than in the billboard — a 118px card
+   has to fit a coin cost and up to two props without pushing the rail taller than the poster. */
+.libCardCost{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.libCardCost .libChip{font-size:10px;padding:2px 6px;gap:3px}
+.libSteps{font-size:9.5px;color:var(--muted);opacity:.75;width:100%;letter-spacing:.02em}
+/* A locked card's price is information, not a call to action, so it sits back a little. */
+.libCard.is-locked .libCardCost{opacity:.72}
+
+/* Badges sit over the art, so they read at card size without stealing a line of type. */
+.libBadge{position:absolute;z-index:2;font-size:10px;font-weight:700;letter-spacing:.02em}
+.libBadge.play{right:6px;bottom:6px;width:24px;height:24px;border-radius:50%;
+  background:rgba(13,16,41,.72);display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:var(--text)}
+.libBadge.seen{left:6px;top:6px;padding:3px 7px;border-radius:999px;
+  background:rgba(13,16,41,.72);color:var(--teal)}
+.libBadge.next{left:6px;top:6px;padding:3px 8px;border-radius:999px;background:var(--gold);
+  color:#2a1c00;text-transform:uppercase}
+.libBadge.lock{right:6px;top:6px;font-size:13px;opacity:.85}
+
+/* Locked art is dimmed and drained, so an unlocked card is the only colour in the rail. */
+.libCard.is-locked .libPoster{filter:grayscale(.75) brightness(.42)}
+.libCard.is-locked .libCardName{opacity:.5}
+.libCard.is-next .libCardArt{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-d),
+  0 6px 18px rgba(255,203,92,.18)}
+.libCard.is-next .libPoster{filter:brightness(.82)}
+
+/* --- a series with nothing in it yet --- */
+.libSoon{position:relative;isolation:isolate;margin:8px 16px 20px;border-radius:var(--r);
+  overflow:hidden;min-height:132px;display:flex;align-items:flex-end;border:1px solid var(--line)}
+.libSoonArt{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;
+  filter:grayscale(.6) brightness(.5)}
+.libSoonArt.missing{display:none}
+.libSoonShade{position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,rgba(13,16,41,.35),rgba(13,16,41,.88))}
+.libSoonIn{padding:12px 14px}
+.libSoonIn h2{margin:3px 0 4px;font-size:16px;color:var(--muted)}
+.libSoonIn p{margin:0;font-size:11.5px;color:var(--muted);opacity:.8;max-width:46ch}
+
+/* --- phone --- */
+@media (max-width:520px){
+  .libHero{min-height:34vh}
+  .libHeroTitle{font-size:21px}
+  .libCard{width:104px}
+  .libCtaBtn{margin-left:0;width:100%;margin-top:6px}
+}
+
+/* ---------- the title page ----------
+   Reached by tapping anything not yet paid for. It is the SAME full-screen frame as the shelf,
+   not a dialog over it — one route variable in js/ui/library.js swaps which of the two renders.
+   That is the whole reason this stopped looking like a modal dropped on a billboard. */
+.libDetail{display:flex;flex-direction:column;height:100%;overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+
+/* The art, and the title over it — the same treatment the billboard gets, so moving between the
+   two reads as one app rather than two screens. */
+.libDetTop{position:relative;isolation:isolate;flex:0 0 auto;min-height:40vh;
+  display:flex;align-items:flex-end}
+.libDetArt{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;
+  object-position:center 22%}
+.libDetArt.missing{display:none}
+.libDetShade{position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,rgba(13,16,41,.35) 0%,rgba(13,16,41,.72) 58%,var(--bg) 100%)}
+.libDetHead{padding:16px}
+.libDetTitle{margin:4px 0 0;font-size:24px;line-height:1.12;letter-spacing:-.01em}
+
+.libBack{position:absolute;top:12px;left:12px;z-index:2;width:36px;height:36px;border-radius:50%;
+  border:0;cursor:pointer;font-size:17px;line-height:1;color:var(--text);
+  background:rgba(13,16,41,.62);backdrop-filter:blur(4px)}
+.libBack:hover{background:rgba(13,16,41,.85)}
+
+.libDetBody{padding:0 16px 22px;display:flex;flex-direction:column;gap:12px}
+.libDetBlurb{margin:0;font-size:13px;line-height:1.5;color:var(--text);opacity:.85;max-width:56ch}
+.libDetNote{margin:0;font-size:11.5px;color:var(--muted);line-height:1.45}
+
+/* How far through the price you are. Reads left to right like the one in the screenshot. */
+.libBar{position:relative;height:9px;border-radius:999px;background:var(--panel);
+  border:1px solid var(--line);overflow:hidden}
+.libBar span{position:absolute;inset:0 auto 0 0;border-radius:999px;
+  background:linear-gradient(90deg,var(--gold-d),var(--gold));transition:width .35s ease}
+.libBarNum{margin-top:-6px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* What this step costs, and the button that pays it. */
+.libPayBox{padding:12px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);
+  display:flex;flex-direction:column;gap:10px}
+.libPayBox.locked{opacity:.85;border-style:dashed}
+.libStepHead{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  font-weight:700}
+.libPayChips{display:flex;gap:6px;flex-wrap:wrap}
+.libPay,.libPlay{border:0;border-radius:11px;padding:13px 18px;font-size:14px;font-weight:800;
+  cursor:pointer;width:100%;box-shadow:0 3px 0 rgba(0,0,0,.28)}
+.libPay{background:linear-gradient(180deg,var(--gold),var(--gold-d));color:#2a2205}
+.libPlay{background:linear-gradient(180deg,var(--teal),#1fa694);color:#053430}
+.libPay:active:not(:disabled),.libPlay:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.28)}
+.libPay:disabled{background:var(--panel2);color:var(--muted);box-shadow:none;cursor:not-allowed}
+
+/* Every step of a multi-step price, so the bar is not the only thing saying how much is left. */
+.libStepList{display:flex;flex-direction:column;gap:6px}
+.libStepRow{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line)}
+.libStepNo{flex:0 0 auto;width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;background:var(--panel2);color:var(--muted)}
+.libStepChips{display:flex;gap:5px;flex-wrap:wrap}
+.libStepRow.done{opacity:.5}
+.libStepRow.done .libStepNo{background:var(--teal);color:#053430}
+.libStepRow.done .libChip{text-decoration:line-through}
+.libStepRow.now{border-color:var(--gold-d)}
+.libStepRow.now .libStepNo{background:var(--gold);color:#2a1c00}
+
+@media (max-width:520px){
+  .libDetTop{min-height:34vh}
+  .libDetTitle{font-size:20px}
+}

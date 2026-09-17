@@ -4,31 +4,25 @@ let state={};
 function initState(){
   state={
     day:1, clock:9*60, sessionsToday:1,
-    /* Two clue counters, because the model uses clues for two unrelated things:
-         clues      — the album. A lifetime total, cosmetic, never spent.
-         cycleClues — the flow. Banked since the last prediction, spent on the next one
-                      (it buys accuracy, see Economy.accuracyFor) and reset to zero. */
-    energy:cfg.energyCap, coins:0, clues:0, cycleClues:0, vip:0,
-    pos:0, mult:1, boardNum:1, series:0,
+    energy:cfg.energyCap, coins:0, vip:0,
+    pos:0, mult:1, boardNum:1,
     /* tile index → what that box holds, decided when it was placed (js/overlays/mystery-box.js).
-       A Map rather than a Set because the board shows a GOLD box on a tile holding clues. */
-    builder:Builders.fresh(), boxes:new Map(),
-    /* Boxes EARNED but not yet on the board. Upgrades bank them here rather than dropping them
-       straight onto tiles, because the player is looking at the builders screen when they buy —
-       a box appearing on a board they cannot see is a reward nobody witnesses. They are thrown
-       on when the player returns to the board (setBuildersView in js/ui/main.js). */
+       A Map rather than a Set so a box can still be drawn differently by what it holds. */
+    boxes:new Map(),
+    /* Boxes EARNED but not yet on the board. Builder upgrades used to bank them here; nothing
+       does yet — what places a box is a deck card, once the deck is written. The banking and
+       the throw survive intact so that card has somewhere to land. */
     pendingBoxes:0,
-    /* epQueue is what is still UNWATCHED, and it shrinks as episodes are watched. Which
-       episodes exist at all is NOT stored — it is derived from the completed builders, since
-       the episode id is the builder number (Builders.unlockedEpisodeIds). */
-    epQueue:[], epsWatched:0, boardsDone:0,
-    /* A bet that was locked in but whose episode was never watched to the end. Holds the
-       already-decided outcome so it can be revealed later, and is PERSISTED — otherwise
-       closing the tab mid-episode would be a way to duck a losing bet or re-bet a won one.
-       {id, wager, odds, won, payout} or null. */
-    pendingReveal:null,
-    predWins:0, predLoss:0, streak:0, bestStreak:0, rolls:0, predsMade:0,
-    lastCoins:0, lastEnergy:cfg.energyCap, lastClues:0,
-    animating:false, seriesDone:false,
+    rolls:0,
+    /* The unlock ledger (js/unlock.js) — the whole of it:
+         items    itemId → how many are held. Granted through Items.add, never written here.
+         paid     "kind:id" → how many steps of that price have been paid.
+         watched  episode ids already played.
+       What is unlocked, what may be paid for next, what a step still owes — none of that is
+       stored. It is derived from these three and the catalog every time it is asked for, so
+       editing a content file can never leave a stale flag behind claiming otherwise. */
+    items:{}, paid:{}, watched:[],
+    lastCoins:0, lastEnergy:cfg.energyCap,
+    animating:false,
   };
 }

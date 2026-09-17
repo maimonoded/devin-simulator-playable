@@ -7,6 +7,16 @@ Most of these came out of mapping `economy model v3.xlsx` onto the code. Where t
 and the game disagree about the SHAPE of a mechanic (not just a number), the disagreement is
 recorded here rather than silently resolved.
 
+> **Read this first on the `simpler-version` branch.** Builders, clues and predictions were
+> removed from the game. Everything below that describes them is therefore **dormant, not
+> outstanding** — the whole **Prediction** section, and the builder-shaped parts of **Economy
+> plumbing**. It is kept rather than deleted because the model is kept, and because coins are
+> meant to pay to unlock episodes later: when that lands, these are the arguments that were
+> already had, not work to redo. Nothing here is a task on this branch.
+>
+> Still live: **Session & time**, and the parts of **Board & tiles** that are not about the
+> train tile.
+
 ---
 
 ## Prediction
@@ -113,7 +123,7 @@ Imported from `Inputs!C9`, in the drawer, read by nothing. In-game time only mov
 The model's shape won. `cfg.trainSmall` / `cfg.trainLarge` / `cfg.trainLargeChance` are now real
 tuning keys, projected by `Economy.apply()` and editable in the drawer; the 5-rung `TRAIN_MULT`
 ladder is deleted. `Economy.trainDraw()` picks one of the two outcomes and
-[js/tiles/train-tile.js](js/tiles/train-tile.js) pays it directly.
+the train tile paid it directly (that file is deleted on this branch).
 
 `cfg.trainEV` survives as a **derived** number (`Economy.trainEV()`), kept in step by `apply()`.
 Nothing pays from it — it exists so the spreadsheet has one figure to be reconciled against, which
@@ -142,6 +152,36 @@ not reconciled with the spreadsheet.
 **Done when:** either the ladder is anchored on its MEAN instead of its top (multiply all three
 rungs by 1.5 — the top rung becomes 472 and the EV returns to exactly 315), or the workbook gains
 real cells for the three rungs and their odds, and `EconomyImport` learns to read them.
+
+### The gala's end-of-round item strip is below the fold on the default desktop board
+`minigames/gala-match3.html` fits itself to the frame with `fitToViewport()`, which shrinks the
+chrome to `--s 0.55` and then the envelope grid to `--c 0.80` and **gives up** — there is no third
+lever. The default desktop board frame is **904×520** (`#boardScene`, `css/board.css`), and at
+both floors the page is still taller than that, so the bottom of the game is simply not on screen
+at `scrollTop 0`.
+
+Measured in the frame's real size:
+
+| | before the billing change | as shipped |
+|---|---|---|
+| overflow at 904×520 | **+177px** (`--s .55 / --c .80`) | **+84px** (`--s .55 / --c .80`) |
+| overflow at 320×568 | +41px (`--s .55 / --c .80`) | **0** (`--s .55 / --c 1.00`) |
+| fit at 375×667 | `--s .55 / --c .84` | `--s .64 / --c 1.00` |
+| fit at 390×844 | `--s .94 / --c 1.00` | `--s .96 / --c 1.00` |
+
+Deleting the decorative floor row and naming the transitioned properties on `.tier`/`.slot`
+(which had been feeding `fitToViewport()` stale, mid-animation heights) roughly halved it, but
+**904×520 still overflows**. What is below the fold there is the last row of envelopes, the
+Collect button (y 588–615) and the cream item strip (y 576–625) — i.e. **the end-of-round item
+reveal has never been visible on the default desktop board.** That is the real reason the items
+went unnoticed, and it is why the same items are now billed under the marquee (y 126–147) where
+every frame can see them. The round still completes: `collectWin()` auto-fires on a timer.
+
+`?view=mobile` and the drawer's phone view are both fine — the 9:16 frame is tall enough.
+
+**Done when:** the frame stops being 520px tall for a 9:16 game, or `fitToViewport()` gains a
+third lever for a wide-and-short frame (the stage is capped at `max-width:440px`, so 232px of
+each side is empty background — a two-column layout there would cost no height at all).
 
 ### Advance-to-Start pays double what the model prices
 `Tile.advanceToStart` pays `startPass + startLand` (200) and re-seeds the VIP pool. The workbook

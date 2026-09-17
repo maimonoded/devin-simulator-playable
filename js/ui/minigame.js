@@ -9,10 +9,10 @@
    separate realm also means every game keeps working when opened on its own, which is how they
    are authored — see minigames/README.md for the contract.
 
-   THE ONE RULE: the game never decides money. The tile has already banked the coins (see
-   js/tiles/train-tile.js) and the amount is handed over purely to be presented. If the game is
-   disabled, missing, or broken, the player still gets paid — the fallback is the plain Collect
-   popup, so a bad file costs presentation and never coins. */
+   THE ONE RULE: the game never decides money. The deck card that opens it has already banked
+   the coins and granted the items (js/tiles/deck-tile.js); both are handed over purely to be
+   presented. If the game is disabled, missing, or broken, the player still gets paid — the
+   fallback is the plain Collect popup, so a bad file costs presentation and never coins. */
 
 /* key → page. A new bonus game is one line here plus the file. */
 const MINIGAMES={
@@ -28,11 +28,10 @@ let bonusOpen=null;
    timeout, load failure, or teardown. roll()'s finally in js/ui/main.js is the only thing that
    clears state.animating, so a promise that never settles soft-locks the board. */
 function showMinigame(spec){
-  /* Auto-play session is the batch balancing tool: thousands of rolls, no one watching. Opening
-     a WebGL page per train tile would be both pointless and a context leak, so it takes the same
-     fast path the Collect popup does. Auto-ROLL deliberately does not — it simulates a real
-     session, so it plays the game and lets it idle-collect like a player who looked away. */
-  if(typeof autoMode!=="undefined"&&autoMode==="session") return showCollect(spec);
+  /* "Auto-play session" used to skip the game entirely here — it was the batch balancing tool,
+     and opening a WebGL page per bonus tile was both pointless and a context leak. That mode is
+     gone with the builders it bought, and auto-ROLL never skipped: it simulates a real session,
+     so it plays the game and lets it idle-collect like a player who looked away. */
   const src=cfg.bonusGames?MINIGAMES[spec.game]:null;
   if(!src) return showCollect(spec);
 
@@ -85,6 +84,10 @@ function showMinigame(spec){
              number the moment the HUD reappeared. Starting from the difference makes the count-up
              land exactly on what the player actually has. */
           coins:Math.max(0,state.coins-(spec.amount||0)),
+          /* Items ride along with the coins and under the same rule: the card granted them
+             before the game opened and the game only shows them. Defaulted here rather than in
+             each game, so a page can render the row without first asking whether it exists. */
+          items:spec.items||[],
           loadMs:cfg.bonusLoadMs, idleMs:auto?trayMs:0, trayMs,
         }),location.origin);
         /* Belt and braces, exactly as showCollect has: whatever happens inside that page, the

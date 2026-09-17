@@ -92,33 +92,47 @@ test("deck and box tables have their default copies preserved", () => {
   ok(deck !== defDeck, "defDeck must be a separate copy");
 });
 
-test("the train's two bonuses are a well-formed pair", () => {
-  ok(typeof TRAIN_MULT === "undefined", "the old five-rung spread must be gone, not shadowed");
-  ok(cfg.trainSmall > 0 && cfg.trainLarge > cfg.trainSmall, "large must be the bigger of the two");
-  ok(cfg.trainLargeChance > 0 && cfg.trainLargeChance < 1, "both outcomes have to be reachable");
-  // cfg.trainEV is derived from the pair; nothing pays from it, but the model is checked against it
-  near(cfg.trainEV, Economy.trainEV(), 1e-9);
-});
-
 suite("board-model");
 
 test("tileType maps every index and only to known types", () => {
-  const known = new Set(["start", "spa", "vip", "premiere", "train", "deck", "standard"]);
+  const known = new Set(["start", "spa", "vip", "reshoot", "deck", "standard", "payroll", "overheads"]);
   for (let i = 0; i < 40; i++) ok(known.has(tileType(i)), `tile ${i} -> ${tileType(i)}`);
 });
 
-test("corners, trains and decks sit where the layout says", () => {
+test("corners and card tiles sit where the layout says", () => {
   eq(tileType(0), "start"); eq(tileType(10), "spa");
-  eq(tileType(20), "vip");  eq(tileType(30), "premiere");
-  [5, 15, 25, 35].forEach(i => eq(tileType(i), "train", `tile ${i}`));
-  [3, 8, 13, 18, 23, 28].forEach(i => eq(tileType(i), "deck", `tile ${i}`));
+  eq(tileType(20), "vip");  eq(tileType(30), "reshoot");
+  // the deck moved onto the four bonus tiles; there is no separate chance tile any more
+  [5, 15, 25, 35].forEach(i => eq(tileType(i), "deck", `tile ${i}`));
+  [8, 13, 18, 28].forEach(i => eq(tileType(i), "standard", `tile ${i}`));
   eq(tileType(1), "standard");
 });
 
-test("there are 26 standard tiles", () => {
+/* The two bills. Their placement is the design, not a free choice: 20 apart so one is met
+   about every half lap, each three tiles after a tile that PAYS OUT (Start at 0, the VIP
+   Lounge at 20), and clear of the card tiles and Reshoot so nothing charges twice in three. */
+test("the two bills sit three tiles after the two payouts, half a lap apart", () => {
+  eq(tileType(3), "payroll");
+  eq(tileType(23), "overheads");
+  eq(23 - 3, 20, "half a lap apart");
+  eq(3 - 0, 3, "Payroll follows Start");
+  eq(23 - 20, 3, "Studio Overheads follows the VIP Lounge");
+  /* Nothing may charge a player twice within three tiles, so the two bills and Reshoot — the
+     only three tiles that take on their own — are each at least three apart. */
+  const takers = [3, 23, 30];
+  takers.forEach(a => takers.forEach(b => {
+    if (a === b) return;
+    const gap = Math.min((a - b + 40) % 40, (b - a + 40) % 40);
+    ok(gap >= 3, `tiles ${a} and ${b} both charge and are only ${gap} apart`);
+  }));
+  [3, 23].forEach(i => ok(!DECKS.has(i) && !CORNERS[i], `tile ${i} must not be a card tile or a corner`));
+});
+
+test("there are 30 standard tiles", () => {
+  // 40 less the four corners, the four card tiles and the two bills
   let n = 0;
   for (let i = 0; i < 40; i++) if (tileType(i) === "standard") n++;
-  eq(n, 26);
+  eq(n, 30);
 });
 
 test("gridPos gives 40 unique cells inside an 11x11 ring", () => {
@@ -147,9 +161,13 @@ test("consecutive tiles are always grid-adjacent", () => {
   }
 });
 
+/* Taking two indices out of `standard` re-normalises this table on its own — which is the
+   point of deriving it from tileType rather than listing it. The mean is still exactly 1, so
+   cfg.stdBase still means "what an average standard tile pays". */
 test("stdWeights covers exactly the standard tiles and averages 1", () => {
   const keys = Object.keys(stdWeights).map(Number);
-  eq(keys.length, 26);
+  eq(keys.length, 30);
+  ok(!(3 in stdWeights) && !(23 in stdWeights), "a bill is not paid a standard tile's coins");
   keys.forEach(i => eq(tileType(i), "standard", `weight on non-standard tile ${i}`));
   const mean = keys.reduce((a, i) => a + stdWeights[i], 0) / keys.length;
   near(mean, 1, 1e-9);
@@ -157,22 +175,75 @@ test("stdWeights covers exactly the standard tiles and averages 1", () => {
 
 test("tileImagePath is 1-based and points into assets/tiles", () => {
   eq(tileImagePath(0), "assets/tiles/1.png", "the first tile (Start) uses 1.png");
-  eq(tileImagePath(5), "assets/tiles/6.png");
   eq(tileImagePath(39), "assets/tiles/40.png", "the last tile uses 40.png");
   eq(TILE_ART_DIR, "assets/tiles/");
   eq(TILE_ART_EXT, ".png");
 });
 
+/* The card tiles are the exception to the numbered convention: they are named by WHO is on
+   them, so swapping a face is a word in TILE_FACES rather than a renamed file. */
+test("a card tile's art is its character, not its number", () => {
+  deepEq(Object.keys(TILE_FACES).map(Number).sort((a, b) => a - b), [5, 15, 25, 35],
+         "the four card tiles, and only those, carry a face");
+  eq(tileImagePath(5), "assets/tiles/faces/simon.png");
+  eq(tileImagePath(15), "assets/tiles/faces/victoria.png");
+  Object.keys(TILE_FACES).forEach(i => eq(tileFace(+i), TILE_FACES[i]));
+  eq(tileFace(4), null, "a tile with no entry has no face");
+});
+
 test("every tile maps to a distinct art filename", () => {
   const paths = new Set();
   for (let i = 0; i < 40; i++) paths.add(tileImagePath(i));
-  eq(paths.size, 40);
+  eq(paths.size, 40, "no two tiles may share a picture, face or numbered");
+});
+
+/* One model for the whole ring EXCEPT the four corners, and none at all on a card tile — null
+   is the signal that its face should be drawn instead, which is what board3d.js keys the art
+   path off. */
+test("every plain tile draws the same model, and a card tile draws none", () => {
+  const models = new Set();
+  for (let i = 0; i < 40; i++) {
+    const m = tileModelPath(i);
+    if (tileFace(i)) eq(m, null, `tile ${i} carries a face, so it must ask for no model`);
+    else if (tileType(i) === "standard") models.add(m);
+  }
+  deepEq([...models], [TILE_MODEL_STD], "the 30 standard tiles share one piece");
+  ok(TILE_MODEL_STD.endsWith("standard.glb"));
+});
+
+/* A corner's model is named after the corner, so CORNERS is the only mapping — there is no
+   second list that could drift out of step with it. The files themselves are allowed not to
+   exist yet: an absent model leaves the plain slab, which is the documented contract. */
+test("each corner asks for its own model, named after its type", () => {
+  deepEq([0, 10, 20, 30].map(tileModelPath), [
+    "assets/tiles/models/start.glb",
+    "assets/tiles/models/spa.glb",
+    "assets/tiles/models/vip.glb",
+    "assets/tiles/models/reshoot.glb",
+  ]);
+  Object.keys(CORNERS).forEach(i => eq(tileModelPath(+i), `${TILE_MODEL_DIR}${CORNERS[i]}.glb`,
+                                       `corner ${i} must be named after its type`));
+  eq(new Set([0, 10, 20, 30].map(tileModelPath)).size, 4, "no two corners may share a model");
+  eq(tileModelPath(1), TILE_MODEL_STD, "a plain tile still gets the shared piece");
+});
+
+/* A bill is named after its type exactly as a corner is, so BILLS is the whole mapping. The
+   files are generated separately and are allowed not to exist yet: an absent model leaves the
+   plain slab, which is the documented contract for every tile on the board. */
+test("each bill asks for its own model, named after its type", () => {
+  eq(tileModelPath(3), "assets/tiles/models/payroll.glb");
+  eq(tileModelPath(23), "assets/tiles/models/overheads.glb");
+  Object.keys(BILLS).forEach(i => eq(tileModelPath(+i), `${TILE_MODEL_DIR}${BILLS[i]}.glb`,
+                                     `bill ${i} must be named after its type`));
+  const named = [0, 10, 20, 30, 3, 23].map(tileModelPath);
+  eq(new Set(named).size, 6, "no two named tiles may share a model");
+  ok(!named.includes(TILE_MODEL_STD), "and none of them draws the paving");
 });
 
 test("corner tiles land on the filenames the docs promise", () => {
   eq(tileImagePath(10), "assets/tiles/11.png");   // Spa
   eq(tileImagePath(20), "assets/tiles/21.png");   // VIP
-  eq(tileImagePath(30), "assets/tiles/31.png");   // Premiere
+  eq(tileImagePath(30), "assets/tiles/31.png");   // Reshoot
 });
 
 test("pathToStart ends on Start and has the right length", () => {

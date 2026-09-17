@@ -1,6 +1,5 @@
 "use strict";
-/* All read-only rendering of state → DOM. No state mutation here
-   (the builder-list upgrade buttons delegate to uiUpgrade in ui/main.js). */
+/* All read-only rendering of state → DOM. No state mutation here. */
 /* Push timing configs into CSS custom properties so the animations match the sim's pacing.
    Token glide/hop stay just inside one cfg.tokenStepMs beat (capped at the original
    .13s/.14s so slow settings don't feel mushy); the dice shake spans its reveal window. */
@@ -65,7 +64,9 @@ function use3d(){ return cfg.board3d && window.Board3D && Board3D.available; }
    stays, because it is information the art cannot carry. */
 function showIcon(i,def){
   if(!def.icon) return false;
-  return !(use3d() && window.Board3D && Board3D.hasModel && Board3D.hasModel(i));
+  if(!(use3d() && window.Board3D)) return true;
+  const skinned=(Board3D.hasModel&&Board3D.hasModel(i))||(Board3D.hasArt&&Board3D.hasArt(i));
+  return !skinned;
 }
 /* Models load asynchronously, so a tile can gain its art after the label was built. */
 function onTileModelled(i){
@@ -92,6 +93,52 @@ function syncBoardLabels(){
     if(!p) return;
     el.style.left=p.x+"px"; el.style.top=p.y+"px";
   });
+  syncVipBadge();
+}
+
+/* ---- the VIP pool, over the tile that pays it ----
+   It used to be a pill in the HUD, three inches from the thing it describes. The pool is the one
+   balance tied to a PLACE: it builds up on the VIP Lounge and is collected by landing there, so
+   floating it over that tile says what it is and where to go for it in one move, and the HUD goes
+   back to being the balances you carry.
+
+   It rides in #boardLabels, the DOM layer that already sits over the canvas and already gets
+   re-positioned every frame the camera moves — so it follows the board for free rather than
+   needing its own projection. Built from JS because index.html is not ours to edit right now;
+   it is one element and it belongs to this function.
+
+   Hidden at zero: an empty pool is not a target, and a badge reading 0 over a corner is noise.
+   Hidden on the legacy CSS board too, which has no screenPosOf to place it with — there the HUD
+   pill stays, which is why that hiding is conditional rather than a flat CSS rule. */
+const VIP_BADGE_LIFT=30;          // px above the tile's centre, clear of the piece standing on it
+function syncVipBadge(){
+  const layer=$("#boardLabels"); if(!layer) return;
+  let el=$("#vipBadge");
+  const on=use3d()&&state.vip>0;
+  if(!on){ if(el) el.style.display="none"; return; }
+  if(!el){
+    el=document.createElement("div");
+    el.className="vipBadge"; el.id="vipBadge";
+    /* The coin icon with the emoji behind it: the PNG is a generated asset and a board that has
+       not got it yet should still show a coin rather than a gap. */
+    el.innerHTML=`<img src="assets/ui/coin.png" alt="" onerror="this.remove()"><b>0</b>`;
+    layer.appendChild(el);
+  }
+  el.style.display="";
+  el.querySelector("b").textContent=fmt(state.vip);
+  const p=Board3D.screenPosOf(20);
+  if(!p) return;
+  /* CLAMPED INTO THE FRAME, not simply placed. cfg.camFollow keeps the camera on the token, so
+     the VIP corner is off-screen most of the time — placed honestly the badge spends the run
+     above the top edge of the canvas, clipped, which would make moving it out of the HUD a
+     downgrade. Pinned to the edge it stays readable AND still points at where the pool is: it
+     sits over the tile when the tile is in view, and drifts to the side it went off on when it
+     is not. Same idea as a map marker that hugs the edge rather than vanishing. */
+  const r=layer.getBoundingClientRect(), m=26;
+  const x=Math.max(m,Math.min(r.width-m,p.x));
+  const y=Math.max(m,Math.min(r.height-m,p.y-VIP_BADGE_LIFT));
+  el.style.left=x+"px"; el.style.top=y+"px";
+  el.classList.toggle("off", x!==p.x||y!==p.y-VIP_BADGE_LIFT);
 }
 
 /* SHOW the DOM pair only when the 3D dice can't replace them. If cfg.dice3d is off, or
@@ -147,10 +194,12 @@ function positionToken(instant){
 }
 /* Draw every registered overlay's markers (mystery boxes today) on their tiles. */
 function renderOverlays(){
-  /* classAt/isGold rather than the flat cssClass: one overlay can look different tile to tile,
-     which is how a box holding clues shows up gold before you land on it. */
+  /* A flat list of tile indices. Boxes used to come in two looks — a gold one when it held
+     clues — so this passed {i, gold} pairs; with clues gone every box looks the same and the
+     flag carried nothing. classAt() (js/overlays/overlay.js) stays, because the legacy CSS
+     board still lets one overlay style itself differently tile to tile. */
   if(use3d()){
-    Board3D.setOverlays(OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))));
+    Board3D.setOverlays(OVERLAYS.flatMap(o=>o.all()));
     return;
   }
   document.querySelectorAll(".tile .ovl").forEach(b=>b.remove());
@@ -159,139 +208,59 @@ function renderOverlays(){
     if(el){ const b=document.createElement("div"); b.className="ovl "+o.classAt(i); b.textContent=o.icon; el.appendChild(b); }
   }));
 }
-/* Mystery boxes bought but not yet thrown onto the board.
-
-   The pop is driven by comparing against the last number SHOWN rather than being fired from the
-   upgrade handler, so every path that banks a box gets the same acknowledgement — including a
-   reload that restores a pending count. It only fires on an increase: the drop to zero after a
-   throw is the boxes leaving, and celebrating that would be backwards. */
-let _boxShown = null;
-function renderBoxCounter(){
-  const el=$("#boxCounter"); if(!el) return;
-  const n=Math.max(0,state.pendingBoxes|0);
-  el.classList.toggle("on",n>0);
-  $("#boxCount").textContent=n;
-  if(_boxShown!==null&&n>_boxShown){
-    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
-  }
-  _boxShown=n;
-}
-/* The builders view's 2D layer: the page header, and one upgrade button per building on the
-   page. The buildings themselves are 3D and live in js/ui/builders3d.js — this is only the
-   part you press.
-
-   Every button on the row is the same width and shows a COMPACT price (fmtShort), because the
-   row has to fit cfg.builderPageSize of them across a phone whatever the economy charges:
-   "2.5k" costs four characters where "2,500" costs five and "1,240,000" costs nine. */
-function renderBuilders(){
-  const page=Builders.pageBuilders();
-  // clickable while auto-roll is running (buying stops it), but not during a manual roll
-  const live=!state.animating||autoMode==="roll";
-  const bar=$("#buildersBar"); bar.innerHTML="";
-  page.forEach(i=>{
-    const done=Builders.isMaxed(i);
-    const afford=Builders.canAfford(i);
-    const b=document.createElement("button");
-    b.className="upb"+(done?" max":afford?"":" cant");
-    b.disabled=done||!afford||!live;
-    b.dataset.b=i;
-    b.innerHTML=done
-      ? `<span class="upbName">#${i+1}</span><span class="upbCost">MAX</span>`
-      : `<span class="upbName">#${i+1} · Lv${Builders.tier(i)+1}</span>
-         <span class="upbCost">🪙 ${fmtShort(Builders.nextCost(i))}</span>`;
-    bar.appendChild(b);
-  });
-  bar.querySelectorAll("button[data-b]").forEach(bt=>bt.onclick=()=>onUpgradeClick(+bt.dataset.b));
-
-  const s=Builders.series(), many=Economy.playableSeries().length>1;
-  const range=page.length?`${page[0]+1}–${page[page.length-1]+1}`:"—";
-  $("#buildersHead").innerHTML=
-    `<b>${many&&s?`${s.name} · `:""}Buildings ${range}</b>
-     <span>${Builders.doneCount()}/${Builders.count()} complete · set ${Builders.page()+1} of ${Builders.pageCount()}</span>`;
-
-  /* Episodes banked by "Binge later" — the only way back to them in the mobile layout, since
-     the side panel's Predict & watch button is not on screen there. */
-  /* A sealed reveal counts as something waiting: the bet is placed and the result is owed, so
-     the button has to stay reachable even when the queue itself is empty. */
-  const queued=state.epQueue.length+(state.pendingReveal?1:0);
-  const binge=$("#bingeBtn");
-  if(binge){
-    binge.style.display=queued?"flex":"none";
-    $("#bingeCount").textContent=queued;
-  }
-  /* The library button only exists once there is something in the library. */
-  const lib=$("#libraryBtn");
-  if(lib) lib.classList.toggle("on",Builders.unlockedEpisodeIds().length>0);
-  /* The album dot marks clues banked for the NEXT prediction — the ones about to be spent —
-     rather than the lifetime total, which only ever grows and would leave the dot on forever. */
-  const adot=$("#albumDot");
-  if(adot) adot.classList.toggle("on",state.cycleClues>0);
-
-  /* The board shows nothing about builders any more, so the only hint that there is something
-     to spend on is a dot on the button that takes you there. */
-  const any=Builders.all().some((_,i)=>Builders.canAfford(i));
-  $("#buildersDot").classList.toggle("on",any);
-  if(use3d()&&window.Board3D&&Board3D.available&&Board3D.setBuilders) Board3D.setBuilders();
-}
 function renderHUD(){
   $("#hDay").textContent="Day "+state.day;
   const tod=((state.clock%1440)+1440)%1440; let h=Math.floor(tod/60),m=Math.floor(tod%60);
   const ap=h<12?"AM":"PM"; let h12=h%12; if(h12===0)h12=12;
   $("#hClock").textContent=`${h12}:${String(m).padStart(2,"0")} ${ap}`;
   tweenNumber($("#hCoins"),state.lastCoins,state.coins,v=>fmt(v)); state.lastCoins=state.coins;
-  /* The album is a lifetime total with a target the model names (clueAlbumSize), so show it as
-     progress toward that rather than as a bare number climbing forever. Past the target it
-     stops reading as a fraction — the collection is simply complete. */
-  tweenNumber($("#hClues"),state.lastClues,state.clues,
-              v=>state.clues>=cfg.clueAlbumSize?fmt(v):`${fmt(v)}/${fmt(cfg.clueAlbumSize)}`);
-  state.lastClues=state.clues;
   $("#hVip").textContent=fmt(state.vip);
-  $("#hEnergy").textContent=Math.floor(state.energy);
-  $("#hEnergyCap").textContent=cfg.energyCap;
-  $("#hEfill").style.width=Math.max(0,Math.min(100,(state.energy/cfg.energyCap)*100))+"%";
+  /* The pill only hides where the badge can take over — the legacy CSS board has no
+     screenPosOf(), so there it stays the only place the pool is readable. */
+  const vipPill=$("#hVip")?.closest(".pill");
+  if(vipPill) vipPill.style.display=use3d()?"none":"";
+  syncVipBadge();
+  /* Energy is NOT here any more — it is on the Roll button, which is the only thing that spends
+     it. See renderAll below. The pill's markup is still in index.html and hidden by a rule in
+     css/panels.css; both come out together once that file is free to edit. */
 }
 function renderStats(){
-  $("#sEps").textContent=state.epsWatched;
-  const tot=state.predWins+state.predLoss;
-  $("#sAcc").textContent=tot? Math.round(state.predWins/tot*100)+"%":"—";
-  $("#sStreak").textContent=state.streak;
-  $("#sBoards").textContent=Builders.doneCount()+"/"+Builders.count();
   $("#sRolls").textContent=state.rolls;
   $("#sSessions").textContent=state.sessionsToday;
 }
-function renderStory(){
-  const n=state.epQueue.length;
-  $("#epBadge").style.display=n?"inline-block":"none";
-  $("#epBadge").textContent=n+" ready";
-  $("#watchBtn").disabled=!n||state.animating;
-  $("#storyHint").innerHTML= n? `<b style="color:var(--pink)">${n}</b> episode${n>1?"s":""} unlocked — place your prediction before watching.`
-                              : "Fully upgrade a builder to unlock the next episode.";
-}
 /* Reflect state.mult on the stake button (needed after a restore or user reset). */
 function syncMultButton(){ $("#multBtn").textContent="×"+state.mult; }
-function renderAll(){ renderHUD();renderOverlays();renderBuilders();renderBoxCounter();renderStats();renderStory();
+function renderAll(){ renderHUD();renderOverlays();renderStats();
   scheduleSaveState();
   const autoBusy=autoMode!==null;
-  const cantRoll=state.animating||state.energy<state.mult||state.seriesDone;
+  const cantRoll=state.animating||state.energy<state.mult;
   /* Roll IS the auto-roll control (hold to start, tap to stop), so while auto-roll owns the
-     loop it has to stay live to act as Stop — otherwise there'd be no way out. The session
-     loop still locks it, since that mode owns the loop instead. */
+     loop it has to stay live to act as Stop — otherwise there'd be no way out. It is now the
+     only auto mode, so autoBusy and rollIsAuto always agree; both stay because the disabled
+     rule is about who owns the loop, not about how many modes there happen to be. */
   const rollIsAuto=autoMode==="roll";
   const rollBtn=$("#rollBtn");
   rollBtn.disabled=rollIsAuto?false:(autoBusy||cantRoll);
-  rollBtn.innerHTML=rollIsAuto?"⏸ Stop auto roll":"🎲 Roll";
+  /* The energy balance rides on Roll rather than sitting in the HUD, because Roll is the only
+     thing that spends it and the number's whole job is to answer "can I press this again?".
+     It also explains the disabled state in place: a greyed-out button with "⚡2 / 30" under it
+     says why, where a greyed-out button next to a pill three inches away does not.
+     `low` is the cost of THIS roll, not zero — at ×5 a balance of 4 is already too little. */
+  const e=Math.floor(state.energy), low=state.energy<state.mult;
+  rollBtn.innerHTML=(rollIsAuto?"⏸ Stop auto roll":"🎲 Roll")+
+    `<i class="rollE${low?" low":""}">⚡ ${fmt(e)}<b>/${cfg.energyCap}</b></i>`;
+  rollBtn.title=low?`Needs ${state.mult}⚡ for a ×${state.mult} roll — you have ${e}`
+                   :`${e} of ${cfg.energyCap} energy · this roll costs ${state.mult}`;
   rollBtn.classList.toggle("auto",rollIsAuto);
   // the multiplier is the stake for the roll in flight — lock it mid-spin and during auto
   $("#multBtn").disabled=state.animating||autoBusy;
   syncMultButton();
-  // the running mode's own button stays clickable so it can act as Stop; the other is locked out
-  [["#autoBtn","session","▶ Auto-play session","⏸ Stop auto-play"]].forEach(([sel,mode,idle,active])=>{
-    const b=$(sel), mine=autoMode===mode;
-    b.innerHTML=mine?active:idle;
-    b.disabled=mine?false:(autoBusy||cantRoll);
-  });
   $("#nextBtn").disabled=state.animating;
-  $("#storeBtn").disabled=state.animating||autoBusy;   // would fight the roll's own overlays
+  /* Both of these open something over the board, so both fight the roll's own overlays and both
+     have to be locked out for the same window. The Library was missed when it was added: it
+     stayed lit through an auto-roll and every tap on it did nothing, which reads as broken. */
+  $("#storeBtn").disabled=state.animating||autoBusy;
+  const lib=$("#libBtn"); if(lib) lib.disabled=state.animating||autoBusy;
   const gap=Math.max((cfg.energyCap-state.energy)*cfg.regenMin, 1440/cfg.sessionsPerDay);
   $("#nextHint").textContent=`advances ${(gap/60).toFixed(1)} h · refills to ${cfg.energyCap}⚡`;
 }

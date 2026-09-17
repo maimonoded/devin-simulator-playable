@@ -3,7 +3,7 @@
    extends Tile, and self-registers via registerTile(). game.js dispatches landings through
    TILE_TYPES; ui/render.js reads icon/corner/valueLabel from the same registry.
 
-   Rewards and presentation builders (gainCoins/gainEnergy/gainClues, reveal/collect/card)
+   Rewards and presentation builders (gainCoins/gainEnergy, reveal/collect/card)
    are inherited from BoardActor in js/board-actor.js and shared with overlays.
 
    onLand(ctx) contract: ctx={pos,mult,bs}. Mutates state synchronously and returns an

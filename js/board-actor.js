@@ -17,10 +17,14 @@ class BoardActor {
     state.energy=Math.max(state.energy,Math.min(cfg.energyCap,state.energy+n));
     return {float:{text:text??"+"+n+"⚡",color:"var(--teal)"}};
   }
-  /* Feeds both counters: the album total and the per-prediction flow that buys accuracy. */
-  gainClues(n,text){
-    state.clues+=n; state.cycleClues+=n;
-    return {float:{text:text??"+"+n+"🔍",color:"var(--teal)"}};
+  /* A windfall that is allowed past the cap, the way a store pack is. Use this ONLY where the
+     player is being handed a specific number they were told they had won — the Reshoot escape
+     pays back the roll it cost them, and capping that silently while the float, the log and the
+     reveal all announce the full figure is the board lying about what it just paid.
+     gainEnergy is still the default: a tile that grants "some energy" should top up, not stack. */
+  grantEnergy(n,text){
+    state.energy+=n;
+    return {float:{text:text??"+"+n+"⚡",color:"var(--teal)"}};
   }
 
   /* ---- presentation event builders (all block the roll loop) ---- */
@@ -50,9 +54,14 @@ class BoardActor {
     return {minigame:Object.assign({},o,{game,amount,outcome:o.outcome||"win",label:o.label||"",
                                          big:"+"+fmt(amount),sub:o.label||""})};
   }
-  /* Drawn card held on screen for cfg.deckCardMs. opts: {positive, energy} */
+  /* Drawn deck card. opts: {positive, energy, item}
+       item — the Catalog id of the item this card granted, or null. Presentation only: the
+              item was already added to the inventory by the tile, and this is how the face
+              drawn in js/ui/card-art.js knows WHICH prop to show. An id rather than the item
+              itself, because an event is data the whole playback chain copies around and a
+              live Catalog object in there invites somebody to mutate it. */
   card(name,big,opts){
     const o=opts||{};
-    return {card:{name,big,positive:!!o.positive,energy:!!o.energy}};
+    return {card:{name,big,positive:!!o.positive,energy:!!o.energy,item:o.item||null}};
   }
 }

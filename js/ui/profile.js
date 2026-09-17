@@ -8,12 +8,16 @@
    Reset is deliberately two-tap. It wipes a run with no undo, and a single tap on a control
    that sits permanently in the HUD is too easy to hit by accident.
 
-   Mounted in #sheetHost so it is bounded by the game window, like the album and the clue
-   popup, rather than dimming the whole browser the way the page-level .scrim does. */
+   Mounted in #sheetHost so it is bounded by the game window, like the mini-games and the
+   deck card, rather than dimming the whole browser the way the page-level .scrim does.
+
+   Two stats where there were six: episodes watched, prediction accuracy, builders done and the
+   clue count all counted systems this version does not have. Coins and rolls are what is left
+   of the run, and the grid is still two columns because the reset button below is the panel's
+   real content. */
 
 function openProfile(){
   const host=$("#sheetHost");
-  const acc=(()=>{ const t=state.predWins+state.predLoss; return t?Math.round(state.predWins/t*100)+"%":"—"; })();
   host.innerHTML=`<div class="modal profileModal"><div class="top">
       <button class="sheetX" id="profileX" title="Close">✕</button>
       <div class="eyebrow">Player</div><h2>Day ${state.day}</h2></div>
@@ -21,10 +25,6 @@ function openProfile(){
       <div class="profileGrid">
         <div class="pstat"><div class="v">${fmt(state.coins)}</div><div class="l">Coins</div></div>
         <div class="pstat"><div class="v">${state.rolls}</div><div class="l">Rolls</div></div>
-        <div class="pstat"><div class="v">${state.epsWatched}</div><div class="l">Episodes watched</div></div>
-        <div class="pstat"><div class="v">${acc}</div><div class="l">Prediction accuracy</div></div>
-        <div class="pstat"><div class="v">${Builders.doneCount()}/${Builders.count()}</div><div class="l">Builders done</div></div>
-        <div class="pstat"><div class="v">${Clues.collected()}/${Clues.total()}</div><div class="l">Clues</div></div>
       </div>
       <button class="btn ghost wide danger" id="resetPlayer" style="margin-top:14px">🗑 Reset player progress</button>
       <div class="hint" id="resetHint" style="margin-top:8px">Wipes this run and reloads. Tuning values are kept.</div>

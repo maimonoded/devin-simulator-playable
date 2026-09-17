@@ -120,6 +120,20 @@
   .tray .amt{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 12px;padding:8px 12px;border-radius:12px;
     background:linear-gradient(180deg,#fbeccb,#efd9b3);border:2px solid var(--gold-d);
     font-family:"Bodoni MT",Georgia,serif;font-weight:700;font-size:32px;color:#8a5f10;text-shadow:0 1px 0 rgba(255,255,255,.6);}
+  /* The item prizes, shown after the coins have finished counting up so the two never compete.
+     Same cream-and-gold card as the tray it replaces, one size down: this is the second prize. */
+  .prizes{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:80;
+    display:none;gap:10px;align-items:flex-end;padding:10px 16px;border-radius:16px;
+    background:linear-gradient(180deg,#fff6e6,#f0dcc0);border:3px solid var(--gold);
+    box-shadow:0 0 0 2px #3a1810,0 12px 40px rgba(0,0,0,.45);}
+  .prizes.show{display:flex;animation:trayUp .5s cubic-bezier(.2,1.3,.4,1);}
+  /* Icon and count share a line — the strip sits where the tray did and must not be as tall. */
+  .prizes .chip{width:86px;text-align:center;}
+  .prizes .chip i{font-size:30px;font-style:normal;vertical-align:middle;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));}
+  .prizes .chip b{font-family:"Bodoni MT",Georgia,serif;font-size:17px;color:#8a5f10;
+    vertical-align:middle;margin-left:4px;}
+  .prizes .chip u{display:block;text-decoration:none;font-size:10px;font-weight:700;color:#7a1226;line-height:1.2;}
   .collect-btn{width:100%;border:none;border-radius:999px;padding:15px;font-size:18px;font-weight:800;cursor:pointer;
     font-family:inherit;letter-spacing:.06em;text-transform:uppercase;color:#fff;
     background:linear-gradient(180deg,#7bd66a,#3fa832 55%,#2c7d22);box-shadow:0 4px 0 #205c18,0 6px 14px rgba(0,0,0,.3);
@@ -170,6 +184,8 @@
     <div class="amt"><span>🪙</span><span id="trayAmt"></span></div>
     <button class="collect-btn" id="collectBtn">Collect</button>
   </div>
+
+  <div class="prizes" id="prizes"></div>
 </div>
 
 <script type="module">
@@ -198,10 +214,16 @@ let SPEC = {                      // demo defaults; a hosted run overwrites thes
   /* idleMs 0 = never pick for the player. Only auto-roll sends a value, because there is nobody
      at the keyboard to choose. trayMs paces the Collect tray, which is an acknowledgement rather
      than a decision — the coins are banked before the game even opens. */
+  /* items are the SECOND prize: [{icon,name,count}], already granted by the card that opened
+     this, listed here only so the round can show what was found. */
   amount: 0, outcome: "win", label: "", coins: 5000, loadMs: 2500, idleMs: 0, trayMs: 14000,
+  items: [],
 };
 let demoMode = !HOST;
 const DEMO_CHECKS = [4200, 5000, 6000, 7500], DEMO_CONSOLATION = 350;
+/* Standalone only, like DEMO_CHECKS — the strip has to be visible to be tuned. */
+const DEMO_ITEMS = [[], [{icon:"📜",name:"Marriage Certificate",count:1}],
+                    [{icon:"💍",name:"A Real Diamond",count:2}]];
 let sent = false;
 function sendDone(amount){
   if(sent || !HOST) return;
@@ -595,7 +617,7 @@ function label3d(x,y,z,text,cls=''){const v=new THREE.Vector3(x,y,z).project(cam
    are never drawn here. currentCheck is set by applyHostSpec(), not by a random pick. */
 const RIVAL_NAMES=['Meghan','PeterCrouch108','Valadon','sofia_r','DiegoM','TheReelQueen','marcopolo22','LunaDrama'];
 const RIVAL_PICS=['🧑‍🎤','👩‍🎤','🧔','👩‍🦰','🕵️','💁‍♀️','🧑‍🦱','👨‍🎨'];
-let rival,busy=true,resolved=false,currentCheck=0,pending=null,blocked=false;
+let rival,busy=true,resolved=false,currentCheck=0,pending=null,blocked=false,prizeItems=[];
 /* every pending timeout, so an idle auto-play or a host teardown never leaves one firing */
 const shots=[];
 function shot(ms,fn){ shots.push(setTimeout(fn,ms)); }
@@ -616,14 +638,28 @@ function preRoll(){
   if(demoMode){
     blocked=Math.random()<0.5;
     currentCheck=blocked?DEMO_CONSOLATION:rnd(DEMO_CHECKS);
+    prizeItems=rnd(DEMO_ITEMS);
   }else{
     blocked=SPEC.outcome==="blocked";
     currentCheck=SPEC.amount;
+    prizeItems=SPEC.items||[];
   }
 }
 
+/* The items ride in behind the coins: they are laid out now and revealed once the count-up has
+   landed, so the player reads one prize at a time. Returns the extra hold the caller owes them,
+   which is nothing at all when the card carried none. */
+const PRIZE_HOLD_MS=1500;
+function showPrizes(afterMs){
+  if(!prizeItems.length) return 0;
+  $('prizes').innerHTML=prizeItems.map(it=>
+    `<span class="chip"><i>${it.icon||'🎁'}</i><b>×${it.count||1}</b><u>${it.name||''}</u></span>`).join('');
+  shot(afterMs,()=>{ $('prizes').classList.add('show'); S.win(); });
+  return PRIZE_HOLD_MS;
+}
+
 function newPitch(){
-  $('tray').classList.remove('show','blocked');resolved=false;busy=true;
+  $('tray').classList.remove('show','blocked');$('prizes').classList.remove('show');resolved=false;busy=true;
   /* hasNet is the VISUAL of the outcome, not its cause — the outcome is already decided. */
   rival={name:rnd(RIVAL_NAMES),pic:rnd(RIVAL_PICS),hasNet:blocked};
   $('whoseName').textContent=rival.name+"'s Town";$('whosePic').firstChild.textContent=rival.pic;
@@ -680,11 +716,13 @@ function collect(){
   (function up(t){const k=Math.min(1,(t-t0)/COUNT_MS);coins=Math.round(start+(target-start)*(1-Math.pow(1-k,3)));
     setCoinsDisplay(coins);if(k<1)requestAnimationFrame(up);else{coins=target;setCoinsDisplay(coins);}})(t0);
   bumpCoins();clearPolaroids();$('tray').classList.remove('show');
+  const hold=showPrizes(COUNT_MS);
   /* Hosted, the round IS the bonus — hand the roll loop back. The demo keeps playing.
      The delay is longer than the count-up above on purpose: reporting done tears this frame down
-     and the rAF driving the tween dies with it, freezing the balance mid-count. */
-  if(demoMode) setTimeout(()=>{preRoll();newPitch();},700);
-  else setTimeout(()=>sendDone(amt),COUNT_MS+220);
+     and the rAF driving the tween dies with it, freezing the balance mid-count. The prize strip
+     is held past that on the same principle — it dies with the frame too. */
+  if(demoMode) setTimeout(()=>{$('prizes').classList.remove('show');preRoll();newPitch();},700+hold);
+  else setTimeout(()=>sendDone(amt),COUNT_MS+220+hold);
 }
 const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
 renderer.domElement.addEventListener('pointerdown',ev=>{

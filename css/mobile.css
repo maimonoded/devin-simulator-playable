@@ -1,10 +1,10 @@
 /* ---------- index.html?view=mobile ----------
    The player's-eye view: the game window and nothing else.
 
-   Everything that exists for DEVELOPMENT is hidden — the side panels (builder list, story,
-   stats, activity log), the action bar, the tuning drawer and its button, and the second
-   controls row (auto-play, phone toggle). What survives is what a player actually sees: the
-   board, the play controls already riding on it, the store, and the HUD.
+   Everything that exists for DEVELOPMENT is hidden — the side panels (run stats, activity log),
+   the action bar, the tuning drawer and its button, and the second controls row (the phone
+   toggle). What survives is what a player actually sees: the board, the play controls already
+   riding on it, the store, and the HUD.
 
    The HUD moves INSIDE the frame rather than being hidden with the rest. "How it looks when
    you play" still has to show coins and energy — a board with no balances is not the game,
@@ -77,8 +77,8 @@ html.viewMobile .hud {
 /* The title block is branding, not gameplay, and it costs two lines the frame cannot spare. */
 html.viewMobile .hud .brand { display: none; }
 /* One row, no wrapping. Pills drop their captions — at this width the icon already says which
-   number it is — and the energy pill gives up its 190px floor, which was on its own what
-   forced the row to wrap onto a second line. */
+   number it is. Two pills, not three: energy rides on the Roll button and its 190px-floored pill
+   is gone, which was on its own what used to force the row onto a second line. */
 html.viewMobile .hud { flex-wrap: nowrap; }
 /* Balances read from the LEFT here — the brand and day chip that used to hold that side are
    hidden, so without this the pills' auto margin pushed everything to the right. The avatar
@@ -89,22 +89,17 @@ html.viewMobile .hud .pill { padding: 4px 8px; gap: 5px; min-width: 0; }
 html.viewMobile .hud .pill .lb { display: none; }
 html.viewMobile .hud .pill .v { font-size: 13px; }
 html.viewMobile .hud .pill .ic { font-size: 13px; }
-html.viewMobile .hud .energywrap { min-width: 0; flex: 1 1 auto; }
-html.viewMobile .hud .ebar { height: 5px; margin-top: 3px; }
+html.viewMobile .hud .pill .ic img { width: 15px; height: 15px; }
 /* Day and clock are simulator instrumentation — a player has no session counter on screen.
-   Dropping it also gives the four balance pills the whole width. */
+   Dropping it also gives the three balance pills the whole width. */
 html.viewMobile .daychip { display: none; }
 
 /* Below the HUD strip rather than under it. The HUD sits at top:10 and runs ~55px tall once
    the pills are compacted, so this clears it with a small gap. Both are absolute inside the
-   same frame, so if the HUD ever grows a row this is the number to move.
-   Back and the builders-view header clear it the same way, which puts the three of them on one
-   line: back left, title centred, store right. */
+   same frame, so if the HUD ever grows a row this is the number to move. The store button is
+   the only thing left on this line — the builders view's back button and header used to share
+   it — so anything added to that corner should start from this offset. */
 html.viewMobile .storeBtn { top: calc(74px + var(--safeT)); right: 12px; padding: 7px 13px; font-size: 12px; }
-html.viewMobile .navBtn.back { top: calc(74px + var(--safeT)); left: 12px; width: 44px; height: 44px; }
-html.viewMobile .buildersHead { top: calc(80px + var(--safeT)); }
-/* Under the store button, which is itself pushed clear of the HUD here. */
-html.viewMobile .boxCounter { top: calc(120px + var(--safeT)); right: 12px; }
 
 /* ---- notch and home indicator ----
    The frame runs edge to edge (viewport-fit=cover in index.html), which is what we want for the
@@ -115,9 +110,8 @@ html.viewMobile {
   --safeT: env(safe-area-inset-top, 0px);
   --safeB: env(safe-area-inset-bottom, 0px);
 }
+/* The Reshoot mode's throw bar stands exactly where the playbar does (css/board.css), so it
+   takes the same inset — it is the control the player is reaching for while the corner plays
+   out, and a button under the home indicator is a button they cannot press. */
 html.viewMobile .playbar,
-html.viewMobile .buildersBar,
-html.viewMobile .bingeBtn { bottom: calc(14px + var(--safeB)); }
-html.viewMobile .bingeBtn { bottom: calc(78px + var(--safeB)); }
-/* Library clears the HUD strip, level with Back and the Store button. */
-html.viewMobile .libBtn { top: calc(74px + var(--safeT)); width: 44px; height: 44px; font-size: 19px; }
+html.viewMobile .rsBar { bottom: calc(14px + var(--safeB)); }

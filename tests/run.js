@@ -17,6 +17,16 @@ const APP_FILES = [
   "js/util.js",
   "js/config.js",
   "js/content.js",
+  /* The catalog, the content files that register into it, then the unlock ledger that reads
+     it — index.html's order. storage.js sanitises a save against the catalog, so both have to
+     be in the context before it. */
+  "js/catalog.js",
+  "content/series/001.js",
+  "content/series/002.js",
+  "content/seasons/001-1.js",
+  "content/seasons/001-2.js",
+  "content/seasons/001-3.js",
+  "js/unlock.js",
   "js/board-model.js",
   "js/env-model.js",
   "js/dice-model.js",
@@ -24,7 +34,6 @@ const APP_FILES = [
   "js/state.js",
   "js/storage.js",
   "js/episodes.js",
-  "js/clues.js",
   ...fs.readdirSync(path.join(ROOT, "episodes"))
       .filter(f => /^\d+\.js$/.test(f)).sort().map(f => "episodes/" + f),
   /* xlsx.js is browser-only at runtime, but it must still LOAD in a bare context —
@@ -34,7 +43,6 @@ const APP_FILES = [
   "js/economy.js",
   "js/economy-import.js",
   "js/board-actor.js",
-  "js/builders/builders.js",
   "js/tiles/tile.js",
   ...fs.readdirSync(path.join(ROOT, "js/tiles"))
       .filter(f => f.endsWith("-tile.js")).sort().map(f => "js/tiles/" + f),

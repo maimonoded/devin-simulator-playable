@@ -5,7 +5,13 @@
    Importing is deliberately all-or-nothing. js/economy-import.js checks the whole workbook
    first and returns every problem it found; nothing is installed unless that list is empty.
    A half-applied economy would be far worse than a refused one — the numbers would be a
-   silent mix of two models and no one would know which. */
+   silent mix of two models and no one would know which.
+
+   The panel shows MORE than the game plays, and that is on purpose. The model still declares a
+   cost curve priced per builder and a series list of 240 episodes; the game has neither builders
+   nor episode unlocks any more. Everything here is a read-only view of the LOADED MODEL — never
+   of the run — so it stays honest about what was imported even while the board reads only the
+   handful of values Economy.apply() projects onto cfg. */
 
 /* Draw the panel into the drawer body. Called by buildTuning(). */
 function buildEconomyPanel(body){
@@ -42,15 +48,18 @@ function buildEconomyPanel(body){
      ${anchors.episodesSeries1} episodes in ${anchors.daysSeries1} days,
      ${anchors.totalEpisodes} in ${anchors.totalDays}.</p>`);
 
-  /* Series: what the model asks for vs what the episode library can actually supply. */
+  /* Series: what the model asks for vs what the episode library can actually supply.
+     Read-only, and now read-only about the MODEL alone. The row the run was in used to be
+     marked "◀ here" from state.series; there is no run position any more — builders are gone,
+     so nothing advances through a series — and a marker pointing at a place the player cannot
+     be is worse than no marker. What the model declares is still worth showing. */
   const shape=Economy.seriesShape();
   const st=document.createElement("table"); st.className="ttable";
   st.innerHTML=`<tr><th>Series</th><th>Builders</th><th>Global #</th><th></th></tr>`;
   shape.forEach(s=>{
-    const cur=s.index===state.series;
     const short=s.builders<s.declared;
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${s.name}${cur?' <b style="color:var(--gold)">◀ here</b>':""}</td>
+    tr.innerHTML=`<td>${s.name}</td>
       <td>${s.builders}${short?` <span class="hint">of ${s.declared}</span>`:""}</td>
       <td>${s.builders?`${s.from}–${s.to}`:"—"}</td>
       <td class="hint">${s.builders?"":"needs episodes"}</td>`;
@@ -59,7 +68,8 @@ function buildEconomyPanel(body){
   wrap.appendChild(st);
   wrap.insertAdjacentHTML("beforeend",
     `<p class="hint" style="margin:6px 0 0">A series can only be as long as the episodes left
-     for it — ${Episodes.count()} exist. The rest stay locked until more content ships.</p>`);
+     for it — ${Catalog.episodeCount()} exist. The model's shape, not the game's: nothing unlocks an
+     episode at the moment.</p>`);
 
   /* Import + reset */
   const msg=document.createElement("div"); msg.id="econMsg"; msg.style.margin="10px 0 0";
@@ -100,11 +110,11 @@ async function importEconomyFile(f){
       `<b>${f.name} was not loaded — ${res.errors.length} problem${res.errors.length>1?"s":""}:</b>
        <ul style="margin:6px 0 0 16px;padding:0">${res.errors.map(x=>`<li>${x}</li>`).join("")}</ul>`,"bad");
   }
+  /* install() projects the model onto cfg itself, so there is nothing to apply afterwards.
+     A new model used to mean repairing the run as well — a shorter series list could leave
+     state.series pointing past the end of it, and every builder had to be reshaped to the new
+     costs. Neither exists now: the model reaches the game only through cfg, deck and boxTable. */
   Economy.install(res.economy);
-  /* A new model means a new series shape, so the run may be pointing past the end of it. */
-  if(state.series>=Economy.playableSeries().length) state.series=0;
-  Economy.apply();
-  Builders.reshape();
   saveEconomy(); saveConfig();
   afterEconomyChange();
   const warn=res.warnings.length
@@ -118,7 +128,7 @@ async function importEconomyFile(f){
    message it just wrote has to be re-applied by the caller if it should survive. */
 function afterEconomyChange(){
   const keep=$("#econMsg")?$("#econMsg").innerHTML:"";
-  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); renderAll();
+  buildTuning(); buildBoard(); onCfgChange(); renderAll();
   if(keep&&$("#econMsg")) $("#econMsg").innerHTML=keep;
 }
 

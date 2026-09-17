@@ -1,5 +1,6 @@
 "use strict";
-/* Tuning drawer — builds inputs from the TUNING schema + deck/box tables, binds live edits. */
+/* Tuning drawer — builds inputs from the TUNING schema + deck/box tables, and binds live edits.
+   Also owns the HUD's debug button and its panel, at the bottom of this file. */
 function buildTuning(){
   const body=$("#tuningBody"); body.innerHTML="";
   TUNING.forEach(g=>{
@@ -32,24 +33,35 @@ function buildTuning(){
   });
   // deck table
   const dwrap=document.createElement("div"); dwrap.className="tgroup";
-  dwrap.innerHTML=`<h4>Merged deck (Chance + Chest)</h4>`;
+  /* Two columns do not mean what a number in them looks like it means, so the hint spells them
+     out: ⚡ 1 would otherwise read as "one energy" when it means "pay 1…mult", and a bonus card's
+     Coins is 0 because the economy prices that payout. Bonus itself is shown, not edited — it is
+     a MINIGAMES key, and the binding below parseFloats every input it finds. */
+  dwrap.innerHTML=`<h4>Deck · drawn on the four bonus tiles</h4>
+    <p class="hint" style="margin:0 0 8px">Weights are out of the table's total, which ships at
+    100 — so a weight is a percentage of draws. <b>⚡</b> is a flag, not an amount: an energy card
+    pays a random 1…roll multiplier. <b>🎁</b> is how many story items to grant, drawn from the
+    series being unlocked. A <b>Bonus</b> row opens that mini-game and pays the economy's train
+    pair (Tile values), not its Coins column.</p>`;
   const dt=document.createElement("table"); dt.className="ttable";
-  dt.innerHTML=`<tr><th>Card</th><th>Wt</th><th>Coins</th><th>⚡</th><th>🔍</th><th>VIP</th></tr>`;
+  dt.innerHTML=`<tr><th>Card</th><th>Wt</th><th>Coins</th><th>⚡</th><th>VIP</th><th>🎁</th><th>Bonus</th></tr>`;
   deck.forEach((c,i)=>{ const tr=document.createElement("tr");
     tr.innerHTML=`<td>${c.name}</td>
       <td><input data-d="${i}" data-f="weight" value="${c.weight}"></td>
       <td><input data-d="${i}" data-f="coins" value="${c.coins}"></td>
       <td><input data-d="${i}" data-f="energy" value="${c.energy}"></td>
-      <td><input data-d="${i}" data-f="clues" value="${c.clues}"></td>
-      <td><input data-d="${i}" data-f="vip" value="${c.vip}"></td>`;
+      <td><input data-d="${i}" data-f="vip" value="${c.vip}"></td>
+      <td><input data-d="${i}" data-f="items" value="${c.items||0}"></td>
+      <td>${c.game||"—"}</td>`;
     dt.appendChild(tr); });
   dwrap.appendChild(dt); body.appendChild(dwrap);
   // box table
   const bwrap=document.createElement("div"); bwrap.className="tgroup";
   const bt=document.createElement("table"); bt.className="ttable";
   bwrap.innerHTML=`<h4>Mystery Box · item 2 of 2</h4>
-    <p class="hint" style="margin:0 0 8px">Item 1 is always coins (set above). This table is the
-    second draw — and the game's only source of clues.</p>`;
+    <p class="hint" style="margin:0 0 8px">Item 1 is always coins (Tile values → Mystery box).
+    This table is the second draw. It had a third row, clues, until the album was removed —
+    the two left renormalise, so these weights are an even split whatever they add up to.</p>`;
   bt.innerHTML=`<tr><th>Drop</th><th>Weight</th><th>Amount</th></tr>`;
   boxTable.forEach((c,i)=>{ const tr=document.createElement("tr");
     tr.innerHTML=`<td>${c.name}</td>
@@ -79,9 +91,11 @@ function buildTuning(){
     onCfgChange();
   });
   body.querySelectorAll("input[data-key]").forEach(inp=>inp.oninput=(e)=>{
+    /* Every numeric row is now a plain assignment. `buildings` and `tiers` used to be special-
+       cased here — rounded up to a whole number and then handed to Builders.reshape() — but both
+       rows went with the builders, and the two keys are written by Economy.apply() alone. */
     const key=e.target.dataset.key; let v=parseFloat(e.target.value); if(isNaN(v))return;
-    if(["buildings","tiers"].includes(key)){ v=Math.max(1,Math.round(v)); cfg[key]=v; Builders.reshape(); }
-    else cfg[key]=v;
+    cfg[key]=v;
     const out=body.querySelector(`output[data-out="${key}"]`); if(out) out.textContent=v;
     onCfgChange();
   });
@@ -97,8 +111,13 @@ function syncTuningInputs(){
   document.querySelectorAll("#tuningBody select[data-key]").forEach(sel=>{ sel.value=cfg[sel.dataset.key]; });
 }
 function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clamp + token speed
-  document.querySelectorAll(".tile.standard .val").forEach(el=>{
-    const i=+el.closest(".tile").dataset.i; el.textContent=TILE_TYPES.standard.valueLabel(i); });
+  /* Every tile that prints a value, not just the standard ones — the two bills print their
+     price too, and scoping this to .tile.standard left their labels stale after an edit while
+     the 3D layer below updated correctly. Asking the registry for each tile's own label means
+     a future tile that prints something is covered without touching this line again. */
+  document.querySelectorAll(".tile .val").forEach(el=>{
+    const i=+el.closest(".tile").dataset.i;
+    el.textContent=TILE_TYPES[tileType(i)].valueLabel(i); });
   // the 3D board keeps its labels in a DOM layer over the canvas
   document.querySelectorAll("#boardLabels .blabel").forEach(el=>{
     const i=+el.dataset.i; const v=el.querySelector(".val");
@@ -110,7 +129,7 @@ function onCfgChange(){ // recompute per-tile labels (stdBase) + energy cap clam
   scheduleSaveConfig();
   renderAll();
 }
-/* Reset config only — player progress (coins, builders, day) is untouched.
+/* Reset config only — player progress (coins, energy, the day) is untouched.
    "Defaults" means the LOADED ECONOMY, not the values hardcoded in config.js: the model is
    what the game is meant to be balanced to, so an imported workbook survives this button and
    only hand edits are discarded. Economy.apply() runs after DEFAULTS so it wins on the keys
@@ -119,7 +138,7 @@ function resetDefaults(){ cfg=Object.assign({},DEFAULTS);
   deck=JSON.parse(JSON.stringify(defDeck)); boxTable=JSON.parse(JSON.stringify(defBox));
   clearConfig();
   Economy.apply();
-  Builders.reshape(); buildTuning(); buildBoard(); onCfgChange(); toast("↺ Config reset to the loaded economy"); }
+  buildTuning(); buildBoard(); onCfgChange(); toast("↺ Config reset to the loaded economy"); }
 
 /* Reset user only — tuning values stay as they are. Two clicks to confirm. */
 let _armed=null;

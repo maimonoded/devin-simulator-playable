@@ -107,26 +107,14 @@ test("builder numbers stay contiguous when a series is short on content", () => 
   eq(shape[1].from, 61); eq(shape[1].to, 70, "no gap in the numbering the cost curve sees");
 });
 
+/* The run no longer tracks which series it is in — builders are gone, and with them
+   state.series — so currentSeries() always answers the first one and globalOf() is the
+   identity plus one. The model still DECLARES the series shape, which is what is checked here
+   and what the Economy panel renders; nothing plays it yet. */
 test("globalOf translates a series-local builder to its global number", () => {
   freshRun();
-  eq(state.series, 0);
   eq(Economy.globalOf(0), 1);
   eq(Economy.globalOf(5), 6);
-});
-
-test("a later series prices and unlocks from its global builder number", () => {
-  freshRun();
-  const shape = Economy.seriesShape();
-  if (shape[1] && shape[1].builders > 0) {
-    state.series = 1;
-    eq(Economy.globalOf(0), shape[1].from);
-    near(Builders.cost(0, 0), Economy.costFor(shape[1].from, 1), 1e-9,
-         "series 2's first builder is priced as its global number, not as builder 1");
-    state.series = 0;
-  } else {
-    // only one series has content in this library, which is itself the documented behaviour
-    eq(Economy.nextSeries(), null, "no second series until more episodes ship");
-  }
 });
 
 test("playableSeries drops the ones with no content", () => {
@@ -195,7 +183,11 @@ test("apply projects the model's three tiers and the album target onto cfg", () 
   resetCfg();
 });
 
-suite("economy: the clue edge");
+/* Clues and predictions are gone from the game; the MODEL still carries the edge, because the
+   user asked for the economy to be kept whole. accuracyFor() is therefore a pure function of
+   the model's numbers with no live caller — tested so the number stays honest for whenever
+   something reads it again. */
+suite("economy: the clue edge (model only — nothing reads it)");
 
 test("accuracy rises per clue and stops at the cap", () => {
   resetCfg();
@@ -205,26 +197,6 @@ test("accuracy rises per clue and stops at the cap", () => {
   near(Economy.accuracyFor(4), 0.70, 1e-9);
   near(Economy.accuracyFor(50), 0.70, 1e-9, "capped");
   near(Economy.accuracyFor(-5), 0.55, 1e-9, "a negative count cannot lower it");
-});
-
-test("a prediction spends the cycle's clues and resets the flow, leaving the album alone", () => {
-  freshRun();
-  state.coins = 1e6;
-  state.clues = 9; state.cycleClues = 3;
-  state.epQueue.push("001");
-  const r = resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
-  eq(r.cluesSpent, 3);
-  near(r.accuracy, 0.67, 1e-9, "the outcome was modelled at the clued accuracy");
-  eq(state.cycleClues, 0, "the flow resets for the next builder");
-  eq(state.clues, 9, "the album is cosmetic and untouched");
-});
-
-test("clues only decide the outcome in auto runs — a manual pick still wins on its merits", () => {
-  freshRun();
-  state.coins = 1e6; state.cycleClues = 0;   // accuracy floor, 0.55
-  state.epQueue.push("001");
-  eq(resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false }).won, true,
-     "the right answer wins regardless of the modelled accuracy");
 });
 
 suite("economy: projection onto cfg");
@@ -241,7 +213,11 @@ test("apply pushes the model's numbers onto the live tuning surface", () => {
   near(cfg.trainEV, e.tiles.trainSmall * (1 - e.tiles.trainLargeChance) + e.tiles.trainLarge * e.tiles.trainLargeChance, 1e-9,
        "cfg.trainEV is the MODEL's number — what the board pays is Economy.trainRealEV()");
   eq(deck.length, e.deck.length);
-  eq(boxTable.length, e.box.item2.length);
+  /* The model keeps its clue row — it is the workbook as written — and apply() drops it on the
+     way to boxTable, because the game has no album to put a clue in. */
+  eq(boxTable.length, e.box.item2.filter(r => r.kind !== "clues").length);
+  eq(boxTable.filter(r => r.kind === "clues").length, 0, "no clue row reaches the live table");
+  eq(deck.filter(c => "clues" in c).length, 0, "and no card reaches the deck carrying one");
   resetCfg();
 });
 
@@ -255,7 +231,8 @@ test("the shipped config defaults already match the built-in model", () => {
   eq(DEFAULTS.accuracy, e.prediction.baseAccuracy);
   eq(DEFAULTS.accuracyPerClue, e.prediction.accuracyPerClue);
   eq(DEFAULTS.accuracyMax, e.prediction.maxAccuracy);
-  eq(defBox.length, e.box.item2.length, "the box table ships as the model's item 2");
+  eq(defBox.length, e.box.item2.filter(r => r.kind !== "clues").length,
+     "the box table ships as the model's item 2, less the clue row the game cannot pay");
   eq(defDeck.filter(c => c.clues > 0).length, 0, "and the deck ships with no clue card");
 });
 
@@ -388,7 +365,10 @@ test("a box outcome the game cannot pay out is refused", () => {
 });
 
 test("a deck without exactly one advance card is refused", () => {
-  const res = EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Deck", "B11", "Nothing happens")), "x.xlsx", null);
+  /* Found rather than hardcoded: the stub lays the shipped deck out from row 5, so the row the
+     advance card lands on moves whenever a card is added to the table. */
+  const row = 5 + ECONOMY_DEFAULT.deck.findIndex(c => c.advance);
+  const res = EconomyImport.fromWorkbook(stubWorkbook(w => w.put("Deck", "B" + row, "Nothing happens")), "x.xlsx", null);
   ok(!res.ok);
   ok(res.errors.some(e => /exactly one card whose name contains "Advance"/.test(e)), res.errors.join(" | "));
 });

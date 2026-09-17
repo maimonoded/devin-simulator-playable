@@ -27,6 +27,11 @@ export const Dice3D = {
   _group: null,
   _proto: null,          // the loaded GLB, cloned per die
   _dice: [],             // { obj, from:{x,z}, to:{x,z}, spin:{axis,rate}, qMid, qEnd }
+  /* Materials cloned for a tinted throw. They are OURS — the prototype's are shared and must
+     never be touched — so nothing else can free them, and the jail tile can be landed on
+     hundreds of times in a session. clear() disposes them. */
+  _tinted: [],
+  _tint: null,
   _t0: 0,
   _ms: 0,
   _pending: false,
@@ -86,13 +91,19 @@ export const Dice3D = {
      frame to land on the boundary. js/ui/main.js then waits cfg.diceToMoveMs before it moves the
      token, so both drawer knobs keep meaning what they say. It also makes diceRevealMs = 0 a
      legal setting: the dice appear already landed instead of never arriving. */
-  throwDice(values, centre) {
+  /* `tint` is an optional colour (a three.js-style hex) for this throw and this throw only —
+     the Reshoot corner's escape throws cost no energy, and they are a different colour so that
+     the player can see that rather than having to be told. It is handed in by board3d.js,
+     which owns the palette; null is the normal pair, exactly as die.glb authored it. */
+  throwDice(values, centre, tint) {
     const ms = Math.max(0, cfg.diceRevealMs || 0);
     /* Clear first and unconditionally. The previous pair is left lying on the board between
        rolls, and it has to be gone the moment this one is thrown — including when the model
        never loaded, where _spawn below won't run at all. */
     this.clear();
     this._pending = values;
+    /* After clear(), which resets it: a throw with no tint must never inherit the last one's. */
+    this._tint = tint || null;
     this._centre = centre || { x: 0, z: 0 };
     if (this._proto) this._spawn(values);
     this._t0 = performance.now();
@@ -105,6 +116,7 @@ export const Dice3D = {
     this._group.clear();
     this._dice = [];
 
+    const tint = this._tint;
     const c = this._centre || { x: 0, z: 0 };
     const size = cfg.diceSize || 0.9;
     const rest = BOARD_TOP + size / 2;
@@ -117,6 +129,7 @@ export const Dice3D = {
       obj.userData.value = value;
       obj.scale.setScalar(size);          // die.glb is a unit cube centred on its origin
       obj.traverse((o) => { if (o.isMesh) { o.castShadow = !!cfg.envShadows; } });
+      if (tint) this._tintDie(obj, tint);
 
       /* Where it ends up: the tilt that puts `value` on top, with a quarter-turn of yaw so
          two dice don't land as a matched pair. The yaw is composed on the LEFT, in world
@@ -197,8 +210,28 @@ export const Dice3D = {
     this._ms = 0;
   },
 
+  /* Recolour ONE die. Object3D.clone() shares materials with the prototype, so setting .color
+     on a clone's material would quietly recolour every die thrown afterwards — including the
+     normal pair, which shares the same instance. The material is therefore cloned first, and
+     only ever on a tinted throw: an untinted die keeps the shared material and stays free.
+     The die's colour multiplies its baked texture, so the pips and shading survive the tint. */
+  _tintDie(obj, tint) {
+    obj.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = (Array.isArray(o.material) ? o.material : [o.material]).map(m => m.clone());
+      mats.forEach((m) => { if (m.color) m.color.set(tint); });
+      this._tinted.push(...mats);
+      o.material = mats.length > 1 ? mats : mats[0];
+    });
+  },
+
   clear() {
     if (this._group) this._group.clear();
+    /* Only the clones made by _tintDie are disposed. The prototype's own materials are shared
+       by every untinted die there will ever be and are never ours to free. */
+    this._tinted.forEach(m => m.dispose());
+    this._tinted = [];
+    this._tint = null;
     this._dice = [];
     this._ms = 0;
   },

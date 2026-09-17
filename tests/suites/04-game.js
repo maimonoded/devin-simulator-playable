@@ -1,5 +1,5 @@
 "use strict";
-/* game.js — dice, lap bonus, prediction resolution, session/time */
+/* game.js — dice, lap bonus, session/time */
 
 suite("game: dice & rolling");
 
@@ -43,119 +43,6 @@ test("the lap bonus scales with the multiplier but the VIP seed does not", () =>
   const paid = applyPassStart(5);
   eq(paid, cfg.startPass * cfg.boardScale * 5);
   eq(state.vip, cfg.vipSeed * cfg.boardScale, "vip seed is per lap, not per multiplier");
-});
-
-suite("game: prediction resolution");
-
-function setupPrediction(coins = 10000) {
-  freshRun();
-  state.coins = coins;
-  state.epQueue = ["001", "002"];
-  return state;
-}
-
-test("a correct pick wins and pays wager x odds", () => {
-  setupPrediction();
-  const before = state.coins;
-  const r = resolvePrediction({ wager: 1000, odds: 2.2, sel: 0, correct: 0, auto: false });
-  eq(r.won, true);
-  near(r.payout, 2200, 1e-9);
-  near(state.coins, before - 1000 + 2200, 1e-9, "stake out, payout in");
-  eq(state.predWins, 1);
-  eq(state.streak, 1);
-});
-
-test("a wrong pick loses the stake and resets the streak", () => {
-  setupPrediction();
-  state.streak = 4;
-  const before = state.coins;
-  const r = resolvePrediction({ wager: 1000, odds: 2.2, sel: 1, correct: 0, auto: false });
-  eq(r.won, false);
-  eq(r.payout, 0);
-  near(state.coins, before - 1000, 1e-9);
-  eq(state.predLoss, 1);
-  eq(state.streak, 0);
-});
-
-test("bestStreak keeps the high-water mark", () => {
-  setupPrediction();
-  for (let i = 0; i < 3; i++) {
-    state.epQueue.push("001");
-    resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
-  }
-  eq(state.streak, 3);
-  state.epQueue.push("001");
-  resolvePrediction({ wager: 10, odds: 2, sel: 1, correct: 0, auto: false });
-  eq(state.streak, 0);
-  eq(state.bestStreak, 3);
-});
-
-test("watching consumes exactly one queued episode and counts it", () => {
-  setupPrediction();
-  eq(state.epQueue.length, 2);
-  resolvePrediction({ wager: 0, odds: 2, sel: 0, correct: 0, auto: false });
-  deepEq(state.epQueue, ["002"], "the front episode is consumed");
-  eq(state.epsWatched, 1);
-  eq(state.predsMade, 1);
-});
-
-test("a zero wager changes no coins but still resolves and counts", () => {
-  setupPrediction();
-  const before = state.coins;
-  const r = resolvePrediction({ wager: 0, odds: 2, sel: 1, correct: 0, auto: false });
-  eq(state.coins, before, "no stake, no payout");
-  eq(r.won, false);
-  eq(state.predWins, 0);
-  eq(state.predLoss, 0, "unwagered results must not pollute accuracy");
-  eq(state.epsWatched, 1);
-});
-
-test("an id consumes THAT episode, not whichever is at the front", () => {
-  setupPrediction(1e9);
-  state.epQueue = ["001", "002", "003"];
-  resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false, id: "002" });
-  deepEq(state.epQueue, ["001", "003"],
-         "the library can play any unwatched episode, so the played one is the one removed");
-});
-
-test("with no id it still consumes the front of the queue", () => {
-  setupPrediction(1e9);
-  state.epQueue = ["001", "002", "003"];
-  resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false });
-  deepEq(state.epQueue, ["002", "003"]);
-});
-
-test("an id that is not queued leaves the queue alone", () => {
-  setupPrediction(1e9);
-  state.epQueue = ["001"];
-  resolvePrediction({ wager: 0, odds: 2, sel: 0, correct: 0, auto: false, id: "007" });
-  deepEq(state.epQueue, ["001"], "a replay must not silently eat a queued episode");
-});
-
-test("auto mode ignores the pick and uses the clue-driven accuracy", () => {
-  setupPrediction(1e9);
-  cfg.accuracy = 1; cfg.accuracyMax = 1;   // the cap binds first, so it has to move too
-  for (let i = 0; i < 5; i++) {
-    state.epQueue.push("001");
-    eq(resolvePrediction({ wager: 10, odds: 2, sel: 1, correct: 0, auto: true }).won, true,
-       "accuracy 1 must always win even with a wrong pick");
-  }
-  cfg.accuracy = 0;
-  for (let i = 0; i < 5; i++) {
-    state.epQueue.push("001");
-    eq(resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: true }).won, false,
-       "accuracy 0 must always lose even with the right pick");
-  }
-  resetCfg();
-});
-
-test("manual mode ignores cfg.accuracy entirely", () => {
-  setupPrediction(1e9);
-  cfg.accuracy = 0;
-  state.epQueue.push("001");
-  eq(resolvePrediction({ wager: 10, odds: 2, sel: 0, correct: 0, auto: false }).won, true,
-     "a correct pick wins regardless of accuracy");
-  resetCfg();
 });
 
 suite("game: session & time");

@@ -2,12 +2,13 @@
 /* Orchestration: turns user input into game.js calls, plays back the returned
    events with animation/timing, wires all buttons, and boots the app. */
 
-/* Play a game.js event list: float → log → move → confetti → reveal → collect → pause.
-   reveal and collect block the roll loop (and therefore auto-play) until they finish. */
+/* Play a game.js event list: float → log → move → confetti → card → reshoot → reveal →
+   collect → minigame → pause. card, reshoot, reveal, collect and minigame block the roll loop
+   (and therefore auto-roll) until they finish. */
 async function playEvents(events){
   for(const ev of events){
-    /* renderHUD on a float too, not only on the blocking three below. A mystery box pays out
-       entirely in floats, so without this the coin and clue counters sat still through the
+    /* renderHUD on a float too, not only on the blocking events below. A mystery box pays out
+       entirely in floats, so without this the coin and energy counters sat still through the
        whole collection and only jumped at the end of the roll — which reads as "I collected
        it and nothing happened". */
     /* Before the floats: the box has to pop before its numbers can come out of the burst. */
@@ -18,10 +19,16 @@ async function playEvents(events){
     if(ev.confetti) confetti();
     if(ev.dice) diceConfetti();
     if(ev.card){ renderHUD(); await showCard(ev.card); }
+    /* The Reshoot corner's escape attempt: up to three throws of the coloured pair, then the
+       outcome. Before `reveal` because it ENDS in one — a tile that carried both would want
+       its own reveal last, after the throws. */
+    /* renderHUD AFTER, unlike every other blocking event: the outcome is already in state
+       before playback begins, so refreshing the HUD first would show the player the result of
+       an attempt they have not watched yet. */
+    if(ev.reshoot){ await showReshoot(ev.reshoot); renderHUD(); }
     if(ev.reveal){ renderHUD(); await showReveal(ev.reveal); }
     if(ev.collect){ renderHUD(); await showCollect(ev.collect); }
-    if(ev.clue){ renderHUD(); await showClue(ev.clue); }
-    /* Last of the blocking three: a mini-game takes the whole frame, so anything else this
+    /* Last of the blocking events: a mini-game takes the whole frame, so anything else this
        event carries should have been shown before it opens. */
     if(ev.minigame){ renderHUD(); await showMinigame(ev.minigame); }
     if(ev.pause) await sleep(ev.pause);
@@ -61,25 +68,37 @@ async function roll(){
   }finally{
     state.animating=false; renderAll();
   }
+  /* AFTER the finally, not inside it: Unlock.payAll refuses while state.animating is true (a
+     payment landing between a roll's events would render against a board the player cannot see),
+     so the offer has to come once the roll is fully unwound. */
+  await maybeOfferUnlock();
 }
 
-/* Upgrade button handler: apply in logic, announce in UI. */
-function uiUpgrade(bIdx){
-  const r=Builders.upgrade(bIdx); if(!r) return;
-  log("🏗️",`Builder ${bIdx+1} → level ${r.level}/${Builders.maxTier()} · −<b>${fmt(r.cost)}</b>`);
-  if(r.builderDone) log("🏗️",`<b>Builder ${bIdx+1} fully upgraded</b> (${Builders.doneCount()}/${Builders.count()} done)`);
-  // episodes unlock only when a builder is completed
-  if(r.title){
-    toast(`🎬 Episode unlocked — <b>${r.title}</b>`);
-    log("🎬",`Episode unlocked · <b>${r.title}</b>`);
-  }
-  if(r.seriesDone) seriesComplete();
+/* Offer the current target the moment the player can clear it OUTRIGHT — every remaining step,
+   not just the next one. Once per target: closing it means no, and the library is always there.
+
+   It PAUSES auto-roll, and resumes it — without touching autoMode at all.
+
+   runAuto's loop is `while(autoMode==="roll"){ await roll(); … }`, and roll() awaits this. So
+   while the popup is up, roll() has not returned and the loop is simply parked mid-iteration;
+   when the popup closes, roll() returns and the next roll happens. An episode becoming
+   affordable is the one moment in a run worth interrupting, and this interrupts it without the
+   loop ever having to be stopped and restarted.
+
+   Setting autoMode=null here and calling autoRoll() again afterwards was the obvious version and
+   it is broken: the resumed call starts a SECOND runAuto whose loop races the first, and the
+   first one's `finally{ autoMode=null }` then kills the second as it unwinds. Auto-roll would
+   stop one roll after the player pressed Unlock, looking like the popup had broken it. Do not
+   reintroduce an explicit stop here. */
+const _offeredUnlock=new Set();
+async function maybeOfferUnlock(){
+  if(typeof Unlock==="undefined"||typeof openUnlockReady!=="function") return;
+  const cur=Unlock.current();
+  if(!cur||_offeredUnlock.has(cur.key)) return;
+  if(!Unlock.canPayAll(cur.kind,cur.id)) return;
+  _offeredUnlock.add(cur.key);
+  await openUnlockReady(cur.kind,cur.id);
   renderAll();
-  /* Offer it the moment it unlocks — but only to a human, and only when the finale is not
-     already on screen. An auto run must never be stopped by a modal (that is the rule the two
-     auto modes are built on), and stacking this over seriesComplete() would bury the finale.
-     Either way the id stays queued, so nothing is lost by not asking. */
-  if(r.episodeId && !r.seriesDone && autoMode===null) openEpisodeUnlock(r.episodeId);
 }
 
 function nextSession(){
@@ -90,46 +109,34 @@ function nextSession(){
   renderAll();
 }
 
-/* Two auto modes, each a toggle (click to start, click again to stop after the current roll):
-     "roll"    — rolls only, nothing else. Stops when energy can't cover the multiplier.
-     "session" — rolls AND spends coins on the cheapest upgrades (internal balancing tool).
-   Only one can own the loop at a time. */
-let autoMode=null;   // null | "roll" | "session"
+/* One auto mode, a toggle (hold Roll to start, tap it to stop after the current roll):
+     "roll" — rolls only, nothing else. Stops when energy can't cover the multiplier.
+
+   It used to be one of two. "Auto-play session" was the same loop plus a pass that bought the
+   cheapest builder upgrade each turn; with builders gone the two modes were the same thing
+   under different names, so only this one is left. autoMode stays a string rather than becoming
+   a boolean because everything that reads it (js/ui/store.js, js/ui/minigame.js, renderAll)
+   asks WHICH mode owns the loop, and a second mode is plausible again later. */
+let autoMode=null;   // null | "roll"
 async function runAuto(mode){
-  if(autoMode===mode){ autoMode=null; renderAll(); return; }   // same button again → stop
-  if(autoMode!==null||state.animating) return;                  // the other mode owns the loop
+  if(autoMode===mode){ autoMode=null; renderAll(); return; }   // same control again → stop
+  if(autoMode!==null||state.animating) return;
   autoMode=mode; renderAll();
   let outOfEnergy=false;
   try{
-    while(autoMode===mode && !state.seriesDone){
+    while(autoMode===mode){
       if(state.energy<state.mult){ outOfEnergy=true; break; }   // re-checked each pass: mult can change mid-run
       await roll();
       if(state.animating) break;   // a roll bailed out unexpectedly — don't spin
-      if(mode==="session"){
-        // opportunistically upgrade the cheapest available builder to keep the loop turning
-        let up=Builders.cheapest();
-        while(up && state.coins>=up.cost && !state.seriesDone){ uiUpgrade(up.b); up=Builders.cheapest(); }
-      }
       await sleep(60);
     }
   }finally{
     autoMode=null;
-    if(outOfEnergy) log("⏹",`${mode==="roll"?"Auto roll":"Auto-play"} stopped · needs <b>${state.mult}</b>⚡ for a ×${state.mult} roll, have <b>${Math.floor(state.energy)}</b>`);
+    if(outOfEnergy) log("⏹",`Auto roll stopped · needs <b>${state.mult}</b>⚡ for a ×${state.mult} roll, have <b>${Math.floor(state.energy)}</b>`);
     renderAll();
   }
 }
 const autoRoll=()=>runAuto("roll");
-const autoPlay=()=>runAuto("session");
-function stopAuto(){ if(autoMode!==null){ autoMode=null; renderAll(); } }
-
-/* Builder button click. Upgrades stay clickable during auto-roll, so buying one is
-   also how you take manual control: stop the loop, let the in-flight roll finish
-   (Builders.upgrade refuses mid-animation), then buy. */
-async function onUpgradeClick(bIdx){
-  stopAuto();
-  while(state.animating) await sleep(50);
-  uiUpgrade(bIdx);
-}
 
 /* ---------------- wiring ---------------- */
 /* ?view=mobile: reparent the HUD and the store button INTO the board scene, so the whole game
@@ -181,50 +188,35 @@ if(typeof VIEW_MOBILE!=="undefined"&&VIEW_MOBILE){
   btn.addEventListener("pointerleave",endHold);
   btn.addEventListener("pointercancel",endHold);
 })();
-$("#autoBtn").onclick=autoPlay;
-/* Builders view. The buildings are a separate 3D scene, so switching means moving the DOM
-   overlay AND the scene the renderer draws — doing both here is what keeps them from ever
-   disagreeing about which view is up. */
-function setBuildersView(on){
-  $("#boardScene").classList.toggle("showBuilders",!!on);
-  if(use3d()&&window.Board3D&&Board3D.available) Board3D.setView(on?"builders":"board");
-  renderAll();
-  if(!on) deliverBoxes();
-}
-/* Boxes bought while the builders screen was up are thrown onto the board now that it is back.
+/* Banked mystery boxes, thrown onto the board.
+
+   Called once from boot(), after loadState(), so boxes banked in a save land on the board the
+   run comes back to. Nothing banks one any more — builder upgrades did, and they are gone — so
+   in a fresh run this is a no-op. It is kept whole, and called from somewhere, because it is
+   the seam a deck card will use: state.pendingBoxes goes up, this puts them on the board.
 
    The state moves FIRST and the animation is decoration on top: spawn() picks the tiles and
-   clears the pending count synchronously, so a reload, a view switch or a missing WebGL context
-   mid-throw all leave the boxes correctly on the board rather than lost. The only thing that can
-   be interrupted is the picture.
+   clears the pending count synchronously, so a reload or a missing WebGL context mid-throw
+   still leaves the boxes correctly on the board rather than lost. The only thing that can be
+   interrupted is the picture.
 
-   Not awaited by anything: the player is back on the board and free to roll, and roll() blocks
-   on state.animating rather than on this. */
+   Not awaited by anything: the player is free to roll, and roll() blocks on state.animating
+   rather than on this. */
 function deliverBoxes(){
   const n=state.pendingBoxes|0;
   if(n<=0) return;
   const spawned=OVERLAY_TYPES.mysteryBox.spawn(n);
-  /* Fewer free tiles than boxes: the rest stay banked for the next trip back, so a full board
-     never silently eats a reward the player paid for. */
+  /* Fewer free tiles than boxes: the rest stay banked for the next delivery, so a full board
+     never silently eats a reward the player earned. */
   state.pendingBoxes=Math.max(0,n-spawned.length);
   renderAll();
   if(!spawned.length) return;
   log("🎁",`<b>${spawned.length}</b> mystery box${spawned.length>1?"es":""} dropped on the board`);
-  /* Auto-play session is the batch tool — thousands of upgrades, nobody watching. It gets the
-     boxes without the show, exactly as it skips episode video and the bonus games. */
-  if(autoMode==="session"||!use3d()||!window.Board3D||!Board3D.available) return;
-  Board3D.throwOverlays(
-    OVERLAYS.flatMap(o=>o.all().map(i=>({i,gold:!!(o.isGold&&o.isGold(i))}))),spawned);
+  if(!use3d()||!window.Board3D||!Board3D.available) return;
+  Board3D.throwOverlays(OVERLAYS.flatMap(o=>o.all()),spawned);
 }
-$("#buildersBtn").onclick=()=>setBuildersView(true);
-$("#boardBtn").onclick=()=>setBuildersView(false);
-/* Straight into the prediction for the earliest unwatched episode — same ordering rule the
-   library enforces, so the two entry points can never disagree about what plays next. */
-$("#bingeBtn").onclick=()=>openPrediction(Builders.firstUnwatchedId());
-$("#libraryBtn").onclick=()=>openLibrary();
-$("#albumBtn").onclick=()=>openAlbum();
 $("#avatarBtn").onclick=()=>openProfile();
-$("#watchBtn").onclick=openPrediction;
+$("#libBtn").onclick=openLibrary;
 $("#storeBtn").onclick=openStore;
 $("#nextBtn").onclick=nextSession;
 /* 9:16 preview. The class goes on .stage and CSS reshapes .boardScene; Board3D's
@@ -280,9 +272,16 @@ function boot(){
   initState();
   const restored=loadState();   // overlay saved progress, if any
   buildBoard(); buildTuning(); setDice(3,4); syncMultButton(); renderAll();
+  /* The debug menu's HUD button (js/ui/debug.js). Guarded rather than called outright, because
+     that file is meant to be droppable: pulling its one <script> tag has to remove the tool, not
+     break boot. */
+  if(typeof buildDebugButton==="function") buildDebugButton();
   applyPhoneView(!!cfg.phoneView);   // after loadConfig, so a saved framing comes back
+  /* After loadState, so boxes banked before the reload land rather than sitting in the save
+     forever. Nothing banks one yet — see deliverBoxes — so this is usually a no-op. */
+  deliverBoxes();
   if(restored) log("💾",`Session restored · Day <b>${state.day}</b> · ${fmt(state.coins)} coins · ${state.rolls} rolls so far.`);
-  else log("✨","Welcome to <b>Harbour Heights</b>. Roll to earn, build to unlock, predict to win.");
+  else log("✨","Welcome to <b>Harbour Heights</b>. Roll the dice, walk the board, collect the coins.");
   if(!storageOK) toast("⚠ Browser storage unavailable — progress won't be saved");
 }
 window.boot=boot;

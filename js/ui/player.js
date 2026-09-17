@@ -23,7 +23,7 @@ function mmss(s){ if(!isFinite(s)||s<0) s=0; const m=Math.floor(s/60); return m+
 /* The player's DOM. Ids here are the contract playVideo() binds to. */
 function playerMarkup(id){
   return `<div class="vwrap" id="vWrap">
-      <video id="epVideo" class="epVideo" playsinline preload="auto" src="${Episodes.videoFor(id)}"></video>
+      <video id="epVideo" class="epVideo" playsinline preload="auto" src="${Catalog.videoFor(id)}"></video>
       <button class="vclose" id="vClose" title="Close">✕</button>
       <div class="vpause">▶</div>
       <div class="vsound" id="vSound">🔇 tap for sound</div>
@@ -56,26 +56,6 @@ function playVideo(id){
       setTimeout(finish,cfg.fallbackSceneMs);
     };
     if(!v){ fallback(); return; }
-
-    /* Auto-play session is a batch economy tool — don't sit through 90s of footage.
-       Read the length from metadata, log that the episode was watched, and move on.
-       (Auto-roll deliberately does NOT skip: it simulates a real viewing session.) */
-    if(typeof autoMode!=="undefined"&&autoMode==="session"){
-      const title=Episodes.titleOf(id);
-      let settled=false;
-      const skip=(secs)=>{
-        if(settled) return; settled=true;
-        const len=isFinite(secs)&&secs>0?` · ${mmss(secs)} of footage`:"";
-        log("⏩",`Auto-play watched <b>${title}</b>${len} (playback skipped)`);
-        try{ v.pause(); v.removeAttribute("src"); v.load(); }catch(e){}   // abort the download
-        finish();
-      };
-      if(isFinite(v.duration)&&v.duration>0) return skip(v.duration);
-      v.addEventListener("loadedmetadata",()=>skip(v.duration));
-      v.addEventListener("error",()=>skip(NaN));
-      setTimeout(()=>skip(v.duration),2000);        // don't hang if metadata never arrives
-      return;
-    }
 
     v.addEventListener("error",fallback);
     // wrapped, not passed directly: the listener's Event argument would land in `completed`

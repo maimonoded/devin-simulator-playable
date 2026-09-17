@@ -19,8 +19,8 @@ import * as THREE from "../../vendor/three.module.js";
 import { GLTFLoader } from "../../vendor/loaders/GLTFLoader.js";
 import { Env3D } from "./env3d.js";
 import { Dice3D } from "./dice3d.js";
-import { Builders3D } from "./builders3d.js";
 import { NPC3D } from "./npc3d.js";
+import { Shoe3D } from "./shoe3d.js";
 
 const N = 11;                    // grid is 11x11, tiles around the ring
 const TILE = 1;                  // one tile = one world unit
@@ -35,10 +35,9 @@ const TOKEN_MODEL = "assets/token/token.glb";
    board never depends on the asset having been generated. Normalized to a 1x1 footprint with its
    origin at the base, like the tiles, so BOX_SIZE is just how big it is in tile units. */
 const BOX_MODEL = "assets/props/models/mystery-box.glb";
-/* The gold one holds clues. Because contents are decided when a box is PLACED, the board can
-   say so before the player gets there — which is what turns a box into somewhere worth landing
-   rather than an invisible bonus. */
-const BOX_MODEL_GOLD = "assets/props/models/mystery-box-gold.glb";
+/* There is one kind of box. A gold variant used to advertise a box holding clues from across the
+   board; clues are gone, so assets/props/models/mystery-box-gold.glb is deliberately never
+   fetched — nothing could make the board show it. The file is left on disk. */
 const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neighbouring tile
 /* Where a box's base goes: the slab's TOP, the same surface the token stands on and the same
    value js/ui/npc3d.js calls FOOT_Y.
@@ -49,9 +48,9 @@ const BOX_SIZE = 0.42;           // tile units, tall enough to read past a neigh
    It got away with it for a while because a chunky object still reads as sitting on a tile when
    its bottom centimetre is buried; the NPCs are what made the same mistake visible.
 
-   Every box height has to come from here: the resting place, the gold box's idle bob, and the
-   put-everything-back path after a cancelled throw. The throw itself captures the resting y and
-   restores it, so it follows on its own — but only because all three agree. */
+   Every box height has to come from here: the resting place, and the put-everything-back path
+   after a cancelled throw. The throw itself captures the resting y and restores it, so it
+   follows on its own — but only because both agree. */
 const BOX_Y = TILE_H;
 
 /* Palette lifted from css/base.css + css/board.css so both renderers look alike. */
@@ -61,19 +60,35 @@ const COLORS = {
   start:    0x3a3016,
   spa:      0x232a63,
   vip:      0x232a63,
-  premiere: 0x232a63,
-  train:    0x2a2f66,
+  reshoot:  0x232a63,
   deck:     0x2b2560,
-  edge: {                        // the coloured borders the CSS tiles carry
+  /* The two bills (indices 3 and 23) — the only tiles that take. They are the one thing on the
+     ring worth seeing from a distance, since a player who can see a bill coming can spend
+     against it, so they are warm where the rest of the board is blue. Overheads is the deeper
+     red of the two: it is the larger bill. */
+  payroll:   0x3a1f2a,
+  overheads: 0x4a1f28,
+  edge: {        // the coloured borders the CSS corner tiles carry — corners only, see below
     start:    0xffcb5c,
     spa:      0x2dd4bf,
     vip:      0x8b6dff,
-    premiere: 0xff6fa5,
+    reshoot:  0xff6fa5,
+    /* No rim on the two bills. It was added when their art carried no signal of its own, and it
+       is a wireframe BoxGeometry — which draws each face's triangle diagonal too, so it renders
+       as a criss-cross of pink lines across the tile rather than as a border. The art now says
+       "this one takes your money" by itself (a near-black ground and a red hazard band), which
+       is where the user asked for that signal to live. */
   },
   token:    0xff6fa5,
-  tower:    0x8b6dff,
-  towerDone:0xffcb5c,
   box:      0xffcb5c,
+  /* Dice thrown by something other than the roll. Keyed by the NAME of the throw, because the
+     caller (js/ui/fx.js) knows what it is throwing and this file knows what colour things are —
+     handing a hex across that boundary would put a second palette in a classic script. Reshoot
+     borrows its own corner's pink, so the free throws read as belonging to the tile that
+     ordered them rather than to the roll that cost energy. */
+  dice: {
+    reshoot:  0xff6fa5,
+  },
 };
 
 /* Smooth in and out — the camera moves, which should never start or stop abruptly. */
@@ -92,10 +107,10 @@ const Board3D = {
   ready: false,
 
   _renderer: null, _scene: null, _camera: null, _host: null,
-  _tiles: [], _token: null, _boxes: new Map(), _models: new Map(), _gltf: null,
+  _tiles: [], _token: null, _boxes: new Map(), _models: new Map(), _arted: new Set(), _gltf: null,
   _raf: 0,
   /* The mystery box model, loaded once and cloned per box. */
-  _boxModel: null, _boxModelGold: null,
+  _boxModel: null,
   /* Frustum half-height from the last resize(), and the multiplier the box throw pulls the
      camera out by. Kept apart so the throw can widen the view without resize() having to know
      about it, and so a resize mid-throw still lands on the right base framing. */
@@ -105,8 +120,6 @@ const Board3D = {
      teardown can settle it rather than leaving the roll loop waiting on an animation that will
      never finish. */
   _anims: [], _fxDone: [], _flying: null,
-  /* "board" | "builders" — which scene the one renderer is drawing. See setView(). */
-  _view: "board",
   _tokenTarget: new THREE.Vector3(), _hopT: 1,
   /* _camTarget is where the camera is looking now, _camWant where it is heading. Keeping
      them apart is what makes the follow trail rather than snap. */
@@ -119,6 +132,10 @@ const Board3D = {
   /* ---------------- setup ---------------- */
   init(host) {
     this._host = host;
+    /* The page's only WebGLRenderer, and it has to stay that way: browsers cap how many live GL
+       contexts a document may hold, and taking a second one can silently kill this one. Anything
+       else that needs drawing belongs in this scene, or in another scene handed to THIS
+       renderer — never to a renderer of its own. */
     try {
       this._renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch (e) {
@@ -183,12 +200,13 @@ const Board3D = {
     }
 
     Env3D.init(this._scene);
-    /* Its own scene, drawn by this renderer — see setView(). */
-    Builders3D.init();
     this.syncPageBackground();
     /* Init once, not per build(): the dice hang off their own group, which build() leaves
        alone, so they survive a board rebuild the way the token does. */
     Dice3D.init(this._scene);
+    /* The pull deck, on the same terms: its own group inside the scene, untouched by build(),
+       and it never gets a <script> tag of its own — one type="module" for the whole project. */
+    Shoe3D.init(this._scene);
     /* Same deal, and handed the board's own geometry rather than deriving the ring a second
        time. anisotropy is passed as a function because the renderer's capability is only
        meaningful once it exists, which it does by here but would not at module scope. */
@@ -245,9 +263,6 @@ const Board3D = {
     this._fit = Math.max(halfH, halfW / aspect);
     this._aspect = aspect;
     this._applyFrustum();
-    /* The builders scene shares this canvas, so it re-fits on the same events — otherwise it
-       would still be framed for whatever size the window was when it was last shown. */
-    Builders3D.resize(w, h);
     if (window.syncBoardLabels) window.syncBoardLabels();
   },
 
@@ -347,10 +362,15 @@ const Board3D = {
   /* ---------------- build ---------------- */
   build() {
     if (!this.available) return;
+    /* A rebuild is a new run or a changed world (boot, Reset user, an economy import) — never
+       mid-roll. Either way the card lying on the discard spot is the memory of a turn that no
+       longer happened, so it goes with the board it was dealt onto. */
+    Shoe3D.clearCard();
     this._tiles.forEach(t => { this._scene.remove(t); });
     this._tiles = [];
     this._models.forEach(m => this._scene.remove(m));
     this._models.clear();
+    this._arted.clear();
 
     const geo = new THREE.BoxGeometry(TILE - GAP, TILE_H, TILE - GAP);
     for (let i = 0; i < 40; i++) {
@@ -363,7 +383,8 @@ const Board3D = {
       this._scene.add(mesh);
       this._tiles[i] = mesh;
 
-      /* corner tiles get a coloured rim, standing in for the CSS border */
+      /* a rim for every type that carries a coloured border on the CSS board — the four corners
+         and the two bills — standing in for that border here */
       const edge = COLORS.edge[type];
       if (edge) {
         const ring = new THREE.Mesh(
@@ -390,9 +411,14 @@ const Board3D = {
      bounding box, fix the up axis, scale to the tile, centre it and sit it on the slab.
      Absent models are normal: the tile keeps its plain slab. */
   _loadModel(i, slab) {
+    /* null is not a missing file — it is board-model.js saying this tile carries a face rather
+       than a model, so the art path below is the one that should run. Without this the loader
+       would fetch the string "null" and 404 on every card tile. */
+    const src = tileModelPath(i);
+    if (!src) return false;
     if (!this._gltf) this._gltf = new GLTFLoader();
     this._gltf.load(
-      tileModelPath(i),
+      src,
       (gltf) => {
         const model = gltf.scene;
 
@@ -488,20 +514,43 @@ const Board3D = {
 
   /* Optional per-tile artwork. In 3D this is just the slab's top-face texture —
      no counter-rotation, no anchor maths, which is the whole point of the port. */
+  /* Per-tile artwork: the slab's top-face texture. This is how a card tile gets its face.
+
+     ---- IT HAS TO BE TURNED, AND BY A CONSTANT ----
+
+     The slab is an unrotated BoxGeometry, so its top face maps u to world +X and v to world −Z.
+     The camera sits at a fixed 45° azimuth, which renders both of those world axes as screen
+     DIAGONALS — so a texture applied straight comes out rotated 45°, and a portrait laid on a
+     tile reads as a lozenge. That is not an art problem to be fixed per file; it is a property
+     of this camera, so it is corrected once, here, for every tile PNG there will ever be.
+
+     Turning the UVs by ENV_CAM.az puts the image upright on screen. The art then FILLS the
+     tile: no inset, because the tile renders as a diamond and the diamond is what should crop
+     the picture. The face's own corners sample outside [0,1] and are edge-clamped, which is
+     deliberate — those corners are the diamond's four points, the picture's own edge pixels
+     continue into them, and the seam is invisible. Art for a tile therefore wants to be a
+     full-bleed square with nothing important in its corners. */
   _loadArt(i, mesh) {
-    const src = tileImagePath(i);
     new THREE.TextureLoader().load(
-      src,
+      tileImagePath(i),
       tex => {
         tex.colorSpace = THREE.SRGBColorSpace;
-        const top = new THREE.MeshLambertMaterial({ map: tex, transparent: true });
+        tex.center.set(0.5, 0.5);
+        tex.rotation = THREE.MathUtils.degToRad(ENV_CAM.az);
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
+        const top = new THREE.MeshLambertMaterial({ map: tex });
         const side = mesh.material;
         /* BoxGeometry material order: +x, -x, +y(top), -y, +z, -z */
         mesh.material = [side, side, top, side, side, side];
+        /* Art arrived, so the fallback emoji is no longer wanted — the same rule a model gets. */
+        this._arted.add(i);
+        if (window.onTileModelled) window.onTileModelled(i);
       },
       undefined,
       () => {},                      // absent art is normal — leave the plain slab
     );
+    return true;
   },
 
   _buildToken() {
@@ -618,57 +667,35 @@ const Board3D = {
     }
   },
 
-  /* `boxes` is [{i, gold}] — which tiles hold a box and which of those are the clue ones. */
+  /* `boxes` is a plain array of tile indices — the tiles that are holding a mystery box. Every
+     box looks the same, so a tile either has one or it does not and nothing here has to notice a
+     box changing appearance underneath it. */
   setOverlays(boxes) {
     if (!this.available) return;
-    const want = new Map(boxes.map(b => [b.i, !!b.gold]));
+    const want = new Set(boxes);
     for (const [i, mesh] of this._boxes) {
-      /* A box whose LOOK changed has to be rebuilt, not just left alone — that happens when a
-         pre-gold save is restored and its contents get drawn on the first landing. */
-      if (!want.has(i) || mesh.userData.gold !== want.get(i)) {
-        this._scene.remove(mesh); this._boxes.delete(i);
-      }
+      if (!want.has(i)) { this._scene.remove(mesh); this._boxes.delete(i); }
     }
-    want.forEach((gold, i) => {
+    want.forEach(i => {
       if (this._boxes.has(i)) return;
-      this._boxes.set(i, this._addBox(i, gold));
+      this._boxes.set(i, this._addBox(i));
     });
   },
 
   /* One box, resting on its tile. Uses the generated model if it has arrived and a plain cube
      otherwise — the cube is not a placeholder to be removed later, it is the fallback for a
      missing or failed asset, exactly like the token's disc. */
-  _addBox(i, gold) {
+  _addBox(i) {
     const holder = new THREE.Group();
     const w = this._tileWorld(i);
     holder.position.set(w.x, BOX_Y, w.z);
-    holder.userData.gold = !!gold;
-    /* Gold falls back to the plain box before it falls back to the cube: a wrong-coloured box
-       still reads as a box, where a cube reads as missing art. */
-    const model = (gold && this._boxModelGold) || this._boxModel;
+    const model = this._boxModel;
     holder.add(model
       ? model.clone(true)
       : new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3),
-                       new THREE.MeshLambertMaterial({ color: gold ? 0xffcb5c : COLORS.box })));
+                       new THREE.MeshLambertMaterial({ color: COLORS.box })));
     if (!model) holder.children[0].position.y = 0.15;   // cube pivots at its middle
 
-    /* The gold one has to be findable from across the board, where a tile is a few dozen pixels
-       and a colour difference alone is lost against the pale deck. So it is also bigger and
-       wears a halo — and it moves, which is what the eye actually catches. */
-    if (gold) {
-      holder.scale.setScalar(Math.max(0.2, +cfg.boxGoldScale || 1));
-      const glow = Math.max(0, +cfg.boxGoldGlow || 0);
-      if (glow > 0) {
-        const s = new THREE.Sprite(new THREE.SpriteMaterial({
-          map: this._glowTexture(), color: 0xffcb5c, transparent: true, opacity: glow,
-          depthWrite: false, blending: THREE.AdditiveBlending,
-        }));
-        s.scale.set(1.5, 1.5, 1);
-        s.position.y = BOX_SIZE * 0.55;
-        holder.add(s);
-        holder.userData.glow = s;
-      }
-    }
     /* Turned to the camera like the piece: a wrapped box has a front (the bow's knot) and no
        board edge to align with, so it should read from wherever the player is sitting. */
     holder.rotation.y = THREE.MathUtils.degToRad(ENV_CAM.az);
@@ -676,50 +703,12 @@ const Board3D = {
     return holder;
   },
 
-  /* A soft radial blob, drawn once and reused as the gold box's halo. Cheaper and softer than
-     any geometry, and as a sprite it always faces the camera. */
-  _glowTexture() {
-    if (this._goldGlowTex) return this._goldGlowTex;
-    const c = document.createElement("canvas");
-    c.width = c.height = 128;
-    const g = c.getContext("2d").createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, "rgba(255,235,170,1)");
-    g.addColorStop(0.35, "rgba(255,203,92,0.55)");
-    g.addColorStop(1, "rgba(255,203,92,0)");
-    const ctx = c.getContext("2d");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
-    this._goldGlowTex = new THREE.CanvasTexture(c);
-    return this._goldGlowTex;
-  },
-
-  /* Idle life on the gold boxes: a slow turn, a gentle bob and a breathing halo. Skipped while
-     any board tween is running — the throw and the opening own the transforms then, and a bob
-     added on top would fight them. */
-  _tickBoxes(t) {
-    if (this._anims.length) return;
-    for (const [i, g] of this._boxes) {
-      if (!g.userData.gold) continue;
-      const spin = Math.max(200, +cfg.boxGoldSpinMs || 4200);
-      g.rotation.y = (t / spin) * Math.PI * 2;
-      const bob = Math.max(0, +cfg.boxGoldBob || 0);
-      g.position.y = BOX_Y + Math.sin(t / 620 + i) * bob;
-      if (g.userData.glow) {
-        const k = 1 + Math.sin(t / 480 + i) * 0.12;
-        g.userData.glow.scale.set(1.5 * k, 1.5 * k, 1);
-      }
-    }
-  },
-
   /* Load the box model once, then re-make any boxes already on the board so they pick it up.
      Called from build(); failure is logged and leaves the cubes, which is a working board. */
   _loadBoxModel() {
-    this._loadOneBoxModel(BOX_MODEL, "_boxModel");
-    this._loadOneBoxModel(BOX_MODEL_GOLD, "_boxModelGold");
-  },
-  _loadOneBoxModel(url, slot) {
-    if (this[slot]) return;
+    if (this._boxModel) return;
     if (!this._gltf) this._gltf = new GLTFLoader();
-    this._gltf.load(url, (gltf) => {
+    this._gltf.load(BOX_MODEL, (gltf) => {
       const model = gltf.scene;
       /* Measure from real vertices, not cached per-geometry boxes: setFromObject without the
          precise flag returns the box OF a rotated box, which reads high and renders the prop
@@ -730,23 +719,15 @@ const Board3D = {
         if (!o.isMesh) return;
         o.castShadow = !!cfg.envShadows;
         if (o.material?.map) o.material.map.anisotropy = this._renderer.capabilities.getMaxAnisotropy();
-        /* Self-lit, so the gold box stays the brightest thing on the deck wherever the sun is
-           pointing. Cloned first — the loaded material is shared by every clone of this model,
-           which is fine here (all gold boxes want it) but must not leak to the plain one. */
-        if (slot === "_boxModelGold" && o.material?.emissive) {
-          o.material = o.material.clone();
-          o.material.emissive = new THREE.Color(0xffb020);
-          o.material.emissiveIntensity = Math.max(0, +cfg.boxGoldEmissive || 0);
-        }
       });
-      this[slot] = model;
-      /* Anything already placed is still a cube (or the wrong colour) — swap it now rather than
-         waiting for the next board rebuild, which might not come until the player rolls. */
-      const live = [...this._boxes].map(([i, m]) => [i, m.userData.gold]);
-      live.forEach(([i]) => { this._scene.remove(this._boxes.get(i)); this._boxes.delete(i); });
-      live.forEach(([i, gold]) => this._boxes.set(i, this._addBox(i, gold)));
+      this._boxModel = model;
+      /* Anything already placed is still a cube — swap it now rather than waiting for the next
+         board rebuild, which might not come until the player rolls. */
+      const live = [...this._boxes.keys()];
+      live.forEach(i => { this._scene.remove(this._boxes.get(i)); this._boxes.delete(i); });
+      live.forEach(i => this._boxes.set(i, this._addBox(i)));
     }, undefined, (e) => {
-      console.warn(`Board3D: mystery box ${url} failed to load, keeping the cube`, e);
+      console.warn(`Board3D: mystery box ${BOX_MODEL} failed to load, keeping the cube`, e);
     });
   },
 
@@ -755,11 +736,12 @@ const Board3D = {
      that resolves when the whole thing is done, so the caller can await it before handing the
      board back to the player.
 
-     Resolves — never rejects — on every path, including no boxes, no WebGL and a mid-throw view
-     switch. The caller clears state.pendingBoxes on the strength of it. */
+     Resolves — never rejects — on every path, including no boxes, no WebGL and a teardown
+     part-way through. The caller clears state.pendingBoxes on the strength of it. */
   throwOverlays(all, fresh) {
-    /* `all` is every box that should be on the board, `fresh` only the ones to animate. Boxes
-       already sitting there from earlier trips must not leap into the air again. */
+    /* Both are arrays of tile indices, like setOverlays: `all` is every box that should be on the
+       board, `fresh` only the ones to animate. Boxes already sitting there from earlier trips
+       must not leap into the air again. */
     this.setOverlays(all);
     if (!this.available) return Promise.resolve();
     const falling = (fresh || all).map(i => this._boxes.get(i)).filter(Boolean);
@@ -871,6 +853,10 @@ const Board3D = {
      and it only runs once the await returns. */
   cancelBoxFx() {
     if (!this.available) return;
+    /* The deck is torn down on the same paths for the same reason: a card left presented in
+       front of the camera is the visible symptom, and a pull promise nobody settles is the one
+       that actually soft-locks the board. */
+    Shoe3D.cancel();
     this._anims.length = 0;
     if (this._flying) { this._scene.remove(this._flying); this._flying = null; }
     /* Anything caught mid-throw is invisible or in the air — put every box back on its tile, so
@@ -891,27 +877,6 @@ const Board3D = {
   _tween(dur, step, end, delay = 0) {
     if (dur <= 0 && delay <= 0) { step && step(1); end && end(); return; }
     this._anims.push({ t: -delay, dur: Math.max(1, dur), step, end });
-  },
-
-  /* The buildings live in their own scene now (js/ui/builders3d.js) — the board's middle is
-     where dice land and reveals play, which is no place for a progress readout. */
-  setBuilders() {
-    if (!this.available) return;
-    Builders3D.build();
-    if (this._view === "builders") this.resize();   // slot count may have changed the fit
-  },
-
-  /* ---------------- views ----------------
-     One renderer, one canvas, two scenes. A second WebGLRenderer would take a second GL
-     context and browsers cap those — losing one silently kills the board. */
-  view() { return this._view; },
-  setView(name) {
-    const next = name === "builders" ? "builders" : "board";
-    if (next === this._view) return this._view;
-    this._view = next;
-    if (next === "builders") Builders3D.build();
-    this.resize();                     // each scene fits the canvas its own way
-    return this._view;
   },
 
   /* Live tuning-drawer edits. env3d and envMargin re-apply without a reload; envShadows does
@@ -941,6 +906,9 @@ const Board3D = {
   /* Did tile i end up with a 3D model? render.js asks, to decide whether the tile still
      needs its emoji. */
   hasModel(i) { return this._models.has(i); },
+  /* A tile PNG counts as art too. Without this the fallback emoji sat on top of a
+     portrait tile, because "has art" only ever meant "has a GLB". */
+  hasArt(i) { return this._arted.has(i); },
 
   /* Throw the dice onto the middle of the board. js/ui/fx.js calls this instead of shaking
      the DOM dice when the 3D board is up and the model actually loaded; it falls back on its
@@ -949,9 +917,31 @@ const Board3D = {
      following, the token when it is, wherever the player dragged to otherwise. Handing it
      over is what makes the dice land in view rather than at the middle of the board, which
      with camFollow on is often off-screen entirely. */
-  throwDice(values) {
-    return Dice3D.throwDice(values, { x: this._camTarget.x, z: this._camTarget.z });
+  /* `style` names a throw in COLORS.dice ("reshoot"), or is omitted for the normal pair. An
+     unknown name tints nothing rather than throwing, so a typo costs the colour and not the
+     roll. */
+  throwDice(values, style) {
+    return Dice3D.throwDice(values, { x: this._camTarget.x, z: this._camTarget.z },
+                            (style && COLORS.dice[style]) || null);
   },
+  /* ---------------- the pull deck ----------------
+     Pull one card off the deck and present it. The card is the finished `card` event from
+     js/tiles/deck-tile.js — every coin of it is already paid, and this only shows what happened.
+
+     The camera's LIVE aim and the camera itself are handed over rather than a pose: with
+     camFollow on the aim drifts while the card is in the air, so a pose computed once would
+     slide the card off-centre exactly while the player is reading it. */
+  pullCard(card) {
+    return Shoe3D.pullCard(card, { aim: this._camTarget, camera: this._camera });
+  },
+  /* Resolves once the presented card has been dealt to the table. ALWAYS resolves — showCard()
+     awaits it, and roll()'s finally is the only thing that clears state.animating. */
+  shoeWhenClear(ms) { return Shoe3D.whenClear(ms); },
+  /* Definitively broken, as opposed to merely not built yet: fx.js keys its flat-card fallback
+     off this, and conflating the two makes the flat card flash on every load. */
+  shoeFailed() { return Shoe3D.failed(); },
+  cancelShoe() { Shoe3D.cancel(); },
+
   diceReady() { return Dice3D.available(); },
   /* Definitively failed, as opposed to merely not downloaded yet. */
   diceFailed() { return Dice3D.failed(); },
@@ -986,21 +976,14 @@ const Board3D = {
         p.y = TILE_H;
       }
     }
-    /* Only the active scene ticks and draws. The board's camera-follow and the dice are
-       pointless work while the builders screen is up, and the tile labels are hidden there. */
-    if (this._view === "builders") {
-      Builders3D.tick(1 / 60);
-      this._renderer.render(Builders3D.scene(), Builders3D.camera());
-      return;
-    }
     /* The board's own tweens (the box throw). Stepped before the camera so a zoom change lands
        in the same frame it was asked for rather than one late. */
     this._stepAnims(1000 / 60);
-    this._tickBoxes(performance.now());
-    /* The cast keeps walking through a box throw, unlike the boxes' own idle tick: nothing here
-       shares an object with the board's tweens, and a world that freezes whenever something else
-       is happening reads worse than one that carries on. */
+    /* The cast keeps walking through a box throw: nothing here shares an object with the board's
+       tweens, and a world that freezes whenever something else is happening reads worse than one
+       that carries on. */
     NPC3D.tick(1000 / 60);
+    Shoe3D.tick();
     if (this._zoom !== this._zoomShown) this._applyFrustum();
     this._followCamera();
     Env3D.tick(1 / 60);

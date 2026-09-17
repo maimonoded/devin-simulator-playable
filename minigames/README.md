@@ -4,19 +4,23 @@ A **bonus mini-game** is a full-frame game a tile opens instead of a popup. Each
 self-contained page in this folder, opened in an `<iframe>` over the board by
 [`js/ui/minigame.js`](../js/ui/minigame.js) and talked to with `postMessage`.
 
-Today the board has two: the four **train** tiles (indices 5/15/25/35) pay one of exactly two
-bonuses, and each bonus has its own game.
+**A deck card opens each one.** The train tile that used to be their only caller is gone, and the
+four tiles it stood on draw a deck card instead — so the *Steal the Spotlight* and *Premiere Gala*
+cards in the deck ([`js/config.js`](../js/config.js)) are what opens a game now, and how often is
+that table's weights rather than `cfg.trainLargeChance`. The two bonuses themselves are unchanged,
+and so are their keys and their prices.
 
-| Key | Bonus | File |
-|---|---|---|
-| `train-small` | the small bonus (`cfg.trainSmall`, 65% of landings) | [steal-the-spotlight.html](steal-the-spotlight.html) |
-| `train-large` | the large bonus (`cfg.trainLarge`, 35% of landings) | [gala-match3.html](gala-match3.html) |
+| Key | Bonus | Opened by | File |
+|---|---|---|---|
+| `train-small` | the small bonus (`cfg.trainSmall`) | the *Steal the Spotlight* card | [steal-the-spotlight.html](steal-the-spotlight.html) |
+| `train-large` | the large bonus (`cfg.trainLarge`) | the *Premiere Gala* card | [gala-match3.html](gala-match3.html) |
 
 ## The one rule
 
-**A mini-game never decides money.** By the time it opens, [`js/tiles/train-tile.js`](../js/tiles/train-tile.js)
-has already drawn the outcome from the economy model *and already banked the coins* with
-`gainCoins`. The amount is handed over purely so the game can present it. This is the same
+**A mini-game never decides money.** By the time it opens, the card that opened it has already
+drawn the outcome from the economy model, *already banked the coins* with `gainCoins` and
+*already granted the items* with `Items.add`. Both are handed over purely so the game can present
+them — an item is no more the game's to award than a coin is. This is the same
 contract the Collect popup has always had — the popup was never anything but theatre over an
 already-paid reward — it is just visible now that the theatre got bigger.
 
@@ -52,10 +56,12 @@ Same-origin `postMessage` both ways. Both sides check `e.origin` and the sender.
 |---|---|
 | `amount` | the coins the engine has already paid. Display it; never add it to a balance the host owns. |
 | `outcome` | `"win"` or `"blocked"` — the *shape* of the round, also engine-owned. |
-| `label` | what the tile calls this bonus (`"Train bonus"`). |
+| `label` | what the caller calls this bonus (the deck card's name). |
+| `items` | the story items the card **already granted**, `[{icon, name, count}]`, under exactly the same rule as `amount` — present them, never grant them. Always an array, empty when the card carried none. Where there is a ladder this is the **winning rung's** entry: it is `tierItems[winIndex]`, and `deck-tile.js` assigns the same array rather than copying it, so the two cannot drift. Both games hand it over as a small row of icons with counts **after the coin count-up**, so the two prizes are read one at a time, and hold it briefly before reporting done. The gala keeps that strip even though its ladder has already shown the prop, for a reason worth knowing before deleting it: **a ladder chip carries no name** — a caption runs 130–150px and would push the slots on every rung — so the player sees `🔑 ×4` and learns it was the Rose Hotel Key only from the strip. It is also the entire item display for a host that sends no `tierItems`. An empty `items` shows nothing at all, never an empty row. |
 | `coins` | the player's balance **before** the win. The tile banks the coins before the game opens, so this is `state.coins - amount` — which means a game that counts its pill up by `amount` on Collect lands exactly on the real total instead of one prize too high. |
 | `tiers` | *(prize-ladder games only)* the rungs, ascending. Rendered as the ladder — never show amounts of your own, or the game promises one number and pays another. |
 | `winIndex` | *(prize-ladder games only)* which rung the engine already paid. The game must **make that rung win**; see "Rigged by design" below. |
+| `tierItems` | *(prize-ladder games only)* the props on each rung — `[[{icon, name, count}], …]`, **exactly three arrays, index-aligned with `tiers`**, any of them possibly empty. Items are a rung's prize exactly as coins are, so they are shown on the ladder before the first pick and not only at the end. The engine drew one prop per rung and granted **only `tierItems[winIndex]`**; the other two were drawn to be *looked at*. Two rungs naming the same prop is legal and expected — the draw is weighted by what the run still owes and all three come off one snapshot — so a ladder must read correctly with a repeat rather than assuming three distinct props. **Optional, and unlike `items` the host gives it no default**: `js/ui/minigame.js` spreads it straight off the spec, so a caller that sends none leaves it `undefined`. A game normalises it itself — three arrays or nothing — and must keep playing without it off the flat `items`, because missing means *older host*, never *no host*: a malformed or absent `tierItems` is not a reason to drop into demo mode. |
 | `loadMs` | how long the game's own opening animation should run (`cfg.bonusLoadMs`). |
 | `idleMs` | how long before the game plays its own round. **`0` for a human — picking is the player's decision and is never made for them, however long they take.** Only auto-roll sends a value, because there is nobody at the keyboard; it gets the same random `cfg.collectMinSec`–`collectMaxSec` window. |
 | `trayMs` | paces the Collect tray's auto-close, always the random `collectMinSec`–`collectMaxSec` window. Collecting is an acknowledgement, not a decision — the coins were banked before the game opened — so this one does time out, exactly as the Collect popup always has. |
@@ -87,6 +93,18 @@ player chooses **which** envelope and **how long** it takes; the prize was alrea
 the first one opened. That is the same bargain the Collect popup has always offered — it is just
 visible now that the theatre got bigger.
 
+**The props on the ladder are rigged the same way, and one step further.** The engine does not only
+pick the winning rung: it draws the prop and the count for *every* rung before the page opens, so
+`tierItems` arrives finished and the game paints three prizes of which exactly one was banked. The
+rule that follows is the one `winIndex` already imposes — the props must **win and lose with their
+rung**, lighting with it and fading with it, because they are that rung's prize and not a separate
+announcement. (In `gala-match3.html` they simply sit inside `.pay` and inherit `.won` / `.faded`;
+no code reaches in to style them.) The matching trap on the engine side is written up in
+[`js/tiles/deck-tile.js`](../js/tiles/deck-tile.js): `drawItem()` picks *and* banks in one call, so
+building a three-rung ladder with it would hand over six props a round instead of two, on the
+currency the run is gated on. `pickItem()` exists to draw a prop without granting it, and only
+`rungs[winIndex]` is ever passed to `Items.add`.
+
 The economy consequence of the ladder is written up in [TODO.md](../TODO.md): an even pick of
 1/3, 2/3 and the top rung pays **2/3 of the top**, so the large bonus yields 210 where the model
 says 315. `Economy.trainEV()` is the model's number and `Economy.trainRealEV()` is what the board
@@ -97,7 +115,12 @@ actually pays — compare them rather than assuming they agree.
 Every game must keep working when opened on its own —
 `http://localhost:8125/minigames/steal-the-spotlight.html` — because that is how they are authored
 and tuned. With no `bonus:open` in the first few seconds the game runs in **demo mode**: its own
-random payouts, and it loops forever instead of reporting back. `document.body.classList` gets
+random payouts — including a stand-in for the items, so they can be seen and tuned with no host to
+send them — and it loops forever instead of reporting back. Steal the Spotlight picks a row from
+`DEMO_ITEMS`; the gala builds a whole ladder in `demoTierItems()`, and **weights it towards the
+awkward shapes on purpose** — all three rungs empty, one empty rung, a two-chip rung, and two rungs
+holding the same prop — because looping standalone is the only routine coverage the contract's
+edges get. `document.body.classList` gets
 `hosted` in the embedded case, which is how demo-only affordances are hidden (Steal the Spotlight
 uses it to drop the *Switch Opponent* button — hosted, that button would be a free re-draw of a
 payout the engine has already committed to).
@@ -124,8 +147,8 @@ persistent renderer*, not about a transient page. The context goes away with the
 2. Import three from the importmap (`{"imports":{"three":"../vendor/three.module.js"}}`) rather
    than a CDN — the project vendors it and must run with no network.
 3. Register it in `MINIGAMES` in [`js/ui/minigame.js`](../js/ui/minigame.js).
-4. Return `this.minigame(key, amount, {outcome, label})` from the tile, *after* `gainCoins` has
-   banked the amount.
+4. Return `this.minigame(key, amount, {outcome, label, items})` from the card, *after* `gainCoins`
+   has banked the amount and `Items.add` has granted the items.
 
 Nothing else needs to change: the event flows through `playEvents()` like any other blocking event.
 

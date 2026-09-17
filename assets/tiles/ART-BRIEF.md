@@ -1,3 +1,11 @@
+> **Out of date in one respect, and it matters.** This brief's tile table below was written when
+> every tile had its own model and the board had Train and Plot Twist tiles. It no longer has
+> either: the ring is one shared `standard.glb`, the four corners have their own models, and the
+> four card tiles carry flat faces rather than models. The STYLE and FORMAT rules in this brief
+> are still exactly right and are what the board-tile-art skill implements — it is only the
+> which-tile-is-which table that has drifted. See assets/tiles/README.md for what is actually
+> loaded.
+
 # Tile art brief — 3D models
 
 Hand this to whoever produces the tile assets. It is self-contained.
@@ -96,9 +104,8 @@ Numbering is 1-based, running clockwise from Start (the bottom vertex on screen)
 | `1.glb` | Start | the entrance / go-again tile |
 | `11.glb` | Spa | grants energy |
 | `21.glb` | VIP Lounge | pays out the accumulated pot |
-| `31.glb` | Premiere | sends the player back to Start |
-| `6, 16, 26, 36` | Train | bonus coins |
-| `4, 9, 14, 19, 24, 29` | Plot Twist | the card / chance tile |
+| `reshoot.glb` | Reshoot | the jail: three free throws for a double, or a fine |
+| `6, 16, 26, 36` | Card tiles | draw from the deck — these carry a FACE (assets/tiles/faces/), not a model |
 | everything else | Standard | ordinary property tiles |
 
 The four corners are the landmarks and should read as bigger, distinct places. The 26 standard

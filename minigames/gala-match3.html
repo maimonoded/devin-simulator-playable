@@ -12,7 +12,7 @@
     --navy:#160a2e; --navy-l:#241340;
     --magenta:#e91e8c; --rosa:#ff7eb9;
     /* Two scales, set by fitToViewport() so the whole board fits the frame without scrolling.
-       --s is the CHROME (medallion, plaque, ladder, floor, paddings, the tray) and takes the
+       --s is the CHROME (medallion, plaque, ladder, paddings, the tray) and takes the
        shrinking. --c is the ENVELOPE GRID, which is already the right size and is only touched
        once the chrome has nothing left to give. Every dimension below is expressed against one
        of the two, so shrinking stays proportional instead of squashing anything. */
@@ -75,20 +75,41 @@
   .plaque .show{font-size:calc(var(--s)*20px);font-weight:700;font-style:italic;color:#5a0a1c;line-height:1.05;
     text-shadow:0 1px 0 rgba(255,255,255,.35);}
   .plaque .sub{font-size:calc(var(--s)*8.5px);color:#7a1226;font-weight:700;}
+
   .match-line{margin:calc(var(--s)*12px) 0 calc(var(--s)*9px);text-align:center;
     font-size:calc(var(--s)*13.5px);font-weight:700;color:var(--champagne);}
   .match-line .b{color:#fff;}
 
   /* ---- prize ladder (size scales with value) ---- */
   .ladder{display:flex;flex-direction:column;gap:calc(var(--s)*8px);margin-bottom:calc(var(--s)*12px);}
+  /* The transition lists its properties by NAME, and must keep doing so. `transition:all` also
+     caught the padding here and the width/height on .slot below — all of them driven by --s — so
+     a re-fit read scrollHeight off a ladder still animating TOWARDS the size it had just been
+     given, and picked a scale for a page that no longer existed. It bites on the paths that
+     re-fit LIVE tiers shortly after --s moved: the setTimeout(relayout,60) pass at the end of
+     newGala(), and the ResizeObserver. (It does NOT bite inside one fitToViewport() call —
+     transitions only advance between frames, and that loop is synchronous. Measuring it by
+     stepping the loop alone shows nothing, which is how it survived.)
+     Re-measured at 375x667 with one prop per rung, 40ms after --s changes, `all` vs named:
+       · --s just LOWERED to 0.66 — `all` reads 706 against a viewport of 667 and the re-fit
+         over-shrinks to 0.55, the floor, an 11-step over-shrink into a needlessly tiny board.
+         Named reads 667 and holds 0.66.
+       · --s just RAISED to 1 — `all` reads 807 where the settled page is 860, so the read is
+         wrong in both directions; that one happens to converge anyway, which is exactly why it
+         cannot be relied on.
+     Nothing listed below affects layout, so the won/faded/lit sweep still animates and the fit
+     measures what it just set. The list got MORE load-bearing with the per-rung props: opacity
+     and transform are what .tier.won/.faded drive over them. */
   .tier{display:flex;align-items:center;gap:calc(var(--s)*9px);
     padding:calc(var(--s)*7px) calc(var(--s)*12px);border-radius:13px;
     background:linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.42));
-    border:1.5px solid rgba(242,201,76,.35);transition:all .35s;}
+    border:1.5px solid rgba(242,201,76,.35);
+    transition:border-color .35s, box-shadow .35s, background .35s, opacity .35s, transform .35s;}
   .tier .slots{display:flex;gap:calc(var(--s)*6px);}
   .slot{border-radius:9px;display:flex;align-items:center;justify-content:center;
     background:linear-gradient(180deg,#2a0a16,#1c0610);border:1.5px solid rgba(242,201,76,.25);
-    filter:grayscale(1) brightness(.55);transition:all .3s;position:relative;}
+    filter:grayscale(1) brightness(.55);position:relative;
+    transition:filter .3s, border-color .3s, background .3s, box-shadow .3s;}
   .slot.lit{filter:none;border-color:var(--gold);
     background:linear-gradient(180deg,#3a1250,#20103a);box-shadow:0 0 12px rgba(242,201,76,.55);animation:slotpop .3s;}
   @keyframes slotpop{40%{transform:scale(1.22);}}
@@ -102,6 +123,52 @@
   .tier.big .pay .amt{font-size:calc(var(--s)*22px);}
   .tier .pay .cat{font-size:calc(var(--s)*9.5px);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--rosa);margin-bottom:calc(var(--s)*3px);}
   .tier.small .pay .cat{font-size:calc(var(--s)*8.5px);}
+  /* ---- the rung's props ----
+     What that rung pays in ITEMS, under what it pays in coins, because they are the same kind of
+     fact: the engine picked one identity per rung and granted only the winner's.
+
+     It lives INSIDE .pay, stacked under .amt, and the obvious alternatives are worse. There is no
+     horizontal slack on the rung that matters most — measured at 375 wide with --s pinned to 1,
+     the huge rung's 🪙 amount ALREADY wraps to two lines before any of this (54px tall against
+     18 and 22 on the rungs below) and its .cat wraps too, squeezing .pay to 82px. So a third flex
+     column has nothing to take; a second line across the whole .tier costs a chip's height on all
+     three rungs. Stacked here the cost is vertical and only where it is spent: +13 / +9 / +26px
+     at --s 1, scrollHeight 812 → 860, which at 375x667 the fit absorbs by stepping --s 0.70 →
+     0.66 and NEVER touches --c — the envelopes stay full size. Even at a punishing 1440x620,
+     where --s is already pinned at its 0.55 floor, --c only goes 0.90 → 0.86 against a 0.80
+     floor.
+
+     THE INVARIANT: .pay's width must stay .cat's. It does in every shape measured (81.6/89.8/82
+     for both the width of .cat and the width of .pay, with chips of 37.3/43.6/47.3 sitting
+     inside), and it is why there is NO NAME on the ladder — a caption runs 130–150px and would
+     push .slots on every rung. Icon and count only; the name lives in the end-of-round strip,
+     which is an overlay and has the room. That is a rule about what is BUILT, not a
+     `display:none` — a caption that exists but is hidden drifts back. A second chip that does not
+     fit wraps to a second line INSIDE .pay rather than widening it, which is what flex-wrap is
+     here for.
+
+     Three things it deliberately does not do:
+       · No gold bloom of its own. rgba(242,201,76,…) glow is this page's word for "this one
+         matched" (.slot.lit, .cell.win-glow). The winning rung's props are already told apart by
+         both losers sitting at 32%; a second signal would compete with the slots doing the work.
+         The top rung's gold is the static .tier.huge treatment its .amt already has, not a win.
+       · No transition and no entrance animation — fitToViewport() measures a settled box, and
+         the note above says what a mid-tween measurement costs.
+       · No state of its own. renderLadder() draws all three once; the win sweep puts .won/.faded
+         on .tier and these inherit the 32% and the scale for free, which is now the CORRECT
+         reading — the items really do depend on the rung. Nothing for openCell(), collectWin()
+         or clearShots() to reach inside. */
+  .tier .pay .props{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;
+    gap:calc(var(--s)*2px) calc(var(--s)*7px);margin-top:calc(var(--s)*4px);}
+  .tier .pay .props .chip{display:inline-flex;align-items:center;gap:calc(var(--s)*3px);}
+  .tier .pay .props .chip i{font-style:normal;line-height:1;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));font-size:calc(var(--s)*16px);}
+  .tier .pay .props .chip b{font-family:"Bodoni MT",Georgia,serif;font-weight:700;line-height:1;
+    font-size:calc(var(--s)*12px);color:var(--champagne);}
+  .tier.big .pay .props .chip i{font-size:calc(var(--s)*19px);}
+  .tier.big .pay .props .chip b{font-size:calc(var(--s)*14px);}
+  .tier.huge .pay .props .chip i{font-size:calc(var(--s)*22px);}
+  .tier.huge .pay .props .chip b{font-size:calc(var(--s)*16px);color:var(--gold);}
   .tier.huge{border-color:rgba(242,201,76,.7);border-width:2px;
     background:linear-gradient(180deg, rgba(242,201,76,.16), rgba(0,0,0,.4));
     box-shadow:inset 0 0 18px rgba(242,201,76,.12);}
@@ -151,11 +218,6 @@
   @keyframes prizein{from{transform:scale(0) rotate(-40deg);}to{transform:scale(1) rotate(0);}}
   .cell.flip{transform:rotateY(180deg);}
   .cell.win-glow .open-face{box-shadow:inset 0 0 14px rgba(0,0,0,.5),0 0 26px rgba(242,201,76,.9);border-color:#fff;}
-
-  /* ---- stage floor loot ---- */
-  .floor{display:flex;justify-content:center;gap:calc(var(--s)*4px);font-size:calc(var(--s)*30px);
-    margin-top:calc(var(--s)*10px);filter:drop-shadow(0 6px 6px rgba(0,0,0,.5));opacity:.92;}
-  .floor span:nth-child(odd){transform:translateY(4px);}
 
   /* ---- loading: private jet flight ---- */
   .loader{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -235,6 +297,23 @@
     margin:calc(var(--s)*6px) 0 calc(var(--s)*10px);line-height:1.35;}
   .tray .their-loss .amt{color:#c0392b;}
   .tray .their-loss .why{display:block;font-size:calc(var(--s)*11px);color:#8a5a3a;font-weight:600;font-style:italic;margin-top:1px;}
+  /* ---- item prizes ---- */
+  /* The second prize, shown once the coins have finished counting up so the two never compete.
+     The tray's own card, one size down and scaled by --s like the rest of the chrome. */
+  .prizes{position:absolute;left:calc(var(--s)*10px);right:calc(var(--s)*10px);bottom:calc(var(--s)*10px);z-index:90;
+    display:none;justify-content:center;gap:calc(var(--s)*10px);
+    padding:calc(var(--s)*10px) calc(var(--s)*14px);border-radius:16px;
+    background:linear-gradient(180deg,#fff6e6,#f0dcc0);border:3px solid var(--gold);
+    box-shadow:0 0 0 2px var(--crimson-d),0 -6px 24px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.7);}
+  .prizes.show{display:flex;animation:trayUp .5s cubic-bezier(.2,1.3,.4,1);}
+  /* Icon and count share a line — the strip sits where the tray did and must not be as tall. */
+  .prizes .chip{width:calc(var(--s)*86px);text-align:center;}
+  .prizes .chip i{font-size:calc(var(--s)*30px);font-style:normal;vertical-align:middle;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));}
+  .prizes .chip b{font-family:"Bodoni MT",Georgia,serif;font-size:calc(var(--s)*17px);color:#8a5f10;
+    vertical-align:middle;margin-left:calc(var(--s)*4px);}
+  .prizes .chip u{display:block;text-decoration:none;font-size:calc(var(--s)*10px);font-weight:700;
+    color:#7a1226;line-height:1.2;}
   .collect-btn{width:100%;border:none;border-radius:999px;padding:calc(var(--s)*14px);
     font-size:calc(var(--s)*18px);font-weight:800;cursor:pointer;
     font-family:inherit;letter-spacing:.06em;text-transform:uppercase;
@@ -289,8 +368,6 @@
 
     <div class="grid" id="grid"></div>
 
-    <div class="floor">🎟️ 🥂 📸 🌹 🥂 🎟️</div>
-
     <div class="tray" id="tray">
       <div class="rival-pic" id="rivalPic">🧑‍🎤<span class="cry">😭</span></div>
       <div class="won-for">You beat <b id="rivalName">Meghan</b> to it<br>you scored <span class="won-cat" id="wonCat"></span></div>
@@ -298,6 +375,8 @@
       <div class="their-loss" id="theirLoss"></div>
       <button class="collect-btn pulse" id="collectBtn">Collect</button>
     </div>
+
+    <div class="prizes" id="prizes"></div>
   </div>
 </div>
 
@@ -326,6 +405,18 @@ const HOST = window.parent !== window;
 let SPEC = {                      // demo defaults; a hosted run overwrites these
   amount:0, label:"", coins:5000, loadMs:2500, idleMs:0, trayMs:14000,
   tiers:null, winIndex:null,
+  /* The ITEM ladder, index-aligned with `tiers`: three entries, each an array (possibly empty) of
+     {icon,name,count}. The engine draws one identity per rung and grants only the winner's, so a
+     rung's props are as much that rung's prize as its coins are, and belong on it — which is the
+     whole of this feature.
+     `items` is the WINNING rung's entry, the same array as tierItems[winIndex]. It stays because
+     it is the older field and a consumer that has never heard of tierItems is then still correct
+     rather than broken; here it is what the end-of-round hand-over strip shows.
+     Both arrive over postMessage and are structured-cloned plain data. tierItems is OPTIONAL: a
+     host older than this page sends only `items`, and the page must then look exactly as it did
+     before — see newGala(). Present, never grant. */
+  tierItems:null,
+  items:[],
 };
 let demoMode = !HOST, started = false, sent = false;
 function sendDone(amount){
@@ -424,11 +515,102 @@ const RIVAL_PICS=['🧑‍🎤','👩‍🎤','🧔','👩‍🦰','🕵️','�
 const SHOWS=['Tonight\'s Premiere','The Season Finale','A Secret Wedding','Midnight in Marbella','The Reunion'];
 const STARS=['💃','🕴️','👰','🤵','🎭'];
 
-let amounts,plan,planAt,found,done,pendingWin,rival,winIdx;
+/* tierItems is ALWAYS three arrays once newGala() has run, even when there is nothing to show —
+   renderLadder() indexes it three times and a page that was sent no ladder must draw rungs, not
+   throw. prizeItems is the winning rung's entry, kept separate because the fallback path (no
+   tierItems) still has a flat `items` to hand over at the end. */
+let amounts,plan,planAt,found,done,pendingWin,rival,winIdx,prizeItems=[],tierItems=[[],[],[]];
 let idleTimer=null;
 /* How long the balance takes to count up on Collect. sendDone() waits longer than this — see
    collectWin(). */
 const COUNT_MS=700;
+/* How long the cream item strip is held at the END of the round — the hand-over. */
+const PRIZE_HOLD_MS=1500;
+
+/* ---- the standalone stand-in for the item ladder ----
+   Like the demo's invented amounts, this exists so the rungs can be authored and tuned with no
+   host. It is a pool of IDENTITIES, not of whole prizes: the engine picks one identity per rung
+   off a single demand snapshot, so demoTierItems() has to build three entries the same way. */
+const DEMO_ITEM_POOL=[{icon:"🔑",name:"Rose Hotel Key"},{icon:"💳",name:"Simon's Black Card"},
+                      {icon:"👠",name:"Size Seven Heel"},{icon:"💍",name:"The Engagement Ring"},
+                      {icon:"📜",name:"The Certificate"}];
+/* The shapes are weighted so that looping standalone deals every case the contract permits, which
+   is the only routine coverage three of them get:
+     · ALL THREE EMPTY, ~30%. This is the real no-items round — Unlock.current() returning null
+       makes every rung's pick null at once, so in play it is all three or none. It is also the
+       whole no-tierItems fallback as far as the ladder is concerned.
+     · ONE EMPTY RUNG, ~15%. The contract allows a per-entry [] even though the engine cannot
+       currently produce one; it must show NOTHING on that rung, never an empty box.
+     · A TWO-CHIP RUNG, ~15%. Likewise permitted by the contract, and the case that has to wrap
+       rather than widen .pay at phone width.
+     · the shape real content sends, the rest of the time.
+   Counts ascend 1/2/3 to mirror the engine's [1,2,3]×mult. Duplicate identities across rungs are
+   deliberately NOT avoided: three i.i.d. picks off one snapshot collide often in play (series 001
+   weights its five props 11/11/9/7/4), so the ladder has to read correctly when two rungs show
+   the same icon, and re-drawing to avoid it would quietly un-weight the draw. */
+function demoTierItems(){
+  const pick=n=>{const it=rnd(DEMO_ITEM_POOL);return {icon:it.icon,name:it.name,count:n};};
+  const r=Math.random();
+  if(r<0.30) return [[],[],[]];
+  if(r<0.45) return [[], [pick(2)], [pick(3)]];
+  if(r<0.60) return [[pick(1)],[pick(2)],[pick(3),pick(1)]];
+  return [[pick(1)],[pick(2)],[pick(3)]];
+}
+/* A host's tierItems, or null when it did not send a usable one. Null is meaningful — it is the
+   older-host path, where the flat `items` is the only item fact there is — so this must not
+   quietly answer [[],[],[]] and make an old host look like a round that pays no props.
+   Per-ENTRY safety (a null member, a bad count, a non-array) is itemChips()'s job, not this. */
+function normTierItems(v){
+  return (Array.isArray(v)&&v.length===3) ? v.map(e=>Array.isArray(e)?e:[]) : null;
+}
+
+/* ONE builder for BOTH item rows — the per-rung props on the ladder and the cream strip at the
+   end. Two near-copies would drift, and only whichever was written second would carry the guards.
+   Each guard is here rather than at a call site, and none of them is a default:
+     · Array.isArray, because SPEC.items and SPEC.tierItems arrive over postMessage. SPEC.tiers is
+       guarded at the bottom of this file and items never was; a truthy non-array would throw
+       inside newGala() and leave a dead board until the host's bonusMaxMs backstop fired.
+     · a count below 1 SKIPS the chip instead of printing ×1. Items.add refuses a grant of 0, so
+       ×1 would be a lie about an inventory that got nothing — and on a rung it is a lie told
+       before the round, which makes it a promise rather than a receipt.
+     · +it.count coerces, so a string count is normalised instead of being written to the DOM raw.
+     · no stand-in NAME. js/catalog.js already falls a missing name back to the item's id, so a
+       blank one is unreachable from real content, and inventing one would promise a thing that
+       has no name. Blank caption, or nothing.
+   `withName` is false on the LADDER, where there is no horizontal room for a caption (see the
+   .tier .pay .props note in the stylesheet). Omitting the element beats hiding it in CSS: a
+   caption that exists but is invisible is one selector away from coming back and breaking the
+   rung's width. */
+function itemChips(list, withName){
+  return (Array.isArray(list)?list:[]).map(it=>{
+    if(!it) return '';
+    const n=+it.count;
+    if(!(n>=1)) return '';
+    const cap = withName===false ? '' : `<u>${it.name||''}</u>`;
+    return `<span class="chip"><i>${it.icon||'🎁'}</i><b>×${n}</b>${cap}</span>`;
+  }).join('');
+}
+
+/* The END-of-round strip: the hand-over. The ladder now shows every rung's props before the first
+   envelope is tapped, so why does this survive?
+     · It is the only place the item is NAMED. The ladder chip is icon + count, because a caption
+       does not fit beside three slots and an amount at phone width — so without this strip the
+       player sees a key and a ×2 and never learns it was the Rose Hotel Key.
+     · Being promised a thing and being handed it are different moments, and this is the one that
+       says the promise was kept — the rung it came from is still lit behind the tray.
+     · It is the WHOLE item display on the fallback path. A host older than this page sends no
+       tierItems, the ladder then carries no props at all, and this strip is what keeps that round
+       looking exactly as it did before.
+   It costs the host nothing: the returned hold is unchanged, so bonus:done still fires at
+   COUNT_MS+220+hold. Revealed after the count-up has landed, so the two prizes never compete.
+   Returns the extra hold the caller owes it — nothing at all when the rung carried none. */
+function showPrizes(afterMs){
+  const chips=itemChips(prizeItems);
+  if(!chips) return 0;
+  $('prizes').innerHTML=chips;
+  shot(afterMs,()=>{ $('prizes').classList.add('show'); S.small(); });
+  return PRIZE_HOLD_MS;
+}
 
 /* The reveal plan: the order symbols come out of the envelopes.
    Exactly three of the target, its third at the very end, and never three of anything else. */
@@ -440,27 +622,49 @@ function buildPlan(target){
   return [...head,target];
 }
 
+/* Both prizes on every rung, drawn once, before a single envelope is open. The props sit under
+   the amount because they are the same kind of fact — this rung's payout — and the fit measures
+   them for free, since renderLadder() runs before the relayout() at the bottom of newGala().
+   A rung with no props emits NO container at all, not an empty one: an empty box on a ladder of
+   three reads as a prize that failed to load. */
 function renderLadder(){
-  $('ladder').innerHTML=TIERS.map((t,i)=>`
+  $('ladder').innerHTML=TIERS.map((t,i)=>{
+    const props=itemChips(tierItems[i], false);
+    return `
     <div class="tier ${t.size}" id="t${i}">
       <div class="slots">
         <div class="slot" id="s${i}_0">${t.sym}</div>
         <div class="slot" id="s${i}_1">${t.sym}</div>
         <div class="slot" id="s${i}_2">${t.sym}</div>
       </div>
-      <div class="pay"><div class="cat">${t.cat}</div><div class="amt">🪙 ${fmt(amounts[i])}</div></div>
-    </div>`).join('');
+      <div class="pay"><div class="cat">${t.cat}</div><div class="amt">🪙 ${fmt(amounts[i])}</div>${
+        props?`<div class="props">${props}</div>`:''}</div>
+    </div>`;}).join('');
 }
 
 function newGala(){
   $('tray').classList.remove('show');
+  $('prizes').classList.remove('show');
   /* Demo mode has no engine, so it invents a top rung and applies the same thirds rule. */
   if(demoMode){
     const top=Math.round((1500+Math.random()*4000)/100)*100;
     amounts=[Math.round(top/3),Math.round(top*2/3),top];
     winIdx=Math.floor(Math.random()*3);
+    tierItems=demoTierItems();
+    prizeItems=tierItems[winIdx]||[];
   }else{
     amounts=SPEC.tiers; winIdx=SPEC.winIndex;
+    /* A missing or malformed tierItems is NOT a reason to fall back to the demo the way a missing
+       ladder is — the amounts are real and already banked, so the round must play. It degrades to
+       the page as it was before the item ladder existed: rungs with no props, and the flat `items`
+       handed over at the end.
+       When the ladder IS there, the winning rung is what the strip hands over, not SPEC.items.
+       The engine guarantees the two are the same array; preferring the rung means that if they
+       ever disagree the page stays self-consistent — it hands over exactly what the player just
+       watched light up, rather than contradicting its own ladder. */
+    const lad=normTierItems(SPEC.tierItems);
+    tierItems=lad||[[],[],[]];
+    prizeItems=lad ? (lad[winIdx]||[]) : (Array.isArray(SPEC.items)?SPEC.items:[]);
   }
   plan=buildPlan(winIdx); planAt=0;
   found=TIERS.map(()=>0);
@@ -529,6 +733,10 @@ function openCell(cell){
 
   done=true;clearTimeout(idleTimer);
   pendingWin={idx,amount:amounts[idx]};
+  /* The whole rung wins or fades — coins AND props, because a rung's props ARE that rung's prize.
+     Nothing here reaches inside .pay: the class is on .tier and the props inherit the 32% and the
+     scale(1.03) as its children. Adding a per-chip sweep would be a second source of truth for
+     the same fact. */
   TIERS.forEach((_,i)=>$('t'+i).classList.add(i===idx?'won':'faded'));
   [...$('grid').children].forEach(c=>{ if(+c.dataset.tier===idx) c.classList.add('win-glow'); });
   idx===2?S.huge():(idx===1?S.big():S.small());
@@ -565,11 +773,13 @@ function collectWin(){
   })(t0);
   const p=$('coinPill');p.classList.remove('bump');void p.offsetWidth;p.classList.add('bump');
   $('tray').classList.remove('show');
+  const hold=showPrizes(COUNT_MS);
   /* Hosted, the round IS the bonus — hand the roll loop back. The demo deals another. */
-  if(demoMode) setTimeout(()=>{btn.classList.add('pulse');newGala();},900);
+  if(demoMode) setTimeout(()=>{btn.classList.add('pulse');newGala();},900+hold);
   /* Longer than the 700ms count-up above, deliberately: reporting done tears this frame down, and
-     the rAF driving the tween dies with it — at 620ms the balance visibly froze mid-count. */
-  else setTimeout(()=>sendDone(win.amount),COUNT_MS+220);
+     the rAF driving the tween dies with it — at 620ms the balance visibly froze mid-count. The
+     prize strip is held past that for the same reason. */
+  else setTimeout(()=>sendDone(win.amount),COUNT_MS+220+hold);
 }
 
 /* private-jet loading screen, then the first gala */

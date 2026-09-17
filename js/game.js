@@ -3,9 +3,14 @@
    Functions that used to animate mid-logic now return ordered event lists;
    ui/main.js plays them back (floats, log lines, token moves, confetti, pauses).
    Event fields (any subset per event, played in this order):
-     float:{text,color} · log:{icon,msg} · move:{path:[tileIdx,...],stepMs} · confetti:true · pause:ms */
-
-/* Builders, upgrades and episode unlocks live in js/builders/builders.js. */
+     float:{text,color} · log:{icon,msg} · move:{path:[tileIdx,...],stepMs} · confetti:true ·
+     dice:true · pause:ms
+   plus the BLOCKING ones, which hold the roll loop (and so auto-roll) until they finish:
+     card · reveal · collect · minigame · boxOpen ·
+     reshoot:{throws:[{d1,d2}],won,energy,finePct,fine}
+       — the Reshoot corner's escape attempt. Every field is a result that has ALREADY been
+         applied to state; the UI throws the dice again for the player's benefit and decides
+         nothing. The full table, with each field's meaning, is in js/tiles/README.md. */
 
 /* ---------- rolling ---------- */
 function rollDice(){ const d1=Math.floor(rand(1,7)),d2=Math.floor(rand(1,7)); return {d1,d2,steps:d1+d2}; }
@@ -27,36 +32,6 @@ function resolveLandingEvents(mult){
   OVERLAYS.forEach(o=>{ if(o.has(i)){ const e=o.consume(i); if(e) ev.push(...[].concat(e)); } });
   ev.push(...TILE_TYPES[tileType(i)].onLand({pos:i,mult,bs:cfg.boardScale}));
   return ev;
-}
-
-/* ---------- prediction ---------- */
-/* Deducts the wager, resolves the outcome, applies payout + streak/accuracy counters,
-   and consumes the queued episode.
-   Manual play is a real prediction: you win only if sel matches the episode's correct
-   answer. Auto runs can't meaningfully "pick", so they fall back to the modelled
-   cfg.accuracy — that keeps batch economy runs independent of what a script clicks. */
-function resolvePrediction({wager,odds,sel,correct,auto,id}){
-  if(wager>0) state.coins-=wager;
-  state.predsMade++;
-  /* Clues banked since the last prediction buy accuracy, then are spent — the economy model
-     treats them as a per-cycle flow, not a balance. They only decide the outcome in auto runs;
-     a human's pick still decides a manual one. See TODO.md. */
-  const accuracy=Economy.accuracyFor(state.cycleClues);
-  const cluesSpent=state.cycleClues;
-  state.cycleClues=0;
-  const won=auto?chance(accuracy):sel===correct;
-  state.epsWatched++;
-  /* Remove THIS episode, not whichever happens to be at the front. The library can start a
-     prediction for any unwatched episode, so blindly shifting would mark the wrong one watched
-     and leave the played one queued forever. No id given → the old front-of-queue behaviour. */
-  if(id!=null){ const k=state.epQueue.indexOf(id); if(k>=0) state.epQueue.splice(k,1); }
-  else state.epQueue.shift();
-  let payout=0;
-  if(wager>0){
-    if(won){ payout=wager*odds; state.coins+=payout; state.predWins++; state.streak++; state.bestStreak=Math.max(state.bestStreak,state.streak); }
-    else { state.predLoss++; state.streak=0; }
-  }
-  return {won,payout,accuracy,cluesSpent};
 }
 
 /* ---------- time ---------- */

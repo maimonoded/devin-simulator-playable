@@ -3,13 +3,36 @@
 const DEFAULTS={
   energyCap:30, regenMin:3, sessionsPerDay:2.5, secPerRoll:5, tokenStepMs:135,
   revealMs:1500, collectMinSec:10, collectMaxSec:20,
-  deckCardMs:2000, vipRevealMs:1500, premiereStepMs:90, startRevealMs:800, autoCollectMs:600,
+  /* THE DRAWN CARD, and its three timings are one beat in order:
+       cardPullMs     the card lifts off the deck, arcs up and comes square to the camera.
+                      The roll loop's promise resolves at exactly this mark.
+       deckCardMs     it hangs there, still and readable. The one the drawer has always had —
+                      and the ONLY one the flat DOM card uses, since it neither flies nor lands.
+       cardToTableMs  it travels back down onto the deck it came off, and is gone.
+     deckCardMs came down from 2000 when the pull arrived: the card is legible through the last
+     of its flight and all of its landing now, so the still hold buys less than it used to and
+     the whole beat still costs only ~0.7s more than the flat card did. */
+  deckCardMs:1600, cardPullMs:620, cardToTableMs:480,
+  /* The deck itself — the stack standing inside the ring (js/ui/shoe3d.js). 0 hides it and
+     falls back to the flat card, which is also what a broken deck does on its own, so nothing
+     downstream has to tell the two apart. WHERE it stands is a constant in that file and
+     deliberately not a cfg key: cfg is persisted, so a position in here would keep whatever
+     value a returning player's save was written with. */
+  deck3d:1,
+  vipRevealMs:1500, startRevealMs:800, autoCollectMs:600,
+  /* These two are the episode video player's (js/ui/player.js), which is parked: still on disk,
+     no longer in index.html, so nothing reads them right now. They are kept — with their drawer
+     rows — because coins are meant to pay for episodes again in a later version, and a timing
+     key that has to be reinvented is a timing key that comes back wrong. */
   fallbackSceneMs:1700, longPressMs:350,
-  /* Bonus mini-games — the full-frame games the train tile opens (minigames/, js/ui/minigame.js).
-     bonusGames 0 falls back to the plain Collect popup, which is also what happens on its own if
-     a game file fails to load. bonusLoadMs is the game's own opening animation. bonusMaxMs is a
-     belt-and-braces ceiling on the whole thing: a wedged game must never soft-lock the roll loop,
-     so the host closes it and pays out regardless once this elapses. */
+  /* Bonus mini-games — the full-frame games in minigames/, opened through js/ui/minigame.js.
+     Two deck cards open them, one each, which is what the train tile used to do before the deck
+     draw took over its four tiles. bonusGames 0 falls back to the plain Collect popup, which is
+     also what happens on its own if a game file fails to load — the card banks the coins before
+     either opens, so a missing game costs presentation and never money.
+     bonusLoadMs is the game's own opening animation.
+     bonusMaxMs is a belt-and-braces ceiling on the whole thing: a wedged game must never
+     soft-lock the roll loop, so the host closes it and pays out regardless once this elapses. */
   bonusGames:1, bonusLoadMs:2200, bonusMaxMs:90000,
   /* How long Roll has to be held before it hands the loop to auto-roll. Long enough that a
      slow tap never trips it, short enough not to feel stuck. */
@@ -67,26 +90,64 @@ const DEFAULTS={
   dice3d:1, diceSize:0.9, diceSpread:1.5, diceThrowFrom:4.0, diceArc:2.2,
   /* These mirror ECONOMY_DEFAULT in js/economy.js, so a fresh install already runs the
      shipped model and Economy.apply() is a no-op until a workbook is imported.
-     The train pays the sheet's two-outcome pair directly: a small bonus most of the time,
-     a large one at trainLargeChance. trainEV is DERIVED from those three
-     (60 x 0.65 + 315 x 0.35 = 149.25) and kept in step by Economy.apply() and onCfgChange().
-     Nothing pays a player from it — it is the number the economy model is checked against,
-     which is why it is not in the drawer. */
+     The train PAIR is spent again: the deck's one Bonus Game card pays trainSmall or trainLarge,
+     so the names outlive the tile that coined them. trainLargeChance DOES decide which of the two
+     turns up — it went dead for a while when the bonus was two separate cards and their weights
+     decided it, which welded "how often is a bonus" to "how often is the big one"; one card
+     unwelds them. trainEV is still DERIVED from all three (60 x 0.65 + 315 x 0.35 =
+     149.25) as the number the spreadsheet is reconciled against. Both stay because the workbook
+     carries them and Economy.apply() projects them (Economy.OWNED_CFG_KEYS); neither is in the
+     drawer, since neither changes anything the player can feel. */
   stdBase:40, trainSmall:60, trainLarge:315, trainLargeChance:0.35, trainEV:149.25,
   startPass:100, startLand:100, spaEnergy:5, vipSeed:60,
+  /* ---- the two bills (js/tiles/payroll-tile.js, js/tiles/overheads-tile.js) ----
+     Payroll at index 3 and Studio Overheads at 23: the only tiles that take. Both are charged
+     cost x boardScale x mult like every other value here, so a x5 roll pays five times the bill.
+
+     MEASURED, NOT GUESSED. 400,000 rolls through the real resolveLandingEvents at stake x1 put
+     the board at ~385 coins a lap before these tiles existed (~67 a roll over 5.7 rolls), and a
+     single tile is landed on 0.142 times a lap — 5.7 landings spread over 40 tiles. So a bill
+     of C costs 0.142 x C a lap, and this pair costs 0.142 x 320 = 46 a lap, ~12% of what the
+     board pays. Re-measured after: 328 a lap, 57 a roll. The rest of that drop (~11 a lap) is
+     the two tiles that stopped being standard payers, not the bills.
+
+     WHY NOT MORE — AND THE SLACK IS NOW GONE. Items were meant to pace this run, not coins
+     (see CLAUDE.md, "What actually paces the run"). An independent 80-seed simulation of the
+     real spendRoll -> resolveLandingEvents -> Unlock.payStep loop, with each constraint waived
+     in turn, measured what that margin actually is:
+
+         rolls to all 18 episodes      coins alone   items alone   the run
+         bills off (3/23 standard)        1,544         1,845        1,877
+         bills on  (as shipped)           1,774         1,845        1,953
+
+     Items led coins by 19.5% before these tiles and lead by **4.3%** now, against a 34-roll
+     standard error — so the two constraints bind at nearly the same moment and which one
+     actually binds varies by seed. The bills cost 230 rolls of coin pace, which is 77% of all
+     the slack there ever was. **Any further bill makes coins the binding constraint**, and the
+     whole content spine in content/ would have to be repriced to suit.
+
+     Note the earlier figures in this comment do not reproduce: they came from a harness that
+     zeroed the Reshoot fee and held the balance at 1e9, and the "~2,290 rolls" item baseline
+     was wrong because the deck table sums to 115, not 100 — 22.6% of draws grant an item, so
+     42 items take ~1,845 rolls. The table above is from an unmocked run and supersedes them.
+
+     Overheads is the larger by two thirds: property costs more than people at this scale, and
+     it arrives later in the lap, three tiles after the VIP Lounge empties its pool. */
+  payrollCost:120, overheadsCost:200,
   boardScale:1,
-  /* Builder shape. The COST CURVE is not here — it is segmented and lives in js/economy.js,
-     because no single formula holds for a whole run. `buildings` is the current series'
-     length, seeded by Economy.apply(). */
+  /* Builders are gone, but these three are still written by Economy.apply() from the model's
+     structure and so have to exist. `tiers` is the level count the Economy panel prices the
+     cost curve at, `buildings` is the current series' length, and `boxesPerUpgrade` priced a
+     box drop that nothing triggers any more. The COST CURVE was never here — it is segmented
+     and lives in js/economy.js, because no single formula holds for a whole run. */
   buildings:12, tiers:5, boxesPerUpgrade:1,
-  /* How many buildings the builders view shows at once. The page only advances once every
-     building on it is maxed, so this is also the size of a "chunk" of the series. */
-  builderPageSize:5,
   /* Mystery box: item 1 is always this many coins, then one draw from boxTable. */
   boxCoins:60, boxItemGapMs:260,
   /* ---- the box throw ----
-     Boxes bought in the builders view are thrown onto the board when the player goes back to it,
-     in three phases: pull the camera out, rain the boxes down, put the camera back.
+     Banked boxes are thrown onto the board when the player returns to it, in three phases: pull
+     the camera out, rain the boxes down, put the camera back. NOTHING BANKS ONE TODAY — builder
+     upgrades were the only source — so this never runs; it is kept whole, knobs and all, for
+     whatever spawns the next box (see js/overlays/mystery-box.js).
 
      boxZoomOut is how far the camera pulls back (1 = not at all; 1.45 shows the whole ring).
      The three times are the three phases, so the whole thing costs
@@ -102,58 +163,100 @@ const DEFAULTS={
      it goes, boxOpenScale how many times its board size it reaches.
      The pop is followed by the SPOILS: what was just won, held in the middle of the screen.
      Floats over the token are too small and too far from where the player is looking after a
-     burst in the centre — the numbers have to appear where the box was.
-     boxSpoilsMs is that hold, and boxCluePopupMs is counted from the moment the spoils appear,
-     so the clue sheet follows the numbers rather than racing them. On a clue box the spoils stay
-     up until the sheet arrives, so the two never leave a blank gap between them. */
-  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxSpoilsMs:1200, boxCluePopupMs:2000,
-  /* ---- the gold (clue) box ----
-     A box is only a target if it can be picked out from across the board, and at tile size that
-     is a matter of pixels: colour alone loses against a pale cream board. So the gold one is also
-     bigger, self-lit, wrapped in a glow, and — the part that actually catches the eye — moving.
-     boxGoldGlow 0 turns the halo off, boxGoldSpinMs is one full turn. */
-  boxGoldScale:1.22, boxGoldGlow:0.7, boxGoldEmissive:0.45, boxGoldSpinMs:4200, boxGoldBob:0.09,
-  /* A clue is the one drop worth stopping for — it is the only collectible in the game, so it
-     gets a popup naming what was found rather than a float that scrolls past. Auto-closes after
-     this long if the player doesn't tap Collect. */
-  clueCollectMs:3000,
-  /* Prediction. accuracy is the no-clue floor; each clue banked this cycle adds
-     accuracyPerClue up to accuracyMax (Economy.accuracyFor). */
+     burst in the centre — the numbers have to appear where the box was. boxSpoilsMs is that
+     hold, and with clues gone it is the last beat: nothing follows the numbers any more. */
+  boxRiseMs:620, boxSwellMs:260, boxOpenScale:4.5, boxSpoilsMs:1200,
+  /* ---- Reshoot, the jail corner (js/tiles/reshoot-tile.js) ----
+     reshootThrows is how many free throws of the coloured pair a player gets to roll a double
+     and escape. At three, 57.9% of visits fail — the tile is meant to be a drain.
+
+     The fine for failing them all is a share of the CURRENT coin balance, drawn triangularly
+     between these two bounds (see the tile). It is a PROPORTION rather than an amount because
+     the cost curve runs from tens of coins to billions, and a flat fee would be ruinous early
+     and unnoticeable late. It is deliberately NOT multiplied by the stake: the delay costs the
+     same whatever you were betting, and scaling it would punish the stake twice.
+
+     reshootThrowGapMs is the beat after a throw lands before the next one is thrown — the three
+     throws have to read as three, or the player never sees themselves fail. reshootRevealMs is
+     how long the outcome is held; it is its own key rather than cfg.revealMs because it lands
+     after up to three throws and needs less dwell than a reveal that arrives cold.
+
+     THE THREE BELOW ARE THE MODE'S OWN PACING (js/ui/fx.js showReshoot).
+     reshootDelayMs is the delay BEAT: the clapperboard snapping shut over the board, held before
+     a single die is thrown. The throws used to start immediately, which put coloured dice on the
+     board with no warning — the announcement is what makes the corner legible, so it gets a knob
+     rather than a hardcoded pause.
+     The player then clicks the pink button once per throw, and the other two are the two ways a
+     throw happens without them: reshootIdleMs is how long an un-clicked throw waits before it
+     throws itself, so a player who wanders off mid-attempt never strands the board (the Collect
+     popup's 10–20s window is the precedent). reshootAutoMs is the same thing under auto-roll,
+     where nobody is at the keyboard at all — deliberately much shorter, because three throws at
+     the idle window would park the loop for most of a minute on a tile it reaches every fortieth
+     landing, with nothing to watch while it waits. */
+  reshootThrows:3, reshootFineMin:0.001, reshootFineMax:0.02,
+  reshootThrowGapMs:450, reshootRevealMs:1600,
+  reshootDelayMs:1900, reshootIdleMs:12000, reshootAutoMs:700,
+  /* Predictions, wagers and the clue edge are GONE from the game — nothing bets, and nothing
+     reads Economy.accuracyFor() or Economy.wagerTiers() any more. These keys stay because the
+     economy model still records the numbers and Economy.apply() projects all of them but
+     minWager onto cfg (Economy.OWNED_CFG_KEYS); minWager is the floor wagerTiers() prices
+     against. None of them has a drawer row now — there is nothing left to feel the difference.
+     clueAlbumSize is the model's cosmetic album target, kept for the same reason. */
   minWager:100, accuracy:0.55, accuracyPerClue:0.04, accuracyMax:0.7, avgOdds:1.8,
-  /* Wagers are a share of the player's balance, not a flat amount — three tiers, Confident
-     being the one the economy model's projections assume (Economy.wagerTiers). minWager is
-     the floor underneath all three. clueAlbumSize is the cosmetic album target. */
   wagerSafe:0.05, wagerConfident:0.10, wagerMax:0.20, clueAlbumSize:300,
 };
 let cfg=Object.assign({},DEFAULTS);
 /* Roll stakes in cycle order. One button steps through these and wraps, so the order here IS
    the order the player sees. A stake costs that much energy per roll and multiplies the coins. */
 const MULTIPLIERS=[1,2,3,5,10];
+/* The deck the four bonus tiles draw from — MIRRORED in ECONOMY_DEFAULT (js/economy.js), which
+   is what actually reaches the game: Economy.apply() rebuilds this table from the model at boot.
+   Editing one copy alone changes nothing. A card's vocabulary:
+
+     coins   paid as coins x boardScale x mult; negative is a fine
+     energy  a FLAG, not an amount — an energy card pays a random 1…mult, so what the stake
+             costs is what it can hand back (js/tiles/deck-tile.js)
+     vip     seeded into the VIP pool, at board scale
+     items   how many story items to grant, drawn from the series being unlocked
+     game    opens that bonus mini-game (the keys are MINIGAMES' in js/ui/minigame.js); its
+             coins come from the economy's train pair, not from the `coins` column
+     advance walks the token to Start
+
+   The weights total 100, so a column IS a percentage of draws. What the shape is buying:
+   coins stay the bulk of the table (54) because they are the run's main currency; energy is
+   14, generous because it buys the rolls that earn the coins; the fine is 9 and Advance 4, the
+   two cards that are there for the swing rather than the payout. An ITEM is 7 — every fourteenth
+   card, against the ~42 items series 001 asks for over a run of several hundred draws, so it
+   still reads as a find and not as a dispenser. The two bonus games are 8 and 4: roughly the
+   model's 65/35 small-to-large split, now decided here instead of by cfg.trainLargeChance, and
+   rare enough that a full-frame game stays an event. The gala also carries an item, which is the
+   second way items reach the player. */
 let deck=[
-  {name:"Small coins",weight:40,coins:30,energy:0,clues:0,vip:0},
-  {name:"Medium coins",weight:15,coins:80,energy:0,clues:0,vip:0},
-  {name:"Windfall",weight:5,coins:300,energy:0,clues:0,vip:0},
-  {name:"Small energy",weight:15,coins:0,energy:2,clues:0,vip:0},
-  /* No clue card: all clues come from the Mystery Box, so the box's weights alone
-     set the rate a prediction runs on. */
-  {name:"Insider tip",weight:10,coins:50,energy:0,clues:0,vip:0},
-  {name:"Fine / Paparazzi",weight:10,coins:-80,energy:0,clues:0,vip:80},
-  {name:"Advance to Start",weight:5,coins:0,energy:0,clues:0,vip:0,advance:true},
+  {name:"Small coins",weight:19,coins:30,energy:0,vip:0,items:0},
+  {name:"Prop from the set",weight:16,coins:0,energy:0,vip:0,items:1},
+  {name:"Medium coins",weight:10,coins:80,energy:0,vip:0,items:0},
+  {name:"Small energy",weight:10,coins:0,energy:1,vip:0,items:0},
+  {name:"Insider tip",weight:7,coins:50,energy:0,vip:0,items:0},
+  {name:"Fine / Paparazzi",weight:7,coins:-80,energy:0,vip:80,items:0},
+  {name:"Windfall",weight:3,coins:300,energy:0,vip:0,items:0},
+  {name:"Advance to Start",weight:3,coins:0,energy:0,vip:0,items:0,advance:true},
+  /* ONE bonus card, not one per game. Which game it opens is decided AFTER the draw by
+     Economy.trainDraw() (cfg.trainLargeChance), so the small/large split is a model number that
+     can be retuned on its own — where two separate cards welded that ratio to two deck weights
+     and made "how often is the big game" and "how often is a bonus at all" the same lever. */
+  {name:"Bonus Game",weight:25,coins:0,energy:0,vip:0,items:0,game:"bonus"},
 ];
-/* The mystery box's SECOND item. Item 1 is always cfg.boxCoins. */
+/* The mystery box's SECOND item. Item 1 is always cfg.boxCoins.
+   There were three rows here — Coins, Energy and Clues, evenly weighted at 33 each. The clue
+   row is gone with the album, and the two survivors keep their weights rather than being
+   rewritten to 50/50: weighted() normalises by the total, so 33/33 IS an even split, and
+   leaving the numbers alone keeps them comparable with the spreadsheet they came from. */
 let boxTable=[
   {name:"Coins",weight:33,amount:60,kind:"coins"},
   {name:"Energy",weight:33,amount:3,kind:"energy"},
-  {name:"Clues",weight:33,amount:2,kind:"clues"},
 ];
 const defDeck=JSON.parse(JSON.stringify(deck));
 const defBox=JSON.parse(JSON.stringify(boxTable));
-
-/* The train's five-rung TRAIN_MULT spread used to live here, normalised so its mean landed on
-   cfg.trainEV. It is gone: the tile now pays the economy model's two-outcome pair directly
-   (cfg.trainSmall / cfg.trainLarge / cfg.trainLargeChance), which is the shape the spreadsheet
-   is written in and the shape the two bonus mini-games present. See TODO.md, "The train is
-   parameterised from the opposite end" — this is that decision, resolved in the model's favour. */
 
 /* Tuning drawer schema: [cfg key, label, input step] */
 const TUNING=[
@@ -165,9 +268,8 @@ const TUNING=[
    ["diceRevealMs","Roll click → dice reveal (ms)",10],
    ["diceToMoveMs","Dice reveal → token moves (ms)",5],
    ["revealMs","Center reveal hold (ms)",100],
-   ["collectMinSec","Train collect auto-close min (s)",1],
-   ["collectMaxSec","Train collect auto-close max (s)",1],
-   ["autoCollectMs","Train collect during auto-play (ms)",50],
+   ["collectMinSec","Collect popup auto-close min (s)",1],
+   ["collectMaxSec","Collect popup auto-close max (s)",1],
    ["fallbackSceneMs","Episode w/o video: placeholder (ms)",100],
    ["longPressMs","Video: hold for 2× after (ms)",25],
    ["autoRollHoldMs","Roll: hold this long for auto-roll (ms)",100],
@@ -175,23 +277,40 @@ const TUNING=[
    ["bonusLoadMs","Bonus game: opening animation (ms)",100],
    ["bonusMaxMs","Bonus game: hard timeout (ms)",1000],
    ["boxItemGapMs","Mystery box: gap between its two items (ms)",20],
-   ["clueCollectMs","Clue popup: auto-close after (ms)",100],
-   ["deckCardMs","Deck: card on screen (ms)",100],
+   ["cardPullMs","Deck: card lifts off the deck (ms)",20],
+   ["deckCardMs","Deck: card held still on screen (ms)",100],
+   ["cardToTableMs","Deck: card travels back to the deck (ms)",20],
    ["vipRevealMs","VIP: dwell before moving on (ms)",100],
-   ["premiereStepMs","Premiere: sweep speed (ms / tile)",5],
    ["startRevealMs","Start: dwell on tile (ms)",50]]},
  {group:"Tile values (base coins)",items:[
    ["stdBase","Standard base coins (avg)",1],
-   /* The train's two outcomes, straight from the model. cfg.trainEV is derived from them
-      and so is deliberately not editable here. */
-   ["trainSmall","Train: small bonus",5],["trainLarge","Train: large bonus",5],
-   ["trainLargeChance","Train: chance of the large bonus",0.05],
+   /* The train's small/large pair used to be edited here. The tile is gone, so the rows are —
+      the cfg keys survive only as targets for Economy.apply(), and a drawer row for a number
+      no square on the board reads is a row that lies about what it does. */
+   ["boxCoins","Mystery box: item 1 coins",10],
+   /* The only two rows here that COST the player. They are tuned against each other — the pair
+      is one tax on income, not two unrelated fees — so they sit together and next to the
+      payouts they are sized against. */
+   ["payrollCost","Payroll: the crew's bill",10],
+   ["overheadsCost","Studio Overheads: the lot's bill",10],
    ["startPass","Start pass bonus",10],["startLand","Start landing extra",10],
    ["spaEnergy","Spa Day energy grant",1],["vipSeed","VIP seed per lap",5],
    ["boardScale","Board scale",0.1],
    ["tileArtScale","Tile art: size ×",0.05],
    ["tileArtLift","Tile art: lift off tile (%)",1],
    ["board3d","3D board (0/1) — reload to apply",1]]},
+ /* Its own group rather than five rows scattered between "Tile values" and "Presentation
+    timing": the throws, the fine and the beat between them are one mechanic, and tuning a jail
+    means moving them against each other. The mystery box's two groups set the same precedent. */
+ {group:"Reshoot (the jail corner)",items:[
+   ["reshootThrows","Free throws to roll a double",1,{min:1,max:6}],
+   ["reshootFineMin","Fine: min share of the balance",0.0005,{min:0,max:0.5}],
+   ["reshootFineMax","Fine: max share of the balance",0.0005,{min:0,max:0.5}],
+   ["reshootThrowGapMs","Beat between throws (ms)",25],
+   ["reshootRevealMs","Outcome held on screen (ms)",50],
+   ["reshootDelayMs","Delay beat before the first throw (ms)",50],
+   ["reshootIdleMs","Throw itself if nobody clicks (ms)",500],
+   ["reshootAutoMs","Auto-roll: gap between throws (ms)",50]]},
  /* The three phases of the box throw, each its own knob so the pacing can be tuned by feel
     rather than by one number that moves all of it at once. */
  {group:"Mystery box throw",items:[
@@ -203,14 +322,7 @@ const TUNING=[
    ["boxRiseMs","1 · Float to the centre (ms)",20],
    ["boxSwellMs","2 · Swell before the pop (ms)",20],
    ["boxOpenScale","Size it reaches (x board size)",0.25],
-   ["boxSpoilsMs","3 · Winnings held on screen (ms)",50],
-   ["boxCluePopupMs","4 · Clue sheet, after the winnings (ms)",50]]},
- {group:"Gold (clue) box",items:[
-   ["boxGoldScale","Size vs a plain box (x)",0.02],
-   ["boxGoldEmissive","Self-lit glow on the model",0.05],
-   ["boxGoldGlow","Halo around it (0 = off)",0.05],
-   ["boxGoldSpinMs","One full turn (ms)",100],
-   ["boxGoldBob","Bob height (tile units)",0.01]]},
+   ["boxSpoilsMs","3 · Winnings held on screen (ms)",50]]},
  {group:"Environment",items:[
    /* A choice rather than a number: the options are whatever assets/env/scene.js defines,
       so the drawer asks the manifest at build time instead of duplicating the list here —
@@ -240,6 +352,12 @@ const TUNING=[
    ["npcPauseMaxMs","Pause between steps — max (ms)",50,{min:0,max:12000}],
    ["npcLane","Walk this far inside the tile centre",0.02,{min:0,max:0.45}],
    ["npcBob","Bob height while stepping (tiles)",0.01,{min:0,max:0.3}]]},
+ {group:"The deck",items:[
+   /* The three timings are in Presentation timing with the rest of the pacing; this group is
+      what the deck IS, not how fast it moves. There is one row because everything else about
+      where the deck and the discard spot stand is a constant in js/ui/shoe3d.js — see the note
+      on cfg being persisted in its header, and in DEFAULTS above. */
+   ["deck3d","Deal from the deck on the board (0/1)",1]]},
  {group:"Dice",items:[
    /* The throw's length is cfg.diceRevealMs, over in Presentation timing — it is the same
       "click → numbers" window the DOM dice used, so it stays where it always was. */
@@ -248,19 +366,9 @@ const TUNING=[
    ["diceSpread","How far apart they land",0.1,{min:0,max:5}],
    ["diceThrowFrom","Thrown from (tiles toward camera)",0.25,{min:0,max:10}],
    ["diceArc","Throw height",0.1,{min:0,max:8}]]},
- {group:"Builders & series",items:[
-   /* The cost curve is not here: it is segmented and belongs to the loaded economy model.
-      The drawer shows it read-only in the Economy panel (js/ui/economy-panel.js). */
-   ["boxesPerUpgrade","Boxes per upgrade",1],["boxCoins","Box item 1: coins",10],
-   ["buildings","Builders in this series",1],["tiers","Levels per builder",1]]},
- {group:"Prediction & wager",items:[
-   ["minWager","Minimum wager (floor under every tier)",10],
-   ["wagerSafe","Wager tier 1 · Safe (share of balance)",0.01,{min:0,max:1}],
-   ["wagerConfident","Wager tier 2 · Confident (the default)",0.01,{min:0,max:1}],
-   ["wagerMax","Wager tier 3 · Max (share of balance)",0.01,{min:0,max:1}],
-   ["accuracy","Accuracy with no clues",0.01,{min:0,max:1}],
-   ["accuracyPerClue","Accuracy gained per clue",0.01,{min:0,max:0.2}],
-   ["accuracyMax","Accuracy cap",0.01,{min:0,max:1}],
-   ["clueAlbumSize","Clue album size (cosmetic target)",10,{min:1}],
-   ["avgOdds","Avg odds (reference)",0.1]]},
 ];
+/* Two whole groups used to close this list: "Builders & series" and "Prediction & wager".
+   Both systems are gone, and their cfg keys are now written by Economy.apply() and read by
+   nothing — so the rows went with the systems rather than staying on as sliders that move a
+   number no one can feel. The loaded model is still on show in the drawer, read-only, in the
+   Economy panel (js/ui/economy-panel.js). */

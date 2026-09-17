@@ -23,6 +23,7 @@
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/drawer.css">
 <link rel="stylesheet" href="css/overlay.css">
+<link rel="stylesheet" href="css/library.css">
 <!-- last, so its overrides win the cascade without needing specificity tricks -->
 <link rel="stylesheet" href="css/mobile.css">
 </head>
@@ -33,12 +34,8 @@
     <div class="brand"><span class="k">Predictive Narrative</span><span class="t display">Harbour Heights</span></div>
     <div class="daychip"><span class="d" id="hDay">Day 1</span><span class="c" id="hClock">9:00 AM</span></div>
     <div class="pills">
-      <div class="pill coins"><span class="ic">🪙</span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
-      <div class="pill clues"><span class="ic">🔍</span><div><div class="v" id="hClues">0</div><div class="lb">Clues</div></div></div>
+      <div class="pill coins"><span class="ic"><img src="assets/ui/coin.png" alt="🪙"></span><div><div class="v" id="hCoins">0</div><div class="lb">Coins</div></div></div>
       <div class="pill"><span class="ic">🌟</span><div><div class="v" id="hVip">0</div><div class="lb">VIP Pool</div></div></div>
-      <div class="pill energywrap"><span class="ic">⚡</span><div style="flex:1">
-        <div class="v"><span id="hEnergy">0</span><span style="font-size:11px;color:var(--muted)"> / <span id="hEnergyCap">50</span></span></div>
-        <div class="ebar"><div class="efill" id="hEfill"></div></div></div></div>
     </div>
     <!-- Player. Not changeable yet — it is the handle for the profile panel, which for now
          holds only the progress reset. Pushed to the far right so the balances read left. -->
@@ -58,6 +55,12 @@
       </div>
       <!-- win/loss reveal, sits flat above the 3D board -->
       <div class="centerfx" id="centerFx"></div>
+      <!-- Reshoot mode (js/ui/fx.js showReshoot): the clapperboard that announces the delay,
+           and the pink per-throw button that stands in for the playbar while the jail corner
+           plays out. Static and EMPTY, like #centerFx and #bonusHost — fx.js fills it on the
+           way in and empties it again on teardown, so nothing of the mode survives the beat.
+           Inside the board scene so ?view=mobile frames it with the board. -->
+      <div class="reshootUI" id="reshootUI"></div>
       <!-- Bonus mini-games (minigames/, js/ui/minigame.js) mount an iframe here. Inside the
            board scene rather than over the viewport, so ?view=mobile frames them like the
            board itself instead of escaping the 9:16 window. -->
@@ -68,64 +71,34 @@
       <div class="sheet" id="sheetHost"></div>
       <!-- Play controls ride ON the board as a flat 2D layer pinned to its bottom edge, so the
            scene reads as a game screen rather than a viewport with a toolbar under it. -->
-      <!-- One row, evenly spaced: builders · stake · ROLL · album. These were three separate
-           things (an absolutely-positioned corner button plus a centred group) which collided
-           on a narrow screen and disagreed about their height. -->
+      <!-- One row, evenly spaced: dice · library · stake · ROLL. The dice are hidden unless the
+           3D pair can't take the throw (body.dice2d), so most of the time this reads as the
+           three controls centred on the board's bottom edge. -->
       <div class="playbar">
         <div class="dice"><div class="die" id="die1"></div><div class="die" id="die2"></div></div>
-        <!-- Into the builders view. Carries a dot when something is affordable, since the
-             board no longer shows builder progress at all. -->
-        <button class="btn navb" id="buildersBtn" title="Builders">🏗<i class="navDot" id="buildersDot"></i></button>
+        <!-- Library: every series, season and episode, and what the next one costs to unlock. -->
+        <button class="btn ghost lib" id="libBtn" title="Library — what there is to unlock">🎞</button>
         <!-- Stake: one button that cycles through MULTIPLIERS and wraps back to ×1. -->
         <button class="btn mult" id="multBtn" title="Roll stake — tap to cycle">×1</button>
         <!-- Roll is also the auto-roll control: hold it to hand the loop over, tap again to stop. -->
         <button class="btn roll" id="rollBtn" title="Tap to roll · hold to auto-roll">🎲 Roll</button>
-        <!-- Clue album. Badged while there are clues banked for the next prediction, since
-             those are the ones about to be spent. -->
-        <button class="btn album" id="albumBtn" title="Clue album">🔍<i class="albumDot" id="albumDot"></i></button>
-      </div>
-      <!-- Every episode unlocked so far, rewatchable. Sits above the builders button; hidden
-           until something has actually been unlocked. -->
-      <button class="libBtn" id="libraryBtn" title="Episode library">🎞</button>
-      <!-- The builders view's own 2D layer. Board3D swaps the scene; .boardScene.showBuilders
-           swaps which of these two overlays is on screen. -->
-      <div class="buildersUi">
-        <button class="navBtn back" id="boardBtn" title="Back to the board">←</button>
-        <!-- Mystery boxes banked by upgrades and waiting to be thrown onto the board. This is
-             the only acknowledgement a purchase gets while the board is out of sight, so it
-             pops each time it changes. -->
-        <div class="boxCounter" id="boxCounter"><span class="boxIco">🎁</span><span id="boxCount">0</span></div>
-        <div class="buildersHead" id="buildersHead"></div>
-        <!-- Episodes banked by "Binge later", sitting just above the upgrade row. Hidden when
-             the queue is empty, so it only appears when there is something to watch. -->
-        <button class="bingeBtn" id="bingeBtn" title="Watch a waiting episode">🎬<span class="bingeCount" id="bingeCount">0</span></button>
-        <div class="buildersBar" id="buildersBar"></div>
       </div>
     </div>
-    <!-- second row: the balancing tool and the view toggle, kept apart from the play controls -->
+    <!-- second row: the view toggle. It used to share the row with the auto-play session
+         button, which went with the builders it existed to buy. -->
     <div class="controls viewrow">
-      <button class="btn ghost" id="autoBtn">▶ Auto-play session</button>
       <button class="btn ghost" id="phoneBtn" title="Toggle 9:16 phone framing">📱 Phone view</button>
     </div>
   </div>
 
   <!-- side -->
   <div class="side">
-    <!-- The builder list used to live here. Upgrading now happens in the builders view
-         (the 🏗 button on the board), which is the only surface for it in either layout. -->
-    <div class="card">
-      <h3>🎬 Story <span id="epBadge" class="badge" style="margin-left:auto;display:none">0 ready</span></h3>
-      <div class="hint" id="storyHint">Upgrade a landmark to unlock the next episode.</div>
-      <button class="btn pink wide" id="watchBtn" style="margin-top:10px" disabled>Predict &amp; watch episode</button>
-    </div>
-
+    <!-- Two stats, one row of the 2-column grid. Everything else that used to be counted here
+         (episodes watched, prediction accuracy, streak, builders done) belonged to systems this
+         version does not have — what is left is the run itself: how much was rolled, and when. -->
     <div class="card">
       <h3>📊 This run</h3>
       <div class="statgrid">
-        <div class="stat"><div class="v teal" id="sEps">0</div><div class="l">Episodes watched</div></div>
-        <div class="stat"><div class="v gold" id="sAcc">—</div><div class="l">Prediction accuracy</div></div>
-        <div class="stat"><div class="v" id="sStreak">0</div><div class="l">Current streak</div></div>
-        <div class="stat"><div class="v" id="sBoards">0</div><div class="l">Builders done</div></div>
         <div class="stat"><div class="v" id="sRolls">0</div><div class="l">Total rolls</div></div>
         <div class="stat"><div class="v" id="sSessions">1</div><div class="l">Session today</div></div>
       </div>
@@ -164,22 +137,19 @@
 <script src="js/util.js"></script>
 <script src="js/config.js"></script>
 <script src="js/content.js"></script>
-<script src="js/episodes.js"></script>
-<!-- clue album content + the derivation that says which are owned -->
-<script src="js/clues.js"></script>
-<!-- episode content: one file per builder (see episodes/README.md) -->
-<script src="episodes/001.js"></script>
-<script src="episodes/002.js"></script>
-<script src="episodes/003.js"></script>
-<script src="episodes/004.js"></script>
-<script src="episodes/005.js"></script>
-<script src="episodes/006.js"></script>
-<script src="episodes/007.js"></script>
-<script src="episodes/008.js"></script>
-<script src="episodes/009.js"></script>
-<script src="episodes/010.js"></script>
-<script src="episodes/011.js"></script>
-<script src="episodes/012.js"></script>
+
+<!-- The catalog: what there is to unlock. One file per series and one per season, each
+     registering itself into Catalog. The season file is the source of truth for an episode's
+     title, video and price — episodes/NNN.js held that when an episode was a prediction, and
+     is parked now that it isn't. -->
+<script src="js/catalog.js"></script>
+<script src="content/series/001.js"></script>
+<script src="content/series/002.js"></script>
+<script src="content/seasons/001-1.js"></script>
+<script src="content/seasons/001-2.js"></script>
+<script src="content/seasons/001-3.js"></script>
+<script src="js/unlock.js"></script>
+
 <!-- economy: the loaded model and its maths, the .xlsx reader, and the importer that gates it.
      After the episode files because the series shape is bounded by how much content exists. -->
 <script src="js/xlsx.js"></script>
@@ -194,32 +164,44 @@
 <script src="assets/npcs/npcs.js"></script>
 <script src="js/state.js"></script>
 <script src="js/storage.js"></script>
-<script src="js/builders/builders.js"></script>
 <script src="js/board-actor.js"></script>
 <script src="js/tiles/tile.js"></script>
 <script src="js/tiles/standard-tile.js"></script>
 <script src="js/tiles/start-tile.js"></script>
 <script src="js/tiles/spa-tile.js"></script>
 <script src="js/tiles/vip-tile.js"></script>
-<script src="js/tiles/premiere-tile.js"></script>
-<script src="js/tiles/train-tile.js"></script>
+<script src="js/tiles/reshoot-tile.js"></script>
 <script src="js/tiles/deck-tile.js"></script>
+<script src="js/tiles/payroll-tile.js"></script>
+<script src="js/tiles/overheads-tile.js"></script>
 <script src="js/overlays/overlay.js"></script>
 <script src="js/overlays/mystery-box.js"></script>
 <script src="js/game.js"></script>
+<!-- The face of a drawn card, composed on a canvas. BEFORE fx.js, which drops that canvas into
+     the DOM for the flat card; js/ui/shoe3d.js wraps the same canvas in a texture for the board.
+     shoe3d.js itself gets NO tag — it is a module imported by js/ui/board3d.js, and this project
+     keeps exactly one <script type="module"> so the classic order stays the dependency order. -->
+<script src="js/ui/card-art.js"></script>
 <script src="js/ui/fx.js"></script>
 <!-- after fx.js: falls back to its showCollect() when a game is off, missing or broken -->
 <script src="js/ui/minigame.js"></script>
 <script src="js/ui/render.js"></script>
-<script src="js/ui/player.js"></script>
-<script src="js/ui/prediction.js"></script>
-<script src="js/ui/library.js"></script>
-<script src="js/ui/album.js"></script>
+<!-- js/ui/prediction.js and finale.js are deliberately NOT loaded, and neither are
+     js/episodes.js or episodes/NNN.js: the prediction system they belong to is gone and the
+     season files in content/ own episode titles now. Nothing may call into them. -->
 <script src="js/ui/profile.js"></script>
 <script src="js/ui/store.js"></script>
-<script src="js/ui/finale.js"></script>
+<!-- The episode video player. Standalone: its only content dependency is Catalog.videoFor, and
+     its CSS has always lived in css/overlay.css. Unparked now that unlocking an episode is also
+     how you get to watch one. -->
+<script src="js/ui/player.js"></script>
+<script src="js/ui/library.js"></script>
 <script src="js/ui/economy-panel.js"></script>
 <script src="js/ui/drawer.js"></script>
+<!-- The debug jumps. A development tool and nothing else: dropping this one tag removes the
+     HUD button and every action with it, because the button is built in JS rather than declared
+     here. See the file's header. -->
+<script src="js/ui/debug.js"></script>
 <script src="js/ui/main.js"></script>
 <!-- three.js addons import the bare specifier "three"; this maps it to the vendored build -->
 <script type="importmap">

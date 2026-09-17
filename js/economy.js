@@ -53,8 +53,19 @@
 
 const ECONOMY_DEFAULT = {
   /* Identity — Guide!B2 of the workbook this came from, or the model this was transcribed
-     from when nothing has been imported. */
-  version: "Economy Model v3.13 - segmented cost curve, 240 builders / 240 episodes",
+     from when nothing has been imported.
+     The suffix letter is the deck outgrowing the sheet: the bonus-game and item cards below have
+     no column in v3.13, so this is no longer a straight transcription of it.
+
+     BUMP THE LETTER ON EVERY DECK CHANGE, not just a structural one. js/storage.js loadConfig()
+     drops the saved deck only when this whole string changes, so an unbumped edit reaches nobody
+     who has played before — they keep the old table and never see the new one. It has already
+     failed that way once: "b" was bumped for the ten-row table and then reused when the two
+     bonus cards merged into one and every weight was re-tuned, so a returning player kept ten
+     rows, kept the old ratios, and drew two cards whose names CardArt.SLUGS no longer knows —
+     which showed up as the emoji fallback face rather than as anything that looked economic.
+     A re-tuned weight is a new table. "c" is the merge. */
+  version: "Economy Model v3.13c - segmented cost curve, 240 episodes, one merged bonus card",
   filename: null,          // set on import, kept purely so a designer can see what they loaded
   loadedAt: null,          // ISO string, same reason
 
@@ -91,18 +102,27 @@ const ECONOMY_DEFAULT = {
     startPass: 100, startLand: 100, spaEnergy: 5, vipSeed: 60, boardScale: 1,
   },
 
+  /* The deck, mirrored in js/config.js — see the note there for what each column means and why
+     the weights are what they are. apply() spreads a row whole, so `items` and `game` reach the
+     table even though the v3 workbook has no column for either: js/economy-import.js still
+     builds a card from name/weight/coins/energy/clues/vip alone, so importing one today drops
+     the item and bonus-game cards. Same shape of gap as the cost curve's — see TODO.md. */
   deck: [
-    { name: "Small coins",      weight: 40, coins:  30, energy: 0, clues: 0, vip:  0 },
-    { name: "Medium coins",     weight: 15, coins:  80, energy: 0, clues: 0, vip:  0 },
-    { name: "Windfall",         weight:  5, coins: 300, energy: 0, clues: 0, vip:  0 },
-    { name: "Small energy",     weight: 15, coins:   0, energy: 2, clues: 0, vip:  0 },
-    { name: "Insider tip",      weight: 10, coins:  50, energy: 0, clues: 0, vip:  0 },
-    { name: "Fine / Paparazzi", weight: 10, coins: -80, energy: 0, clues: 0, vip: 80 },
-    { name: "Advance to Start", weight:  5, coins:   0, energy: 0, clues: 0, vip:  0, advance: true },
+    { name: "Small coins",        weight: 19, coins:  30, energy: 0, clues: 0, vip:  0, items: 0 },
+    { name: "Prop from the set",  weight: 16, coins:   0, energy: 0, clues: 0, vip:  0, items: 1 },
+    { name: "Medium coins",       weight: 10, coins:  80, energy: 0, clues: 0, vip:  0, items: 0 },
+    { name: "Small energy",       weight: 10, coins:   0, energy: 1, clues: 0, vip:  0, items: 0 },
+    { name: "Insider tip",        weight:  7, coins:  50, energy: 0, clues: 0, vip:  0, items: 0 },
+    { name: "Fine / Paparazzi",   weight:  7, coins: -80, energy: 0, clues: 0, vip: 80, items: 0 },
+    { name: "Windfall",           weight:  3, coins: 300, energy: 0, clues: 0, vip:  0, items: 0 },
+    { name: "Advance to Start",   weight:  3, coins:   0, energy: 0, clues: 0, vip:  0, items: 0, advance: true },
+    { name: "Bonus Game",         weight: 25, coins:   0, energy: 0, clues: 0, vip:  0, items: 0, game: "bonus" },
   ],
 
   /* Two items every box. Item 1 is always coins; item 2 is one weighted draw of three.
-     The split is what supplies clues — the deck no longer pays any. */
+     The clue row is still HERE, and stays here: this is the model as the workbook wrote it,
+     and a workbook that prices a clue drop must keep importing cleanly even though the game
+     no longer has an album to put one in. apply() is what drops it on the way to boxTable. */
   box: {
     boxesPerUpgrade: 1,
     item1Coins: 60,
@@ -270,7 +290,7 @@ const Economy = {
   seriesShape(available) {
     const eps = available != null
       ? available
-      : (typeof Episodes !== "undefined" ? Episodes.count() : 0);
+      : (typeof Catalog !== "undefined" ? Catalog.episodeCount() : 0);
     let left = eps, from = 1;
     return this.seriesPlan().map(s => {
       const builders = Math.max(0, Math.min(s.declared, left));
@@ -283,7 +303,11 @@ const Economy = {
   /* Series that have content and can be played. */
   playableSeries() { return this.seriesShape().filter(s => s.builders > 0); },
   seriesAt(i) { return this.seriesShape()[i] || null; },
-  /* The series the run is currently in, falling back to the first. */
+  /* The series the run is currently in, falling back to the first.
+     state.series went with the builders, so the lookup below always falls through to series 1 —
+     these three are the model's own maths and are kept whole, but nothing in the game calls them
+     now that there is no run position to ask about. They stay guarded rather than hardcoded so
+     they still answer correctly if a run ever tracks a series again. */
   currentSeries() {
     const i = (typeof state !== "undefined" && state && state.series) || 0;
     return this.seriesAt(i) || this.seriesAt(0);
@@ -345,9 +369,11 @@ const Economy = {
 
   /* ---------------- the train's two bonuses ---------------- */
 
-  /* The train pays one of exactly two outcomes. Both the amount AND which of the two it is are
-     decided here, before anything is shown, because each outcome opens its own bonus mini-game
-     and the mini-game is never allowed to invent the payout — it only presents it.
+  /* One draw of the two bonuses, small or large. NOTHING CALLS THIS: the two bonuses are a card
+     each in the deck now, so which one turns up is that table's weights rather than one chance
+     here — the deck is where a designer expects to change how often a bonus game appears. It is
+     kept because cfg.trainLargeChance is still the model's number and trainEV() below is still
+     reconciled against the spreadsheet, so the pair needs somewhere to be read as a pair.
      Reads cfg (not the model) so the tuning drawer stays live. */
   trainDraw() {
     const large = chance(cfg.trainLargeChance);
@@ -418,10 +444,11 @@ const Economy = {
     cfg.tiers = e.structure.levelsPerBuilder;
 
     cfg.stdBase = e.tiles.stdBase;
-    /* The train's small/large pair now survives into cfg intact — js/tiles/train-tile.js draws
-       one of the two outcomes and hands it to the matching bonus mini-game, so the felt shape
-       and the modelled shape are finally the same thing. trainEV is derived and carried only so
-       the model has a single number to be checked against. */
+    /* The train's small/large pair is projected as it always was, and the two bonus-game cards
+       in the deck spend it — the tile that named it is gone, the pair it priced is not.
+       trainLargeChance no longer picks between them (the cards' weights do) but is still the
+       model's number, and trainEV remains derived from all three as the single number the
+       spreadsheet is reconciled against. */
     cfg.trainSmall = e.tiles.trainSmall;
     cfg.trainLarge = e.tiles.trainLarge;
     cfg.trainLargeChance = e.tiles.trainLargeChance;
@@ -451,11 +478,27 @@ const Economy = {
        What the game owes the model is the choice it presupposes, so Skip & watch is always
        offered rather than only appearing when the minimum is unaffordable. */
 
-    deck = JSON.parse(JSON.stringify(e.deck));
-    boxTable = JSON.parse(JSON.stringify(e.box.item2));
+    /* The live tables are the model MINUS what the game no longer pays. Clues are gone — no
+       album, no clue flow, no edge on a prediction — but the model has to go on recording the
+       drop, or a workbook that prices one would stop importing. So the filtering happens HERE,
+       on the way out: the model keeps the number and the game stops paying it.
 
-    /* Builders in the CURRENT series — the shape the board and the builder list render. */
-    const s = this.currentSeries();
+       Dropping item 2's clue row leaves the two survivors to renormalise on their own, because
+       weighted() divides by the table's total rather than assuming it sums to 100 — their
+       unchanged 33s are still an even split. A model whose item 2 is ONLY clues would filter
+       down to an empty table and weighted() would draw nothing at all, so in that one case the
+       model's rows are kept as they are: js/overlays/mystery-box.js already pays coins for a
+       drop whose kind it does not recognise, which is a box that opens rather than one that
+       throws. The deck's dead `clues` field is dropped the same way — a card carrying a payout
+       the game has no concept of is a trap for whoever reads the table next. */
+    deck = e.deck.map(c => { const card = { ...c }; delete card.clues; return card; });
+    const item2 = e.box.item2.filter(r => r.kind !== "clues");
+    boxTable = JSON.parse(JSON.stringify(item2.length ? item2 : e.box.item2));
+
+    /* The current series' length. Deliberately seriesAt(0) and not currentSeries(): state.series
+       went with the builders, so there is no series the run can be "in" — and apply() runs at
+       boot BEFORE the state exists anyway, so reaching into it was always the wrong way round. */
+    const s = this.seriesAt(0);
     cfg.buildings = s && s.builders > 0 ? s.builders : 1;
   },
 

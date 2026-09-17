@@ -51,10 +51,10 @@ input{font-family:inherit}
 .pill{display:flex;align-items:center;gap:8px;background:var(--panel2);
       border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-width:96px}
 .pill .ic{font-size:16px}
+/* The coins pill wears the generated icon (assets/ui/coin.png) rather than the emoji, which
+   rendered as a dull grey disc. The alt text is the emoji, so a missing file still shows a coin.
+   Sized in px rather than em: it has to match the other pills' 16px glyphs, not the text. */
+.pill .ic img{width:18px;height:18px;display:block}
 .pill .v{font-weight:800;font-size:15px}
 .pill .lb{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .pill.coins .v{color:var(--gold)}
-.pill.clues .v{color:var(--teal)}
-.energywrap{min-width:190px}
-.ebar{height:9px;background:#10143a;border-radius:6px;overflow:hidden;margin-top:5px;border:1px solid var(--line)}
-.efill{height:100%;background:linear-gradient(90deg,var(--teal),#48e0c4);transition:width .5s cubic-bezier(.2,.8,.2,1)}
